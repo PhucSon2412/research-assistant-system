@@ -22,6 +22,9 @@ def test_readyz_ok_after_migration(app_env, migrated_db_url: str) -> None:
     assert response.status_code == 200
 
 
-def test_m1a_exposes_no_auth_or_upload_routes() -> None:
-    paths = {route.path for route in app.routes}
-    assert not any(p.startswith(("/auth", "/uploads", "/login", "/sessions")) for p in paths)
+def test_no_upload_or_file_routes_before_m1c() -> None:
+    # M1a asserted "no auth routes"; M1b adds auth but still no upload/file path.
+    paths = set(app.openapi()["paths"])
+    assert "/auth/login" in paths  # sanity: included routers are listed
+    assert not any(p.startswith(("/uploads", "/files")) for p in paths)
+    assert not any("upload" in p or "file" in p for p in paths)

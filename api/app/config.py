@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -57,7 +58,10 @@ class PasswordPolicy(BaseModel):
 
 
 class AuthLifetimes(BaseModel):
-    """Session/invite/reset lifetimes (used from M1b)."""
+    """Session/invite/reset lifetimes.
+
+    A session ends ``session_idle`` after its last authenticated request or
+    ``session_absolute`` after login, whichever comes first (server side)."""
 
     session_idle: timedelta = timedelta(minutes=30)
     session_absolute: timedelta = timedelta(hours=8)
@@ -126,12 +130,54 @@ class ProviderBudget(BaseModel):
         return self
 
 
+class HttpSecurity(BaseModel):
+    """Cookie and request-origin policy (M1b).
+
+    ``cookie_secure`` must stay true behind HTTPS; only the local HTTP dev
+    stack turns it off. ``allowed_origins`` lists the browser origins whose
+    state-changing requests are accepted (``Origin`` header check, on top of
+    the CSRF token). ``public_base_url`` is the web origin used to build
+    invitation/reset links.
+    """
+
+    cookie_secure: bool = True
+    allowed_origins: list[str] = Field(default_factory=list)
+    public_base_url: str | None = None
+
+    @model_validator(mode="after")
+    def _check_urls(self) -> "HttpSecurity":
+        for origin in self.allowed_origins:
+            if not origin.startswith(("http://", "https://")) or origin.endswith("/"):
+                raise ValueError("allowed_origins entries must be scheme://host[:port] without a trailing slash")
+        if self.public_base_url is not None:
+            if not self.public_base_url.startswith(("http://", "https://")):
+                raise ValueError("public_base_url must start with http:// or https://")
+            self.public_base_url = self.public_base_url.rstrip("/")
+        return self
+
+
+class Delivery(BaseModel):
+    """How invitation/reset links reach people (M1b).
+
+    ``disabled``: nothing is sent; creating an invitation is refused.
+    ``dev_outbox``: links are kept in API process memory for an Admin to read
+    (development only; the real channel is still an open decision).
+    """
+
+    mode: Literal["disabled", "dev_outbox"] = "disabled"
+    dev_outbox_max_entries: int = Field(default=200, gt=0, le=10_000)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="RAS_",
         env_nested_delimiter="__",
         extra="ignore",
     )
+
+    # Safe by default: "production" forces secure cookies and forbids the dev
+    # outbox. The Compose dev stack sets RAS_ENVIRONMENT=development.
+    environment: Literal["development", "production"] = "production"
 
     # Exactly one of these is required; no default so a missing value fails
     # loudly instead of silently connecting with a built-in credential.
@@ -146,11 +192,24 @@ class Settings(BaseSettings):
     pdf_body: PdfBodyThreshold = PdfBodyThreshold()
     retention: Retention = Retention()
     budget: ProviderBudget = ProviderBudget()
+    http: HttpSecurity = HttpSecurity()
+    delivery: Delivery = Delivery()
 
     @model_validator(mode="after")
     def _check_database(self) -> "Settings":
         if (self.db is None) == (self.database_url is None):
             raise ValueError("set exactly one of RAS_DB__* (host/user/password/name) or RAS_DATABASE_URL")
+        return self
+
+    @model_validator(mode="after")
+    def _check_environment(self) -> "Settings":
+        if self.environment == "production":
+            if not self.http.cookie_secure:
+                raise ValueError("production requires RAS_HTTP__COOKIE_SECURE=true")
+            if self.delivery.mode == "dev_outbox":
+                raise ValueError("the dev outbox is only allowed with RAS_ENVIRONMENT=development")
+        if self.delivery.mode != "disabled" and self.http.public_base_url is None:
+            raise ValueError("RAS_HTTP__PUBLIC_BASE_URL is required to deliver invitation/reset links")
         return self
 
     def sqlalchemy_url(self) -> URL:

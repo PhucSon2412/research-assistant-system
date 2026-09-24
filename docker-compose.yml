@@ -1,4 +1,4 @@
-# Development stack (M1a). Copy .env.example to .env and fill every secret
+# Development stack (M1a foundation + M1b auth). Copy .env.example to .env and fill every secret
 # before `docker compose up`; required values have no fallback on purpose.
 # Host ports bind to 127.0.0.1 only.
 
@@ -82,6 +82,17 @@ services:
     build: ./api
     environment:
       <<: *db-env
+      # Development only: plain HTTP, non-Secure cookies and the in-memory dev
+      # outbox are hardcoded here on purpose. This file is not a deployment
+      # config and cannot be turned into one by setting variables; see
+      # docs/dev-setup.md ("Trước khi đưa lên server").
+      RAS_ENVIRONMENT: development
+      RAS_HTTP__COOKIE_SECURE: "false"
+      RAS_HTTP__PUBLIC_BASE_URL: http://127.0.0.1:${WEB_HOST_PORT:-3000}
+      RAS_HTTP__ALLOWED_ORIGINS: '["http://127.0.0.1:${WEB_HOST_PORT:-3000}","http://localhost:${WEB_HOST_PORT:-3000}"]'
+      # Invitation/reset links are kept in API memory for an Admin to read
+      # at /admin (single process; emptied on restart). Real channel: open.
+      RAS_DELIVERY__MODE: dev_outbox
     ports:
       - "127.0.0.1:${API_HOST_PORT:-8000}:8000"
     depends_on:

@@ -1,7 +1,8 @@
 """FastAPI entrypoint.
 
-M1a exposes only health probes. Auth/session (M1b) and upload intent (M1c)
-endpoints are intentionally absent.
+M1b adds invitation/session/reset auth, Admin account management and the
+minimal library metadata API. Upload intent and file storage (M1c) are
+intentionally absent.
 """
 
 from __future__ import annotations
@@ -10,9 +11,17 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
+from app.api.csrf import install_csrf_middleware
+from app.api.errors import install_error_handlers
+from app.api.routes import admin, auth, library
 from app.db import get_engine
 
-app = FastAPI(title="Research Assistant System API", version="0.1.0")
+app = FastAPI(title="Research Assistant System API", version="0.2.0")
+install_error_handlers(app)
+install_csrf_middleware(app)
+app.include_router(auth.router)
+app.include_router(admin.router)
+app.include_router(library.router)
 
 
 @app.get("/healthz")

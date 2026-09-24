@@ -2,7 +2,7 @@
 
 [Mục lục](README.md) · [Quyết định còn mở](decisions.md) · [Kiểm thử](testing.md)
 
-Các milestone nhỏ, có thể review riêng. Thứ tự và phạm vi dưới đây là **đề xuất**. **Trạng thái:** M1a đã triển khai và kiểm chứng cục bộ (Compose, migration, bootstrap — xem [dev-setup](dev-setup.md)), đang chờ review; M1b trở đi chưa bắt đầu. Mỗi bước giữ khả năng kiểm quyền và khả năng truy nguyên từ file/version đến chunk.
+Các milestone nhỏ, có thể review riêng. Thứ tự và phạm vi dưới đây là **đề xuất**. **Trạng thái:** M1a đã review và merge vào `main` (PR #1). M1b đang triển khai ở PR riêng (nhánh `feat/m1b-invite-session-acl`, chờ review): invite/session/reset, CSRF, dev outbox và API metadata có ACL, kiểm chứng cục bộ theo [dev-setup](dev-setup.md). M1c trở đi chưa bắt đầu. Mỗi bước giữ khả năng kiểm quyền và khả năng truy nguyên từ file/version đến chunk.
 
 | Mốc | Phụ thuộc | Đầu ra kiểm chứng được | Rủi ro / phép thử then chốt |
 | --- | --- | --- | --- |
@@ -18,11 +18,13 @@ Các milestone nhỏ, có thể review riêng. Thứ tự và phạm vi dưới 
 
 **Đề xuất:** Nếu cần đánh giá discovery sớm, có thể làm luồng **metadata + link arXiv** ngay sau M1c; paper chỉ xuất hiện ở trang khám phá cho tới khi M2/M3 và gate quyền hoàn tất. Mỗi PR/mốc kết thúc bằng demo, test, giới hạn và cập nhật docs/decisions. Kết thúc **toàn bộ M1** phải có demo hai User: A upload private và mở original, B không thể xem qua list/ID/link, cùng Admin quản lý metadata item chung mà không đọc private của A ngoài review. [Workload phi chức năng](nonfunctional.md) chỉ là bài đo ban đầu, không là SLO trước benchmark.
 
-## Task đầu tiên có thể giao coding agent
+## Task hiện tại và tiếp theo
 
-Thực hiện **chỉ M1a trong PR đầu**, theo stack đã chốt. Dựng Compose dev cho Next.js, FastAPI, PostgreSQL (chuẩn bị pgvector), Redis và MinIO; migration nền với User, LibraryItem/PaperVersion/SourceFile/IngestionJob/AuditEvent và các khóa cần mở rộng cho invite/session/reset, acknowledgement/intent, `AccessRights`. Lệnh bootstrap Admin chạy một lần, nhận mật khẩu từ input an toàn, lưu verifier và ghi audit tối thiểu; không có credential mặc định, không echo/log secret. M1a **chưa mở endpoint upload, provider hoặc luồng auth đầy đủ**. Đầu ra review: hướng dẫn dựng/hạ môi trường và chạy migration/bootstrap bằng lệnh thực đã kiểm, sơ đồ migration/schema, test DB trống → migrate → bootstrap thành công → bootstrap lần hai bị từ chối; secret không xuất hiện trong repo/log. Nếu phải chạy Python/cài thư viện trên máy Windows, dùng môi trường Conda ở [AGENTS.md](../AGENTS.md), không tạo venv.
+**M1a (đã merge):** Compose dev, migration nền `0001`, bootstrap Admin một lần — xem [dev-setup](dev-setup.md).
 
-Sau khi review M1a, giao **M1b** làm invite/session/reset và ACL common/private với hai User test. Sau khi review M1b, giao **M1c** làm giao thức upload intent hai bước, original storage và demo cuối M1. Mỗi PR chỉ cập nhật docs/lệnh chạy khi đã kiểm chứng; không kéo parser/index/RAG vào M1. [Hợp đồng consent và thu hồi](access-and-data.md) cùng [kiểm thử](testing.md) là đầu vào cho các PR phụ thuộc.
+**M1b (PR #2, chờ review, chưa merge):** migration `0002` cho invitation/session/reset token (chỉ lưu hash); login/logout, thu hồi session, reset bằng link một lần; session server-side hết hạn theo idle/absolute trong config; CSRF cho thao tác ghi; delivery adapter + dev outbox; Admin quản lý tài khoản; API metadata `list/count/detail` lọc common/private trước phân trang/đếm; web tối thiểu cho auth và xem metadata. **Chưa** có upload intent, lưu file, parser, worker, search, RAG, promotion hay chia sẻ nhóm. Item riêng trong test/demo được tạo bằng fixture SQL, không có đường nhập paper mới.
+
+Sau khi review M1b, giao **M1c** làm giao thức upload intent hai bước, original storage và demo cuối M1. **Bàn giao bắt buộc cho M1c:** `source_files.job_id` và `version_id` vẫn là hai FK độc lập; phải ràng buộc chúng cùng item trước khi mở đường tải file ([decisions](decisions.md#ghi-nhận-khi-triển-khai-m1a-2026-09-24)). Proxy web `/api/*` của M1b buffer toàn bộ request/response và timeout 15 giây, nên đường upload PDF cần thiết kế riêng ([decisions](decisions.md#ghi-nhận-khi-triển-khai-m1b-2026-09-24)). M1b chạy trên Compose chỉ dành cho dev; điều kiện trước khi triển khai ngoài dev ở [dev-setup](dev-setup.md#trước-khi-đưa-lên-server). Mỗi PR chỉ cập nhật docs/lệnh chạy khi đã kiểm chứng; không kéo parser/index/RAG vào M1. [Hợp đồng consent và thu hồi](access-and-data.md) cùng [kiểm thử](testing.md) là đầu vào cho các PR phụ thuộc.
 
 ## Ưu tiên sau MVP — đã xác nhận về thứ tự
 
