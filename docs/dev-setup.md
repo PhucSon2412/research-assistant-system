@@ -122,7 +122,7 @@ Ba lớp tách riêng: **xác thực** (`app/identity/login.py`: email + mật k
 
 Thời hạn nằm ở `Settings.auth` (M1a): `RAS_AUTH__SESSION_IDLE` (mặc định `PT30M`), `RAS_AUTH__SESSION_ABSOLUTE` (`PT8H`), `RAS_AUTH__INVITE` (`PT72H`), `RAS_AUTH__PASSWORD_RESET` (`PT30M`). M1b thêm:
 
-| Biến | Mặc định | Compose dev |
+| Biến | Mặc định trong code (`Settings`) | Compose dev (đặt cứng) |
 | --- | --- | --- |
 | `RAS_ENVIRONMENT` | `production` (bắt buộc cookie Secure, cấm dev outbox) | `development` |
 | `RAS_HTTP__COOKIE_SECURE` | `true` (cookie `__Host-ras_session`, `Secure`) | `false` (HTTP cục bộ, cookie `ras_session`) |
@@ -130,7 +130,18 @@ Thời hạn nằm ở `Settings.auth` (M1a): `RAS_AUTH__SESSION_IDLE` (mặc đ
 | `RAS_HTTP__PUBLIC_BASE_URL` | trống (bắt buộc khi có delivery) | `http://127.0.0.1:3000` |
 | `RAS_DELIVERY__MODE` | `disabled` (không tạo được invitation) | `dev_outbox` |
 
-Các giá trị dev đặt trực tiếp trong `docker-compose.yml`, không cần sửa `.env`. Triển khai sau HTTPS: đặt `RAS_ENVIRONMENT=production`, `RAS_HTTP__COOKIE_SECURE=true`, origin thật và một delivery adapter thật (kênh gửi còn là quyết định mở). **Dev outbox** giữ link mời/reset trong bộ nhớ tiến trình API, chỉ Admin đọc ở `/admin`; mất khi restart API và Admin xem được cả link reset của User, nên không dùng ngoài dev.
+`docker-compose.yml` là cấu hình **chỉ dành cho dev**: các giá trị trên được đặt cứng trong file (HTTP cục bộ, cookie không `Secure`, `dev_outbox`), không đọc từ `.env`, nên đặt biến môi trường trên host **không** biến stack này thành cấu hình HTTPS hay production. Cột “mặc định trong code” chỉ mô tả hành vi của `Settings` khi không có biến nào; repo chưa có cấu hình triển khai nào được kiểm chứng. **Dev outbox** giữ link mời/reset trong bộ nhớ tiến trình API, chỉ Admin đọc ở `/admin`; mất khi restart API và Admin xem được cả link reset của User.
+
+### Trước khi đưa lên server
+
+M1b **chưa** sẵn sàng triển khai ngoài máy dev. Điều kiện tối thiểu, đều chưa có trong repo:
+
+1. Một cấu hình triển khai riêng (không dùng `docker-compose.yml` này), đã kiểm chứng, chạy sau HTTPS với cookie `Secure` (`RAS_ENVIRONMENT=production`, `RAS_HTTP__COOKIE_SECURE=true` — settings từ chối cookie không Secure khi `production`) và origin/`PUBLIC_BASE_URL` thật.
+2. Không dùng `dev_outbox`; có delivery adapter cho kênh gửi invite/reset thật (kênh còn là quyết định mở).
+3. Rate limit/khóa tạm cho login và yêu cầu reset.
+4. Kiểm và xử lý **timing enumeration** của yêu cầu reset: hiện response cho email tồn tại và không tồn tại giống nhau về status/body, và việc gửi link chạy sau response, nhưng nhánh email tồn tại còn làm thêm việc DB (khóa dòng user, thu hồi token cũ, ghi token và audit), nên **chưa chứng minh** không phân biệt được qua thời gian phản hồi. Cần đo, rồi cân bằng (ví dụ xử lý nền cho cả hai nhánh) trước khi mở ra ngoài.
+
+Theo dõi ở [decisions](decisions.md#cần-xác-nhận-hoặc-đo-trước-phần-phụ-thuộc).
 
 ### Luồng thử trên web
 
@@ -157,7 +168,21 @@ echo "INSERT INTO library_items (visibility, title) VALUES ('common', 'Paper chu
 
 *Đã kiểm:* cả hai khối, trên DB dev (mỗi khối in `INSERT 0 1` cho item chung, `INSERT 0 0` khi chưa có `a@example.org`). Không bọc `$POSTGRES_USER` trong nháy kép ở PowerShell 5.1: nháy kép lồng trong đối số của lệnh native bị bỏ, làm hỏng lệnh `psql` (đã tái hiện).
 
-*Giới hạn kiểm chứng:* các trang web đã qua typecheck/build và trả HTTP 200, nhưng **chưa được thao tác bằng trình duyệt thật** trong môi trường agent. Toàn bộ luồng API mà các trang gọi đã chạy qua proxy web `http://127.0.0.1:3000/api/*` bằng script HTTP (cookie + header CSRF + `Origin`) — xem demo dưới.
+*Smoke test trình duyệt (2026-09-24):* **Google Chrome 153.0.8010.53** chạy headless, điều khiển bằng Playwright 1.63 (cài trong Conda `ras`, chỉ là công cụ thử, không phải dependency của repo), trên stack Compose với DB vừa migrate trống. Mỗi người dùng một browser context riêng (cookie riêng). Đạt 11/11 bước:
+
+1. Admin đăng nhập bằng form `/login` → vào thư viện, thanh điều hướng ghi “(Admin)”.
+2. Sai mật khẩu → thông báo chung “Email hoặc mật khẩu không đúng.”, vẫn ở `/login`.
+3. `/admin` → form **Gửi lời mời** → lời mời `pending`, link `/invite#token=…` hiện ở Dev outbox.
+4. Mở link ở context khác → trang hiện email được mời, token bị xóa khỏi thanh địa chỉ; nhập tên, mật khẩu hai lần → “Đã tạo tài khoản”.
+5. Mở lại cùng link → “Liên kết không hợp lệ, đã dùng hoặc đã hết hạn.”
+6. User đăng nhập → thư viện (“(User)”, không có link Quản trị), mở chi tiết item chung, không có nút sửa.
+7. User mở `/admin` → API trả forbidden, trang báo “Bạn không có quyền…”.
+8. Nút **Đăng xuất** → về `/login`; mở lại `/` bị chuyển về `/login`.
+9. `/forgot-password` với email có tài khoản và email không tồn tại → cùng một thông báo.
+10. Dev outbox chỉ có link reset cho email có tài khoản.
+11. Form `/reset-password` → “Đã đổi mật khẩu”; đăng nhập bằng mật khẩu cũ bị từ chối, mật khẩu mới vào được.
+
+Console của Chrome chỉ ghi các response lỗi đúng dự kiến (401/400/403 của các bước sai quyền/sai mật khẩu/link đã dùng) và `404 /favicon.ico` (web chưa có favicon). *Giới hạn:* chạy headless trên Chrome cho Windows, chưa thử Firefox/Safari hay thiết bị di động; các form `/account` (thu hồi phiên), vô hiệu hóa/kích hoạt tài khoản ở `/admin` và sửa tiêu đề item **chưa** được thử bằng trình duyệt (chỉ có test API). Luồng API tương ứng cũng đã chạy qua proxy web bằng script HTTP — xem demo dưới.
 
 ### API
 
@@ -259,7 +284,7 @@ M1b đã thêm `invitations`, `sessions`, `password_reset_tokens` ở revision `
 
 | PR | Bảng/khóa sẽ thêm | Điểm nối đã chuẩn bị |
 | --- | --- | --- |
-| M1c | `processing_acknowledgements`, `upload_intents`; liên kết intent → item/job. **Bắt buộc trước khi mở đường tải file:** ràng buộc `source_files.job_id` và `source_files.version_id` cùng thuộc một item (hiện là hai FK độc lập, DB chưa chặn file gắn job của item A nhưng version của item B), kèm test khác User/khác scope | `library_items` private + owner, `ingestion_jobs` origin `upload` bắt buộc private, `source_files` gắn job; giới hạn file trong `Settings.files` |
+| M1c | Đường upload PDF không đi qua nguyên proxy web `/api/*` hiện tại (proxy buffer toàn bộ body, timeout 15 giây). `processing_acknowledgements`, `upload_intents`; liên kết intent → item/job. **Bắt buộc trước khi mở đường tải file:** ràng buộc `source_files.job_id` và `source_files.version_id` cùng thuộc một item (hiện là hai FK độc lập, DB chưa chặn file gắn job của item A nhưng version của item B), kèm test khác User/khác scope | `library_items` private + owner, `ingestion_jobs` origin `upload` bắt buộc private, `source_files` gắn job; giới hạn file trong `Settings.files` |
 | M2 | `step_attempts`, `sections`, `chunks`, `references`; trạng thái coverage chi tiết | `ingestion_jobs.state/attempt_count/warnings`, `paper_versions.coverage`; ngưỡng trong `Settings.pdf_body` |
 | M3 | `embeddings` (pgvector theo model/dimensions), active index pointer, `provider_usage` | extension `vector`; `Settings.budget` |
 | M5–M6 | `access_rights`, `discovery_*`, `promotion_requests`/`review_grants`, `deletion_tombstones`, backup manifest | khóa `(paper_versions.id, item_id)`, `(source_files.id, version_id)`, `checksum_sha256`, `library_items.rights_epoch`, `ingestion_jobs.cancel_requested` |
