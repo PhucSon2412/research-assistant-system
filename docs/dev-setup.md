@@ -1,8 +1,8 @@
-# Môi trường phát triển và schema nền (M1a)
+# Môi trường phát triển và schema (M1a, M1b)
 
 [Mục lục](README.md) · [Mô hình dữ liệu](data-model.md) · [Roadmap](roadmap.md)
 
-Tài liệu này mô tả phần **đã triển khai ở M1a**: Docker Compose dev, migration nền và lệnh bootstrap Admin. M1a **chưa** có invite/login/session/reset (M1b), upload intent/lưu original (M1c), worker, provider, search hay RAG.
+Tài liệu này mô tả phần **đã triển khai**: M1a (Docker Compose dev, migration nền, lệnh bootstrap Admin) và M1b (invite, login/logout, session server-side, reset mật khẩu, CSRF, dev outbox, API metadata có ACL, web tối thiểu — xem [mục M1b](#xác-thực-phiên-và-quyền-m1b)). **Chưa** có upload intent/lưu original (M1c), worker, provider, search hay RAG.
 
 **Cách kiểm chứng (2026-09-24):** Windows 11, Docker Desktop 28.4 (Compose v2.39, engine Linux), Windows PowerShell 5.1 và Git Bash. Mỗi lệnh dưới đây đã được chạy trong shell ghi kèm, trừ các chỗ ghi rõ **chưa chạy trực tiếp**. Lệnh không ghi shell chạy giống nhau ở cả hai. Chạy mọi lệnh từ **gốc repo**; Windows PowerShell 5.1 không có `&&`, nên tài liệu không dùng `cd … &&`.
 
@@ -22,8 +22,8 @@ PY="$USERPROFILE/.conda/envs/ras/python.exe"
 
 | Thư mục | Nội dung |
 | --- | --- |
-| `api/` | FastAPI (`app/main.py` chỉ có `/healthz`, `/readyz`), model SQLAlchemy (`app/models/`), cấu hình tập trung (`app/config.py`), bootstrap (`app/identity/`, `app/cli/bootstrap_admin.py`), Alembic (`migrations/`), test (`tests/`) |
-| `web/` | Next.js tối thiểu: trang trạng thái gọi `API_INTERNAL_URL/readyz` phía server; không giữ secret, không quyết định quyền |
+| `api/` | FastAPI (`app/main.py`: `/healthz`, `/readyz` và router `auth`, `admin`, `library` trong `app/api/routes/`), model SQLAlchemy (`app/models/`), cấu hình tập trung (`app/config.py`), xác thực và quản lý phiên (`app/identity/`: `login.py`, `sessions.py`, `invitations.py`, `password_reset.py`, `users.py`, bootstrap), phân quyền (`app/authz.py`), CSRF/cookie (`app/api/`), delivery adapter (`app/delivery.py`), Alembic (`migrations/`), test (`tests/`) |
+| `web/` | Next.js tối thiểu: `/login`, `/invite`, `/forgot-password`, `/reset-password`, thư viện `/` và `/items/[id]`, `/account` (phiên), `/admin` (lời mời, tài khoản, dev outbox). Route `app/api/[...path]` chuyển tiếp cùng origin tới `API_INTERNAL_URL`; web không giữ secret, không quyết định quyền |
 | `docker-compose.yml` | `db` (PostgreSQL 16 + pgvector), `redis`, `minio`, `migrate` (one-shot), `api`, `web` |
 | `.env.example` | Mẫu cấu hình, các secret để trống |
 
@@ -57,7 +57,7 @@ PY="$USERPROFILE/.conda/envs/ras/python.exe"
    curl.exe -s http://127.0.0.1:8000/readyz    # {"status":"ready"} khi DB đã migrate
    ```
 
-   Trang `http://127.0.0.1:3000/` hiển thị “Trạng thái API: sẵn sàng”.
+   Trang `http://127.0.0.1:3000/login` hiển thị form đăng nhập; `curl.exe -s http://127.0.0.1:3000/api/library/items` trả `{"error":"not_authenticated"}` (proxy tới API hoạt động, khách không xem được metadata).
 
 ## Kết nối database
 
@@ -114,6 +114,67 @@ unset RAS_ADMIN_PW
 
 Mã thoát: `0` tạo thành công; `3` đã bootstrap (hoặc đã có user) — không tạo gì, ghi audit `denied`; `2` input không hợp lệ (mật khẩu < 12 ký tự, > 1024 ký tự, toàn khoảng trắng, trùng email, nhập lại không khớp, không có TTY mà thiếu `--password-stdin`, hoặc có đối số lạ — lỗi không in lại giá trị đối số); `1` lỗi khác (chỉ in tên loại lỗi).
 
+## Xác thực, phiên và quyền (M1b)
+
+Ba lớp tách riêng: **xác thực** (`app/identity/login.py`: email + mật khẩu Argon2id), **quản lý phiên** (`app/identity/sessions.py`: cấp, kiểm/cập nhật hoạt động, thu hồi session server-side) và **phân quyền** (`app/authz.py`: điều kiện ACL theo sở hữu item). Mọi request được bảo vệ đều kiểm session trong DB rồi mới tính quyền; Next.js chỉ hiển thị. Lý do các lựa chọn ở [decisions](decisions.md#ghi-nhận-khi-triển-khai-m1b-2026-09-24).
+
+### Cấu hình
+
+Thời hạn nằm ở `Settings.auth` (M1a): `RAS_AUTH__SESSION_IDLE` (mặc định `PT30M`), `RAS_AUTH__SESSION_ABSOLUTE` (`PT8H`), `RAS_AUTH__INVITE` (`PT72H`), `RAS_AUTH__PASSWORD_RESET` (`PT30M`). M1b thêm:
+
+| Biến | Mặc định | Compose dev |
+| --- | --- | --- |
+| `RAS_ENVIRONMENT` | `production` (bắt buộc cookie Secure, cấm dev outbox) | `development` |
+| `RAS_HTTP__COOKIE_SECURE` | `true` (cookie `__Host-ras_session`, `Secure`) | `false` (HTTP cục bộ, cookie `ras_session`) |
+| `RAS_HTTP__ALLOWED_ORIGINS` | `[]` (JSON list; request ghi có `Origin` ngoài list bị từ chối) | `http://127.0.0.1:3000`, `http://localhost:3000` |
+| `RAS_HTTP__PUBLIC_BASE_URL` | trống (bắt buộc khi có delivery) | `http://127.0.0.1:3000` |
+| `RAS_DELIVERY__MODE` | `disabled` (không tạo được invitation) | `dev_outbox` |
+
+Các giá trị dev đặt trực tiếp trong `docker-compose.yml`, không cần sửa `.env`. Triển khai sau HTTPS: đặt `RAS_ENVIRONMENT=production`, `RAS_HTTP__COOKIE_SECURE=true`, origin thật và một delivery adapter thật (kênh gửi còn là quyết định mở). **Dev outbox** giữ link mời/reset trong bộ nhớ tiến trình API, chỉ Admin đọc ở `/admin`; mất khi restart API và Admin xem được cả link reset của User, nên không dùng ngoài dev.
+
+### Luồng thử trên web
+
+1. Bootstrap Admin như [mục trên](#bootstrap-admin-đầu-tiên), rồi mở `http://127.0.0.1:3000/login` và đăng nhập.
+2. `/admin` → nhập email → **Gửi lời mời** (luôn là vai trò User, hết hạn 72 giờ). Mục **Dev outbox** hiện liên kết `http://127.0.0.1:3000/invite#token=…`.
+3. Mở liên kết trong cửa sổ ẩn danh hoặc trình duyệt khác (để không dùng chung cookie của Admin), đặt mật khẩu, rồi đăng nhập ở `/login`.
+4. Quên mật khẩu: `/forgot-password` luôn trả cùng thông báo; liên kết `/reset-password#token=…` xuất hiện ở dev outbox của Admin. Đổi mật khẩu xong, mọi phiên cũ của User bị thu hồi.
+5. `/account` liệt kê và thu hồi phiên của chính mình; `/admin` vô hiệu hóa/kích hoạt tài khoản (vô hiệu hóa thu hồi mọi phiên ngay).
+
+M1b không có đường nhập paper. Để thử ACL, thêm item metadata bằng **fixture SQL** (chỉ cho dev/test, không phải tính năng sản phẩm):
+
+```powershell
+# PowerShell 5.1: $OutputEncoding giữ đúng ký tự tiếng Việt khi pipe (như mục bootstrap)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+"INSERT INTO library_items (visibility, title) VALUES ('common', 'Paper chung');
+ INSERT INTO library_items (visibility, owner_user_id, title) SELECT 'private', id, 'Paper riêng của A' FROM users WHERE email = 'a@example.org';" | docker compose exec -T db sh -c 'psql -U $POSTGRES_USER -d $POSTGRES_DB'
+```
+
+```bash
+# Git Bash
+echo "INSERT INTO library_items (visibility, title) VALUES ('common', 'Paper chung');
+ INSERT INTO library_items (visibility, owner_user_id, title) SELECT 'private', id, 'Paper riêng của A' FROM users WHERE email = 'a@example.org';" | docker compose exec -T db sh -c 'psql -U $POSTGRES_USER -d $POSTGRES_DB'
+```
+
+*Đã kiểm:* cả hai khối, trên DB dev (mỗi khối in `INSERT 0 1` cho item chung, `INSERT 0 0` khi chưa có `a@example.org`). Không bọc `$POSTGRES_USER` trong nháy kép ở PowerShell 5.1: nháy kép lồng trong đối số của lệnh native bị bỏ, làm hỏng lệnh `psql` (đã tái hiện).
+
+*Giới hạn kiểm chứng:* các trang web đã qua typecheck/build và trả HTTP 200, nhưng **chưa được thao tác bằng trình duyệt thật** trong môi trường agent. Toàn bộ luồng API mà các trang gọi đã chạy qua proxy web `http://127.0.0.1:3000/api/*` bằng script HTTP (cookie + header CSRF + `Origin`) — xem demo dưới.
+
+### API
+
+| Nhóm | Endpoint | Quyền |
+| --- | --- | --- |
+| Phiên | `GET /auth/csrf`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/session`, `GET /auth/sessions`, `POST /auth/sessions/{id}/revoke`, `POST /auth/sessions/revoke-others` | login: khách; còn lại: session hợp lệ, chỉ phiên của chính mình |
+| Lời mời | `POST /auth/invitations/inspect`, `POST /auth/invitations/accept` | người có token |
+| Reset | `POST /auth/password-reset/request` (luôn `202`), `POST /auth/password-reset/confirm` | khách / người có token |
+| Admin | `POST/GET /admin/invitations`, `POST /admin/invitations/{id}/revoke`, `GET /admin/users`, `POST /admin/users/{id}/disable|enable`, `GET /admin/dev-outbox` | Admin (khách `401`, User `403`) |
+| Thư viện | `GET /library/items?scope=all|common|mine&limit&offset`, `GET /library/items/count`, `GET /library/items/{id}`, `PATCH /library/items/{id}` | session; lọc common + item riêng của chính mình trong SQL; item riêng trái quyền trả `404` như item không tồn tại |
+
+Mọi `POST/PATCH/DELETE` cần header `X-CSRF-Token` bằng cookie `ras_csrf` (web tự gửi). Lỗi có dạng `{"error": "<code>"}`.
+
+### Demo hai User đã chạy (2026-09-24)
+
+Trên stack Compose (DB `0002`, trống), qua proxy web, bằng script HTTP: bootstrap Admin (`--password-stdin`) → Admin mời Alice và Bob → hai người nhận lời mời qua dev outbox (dùng lại link bị `400`) → thêm 1 item chung, 1 item riêng mỗi người bằng SQL fixture. Kết quả: Alice chỉ thấy item chung + của mình (count 2), Bob tương tự; Admin chỉ thấy item chung; Alice/ Admin `GET`/`PATCH` item của Bob đều `404` giống ID không tồn tại; Alice sửa item chung `403`, sửa item của mình `200`; Bob gọi route Admin `403`, khách `401`; `POST` thiếu CSRF hoặc `Origin` lạ `403`. Reset mật khẩu của Alice: phản hồi yêu cầu giống hệt với email không tồn tại, hai phiên cũ của Alice `401`, mật khẩu cũ bị từ chối. Bob logout → `401`; Admin vô hiệu hóa Bob → phiên đang mở `401` ngay. 13 secret (mật khẩu, token mời/reset/session) không xuất hiện trong log `api`/`web`/`migrate` hay trong các bảng invitation/session/reset/audit.
+
 ## Hạ môi trường
 
 ```bash
@@ -143,12 +204,14 @@ npm run typecheck --prefix web
 npm run build --prefix web
 ```
 
+*Kết quả kiểm ngày 2026-09-24 (M1b):* `pytest api -q` → **181 passed** (PowerShell, Conda `ras`, Python 3.12); `npm run typecheck`/`npm run build` đạt; `docker compose up -d --build --wait` đạt với mọi service healthy và `alembic current` = `0002 (head)`, kể cả khi nâng DB dev đang ở `0001`. Test M1b chạy trên PostgreSQL thật với đồng hồ giả (`tests/helpers.py`) để kiểm biên idle 30 phút/absolute 8 giờ/invite 72 giờ/reset 30 phút; các ca đồng thời (hai request cùng token, login đua với reset) gọi service trong nhiều luồng. Kiểm đối chứng: bỏ điều kiện `owner_user_id` khỏi `visible_items_clause` làm 9 test ACL thất bại.
+
 ## Lựa chọn kỹ thuật ảnh hưởng M1b/M1c
 
 - **Kết nối DB theo thành phần** (`RAS_DB__*` → `URL.create`) thay vì ghép URL, để mật khẩu có `@`, `%XX` hay tổ hợp ký tự phân cách không bị parse sai. M1b/M1c (và worker M2) phải lấy engine qua `app.db`/`Settings.sqlalchemy_url()`, không tự dựng chuỗi kết nối.
 - **Alembic + SQLAlchemy 2 + psycopg 3.** Migration viết tay, có kiểm tự động model ↔ schema, downgrade về base và nâng lại. M1b/M1c thêm revision mới (`0002`, …) thay vì sửa `0001`.
 - **Trạng thái/loại là `text` + `CHECK`**, không dùng PostgreSQL ENUM: thêm giá trị ở PR sau chỉ cần thay constraint, không vướng `ALTER TYPE` trong transaction.
-- **Argon2id (argon2-cffi, tham số mặc định RFC 9106 low-memory)**, lưu chuỗi PHC trong `users.password_verifier`. DB có `CHECK` chỉ nhận `$argon2id$...` nên không thể lưu plaintext. M1b login dùng `verify_password`/`needs_rehash` trong `app/identity/passwords.py`; chính sách độ dài trong `Settings.password`.
+- **Argon2id (argon2-cffi, tham số mặc định RFC 9106 low-memory)**, lưu chuỗi PHC trong `users.password_verifier`. DB có `CHECK` chỉ nhận `$argon2id$...` nên không thể lưu plaintext. Login M1b dùng `verify_password`/`needs_rehash` trong `app/identity/passwords.py` (rehash khi tham số đổi); accept invitation và reset dùng cùng `validate_password`/`Settings.password`.
 - **Bootstrap đồng thời:** advisory lock giao dịch + hàng singleton `bootstrap_state` (khóa chính boolean chỉ nhận `true`) ghi cùng giao dịch với Admin; bootstrap cũng từ chối khi đã có bất kỳ user nào. Test 8 luồng đồng thời chỉ tạo đúng một Admin.
 - **Cấu hình tập trung** ở `app/config.py` (`RAS_` prefix, nested `__`): thời hạn session/invite/reset, giới hạn file, ngưỡng PDF, cleanup/backup, budget ứng dụng và key cap. Phần lớn chưa được code dùng tới trước M1b–M3 nhưng đã có test giá trị mặc định/biên, để PR sau không hardcode rải rác.
 - **Audit append-only** bằng trigger (chặn UPDATE/DELETE/TRUNCATE); `details` chỉ chứa định danh/mã lý do. Việc purge theo retention (M6) phải qua migration có review.
@@ -168,6 +231,9 @@ erDiagram
   paper_versions ||--o{ ingestion_jobs : "version of same item"
   users ||--o{ ingestion_jobs : "actor / scope owner"
   users ||--o{ audit_events : "actor (user)"
+  users ||--o{ invitations : "invited_by / accepted_user (M1b)"
+  users ||--o{ sessions : "server-side sessions (M1b)"
+  users ||--o{ password_reset_tokens : "reset tokens (M1b)"
 ```
 
 | Bảng | Ràng buộc chính trong DB |
@@ -179,14 +245,20 @@ erDiagram
 | `source_files` | gắn version hoặc job; MIME đã xác minh ∈ {PDF, Markdown}; `byte_size > 0`; SHA-256 hex; các cột định danh **bất biến** (trigger), `version_id`/`job_id`/`page_count` chỉ điền một lần từ NULL; `storage_key` không unique vì một object vật lý có thể phục vụ nhiều item hợp lệ; khóa `(id, version_id)` cho AccessRights |
 | `ingestion_jobs` | `origin`/`state` theo [kiến trúc](architecture.md#pipeline-và-trạng-thái), mặc định `received`; scope `private`⇔owner; `upload` luôn private; scope phải trùng scope của item (trigger); version phải thuộc item (FK kép); `idempotency_key` unique trong scope (`NULLS NOT DISTINCT` cho kho chung); `cancel_requested` nhất quán với `cancel_requested_at`; `rights_epoch_at_start` |
 | `audit_events` | append-only; `actor_type='user'` ⇔ có `actor_user_id`; `outcome ∈ {success, denied, failure}` |
+| `invitations` (M1b, `0002`) | `token_hash` SHA-256 hex unique (không lưu token thô); email chuẩn hóa; không có cột vai trò (accept luôn tạo `user`); `accepted_at` ⇔ `accepted_user_id`, không vừa accepted vừa revoked; partial unique: tối đa một lời mời mở mỗi email |
+| `sessions` (M1b) | `token_hash`, `csrf_token_hash` SHA-256 hex; `last_activity_at`, `absolute_expires_at`; `revoked_at` ⇔ `revoked_reason ∈ {logout, replaced, user_revoked, password_reset, user_disabled}` |
+| `password_reset_tokens` (M1b) | `token_hash` SHA-256 hex unique; không vừa used vừa revoked; partial unique: tối đa một token mở mỗi user |
 
 Mọi FK dùng `ON DELETE RESTRICT`: xóa/thu hồi đi qua tombstone và cleanup (M6), không cascade ngầm. Extension `vector` được tạo sẵn nhưng chưa có cột vector — số chiều phải kiểm khi tích hợp model (M3).
 
-### Dành cho PR sau (chưa có trong migration `0001`)
+Các bảng M1b không có server default cho thời điểm: API ghi `created_at/expires_at/...` từ đồng hồ ứng dụng để thời hạn kiểm được ở test biên.
+
+### Dành cho PR sau (chưa có trong migration `0001`/`0002`)
+
+M1b đã thêm `invitations`, `sessions`, `password_reset_tokens` ở revision `0002` (bảng trên).
 
 | PR | Bảng/khóa sẽ thêm | Điểm nối đã chuẩn bị |
 | --- | --- | --- |
-| M1b | `invitations`, `sessions`, `password_reset_tokens` (token hash, expiry, used/revoked) | `users.id` UUID, `users.status`, `users.password_changed_at`; thời hạn trong `Settings.auth` |
 | M1c | `processing_acknowledgements`, `upload_intents`; liên kết intent → item/job. **Bắt buộc trước khi mở đường tải file:** ràng buộc `source_files.job_id` và `source_files.version_id` cùng thuộc một item (hiện là hai FK độc lập, DB chưa chặn file gắn job của item A nhưng version của item B), kèm test khác User/khác scope | `library_items` private + owner, `ingestion_jobs` origin `upload` bắt buộc private, `source_files` gắn job; giới hạn file trong `Settings.files` |
 | M2 | `step_attempts`, `sections`, `chunks`, `references`; trạng thái coverage chi tiết | `ingestion_jobs.state/attempt_count/warnings`, `paper_versions.coverage`; ngưỡng trong `Settings.pdf_body` |
 | M3 | `embeddings` (pgvector theo model/dimensions), active index pointer, `provider_usage` | extension `vector`; `Settings.budget` |

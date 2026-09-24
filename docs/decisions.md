@@ -50,6 +50,24 @@ Các lựa chọn dưới đây là **quyết định kỹ thuật của PR M1a,
 - **Bàn giao cho M1c:** `source_files.job_id` và `version_id` là hai FK độc lập. Trước khi mở đường tải file, M1c phải ràng buộc job và version cùng item (ví dụ FK kép qua `item_id` hoặc trigger như `ingestion_jobs`) và test trường hợp khác User/scope.
 - Docker Hub không còn phục vụ `minio/minio`; Compose dùng `quay.io/minio/minio` pin tag `RELEASE.2025-09-07T16-13-09Z`. Cần xem lại nguồn/phiên bản MinIO (hoặc S3-compatible thay thế) trước triển khai ngoài dev.
 
+## Ghi nhận khi triển khai M1b (2026-09-24)
+
+Các lựa chọn dưới đây là **quyết định kỹ thuật của PR M1b, chờ chủ dự án review**; chi tiết vận hành ở [dev-setup](dev-setup.md#xác-thực-phiên-và-quyền-m1b). Chúng hiện thực các mục **Đề xuất** về tách xác thực/phiên/phân quyền và ma trận quyền metadata; không mở rộng yêu cầu sản phẩm.
+
+- **Token:** invitation, reset, session và CSRF đều là 256 bit từ `secrets`; DB chỉ lưu SHA-256 hex (có `CHECK` định dạng), không lưu token thô. Dùng hash nhanh vì đầu vào là ngẫu nhiên entropy cao, không phải mật khẩu, và cần tra cứu có index. Link đặt token ở fragment `#token=` để trình duyệt không gửi token lên web/API và không vào access log.
+- **Dùng một lần/đồng thời:** accept invitation và confirm reset khóa dòng (`SELECT … FOR UPDATE`) rồi kiểm lại điều kiện còn hiệu lực; request thua cuộc nhận `invalid_token`. Partial unique index giữ tối đa một invitation mở mỗi email và một reset token mở mỗi user; invite/reset mới thu hồi cái cũ.
+- **Session server-side:** bảng `sessions` (`last_activity_at`, `absolute_expires_at`, `revoked_at/reason`). Mỗi request kiểm và cập nhật hoạt động trong một câu `UPDATE … RETURNING`: hợp lệ khi chưa thu hồi, user `active`, `now < last_activity_at + idle` và `now < absolute_expires_at`; đúng mốc biên là hết hạn. Thời hạn lấy từ `Settings.auth` (idle đọc ở thời điểm request, absolute chốt khi login). Thời gian quyết định bằng đồng hồ ứng dụng (`app/clock.py`), để test biên chính xác.
+- **Reset/disable thu hồi phiên:** cùng giao dịch đổi verifier (hoặc `status=disabled`) thu hồi mọi session và reset token mở. Login khóa dòng user và kiểm lại verifier/status trước khi tạo session, nên login đang chạy song song với reset không giữ được phiên dùng mật khẩu cũ (có test). `users.password_changed_at` được cập nhật nhưng **không** dùng để so thời điểm, vì so hai đồng hồ (ứng dụng và DB) dễ sai.
+- **Cookie/CSRF:** session cookie HttpOnly, `SameSite=Lax`, `Path=/`; khi `RAS_HTTP__COOKIE_SECURE=true` thêm `Secure` và tên `__Host-ras_session`. Thao tác ghi cần header `X-CSRF-Token` bằng cookie `ras_csrf` (double submit), token phải khớp hash lưu trong session khi đã đăng nhập, và `Origin` (nếu có) phải thuộc `RAS_HTTP__ALLOWED_ORIGINS`. `RAS_ENVIRONMENT` mặc định `production`: bắt buộc cookie Secure và cấm dev outbox; Compose dev đặt `development`.
+- **Web:** Next.js gọi API qua route proxy cùng origin (`/api/*` → `API_INTERNAL_URL`, chỉ tiền tố `auth`, `admin`, `library`), chỉ chuyển tiếp header/cookie, không quyết định quyền.
+- **Không lộ tài khoản:** login sai email, sai mật khẩu hay tài khoản bị vô hiệu hóa đều trả `401 invalid_credentials` sau cùng lượng việc Argon2 (verify với verifier giả khi không có user). Yêu cầu reset luôn trả `202` giống nhau; gửi link chạy sau response. Lỗi validation không trả lại giá trị đã gửi. Audit login thất bại không ghi email đã nhập.
+- **Delivery:** interface `DeliveryAdapter`; `disabled` (mặc định; từ chối tạo invitation, reset vẫn trả chung) và `dev_outbox` (chỉ `development`): link giữ trong bộ nhớ tiến trình API, giới hạn số lượng, bỏ khi token hết hạn, chỉ Admin đọc qua `GET /admin/dev-outbox` (có audit). Không ghi DB/log. Giới hạn: mất khi restart, không chia sẻ giữa nhiều process, và Admin xem được link reset của User — vì vậy chỉ dành cho dev.
+- **Vai trò:** invitation không có cột/trường vai trò; accept luôn tạo `user`, trường `role` gửi kèm bị bỏ qua. Admin không tự vô hiệu hóa chính mình.
+- **ACL metadata:** `app/authz.py` dựng điều kiện `common OR owner = principal` đưa vào SQL trước `ORDER/LIMIT/OFFSET/COUNT`; `scope=all|common|mine` chỉ thu hẹp. Truy cập theo ID áp lại cùng điều kiện; item riêng trái quyền, ID không tồn tại và ID sai định dạng đều trả `404 not_found` giống nhau. Admin xem/sửa item chung và item riêng của chính mình, không đọc item riêng của User khác; User sửa item riêng của mình, sửa item chung bị `403`.
+- **Mâu thuẫn test M1a đã xử lý:** `test_m1a_exposes_no_auth_or_upload_routes` khẳng định không có route auth — đúng với M1a nhưng trái phạm vi M1b; đổi thành kiểm vẫn chưa có route upload/file. Các test M1a ghim revision `0001` nay dùng `HEAD_REVISION`.
+
+**Quyết định còn mở từ M1b** (thêm vào bảng dưới): cấp vai trò Admin qua lời mời/nâng quyền; kênh gửi link thật; giới hạn tần suất/khóa tạm login và reset; chính sách session đồng thời tối đa, dọn session hết hạn.
+
 ## Cần xác nhận hoặc đo trước phần phụ thuộc
 
 | Ưu tiên | Vấn đề còn mở | Hướng làm việc hiện tại | Cần trước |
@@ -58,7 +76,10 @@ Các lựa chọn dưới đây là **quyết định kỹ thuật của PR M1a,
 | 1 | Ngưỡng PDF 70%/2.000 ký tự loại oan bao nhiêu paper nhiều hình/công thức? | Dùng làm ngưỡng thử, kiểm fixture thật; trường hợp chưa rõ vào `needs_review`, không `indexed` | M2 |
 | 2 | SLO và quality gate thực sau benchmark? | Dùng workload, budget và mục tiêu **đề xuất, cần đo** ở [phi chức năng](nonfunctional.md) và [kiểm thử](testing.md); báo baseline theo nhóm lỗi | M3–M6 |
 | 2 | Chính sách nguồn cho việc giữ metadata/link sau thu hồi và cách xử lý file đồng sở hữu vật lý? | Quyền theo item/version; audit tối thiểu, tombstone trước cleanup; không ảnh hưởng item riêng khác | M5–M6 |
-| 2 | Kênh chuyển invite/reset link ở triển khai đầu là gì? | Delivery adapter; dev outbox có kiểm soát, không log token/mật khẩu; chốt kênh thật trước triển khai cho user | M1 trước triển khai ngoài dev |
+| 2 | Kênh chuyển invite/reset link ở triển khai đầu là gì? | M1b có `DeliveryAdapter`, mặc định `disabled`; `dev_outbox` trong bộ nhớ chỉ ở `development`, không ghi DB/log; chốt kênh thật trước triển khai cho user | M1 trước triển khai ngoài dev |
+| 2 | Có cấp vai trò Admin cho người thứ hai không, bằng cách nào? | M1b: lời mời chỉ tạo `user`, không có đường tự nâng quyền; chỉ Admin bootstrap là Admin | Khi cần Admin thứ hai |
+| 2 | Giới hạn tần suất và khóa tạm cho login/reset? | M1b chưa có rate limit/lockout; phản hồi không lộ tài khoản, Argon2 làm chậm dò mật khẩu | Trước triển khai ngoài dev |
+| 3 | Số session đồng thời tối đa, dọn session/token hết hạn? | Không giới hạn số session; hàng hết hạn/thu hồi giữ lại (không còn hiệu lực) cho tới job dọn dẹp sau này | M6 |
 
 ## Quyết định đã chốt trong brief
 
