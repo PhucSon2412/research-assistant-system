@@ -8,7 +8,7 @@ Brief khởi tạo và quyết định của chủ dự án ngày **2026-09-24**
 
 | Chủ đề | Quyết định | Hệ quả thiết kế |
 | --- | --- | --- |
-| Stack | Next.js web; FastAPI API; PostgreSQL + pgvector cho metadata, keyword và vector search; Redis + Celery cho job; lớp lưu file S3-compatible, MinIO local; Docker Compose cho dev và triển khai đầu | Module web/API/worker riêng; PostgreSQL là nguồn chân lý, index và job có thể xây/chạy lại; chưa có code trong repo |
+| Stack | Next.js web; FastAPI API; PostgreSQL + pgvector cho metadata, keyword và vector search; Redis + Celery cho job; lớp lưu file S3-compatible, MinIO local; Docker Compose cho dev và triển khai đầu | Module web/API/worker riêng; PostgreSQL là nguồn chân lý, index và job có thể xây/chạy lại; nền Compose/migration/bootstrap có từ M1a ([dev-setup](dev-setup.md)) |
 | Auth | Tài khoản nội bộ, cấp bằng lời mời trong MVP, chưa SSO; API kiểm session và quyền mỗi request; Admin đầu tiên từ lệnh bootstrap một lần, mật khẩu nhận bằng input an toàn, không có tài khoản/mật khẩu mặc định hardcode | Tách xác thực, quản lý phiên và phân quyền trong API/schema/test |
 | OpenRouter | OpenRouter cho embedding, rerank và RAG generation MVP. Model được chủ dự án chọn: `openai/text-embedding-3-small`, `qwen/qwen3-reranker-8b`, `openai/gpt-6-sol` | Dùng model ID trong config; kiểm khả dụng, API và kích thước vector khi tích hợp; cùng embedding model cho chunk/query; rerank chỉ trên candidate đã lọc quyền; theo dõi token/chi phí từng tác vụ |
 | Hạn mức key | Chủ dự án cung cấp phản hồi API của key với `limit=50`, `limit_reset=daily`, `include_byok_in_limit=false` | Đây là **giới hạn chi tiêu $50/ngày của key**, không phải credit $50 được cấp mới mỗi ngày. Số dư/usage trong phản hồi là snapshot, không ghi làm cấu hình cố định; không lưu label, organization/workspace ID hoặc secret trong repo |
@@ -38,6 +38,15 @@ Nguồn kiểm tra: các trang model [embedding](https://openrouter.ai/openai/te
 - Xác nhận xử lý ngoài dùng hai bước: User xác nhận riêng cho từng upload, UI tạo upload intent không có file rồi mới gửi file sau khi API chấp nhận; API kiểm intent gắn đúng upload trước khi lưu file/tạo job. Nếu client cố gửi multipart không có intent, bytes có thể đã qua mạng dù API từ chối. [Hợp đồng chi tiết](access-and-data.md#hợp-đồng-xác-nhận-upload-riêng).
 - “Thu hồi ngay” áp dụng cho request **mới** từ khi giao dịch thu hồi commit (`t_rev`); cache/index/link không được vượt qua chốt quyền. Job được đánh dấu hủy, worker kiểm ở các điểm an toàn; RAG đang chạy dừng phát tiếp khi phát hiện thu hồi. Bytes đã giao cho client và nội dung đã gửi provider trước thời điểm đó không thể thu hồi. [Giới hạn và thử nghiệm](access-and-data.md#hợp-đồng-thu-hồi-và-xóa).
 - M1 chia thành ba PR kiểm chứng độc lập: nền dữ liệu + bootstrap, sau đó invite/session/ACL, sau đó upload intent + lưu original. Cuối M1 vẫn demo hai User. [Roadmap](roadmap.md).
+
+## Ghi nhận khi triển khai M1a (2026-09-24)
+
+Các lựa chọn dưới đây là **quyết định kỹ thuật của PR M1a, chờ chủ dự án review**; lý do và tác động tới M1b/M1c ở [dev-setup](dev-setup.md#lựa-chọn-kỹ-thuật-ảnh-hưởng-m1bm1c).
+
+- Migration: Alembic + SQLAlchemy 2 + psycopg 3; trạng thái/loại dạng `text` + `CHECK` thay cho PostgreSQL ENUM. Password verifier: Argon2id (argon2-cffi), DB chỉ nhận chuỗi `$argon2id$`. Bootstrap: advisory lock + hàng singleton `bootstrap_state`, từ chối khi đã có bất kỳ user; mật khẩu chỉ qua prompt không echo hoặc `--password-stdin`, tối thiểu 12 ký tự (cấu hình `RAS_PASSWORD__MIN_LENGTH`, sàn 8) — độ dài tối thiểu là **đề xuất** của agent, chưa có trong brief.
+- Bất biến đưa xuống DB: visibility/owner của `LibraryItem` không đổi (promotion tạo item chung mới); scope của `IngestionJob` phải trùng scope item và upload luôn private; `SourceFile` bất biến; `AuditEvent` append-only. Mọi FK `ON DELETE RESTRICT` để xóa đi qua tombstone/cleanup (M6).
+- **Mâu thuẫn wording đã xử lý:** bảng roadmap ghi M1a có “migration nền cho … rights/intent”, trong khi mục “Task đầu tiên” của roadmap và yêu cầu giao việc M1a ghi “các khóa cần mở rộng cho … acknowledgement/intent, `AccessRights`” và “chỉ triển khai phần schema cần thiết ở M1a”. PR M1a theo cách hiểu thứ hai: **chưa tạo** bảng `AccessRights`, `ProcessingAcknowledgement`, `UploadIntent`, invite/session/reset; chỉ chuẩn bị khóa nối (`(paper_versions.id, item_id)`, `(source_files.id, version_id)`, checksum, `users.status/password_changed_at`, `rights_epoch`, `cancel_requested`). Các bảng đó thuộc M1b/M1c/M5–M6.
+- Docker Hub không còn phục vụ `minio/minio`; Compose dùng `quay.io/minio/minio` pin tag `RELEASE.2025-09-07T16-13-09Z`. Cần xem lại nguồn/phiên bản MinIO (hoặc S3-compatible thay thế) trước triển khai ngoài dev.
 
 ## Cần xác nhận hoặc đo trước phần phụ thuộc
 

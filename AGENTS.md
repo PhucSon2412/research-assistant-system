@@ -26,4 +26,15 @@
 
 Nếu task cần chạy Python hoặc cài thư viện Python, dùng môi trường Conda hiện có tại `C:\Users\ADMIN\.conda\envs\ras`. Không tạo hoặc cài vào `venv` mới. Kiểm tra interpreter và công cụ cài đặt đang trỏ đúng môi trường này trước khi chạy/cài; không giả định dự án bắt buộc dùng Python.
 
-Repo hiện chưa có ứng dụng hoặc lệnh build/test. Khi có code và lệnh chạy thực tế, cập nhật file này bằng các lệnh đã kiểm chứng.
+## Lệnh đã kiểm chứng (M1a)
+
+Chi tiết và giải thích ở [môi trường phát triển](docs/dev-setup.md). Chạy từ gốc repo bằng Git Bash/PowerShell:
+
+- Chuẩn bị: `cp .env.example .env` rồi điền mọi secret trống (không commit `.env`).
+- Dựng: `docker compose up -d --build --wait` (service `migrate` tự chạy `alembic upgrade head`); hạ: `docker compose down` (giữ dữ liệu) hoặc `docker compose down -v` (xóa volume).
+- Migration: `docker compose run --rm migrate`; revision hiện tại: `docker compose exec api alembic current`.
+- Bootstrap Admin một lần: `docker compose exec api python -m app.cli.bootstrap_admin --email <email>` (hỏi mật khẩu, không echo) hoặc `... -T ... --password-stdin < <file>`.
+- Test API (cần `docker compose up -d db`): `cd api && C:/Users/ADMIN/.conda/envs/ras/python.exe -m pytest -q`; cài lần đầu `C:/Users/ADMIN/.conda/envs/ras/python.exe -m pip install -e ".[dev]"`.
+- Web: `cd web && npm ci && npm run typecheck && npm run build`.
+
+Schema thay đổi qua revision Alembic mới, không sửa revision đã merge; giữ test `test_orm_models_match_migrated_schema` xanh.

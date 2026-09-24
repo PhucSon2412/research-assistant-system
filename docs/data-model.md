@@ -2,7 +2,7 @@
 
 [Mục lục](README.md) · [Kiến trúc](architecture.md) · [Quyền và dữ liệu](access-and-data.md)
 
-Đây là schema khái niệm **đề xuất** trên PostgreSQL + pgvector đã chốt, chưa phải migration. ID ổn định và scope được mang qua mọi bản ghi dẫn xuất để kiểm quyền, xóa và reindex.
+Đây là schema khái niệm **đề xuất** trên PostgreSQL + pgvector đã chốt. Tập con đã thành migration ở M1a (`users`, `bootstrap_state`, `library_items`, `paper_versions`, `source_files`, `ingestion_jobs`, `audit_events`) được mô tả ở [dev-setup](dev-setup.md#schema-nền); các entity còn lại vẫn là thiết kế. ID ổn định và scope được mang qua mọi bản ghi dẫn xuất để kiểm quyền, xóa và reindex.
 
 | Entity | Trường / quan hệ quan trọng | Ràng buộc |
 | --- | --- | --- |

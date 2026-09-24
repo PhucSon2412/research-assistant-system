@@ -2,7 +2,7 @@
 
 [Mục lục](README.md) · [Yêu cầu sản phẩm](product-requirements.md) · [Search và RAG](search-and-rag.md) · [Phi chức năng](nonfunctional.md)
 
-Đây là kế hoạch **đề xuất**, chưa có test runner hay test hiện hữu trong repo. Mỗi milestone bổ sung test cho rủi ro mà nó tạo ra; dùng fixture nhỏ có giấy phép/nguồn rõ và dữ liệu giả cho paper riêng.
+Đây là kế hoạch **đề xuất**. Từ M1a đã có pytest cho API (`api/tests/`: migration trên DB trống, ràng buộc schema, bootstrap một lần/đồng thời/không lộ secret, config, health) chạy trên PostgreSQL thật; cách chạy ở [dev-setup](dev-setup.md#chạy-test-api). Mỗi milestone bổ sung test cho rủi ro mà nó tạo ra; dùng fixture nhỏ có giấy phép/nguồn rõ và dữ liệu giả cho paper riêng.
 
 | Tầng | Ca kiểm chính | Điều kiện đạt |
 | --- | --- | --- |
