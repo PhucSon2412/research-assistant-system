@@ -19,6 +19,16 @@ class UserStatus(StrEnum):
     DISABLED = "disabled"
 
 
+class SessionRevokeReason(StrEnum):
+    LOGOUT = "logout"
+    # Replaced by a new login from the same browser.
+    REPLACED = "replaced"
+    # The user ended one of their own sessions (or all others).
+    USER_REVOKED = "user_revoked"
+    PASSWORD_RESET = "password_reset"
+    USER_DISABLED = "user_disabled"
+
+
 class Visibility(StrEnum):
     COMMON = "common"
     PRIVATE = "private"
