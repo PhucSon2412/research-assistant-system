@@ -15,6 +15,11 @@
 - Giới hạn file, ngưỡng PDF, thời hạn auth/cleanup/backup và budget phải nằm trong config có test; không hardcode rải rác. $50/ngày là cap của OpenRouter key, $10/ngày là budget thử của ứng dụng, không phải credit được cấp mới.
 - Không bổ sung tính năng AI tự động tóm tắt paper nếu chưa có yêu cầu mới.
 
+## Quy ước commit
+
+- Không tự thêm model AI, công cụ AI hoặc trợ lý AI vào tác giả, committer hay trailer `Co-authored-by` của commit. Không thêm trailer này chỉ vì AI đã hỗ trợ viết code hoặc vì công cụ gợi ý tự động.
+- Chỉ ghi người đồng tác giả khi chủ dự án yêu cầu rõ và cung cấp thông tin cần ghi.
+
 ## Khi làm task
 
 1. Đọc docs liên quan; nêu phạm vi, giả định và quyết định còn mở ảnh hưởng task.
