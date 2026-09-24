@@ -3,7 +3,7 @@
 Every limit, threshold, lifetime and budget the product docs describe lives
 here so it can be tested and changed in one place (see AGENTS.md). Values are
 the MVP proposals from docs/decisions.md ("đề xuất, cần đo"); many are not
-used by code until later milestones (M1b auth, M1c upload, M2 PDF, M3 budget).
+used by code until later milestones (M2 PDF body, M3 budget).
 
 Secrets (database password, S3 keys, OpenRouter key) have no defaults and are
 only provided through the environment.
@@ -84,6 +84,25 @@ class FileLimits(BaseModel):
     pdf_max_bytes: int = Field(default=30 * MIB, gt=0)
     pdf_max_pages: int = Field(default=100, gt=0)
     markdown_max_bytes: int = Field(default=2 * MIB, gt=0)
+    upload_intent_lifetime: timedelta = timedelta(minutes=10)
+    pdf_probe_timeout_seconds: int = Field(default=10, gt=0)
+    pdf_probe_memory_bytes: int = Field(default=256 * MIB, gt=0)
+    orphan_grace: timedelta = timedelta(hours=24)
+
+    @model_validator(mode="after")
+    def _check_lifetime(self) -> "FileLimits":
+        if self.upload_intent_lifetime <= timedelta(0):
+            raise ValueError("upload_intent_lifetime must be positive")
+        if self.orphan_grace <= self.upload_intent_lifetime:
+            raise ValueError("orphan_grace must exceed upload_intent_lifetime")
+        return self
+
+
+class ObjectStorage(BaseModel):
+    endpoint_url: str
+    access_key: SecretStr
+    secret_key: SecretStr
+    bucket: str = "ras-originals"
 
 
 class PdfBodyThreshold(BaseModel):
@@ -189,11 +208,13 @@ class Settings(BaseSettings):
     password: PasswordPolicy = PasswordPolicy()
     auth: AuthLifetimes = AuthLifetimes()
     files: FileLimits = FileLimits()
+    upload_notice_version: str = Field(default="2026-09-24.v1", min_length=1)
     pdf_body: PdfBodyThreshold = PdfBodyThreshold()
     retention: Retention = Retention()
     budget: ProviderBudget = ProviderBudget()
     http: HttpSecurity = HttpSecurity()
     delivery: Delivery = Delivery()
+    storage: ObjectStorage | None = None
 
     @model_validator(mode="after")
     def _check_database(self) -> "Settings":

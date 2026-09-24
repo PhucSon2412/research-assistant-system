@@ -40,6 +40,11 @@ def test_defaults_match_documented_mvp_values() -> None:
     assert s.auth.invite == timedelta(hours=72)
     assert s.auth.password_reset == timedelta(minutes=30)
     assert (s.files.pdf_max_bytes, s.files.pdf_max_pages, s.files.markdown_max_bytes) == (30 * MIB, 100, 2 * MIB)
+    assert s.files.upload_intent_lifetime == timedelta(minutes=10)
+    assert s.files.orphan_grace == timedelta(hours=24)
+    assert s.files.pdf_probe_timeout_seconds == 10
+    assert s.files.pdf_probe_memory_bytes == 256 * MIB
+    assert s.upload_notice_version
     assert (s.pdf_body.min_body_page_ratio, s.pdf_body.min_chars_per_body_page, s.pdf_body.min_total_body_chars) == (
         0.70, 100, 2000
     )
@@ -65,6 +70,9 @@ def test_nested_values_override_from_environment(monkeypatch: pytest.MonkeyPatch
         lambda: AuthLifetimes(session_idle=timedelta(hours=9)),  # idle > absolute
         lambda: AuthLifetimes(invite=timedelta(0)),
         lambda: FileLimits(pdf_max_bytes=0),
+        lambda: FileLimits(upload_intent_lifetime=timedelta(0)),
+        lambda: FileLimits(orphan_grace=timedelta(minutes=10)),
+        lambda: FileLimits(pdf_probe_timeout_seconds=0),
         lambda: PdfBodyThreshold(min_body_page_ratio=1.01),
         lambda: PdfBodyThreshold(min_body_page_ratio=0),
         lambda: Retention(backup_retention=timedelta(0)),

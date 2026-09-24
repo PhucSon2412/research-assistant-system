@@ -52,7 +52,7 @@ Các lựa chọn dưới đây là **quyết định kỹ thuật của PR M1a,
 
 ## Ghi nhận khi triển khai M1b (2026-09-24)
 
-Các lựa chọn dưới đây là **quyết định kỹ thuật của PR M1b (PR #2), đang chờ chủ dự án review, chưa merge**; chi tiết vận hành ở [dev-setup](dev-setup.md#xác-thực-phiên-và-quyền-m1b). Chúng hiện thực các mục **Đề xuất** về tách xác thực/phiên/phân quyền và ma trận quyền metadata; không mở rộng yêu cầu sản phẩm.
+Các lựa chọn dưới đây là **quyết định kỹ thuật của PR M1b (PR #2), đã merge vào `main` tại `b20b552`**; chi tiết vận hành ở [dev-setup](dev-setup.md#xác-thực-phiên-và-quyền-m1b). Chúng hiện thực các mục **Đề xuất** về tách xác thực/phiên/phân quyền và ma trận quyền metadata; không mở rộng yêu cầu sản phẩm.
 
 - **Token:** invitation, reset, session và CSRF đều là 256 bit từ `secrets`; DB chỉ lưu SHA-256 hex (có `CHECK` định dạng), không lưu token thô. Dùng hash nhanh vì đầu vào là ngẫu nhiên entropy cao, không phải mật khẩu, và cần tra cứu có index. Link đặt token ở fragment `#token=` để trình duyệt không gửi token lên web/API và không vào access log.
 - **Dùng một lần/đồng thời:** accept invitation và confirm reset khóa dòng (`SELECT … FOR UPDATE`) rồi kiểm lại điều kiện còn hiệu lực; request thua cuộc nhận `invalid_token`. Partial unique index giữ tối đa một invitation mở mỗi email và một reset token mở mỗi user; invite/reset mới thu hồi cái cũ.
@@ -71,6 +71,14 @@ Các lựa chọn dưới đây là **quyết định kỹ thuật của PR M1b 
 **Điều kiện trước khi triển khai ngoài dev** (chưa đáp ứng ở M1b): cấu hình triển khai riêng đã kiểm chứng với HTTPS và cookie `Secure`; không dùng `dev_outbox`; kênh gửi invite/reset thật; rate limit/khóa tạm cho login và reset; đo và xử lý timing enumeration của yêu cầu reset. Chi tiết ở [dev-setup](dev-setup.md#trước-khi-đưa-lên-server).
 
 **Bàn giao cho M1c từ M1b:** proxy web `/api/*` (`web/app/api/[...path]/route.ts`) đọc toàn bộ request/response vào bộ nhớ và có timeout 15 giây, không phù hợp để truyền PDF tới 30 MB; M1c cần thiết kế đường upload riêng (ví dụ stream hoặc gửi thẳng tới API/lưu trữ sau khi có intent) thay vì dùng nguyên proxy này. Trước khi mở download, vẫn phải ràng buộc `source_files.job_id` và `version_id` cùng item (mục M1a ở trên).
+
+## Ghi nhận khi triển khai M1c (2026-09-24)
+
+- **Hai request:** `GET /uploads/notice` trả text/version hiện hành. `POST /uploads/intents` nhận xác nhận tường minh cùng tên, loại, kích thước và SHA-256 của file, không nhận file; ghi `processing_acknowledgements` (actor, session, thời điểm, version). Token intent ngẫu nhiên 256 bit chỉ trả một lần, DB lưu hash; thời hạn mặc định 10 phút (`Settings.files`). `PUT /uploads/original` gắn token trong header, khóa dòng intent trong lúc nhận file để hai request đua nhau chỉ một request commit. Sai User, session, notice, file, hết hạn và tái dùng bị từ chối. UI bỏ chọn checkbox sau mỗi lần thử.
+- **Streaming cùng origin:** Next.js dùng route riêng `/api/uploads/original` và `/api/files/{id}/original`, chuyển tiếp `ReadableStream` hai chiều, không đi qua proxy JSON đang buffer và timeout 15 giây. Cookie/CSRF/Origin tiếp tục đi cùng request; FastAPI quyết định intent và quyền. Download theo ID luôn truy vấn ACL, trả `404` cho User/Admin trái quyền; không cấp object URL. Script HTTP đã thử PDF 30.409.152 byte qua proxy, tải lại đúng SHA-256.
+- **File và trạng thái:** API stream request vào tempfile giới hạn kích thước, so hash/size, kiểm UTF-8 Markdown hoặc PDF hợp lệ/số trang bằng subprocess có timeout; trên container Linux có giới hạn address space/CPU. M1c chưa trích text, OCR, kiểm body coverage, gọi provider hoặc index. Sau khi put S3 thành công, một giao dịch tạo item `private`/`metadata_only`, version, file và job `received`.
+- **DB ↔ S3:** object key ngẫu nhiên riêng từng lần upload, không dedup xuyên User. Object được put trước DB commit; nếu DB lỗi, API chỉ xóa sau khi kiểm không có `SourceFile` tham chiếu. Nếu crash hoặc không xác định được kết quả commit, object chưa có DB record vẫn không thể tải qua API; lệnh `python -m app.cli.reconcile_originals` xóa object không tham chiếu sau grace mặc định 24 giờ, chạy khi không có upload cũ còn xử lý. DB record không trỏ object chưa put thành công. Đây là cơ chế phục hồi cho dev; chưa có lịch sweep/giám sát production.
+- **Ràng buộc DB:** migration `0003` tạo bảng consent/intent và trigger chặn link file chéo item; `0004` thêm `source_files.item_id` và hai FK kép `(version_id,item_id)`/`(job_id,item_id)` để PostgreSQL giữ bất biến cả khi cập nhật đồng thời. Test PostgreSQL thật thử khác User và khác scope. Quyền file vẫn được kiểm theo item/version trên từng GET.
 
 ## Cần xác nhận hoặc đo trước phần phụ thuộc
 

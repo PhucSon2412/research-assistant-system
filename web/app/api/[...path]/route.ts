@@ -5,7 +5,7 @@
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED_PREFIXES = new Set(["auth", "admin", "library"]);
+const ALLOWED_PREFIXES = new Set(["auth", "admin", "library", "uploads"]);
 const REQUEST_HEADERS = ["cookie", "content-type", "accept", "origin", "x-csrf-token"];
 const RESPONSE_HEADERS = ["content-type", "cache-control"];
 

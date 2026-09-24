@@ -5,6 +5,7 @@ from app.models.base import Base
 from app.models.identity import BootstrapState, Invitation, PasswordResetToken, User, UserSession
 from app.models.ingest import IngestionJob
 from app.models.library import LibraryItem, PaperVersion, SourceFile
+from app.models.upload import ProcessingAcknowledgement, UploadIntent
 
 __all__ = [
     "AuditEvent",
@@ -18,4 +19,6 @@ __all__ = [
     "SourceFile",
     "User",
     "UserSession",
+    "ProcessingAcknowledgement",
+    "UploadIntent",
 ]

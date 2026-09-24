@@ -22,7 +22,7 @@ function readCookie(name: string): string | null {
   return null;
 }
 
-async function csrfToken(): Promise<string> {
+export async function csrfToken(): Promise<string> {
   let token = readCookie("ras_csrf");
   if (!token) {
     await fetch("/api/auth/csrf", { cache: "no-store", credentials: "same-origin" });
@@ -64,6 +64,13 @@ const MESSAGES: Record<string, string> = {
   delivery_unavailable: "Chưa cấu hình kênh gửi liên kết.",
   invalid_email: "Email không hợp lệ.",
   cannot_change_own_status: "Không thể tự vô hiệu hóa tài khoản của mình.",
+  invalid_intent: "Phiên xác nhận upload không hợp lệ, đã dùng hoặc hết hạn. Hãy xác nhận lại.",
+  notice_changed: "Thông báo xử lý đã thay đổi. Tải lại trang và xác nhận lại.",
+  file_too_large: "File vượt giới hạn cho phép.",
+  file_mismatch: "File không khớp với lần xác nhận.",
+  invalid_pdf: "PDF không hợp lệ hoặc vượt giới hạn trang.",
+  invalid_markdown: "Markdown không hợp lệ.",
+  upload_unavailable: "Chưa thể lưu file. Hãy thử lại.",
 };
 
 export function describeError(err: unknown): string {
