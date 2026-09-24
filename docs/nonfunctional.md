@@ -1,0 +1,31 @@
+# Yêu cầu phi chức năng
+
+[Mục lục](README.md) · [Kiểm thử](testing.md) · [Quyết định còn mở](decisions.md)
+
+**Đã xác nhận:** Orchestrator đặt workload ban đầu, đo baseline rồi mới chốt SLO. Không có SLO hiệu năng, uptime hoặc quality gate nào đã benchmark/cam kết. Phản hồi key do chủ dự án cung cấp cho biết `limit=50`, `limit_reset=daily`: đây là **spending cap $50/ngày của key**, không phải credit cấp mới mỗi ngày; `limit_remaining`/usage là snapshot, không ghi vào config. Ngân sách **ứng dụng thử** là $10/ngày, thấp hơn và độc lập với key cap.
+
+**Workload thử ban đầu — đề xuất, cần đo:** Tập khoảng **1.000 paper, trung bình 20 trang**, có quyền dùng để benchmark; gồm paper chung/riêng, PDF partial và metadata-only. **5 user đồng thời** chạy hỗn hợp keyword/hybrid search, RAG một paper/collection/toàn quyền và API thư viện; song song một đợt **10 upload PDF text/Markdown** và **50 candidate arXiv metadata** qua fixture/replay trong một giờ. Nếu tập thực nhỏ hơn, báo kích thước và giới hạn kết luận. Dùng Docker Compose trên máy tham chiếu đề xuất 8 vCPU/32 GB RAM; ghi cấu hình/tài nguyên từng service, số worker, model/provider, cache warm/cold, số request và lỗi. Load lớn dùng mock/fixture vector để không chi provider ngoài budget; chạy mẫu live trong ngân sách để đo tác động OpenRouter. Báo p50/p95/p99, confidence theo số mẫu và tách thời gian queue, retrieval, provider.
+
+| Chủ đề | Cách đo dưới workload ban đầu | Kết quả / ngưỡng |
+| --- | --- | --- |
+| Search latency | p95 từ request tới trang 20 hit, 5 user, keyword/vector/hybrid và scope được ghi, warm/cold tách riêng | **Mục tiêu đề xuất, cần đo:** p95 < 2 giây |
+| RAG latency | p95 token đầu và câu trả lời hoàn chỉnh có citation, 5 user, model/provider cố định; tách retrieval, query embedding, rerank và generation | **Mục tiêu đề xuất, cần đo:** token đầu < 10 giây; hoàn tất < 45 giây |
+| Ingest PDF | p95 từ worker bắt đầu parse đến `ready` cho PDF text 20 trang; báo riêng queue wait, scan/partial và worker concurrency | **Mục tiêu đề xuất, cần đo:** < 5 phút, không tính queue |
+| Đồng thời / mở rộng | Baseline 5 user; sau đó tăng có kiểm soát, đo p95, lỗi, CPU/RAM, PostgreSQL/pgvector, Redis/MinIO và queue age | Báo đường cong/nút nghẽn; chưa đặt SLO quy mô lớn |
+| Daily discovery | 50 candidate metadata qua fixture/replay song song upload; đo trùng, độ trễ cập nhật và gate quyền full text | Baseline chưa đo; không gọi arXiv ồ ạt khi load test |
+| Sẵn sàng | Probe API ngoài hệ thống theo tháng trên triển khai thật; ghi downtime và bảo trì | Chưa đặt uptime SLO trước dữ liệu vận hành |
+| Backup / restore | Backup PostgreSQL và object storage ít nhất hằng ngày, giữ 30 ngày; diễn tập restore hằng tháng trên môi trường sạch, kiểm checksum/ACL/tombstone/index rebuild | **Mục tiêu thử đề xuất, cần đo:** RPO ≤ 24 giờ, RTO ≤ 24 giờ; bản đã xóa không tái xuất hiện |
+| Độ tin cậy ingest | 1.000 job fixture có chèn lỗi mạng/parser/index; đo job mất, duplicate, thời gian retry | Không được mất job hoặc tạo dẫn xuất trùng trong bộ test; báo mọi lỗi |
+| Thu hồi quyền | Trong fixture hai User, ghi mốc commit `t_rev`; bắn request mới tới file/range/search/RAG/citation khi cache/index còn stale, đồng thời giữ job và RAG stream đang chạy | Request mới sau commit không phục vụ nội dung; báo thời gian worker dừng, stream ngừng sau khi phát hiện và mọi phần đã gửi trước mốc phát hiện. Không thể thu hồi bytes đã gửi client/provider; xem [hợp đồng](access-and-data.md#hợp-đồng-thu-hồi-và-xóa) |
+| Chất lượng retrieval/RAG | ≥ 80 câu hỏi có evidence chuẩn, phân nhóm một/nhiều paper, không đáp án, partial, quyền; đo Recall@5, grounded answer, citation span, abstention và leak | **Mục tiêu đề xuất, cần đo:** lần lượt ≥ 0,80; ≥ 90%; ≥ 95%; ≥ 90%; ACL leak = 0; chưa là quality gate |
+| Chi phí | Ghi model/provider, token/units và giá theo embed document/query, rerank, generation; đo trong live sample nằm dưới budget, báo estimate khác billed | Budget ứng dụng thử $10/ngày, quota mỗi request/user và cảnh báo gần hết; **đề xuất chia** embedding $3, rerank $2, generation $5/ngày, điều chỉnh theo baseline; key cap $50/ngày riêng |
+
+## An toàn, riêng tư và vận hành
+
+**Đề xuất:** Mọi route và truy vấn dẫn xuất kiểm quyền ở server; file gốc được tải qua route kiểm quyền mỗi request, không có link object công khai dài hạn; encryption khi truyền/lưu, secret qua cơ chế quản lý secret, audit các thao tác nhạy cảm. Đo bảo mật bằng bộ test ma trận quyền, kiểm thử IDOR, injection, upload file độc hại, prompt injection, cache leak và phân tích dependency theo từng release; điều kiện là hai User tách biệt, một Admin, item trùng DOI/hash ở cả kho chung/riêng. Mục tiêu là 0 đường rò rỉ khác quyền trong bộ test, kèm kiểm tra thủ công trước release. Không ghi paper, prompt, embedding hoặc URL token vào log mặc định.
+
+**Đề xuất:** Quan sát hệ thống qua metrics theo stage (queue age, throughput, lỗi, partial coverage, index lag, latency token đầu/hoàn tất, token/cost theo model/provider/tác vụ), trace theo job/request ID và alert gần hết budget $10/ngày hoặc job lỗi. Đo trên staging và production với sampling rõ; kiểm bằng cách chèn một lỗi vào mỗi stage và xác nhận có metric, trace, cảnh báo và runbook tương ứng. Không gom dữ liệu paper riêng vào dashboard vận hành. Runbook gồm retry, reindex, restore, thu hồi quyền và xử lý item lỗi.
+
+**Đề xuất:** Kiểm accessibility bằng thao tác toàn bộ hành trình chính chỉ với bàn phím và screen reader, cộng kiểm tương phản/nhãn form trên các trang upload, trạng thái, search, viewer, RAG. Điều kiện thử: trình duyệt và công cụ hỗ trợ được ghi phiên bản, người thử không dùng chuột; mục tiêu đề xuất, chưa kiểm là hoàn thành 100% hành trình chính và không có lỗi accessibility mức nghiêm trọng. Chuẩn cụ thể cần xác nhận. Kiểm bảo trì bằng thời gian thiết lập Docker Compose trên máy sạch theo hướng dẫn repo, chạy migration/rollback trên dữ liệu mẫu, kiểm tài liệu API/schema và test chạy lại được; ghi thời gian baseline rồi chốt mục tiêu. Không ghi lệnh build/test giả định ở giai đoạn này.
+
+**Cần kiểm qua benchmark/triển khai:** model/provider routing và retention thực tế, số chiều vector, độ đại diện của tập 1.000 paper, ngưỡng PDF và khả năng đạt mục tiêu đề xuất. Chỉ sau khi có baseline mới chốt SLO/quality gate; xem [decisions](decisions.md).
