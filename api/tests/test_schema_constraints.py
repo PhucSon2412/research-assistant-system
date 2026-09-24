@@ -293,3 +293,78 @@ def test_audit_actor_type_matches_actor(conn: Connection) -> None:
     assert "ck_audit_events_actor_user_matches_type" in expect_error(
         conn, "INSERT INTO audit_events (actor_type, action, outcome) VALUES ('user', 'x', 'success')"
     )
+
+
+# --- M1b auth tables -----------------------------------------------------------
+
+DIGEST = "b" * 64
+INSERT_INVITATION = (
+    "INSERT INTO invitations (email, token_hash, invited_by_user_id, created_at, expires_at)"
+    " VALUES (:e, :h, :i, now(), now() + interval '72 hours') RETURNING id"
+)
+INSERT_SESSION = (
+    "INSERT INTO sessions (user_id, token_hash, csrf_token_hash, created_at, last_activity_at,"
+    " absolute_expires_at) VALUES (:u, :h, :d, now(), now(), now() + interval '8 hours') RETURNING id"
+)
+INSERT_RESET = (
+    "INSERT INTO password_reset_tokens (user_id, token_hash, created_at, expires_at)"
+    " VALUES (:u, :h, now(), now() + interval '30 minutes')"
+)
+
+
+def add_invitation(conn: Connection, inviter: uuid.UUID, email: str) -> uuid.UUID:
+    return conn.scalar(text(INSERT_INVITATION), {"e": email, "h": uuid.uuid4().hex * 2, "i": inviter})
+
+
+def test_token_columns_accept_only_sha256_digests(conn: Connection) -> None:
+    admin = add_user(conn, role="admin")
+    raw = "Zm9vYmFyLXJhdy10b2tlbi12YWx1ZS1ub3QtYS1kaWdlc3Q"  # shaped like a raw urlsafe token
+    assert "ck_invitations_token_hash_sha256_hex" in expect_error(
+        conn, INSERT_INVITATION, {"e": "x@example.org", "h": raw, "i": admin}
+    )
+    assert "ck_sessions_token_hash_sha256_hex" in expect_error(conn, INSERT_SESSION, {"u": admin, "h": raw, "d": DIGEST})
+    assert "ck_password_reset_tokens_token_hash_sha256_hex" in expect_error(conn, INSERT_RESET, {"u": admin, "h": raw})
+
+
+def test_one_open_invitation_per_email(conn: Connection) -> None:
+    admin = add_user(conn, role="admin")
+    first = add_invitation(conn, admin, "inv@example.org")
+    with pytest.raises(IntegrityError) as info, conn.begin_nested():
+        add_invitation(conn, admin, "inv@example.org")
+    assert "uq_invitations_open_email" in str(info.value.orig)
+    conn.execute(text("UPDATE invitations SET revoked_at = now() WHERE id = :i"), {"i": first})
+    add_invitation(conn, admin, "inv@example.org")
+
+
+def test_invitation_state_consistency(conn: Connection) -> None:
+    admin, user = add_user(conn, role="admin"), add_user(conn)
+    inv = add_invitation(conn, admin, "state@example.org")
+    assert "ck_invitations_accepted_fields_consistent" in expect_error(
+        conn, "UPDATE invitations SET accepted_at = now() WHERE id = :i", {"i": inv}
+    )
+    assert "ck_invitations_accepted_or_revoked" in expect_error(
+        conn,
+        "UPDATE invitations SET accepted_at = now(), accepted_user_id = :u, revoked_at = now() WHERE id = :i",
+        {"i": inv, "u": user},
+    )
+    assert "ck_invitations_email_normalised" in expect_error(
+        conn, INSERT_INVITATION, {"e": "Mixed@Example.org", "h": DIGEST, "i": admin}
+    )
+
+
+def test_session_revocation_needs_known_reason(conn: Connection) -> None:
+    user = add_user(conn)
+    sid = conn.scalar(text(INSERT_SESSION), {"u": user, "h": DIGEST, "d": DIGEST})
+    assert "ck_sessions_revoked_fields_consistent" in expect_error(
+        conn, "UPDATE sessions SET revoked_at = now() WHERE id = :s", {"s": sid}
+    )
+    assert "ck_sessions_revoked_reason_valid" in expect_error(
+        conn, "UPDATE sessions SET revoked_at = now(), revoked_reason = 'whim' WHERE id = :s", {"s": sid}
+    )
+    conn.execute(text("UPDATE sessions SET revoked_at = now(), revoked_reason = 'logout' WHERE id = :s"), {"s": sid})
+
+
+def test_one_open_reset_token_per_user(conn: Connection) -> None:
+    user = add_user(conn)
+    conn.execute(text(INSERT_RESET), {"u": user, "h": "c" * 64})
+    assert "uq_password_reset_tokens_open_user_id" in expect_error(conn, INSERT_RESET, {"u": user, "h": "d" * 64})

@@ -24,7 +24,7 @@ from sqlalchemy.engine import URL, make_url
 
 from app.config import DatabaseConnection, Settings
 from app.main import app
-from tests.conftest import create_empty_database, db_env, drop_database
+from tests.conftest import HEAD_REVISION, create_empty_database, db_env, drop_database
 
 API_DIR = Path(__file__).resolve().parents[1]
 
@@ -179,6 +179,6 @@ def test_special_password_works_for_migration_api_and_bootstrap(tricky_role_db: 
 
     check = create_engine(tricky_role_db)
     with check.connect() as conn:
-        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == "0001"
+        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == HEAD_REVISION
         assert conn.scalar(text("SELECT count(*) FROM users WHERE role = 'admin'")) == 1
     check.dispose()

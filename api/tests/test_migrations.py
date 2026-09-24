@@ -8,7 +8,7 @@ from alembic.migration import MigrationContext
 from sqlalchemy import create_engine, inspect, text
 
 from app.models import Base
-from tests.conftest import alembic_config, upgrade
+from tests.conftest import HEAD_REVISION, alembic_config, upgrade
 
 EXPECTED_TABLES = {
     "alembic_version",
@@ -19,6 +19,10 @@ EXPECTED_TABLES = {
     "source_files",
     "ingestion_jobs",
     "audit_events",
+    # M1b (0002)
+    "invitations",
+    "sessions",
+    "password_reset_tokens",
 }
 
 
@@ -38,7 +42,7 @@ def test_empty_database_upgrades_to_head(empty_db_url: str) -> None:
     assert _tables(empty_db_url) == EXPECTED_TABLES
     eng = create_engine(empty_db_url)
     with eng.connect() as conn:
-        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == "0001"
+        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == HEAD_REVISION
         assert conn.scalar(text("SELECT count(*) FROM pg_extension WHERE extname = 'vector'")) == 1
         # No seeded/default accounts or credentials.
         assert conn.scalar(text("SELECT count(*) FROM users")) == 0
@@ -84,3 +88,52 @@ def test_migration_sql_seeds_no_rows() -> None:
         if line.strip().upper().startswith("INSERT") and "alembic_version" not in line
     ]
     assert inserts == []
+
+
+# --- M1b: 0001 -> 0002 on a database that already holds M1a data -------------
+
+
+def _snapshot(conn) -> dict[str, list]:
+    return {
+        t: [tuple(r) for r in conn.execute(text(f"SELECT * FROM {t} ORDER BY 1")).all()]
+        for t in ("users", "bootstrap_state", "library_items", "paper_versions", "audit_events")
+    }
+
+
+def test_upgrade_from_0001_keeps_existing_data(empty_db_url: str) -> None:
+    from app.identity.passwords import hash_password
+
+    upgrade(empty_db_url, "0001")
+    eng = create_engine(empty_db_url)
+    with eng.begin() as conn:
+        admin = conn.scalar(
+            text(
+                "INSERT INTO users (email, role, password_verifier)"
+                " VALUES ('a@example.org', 'admin', :v) RETURNING id"
+            ),
+            {"v": hash_password("x" * 12)},
+        )
+        conn.execute(text("INSERT INTO bootstrap_state (admin_user_id) VALUES (:a)"), {"a": admin})
+        item = conn.scalar(text("INSERT INTO library_items (visibility, title) VALUES ('common', 't') RETURNING id"))
+        conn.execute(text("INSERT INTO paper_versions (item_id) VALUES (:i)"), {"i": item})
+        conn.execute(text("INSERT INTO audit_events (actor_type, action, outcome) VALUES ('system', 'x', 'success')"))
+    with eng.connect() as conn:
+        before = _snapshot(conn)
+
+    upgrade(empty_db_url)
+    with eng.connect() as conn:
+        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == HEAD_REVISION
+        after_first = _snapshot(conn)
+    upgrade(empty_db_url)  # re-run: no-op
+    with eng.connect() as conn:
+        after_second = _snapshot(conn)
+        for table in ("invitations", "sessions", "password_reset_tokens"):
+            assert conn.scalar(text(f"SELECT count(*) FROM {table}")) == 0
+    assert before == after_first == after_second
+
+    # Downgrading only M1b keeps the M1a data too.
+    command.downgrade(alembic_config(empty_db_url), "0001")
+    with eng.connect() as conn:
+        assert _snapshot(conn) == before
+    assert "sessions" not in _tables(empty_db_url)
+    eng.dispose()

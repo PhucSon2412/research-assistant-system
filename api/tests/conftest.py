@@ -24,6 +24,8 @@ from app import config as app_config
 from app import db as app_db
 
 API_DIR = Path(__file__).resolve().parents[1]
+# Latest Alembic revision; bump when a migration is added.
+HEAD_REVISION = "0002"
 REPO_DIR = API_DIR.parent
 
 
@@ -145,6 +147,25 @@ def db_env(url: URL) -> dict[str, str]:
         "RAS_DB__PASSWORD": url.password or "",
         "RAS_DB__NAME": url.database or "",
     }
+
+
+@pytest.fixture
+def api(app_env, migrated_db_url: URL, monkeypatch: pytest.MonkeyPatch, engine: Engine):
+    """Migrated DB + development auth settings + a controllable clock."""
+    from app.api.deps import get_now
+    from app.delivery import get_delivery
+    from app.main import app
+    from tests.helpers import DEV_ENV, FakeClock, Harness
+
+    for key, value in DEV_ENV.items():
+        monkeypatch.setenv(key, value)
+    app_env(migrated_db_url)
+    get_delivery.cache_clear()
+    clock = FakeClock()
+    app.dependency_overrides[get_now] = lambda: clock.now
+    yield Harness(engine=engine, clock=clock)
+    app.dependency_overrides.clear()
+    get_delivery.cache_clear()
 
 
 @pytest.fixture

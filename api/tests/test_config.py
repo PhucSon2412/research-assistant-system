@@ -85,3 +85,42 @@ def test_boundary_values_are_accepted() -> None:
     ProviderBudget(embedding_daily_usd=3, rerank_daily_usd=2, generation_daily_usd=5)  # sum == app budget
     ProviderBudget(app_daily_usd=50.0, key_spending_cap_daily_usd=50.0)
     PasswordPolicy(min_length=8)
+
+
+# --- M1b: environment, cookies, delivery ---------------------------------------
+
+
+def test_production_defaults_are_safe() -> None:
+    s = Settings(database_url=URL)
+    assert s.environment == "production"
+    assert s.http.cookie_secure is True
+    assert s.delivery.mode == "disabled"
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"http": {"cookie_secure": False}},  # insecure cookie in production
+        {"delivery": {"mode": "dev_outbox"}, "http": {"public_base_url": "https://x.example"}},  # dev outbox in prod
+        {"environment": "development", "delivery": {"mode": "dev_outbox"}},  # no base URL for links
+        {"environment": "development", "http": {"allowed_origins": ["http://x.example/"]}},
+        {"environment": "development", "http": {"public_base_url": "ftp://x.example"}},
+        {"delivery": {"dev_outbox_max_entries": 0}},
+    ],
+)
+def test_unsafe_auth_settings_are_rejected(kwargs) -> None:
+    with pytest.raises(ValidationError):
+        Settings(database_url=URL, **kwargs)
+
+
+def test_development_settings_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RAS_DATABASE_URL", URL)
+    monkeypatch.setenv("RAS_ENVIRONMENT", "development")
+    monkeypatch.setenv("RAS_HTTP__COOKIE_SECURE", "false")
+    monkeypatch.setenv("RAS_HTTP__PUBLIC_BASE_URL", "http://127.0.0.1:3000/")
+    monkeypatch.setenv("RAS_HTTP__ALLOWED_ORIGINS", '["http://127.0.0.1:3000","http://localhost:3000"]')
+    monkeypatch.setenv("RAS_DELIVERY__MODE", "dev_outbox")
+    s = Settings()  # type: ignore[call-arg]
+    assert s.http.public_base_url == "http://127.0.0.1:3000"
+    assert s.http.allowed_origins == ["http://127.0.0.1:3000", "http://localhost:3000"]
+    assert (s.delivery.mode, s.http.cookie_secure) == ("dev_outbox", False)
