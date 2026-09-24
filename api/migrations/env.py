@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import os
 from logging.config import fileConfig
 
 from alembic import context
+from sqlalchemy.engine import URL
 
+from app.config import get_settings
 from app.db import make_engine
 from app.models import Base
 
@@ -16,13 +17,11 @@ if config.config_file_name is not None and config.attributes.get("configure_logg
 target_metadata = Base.metadata
 
 
-def _database_url() -> str:
+def _database_url() -> str | URL:
     # Tests pass a URL/connection through config.attributes; otherwise use
-    # the same environment variable as the application.
-    url = config.attributes.get("database_url") or os.environ.get("RAS_DATABASE_URL")
-    if not url:
-        raise RuntimeError("RAS_DATABASE_URL is not set")
-    return url
+    # the application settings (RAS_DB__* parts or RAS_DATABASE_URL), so the
+    # password is never spliced into a URL string here.
+    return config.attributes.get("database_url") or get_settings().sqlalchemy_url()
 
 
 def run_migrations_offline() -> None:

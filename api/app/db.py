@@ -3,12 +3,13 @@ from __future__ import annotations
 from functools import lru_cache
 
 from sqlalchemy import Engine, create_engine
+from sqlalchemy.engine import URL
 from sqlalchemy.orm import sessionmaker
 
 from app.config import get_settings
 
 
-def make_engine(database_url: str) -> Engine:
+def make_engine(database_url: str | URL) -> Engine:
     # hide_parameters keeps bound values (e.g. password verifiers) out of
     # exception messages and SQL echo.
     return create_engine(database_url, pool_pre_ping=True, hide_parameters=True)
@@ -16,7 +17,7 @@ def make_engine(database_url: str) -> Engine:
 
 @lru_cache
 def get_engine() -> Engine:
-    return make_engine(get_settings().database_url)
+    return make_engine(get_settings().sqlalchemy_url())
 
 
 def get_sessionmaker() -> sessionmaker:

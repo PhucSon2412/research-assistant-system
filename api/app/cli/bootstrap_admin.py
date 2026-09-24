@@ -104,7 +104,7 @@ def main(
         password = _read_password(args, stdin, getpass_fn)
         own_engine = engine is None
         if engine is None:
-            engine = make_engine(settings.database_url)
+            engine = make_engine(settings.sqlalchemy_url())
         try:
             result = bootstrap_admin(
                 engine,

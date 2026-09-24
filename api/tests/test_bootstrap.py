@@ -12,11 +12,13 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import Engine, text
+from sqlalchemy.engine import URL
 
 from app.cli import bootstrap_admin as cli
 from app.config import PasswordPolicy
 from app.identity.bootstrap import BootstrapRefused, bootstrap_admin
 from app.identity.passwords import verify_password
+from tests.conftest import db_env
 
 PASSWORD = "Tr0ub4dor&3-long-enough"
 API_DIR = Path(__file__).resolve().parents[1]
@@ -58,7 +60,7 @@ def dump_all_text(engine: Engine) -> str:
 
 
 @pytest.fixture(autouse=True)
-def _settings(app_env, migrated_db_url: str) -> None:
+def _settings(app_env, migrated_db_url: URL) -> None:
     app_env(migrated_db_url)
 
 
@@ -236,9 +238,9 @@ def test_secrets_never_reach_logs_output_or_audit(engine: Engine, caplog) -> Non
     assert db_text.count(verifier) == 1  # only in users.password_verifier, not in audit details
 
 
-def test_cli_subprocess_end_to_end(migrated_db_url: str, engine: Engine) -> None:
+def test_cli_subprocess_end_to_end(migrated_db_url: URL, engine: Engine) -> None:
     """Real process: stdin password, exit codes, no secret on stdout/stderr."""
-    env = {**os.environ, "RAS_DATABASE_URL": migrated_db_url}
+    env = {k: v for k, v in os.environ.items() if not k.startswith("RAS_")} | db_env(migrated_db_url)
     cmd = [sys.executable, "-m", "app.cli.bootstrap_admin", "--email", "admin@example.org", "--password-stdin"]
 
     first = subprocess.run(cmd, input=PASSWORD + "\n", capture_output=True, text=True, cwd=API_DIR, env=env, timeout=60)

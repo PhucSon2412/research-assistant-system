@@ -28,13 +28,14 @@ Nếu task cần chạy Python hoặc cài thư viện Python, dùng môi trư�
 
 ## Lệnh đã kiểm chứng (M1a)
 
-Chi tiết và giải thích ở [môi trường phát triển](docs/dev-setup.md). Chạy từ gốc repo bằng Git Bash/PowerShell:
+Chi tiết, bản PowerShell/Git Bash và giới hạn kiểm chứng ở [môi trường phát triển](docs/dev-setup.md). Chạy từ gốc repo; Windows PowerShell 5.1 không có `&&`. Python host: `$py = "$env:USERPROFILE\.conda\envs\ras\python.exe"` (PowerShell) hoặc `PY="$USERPROFILE/.conda/envs/ras/python.exe"` (Git Bash).
 
-- Chuẩn bị: `cp .env.example .env` rồi điền mọi secret trống (không commit `.env`).
+- Chuẩn bị: `Copy-Item .env.example .env` (PowerShell) / `cp .env.example .env` (Git Bash), rồi điền mọi secret trống; không commit `.env`.
 - Dựng: `docker compose up -d --build --wait` (service `migrate` tự chạy `alembic upgrade head`); hạ: `docker compose down` (giữ dữ liệu) hoặc `docker compose down -v` (xóa volume).
-- Migration: `docker compose run --rm migrate`; revision hiện tại: `docker compose exec api alembic current`.
-- Bootstrap Admin một lần: `docker compose exec api python -m app.cli.bootstrap_admin --email <email>` (hỏi mật khẩu, không echo) hoặc `... -T ... --password-stdin < <file>`.
-- Test API (cần `docker compose up -d db`): `cd api && C:/Users/ADMIN/.conda/envs/ras/python.exe -m pytest -q`; cài lần đầu `C:/Users/ADMIN/.conda/envs/ras/python.exe -m pip install -e ".[dev]"`.
-- Web: `cd web && npm ci && npm run typecheck && npm run build`.
+- Migration: `docker compose run --rm migrate`; revision hiện tại: `docker compose exec -T api alembic current`.
+- Bootstrap Admin một lần: `docker compose exec api python -m app.cli.bootstrap_admin --email <email>` (hỏi mật khẩu, không echo). Cách `--password-stdin` khác nhau giữa PowerShell và Git Bash (PowerShell không có `<`, cần `$OutputEncoding` UTF-8): xem [dev-setup](docs/dev-setup.md#bootstrap-admin-đầu-tiên).
+- Test API (cần `docker compose up -d --wait db`): `& $py -m pytest api -q` / `"$PY" -m pytest api -q`; cài lần đầu `& $py -m pip install -e ".\api[dev]"` / `"$PY" -m pip install -e "./api[dev]"`.
+- Web: `npm ci --prefix web`, `npm run typecheck --prefix web`, `npm run build --prefix web`.
+- Kết nối DB luôn qua `RAS_DB__*` → `Settings.sqlalchemy_url()`; không ghép mật khẩu vào chuỗi URL.
 
 Schema thay đổi qua revision Alembic mới, không sửa revision đã merge; giữ test `test_orm_models_match_migrated_schema` xanh.

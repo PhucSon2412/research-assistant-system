@@ -14,10 +14,34 @@ from __future__ import annotations
 from datetime import timedelta
 from functools import lru_cache
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import URL, make_url
 
 MIB = 1024 * 1024
+
+
+class DatabaseConnection(BaseModel):
+    """Connection parts, passed separately so a password containing URL
+    delimiters (``@ : / ? # %`` ...) is never spliced into a URL string.
+    ``URL.create`` escapes each part when a driver string is rendered."""
+
+    host: str = Field(min_length=1)
+    port: int = Field(default=5432, gt=0, le=65535)
+    user: str = Field(min_length=1)
+    password: SecretStr
+    name: str = Field(min_length=1)
+    driver: str = "postgresql+psycopg"
+
+    def url(self) -> URL:
+        return URL.create(
+            self.driver,
+            username=self.user,
+            password=self.password.get_secret_value(),
+            host=self.host,
+            port=self.port,
+            database=self.name,
+        )
 
 
 class PasswordPolicy(BaseModel):
@@ -109,9 +133,12 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Required; no default so a missing value fails loudly instead of
-    # silently connecting with a built-in credential.
-    database_url: str
+    # Exactly one of these is required; no default so a missing value fails
+    # loudly instead of silently connecting with a built-in credential.
+    # Prefer ``db`` (RAS_DB__HOST/PORT/USER/PASSWORD/NAME). ``database_url``
+    # (RAS_DATABASE_URL) must already be percent-encoded.
+    db: DatabaseConnection | None = None
+    database_url: SecretStr | None = None
 
     password: PasswordPolicy = PasswordPolicy()
     auth: AuthLifetimes = AuthLifetimes()
@@ -119,6 +146,17 @@ class Settings(BaseSettings):
     pdf_body: PdfBodyThreshold = PdfBodyThreshold()
     retention: Retention = Retention()
     budget: ProviderBudget = ProviderBudget()
+
+    @model_validator(mode="after")
+    def _check_database(self) -> "Settings":
+        if (self.db is None) == (self.database_url is None):
+            raise ValueError("set exactly one of RAS_DB__* (host/user/password/name) or RAS_DATABASE_URL")
+        return self
+
+    def sqlalchemy_url(self) -> URL:
+        if self.db is not None:
+            return self.db.url()
+        return make_url(self.database_url.get_secret_value())  # type: ignore[union-attr]
 
 
 @lru_cache

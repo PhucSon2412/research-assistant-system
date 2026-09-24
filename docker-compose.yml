@@ -4,8 +4,14 @@
 
 name: ras
 
+# Connection parts are passed separately and assembled with SQLAlchemy's
+# URL.create(), so passwords containing URL delimiters (@ : / ? # %) work.
 x-db-env: &db-env
-  RAS_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?set POSTGRES_USER in .env}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:?set POSTGRES_DB in .env}
+  RAS_DB__HOST: db
+  RAS_DB__PORT: "5432"
+  RAS_DB__USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+  RAS_DB__PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+  RAS_DB__NAME: ${POSTGRES_DB:?set POSTGRES_DB in .env}
 
 services:
   db:
