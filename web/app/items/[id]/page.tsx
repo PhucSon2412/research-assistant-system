@@ -16,17 +16,19 @@ type Version = {
   received_at: string;
 };
 type Detail = Item & { versions: Version[] };
+type FileInfo = { id: string; filename: string | null; byte_size: number; verified_mime: string; page_count: number | null };
+type JobInfo = { id: string; state: string; origin: string };
 
 export default function ItemPage() {
   const user = useSession();
   const { id } = useParams<{ id: string }>();
-  const [item, setItem] = useState<Detail | null>(null);
+  const [item, setItem] = useState<(Detail & { files: FileInfo[]; jobs: JobInfo[] }) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (!user) return;
-    api<{ item: Detail }>(`/library/items/${encodeURIComponent(id)}`)
+    api<{ item: Detail & { files: FileInfo[]; jobs: JobInfo[] } }>(`/library/items/${encodeURIComponent(id)}`)
       .then((d) => setItem(d.item))
       .catch((err) => setError(describeError(err)));
   }, [user, id]);
@@ -78,6 +80,12 @@ export default function ItemPage() {
               </li>
             ))}
           </ul>
+          {item.jobs.length > 0 && <p>Trạng thái tiếp nhận: {item.jobs.map((j) => j.state).join(", ")}</p>}
+          <h2>File gốc</h2>
+          <ul>{item.files.map((f) => <li key={f.id}>
+            <a href={`/api/files/${encodeURIComponent(f.id)}/original`}>{f.filename ?? "Original"}</a>
+            {` · ${f.byte_size} byte`}{f.page_count ? ` · ${f.page_count} trang` : ""}
+          </li>)}</ul>
         </>
       )}
     </Shell>

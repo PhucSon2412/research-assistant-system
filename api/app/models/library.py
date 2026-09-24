@@ -116,6 +116,15 @@ class SourceFile(Base):
         CheckConstraint("checksum_sha256 ~ '^[0-9a-f]{64}$'", name="checksum_sha256_hex"),
         CheckConstraint("version_id IS NOT NULL OR job_id IS NOT NULL", name="has_owner_record"),
         CheckConstraint("length(storage_key) > 0", name="storage_key_not_empty"),
+        CheckConstraint("version_id IS NULL OR job_id IS NULL OR item_id IS NOT NULL", name="both_links_require_item"),
+        ForeignKeyConstraint(
+            ["version_id", "item_id"], ["paper_versions.id", "paper_versions.item_id"],
+            name="fk_source_files_version_item_paper_versions", ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["job_id", "item_id"], ["ingestion_jobs.id", "ingestion_jobs.item_id"],
+            name="fk_source_files_job_item_ingestion_jobs", ondelete="RESTRICT",
+        ),
         UniqueConstraint("id", "version_id", name="uq_source_files_id_version_id"),
         Index("ix_source_files_version_id", "version_id"),
         Index("ix_source_files_job_id", "job_id"),
@@ -126,6 +135,7 @@ class SourceFile(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
+    item_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     version_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("paper_versions.id", ondelete="RESTRICT")
     )

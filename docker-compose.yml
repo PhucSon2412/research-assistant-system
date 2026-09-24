@@ -1,4 +1,4 @@
-# Development stack (M1a foundation + M1b auth). Copy .env.example to .env and fill every secret
+# Development stack (M1a–M1c). Copy .env.example to .env and fill every secret
 # before `docker compose up`; required values have no fallback on purpose.
 # Host ports bind to 127.0.0.1 only.
 
@@ -58,6 +58,7 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
     ports:
+      - "127.0.0.1:${MINIO_API_HOST_PORT:-9000}:9000"
       - "127.0.0.1:${MINIO_CONSOLE_HOST_PORT:-9001}:9001"
     volumes:
       - minio-data:/data
@@ -93,6 +94,10 @@ services:
       # Invitation/reset links are kept in API memory for an Admin to read
       # at /admin (single process; emptied on restart). Real channel: open.
       RAS_DELIVERY__MODE: dev_outbox
+      RAS_STORAGE__ENDPOINT_URL: http://minio:9000
+      RAS_STORAGE__ACCESS_KEY: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}
+      RAS_STORAGE__SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+      RAS_STORAGE__BUCKET: ras-originals
     ports:
       - "127.0.0.1:${API_HOST_PORT:-8000}:8000"
     depends_on:

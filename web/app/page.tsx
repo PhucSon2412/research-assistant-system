@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, describeError } from "../lib/api";
 import { ErrorText, Shell, useSession } from "./components/session";
+import { Upload } from "./components/upload";
 
 export type Item = {
   id: string;
@@ -28,6 +29,7 @@ export default function LibraryPage() {
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState<Page | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -37,12 +39,13 @@ export default function LibraryPage() {
         setError(null);
       })
       .catch((err) => setError(describeError(err)));
-  }, [user, scope, offset]);
+  }, [user, scope, offset, refresh]);
 
   return (
     <Shell user={user}>
       <h1>Thư viện</h1>
-      <p style={{ color: "#555" }}>Kho chung và kho riêng của bạn. Chưa có upload ở giai đoạn này.</p>
+      <p style={{ color: "#555" }}>Kho chung và kho riêng của bạn.</p>
+      {user?.role === "user" && <Upload onComplete={() => { setOffset(0); setRefresh((n) => n + 1); }} />}
       <label>
         Phạm vi{" "}
         <select

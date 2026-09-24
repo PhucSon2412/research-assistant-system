@@ -2,7 +2,7 @@
 
 [Mục lục](README.md) · [Yêu cầu sản phẩm](product-requirements.md) · [Search và RAG](search-and-rag.md) · [Phi chức năng](nonfunctional.md)
 
-Đây là kế hoạch **đề xuất**. Từ M1a đã có pytest cho API (`api/tests/`: migration trên DB trống, ràng buộc schema, bootstrap một lần/đồng thời/không lộ secret, config, health) chạy trên PostgreSQL thật; cách chạy ở [dev-setup](dev-setup.md#chạy-test-và-build). M1b thêm contract/integration test cho invite/session/reset (biên hết hạn bằng đồng hồ giả, dùng một lần, hai request đồng thời cùng token, login đua reset, user bị vô hiệu hóa, reset thu hồi phiên), CSRF/cookie, route Admin/dev outbox với User và khách, token/mật khẩu không có trong DB/log/audit, nâng `0001 → 0002` giữ dữ liệu, và ma trận ACL metadata Admin/User A/User B qua list/count/detail/ID tự sửa/phân trang (`test_library_acl.py`). Mỗi milestone bổ sung test cho rủi ro mà nó tạo ra; dùng fixture nhỏ có giấy phép/nguồn rõ và dữ liệu giả cho paper riêng.
+Đây là kế hoạch **đề xuất**. Từ M1a đã có pytest cho API (`api/tests/`: migration trên DB trống, ràng buộc schema, bootstrap một lần/đồng thời/không lộ secret, config, health) chạy trên PostgreSQL thật; cách chạy ở [dev-setup](dev-setup.md#chạy-test-và-build). M1b thêm contract/integration test cho invite/session/reset, CSRF/cookie và ma trận ACL metadata. M1c thêm `test_uploads.py` trên PostgreSQL và MinIO thật: intent một lần/expiry/race/CSRF/Origin, file hợp lệ và sai định dạng/kích thước/trang, PDF gần 30 MiB, lỗi storage/DB cleanup, file private qua list/ID/URL và khóa DB khác item/User/scope. Mỗi milestone bổ sung test cho rủi ro mà nó tạo ra; dùng fixture nhỏ có giấy phép/nguồn rõ và dữ liệu giả cho paper riêng.
 
 | Tầng | Ca kiểm chính | Điều kiện đạt |
 | --- | --- | --- |

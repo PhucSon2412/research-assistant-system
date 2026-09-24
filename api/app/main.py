@@ -1,8 +1,7 @@
 """FastAPI entrypoint.
 
 M1b adds invitation/session/reset auth, Admin account management and the
-minimal library metadata API. Upload intent and file storage (M1c) are
-intentionally absent.
+minimal library metadata API. M1c adds private upload intent and originals.
 """
 
 from __future__ import annotations
@@ -13,7 +12,7 @@ from sqlalchemy import text
 
 from app.api.csrf import install_csrf_middleware
 from app.api.errors import install_error_handlers
-from app.api.routes import admin, auth, library
+from app.api.routes import admin, auth, library, uploads
 from app.db import get_engine
 
 app = FastAPI(title="Research Assistant System API", version="0.2.0")
@@ -22,6 +21,7 @@ install_csrf_middleware(app)
 app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(library.router)
+app.include_router(uploads.router)
 
 
 @app.get("/healthz")

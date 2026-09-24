@@ -23,6 +23,8 @@ EXPECTED_TABLES = {
     "invitations",
     "sessions",
     "password_reset_tokens",
+    "processing_acknowledgements",
+    "upload_intents",
 }
 
 

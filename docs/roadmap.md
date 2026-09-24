@@ -2,7 +2,7 @@
 
 [Mục lục](README.md) · [Quyết định còn mở](decisions.md) · [Kiểm thử](testing.md)
 
-Các milestone nhỏ, có thể review riêng. Thứ tự và phạm vi dưới đây là **đề xuất**. **Trạng thái:** M1a đã review và merge vào `main` (PR #1). M1b đang triển khai ở PR riêng (nhánh `feat/m1b-invite-session-acl`, chờ review): invite/session/reset, CSRF, dev outbox và API metadata có ACL, kiểm chứng cục bộ theo [dev-setup](dev-setup.md). M1c trở đi chưa bắt đầu. Mỗi bước giữ khả năng kiểm quyền và khả năng truy nguyên từ file/version đến chunk.
+Các milestone nhỏ, có thể review riêng. Thứ tự và phạm vi dưới đây là **đề xuất**. **Trạng thái:** M1a đã merge (PR #1); M1b đã merge vào `main` tại `b20b552` (PR #2). M1c đang triển khai trên nhánh `feat/m1c-upload-intent-original`; M2 trở đi chưa bắt đầu. Mỗi bước giữ khả năng kiểm quyền và khả năng truy nguyên từ file/version đến chunk.
 
 | Mốc | Phụ thuộc | Đầu ra kiểm chứng được | Rủi ro / phép thử then chốt |
 | --- | --- | --- | --- |
@@ -22,9 +22,9 @@ Các milestone nhỏ, có thể review riêng. Thứ tự và phạm vi dưới 
 
 **M1a (đã merge):** Compose dev, migration nền `0001`, bootstrap Admin một lần — xem [dev-setup](dev-setup.md).
 
-**M1b (PR #2, chờ review, chưa merge):** migration `0002` cho invitation/session/reset token (chỉ lưu hash); login/logout, thu hồi session, reset bằng link một lần; session server-side hết hạn theo idle/absolute trong config; CSRF cho thao tác ghi; delivery adapter + dev outbox; Admin quản lý tài khoản; API metadata `list/count/detail` lọc common/private trước phân trang/đếm; web tối thiểu cho auth và xem metadata. **Chưa** có upload intent, lưu file, parser, worker, search, RAG, promotion hay chia sẻ nhóm. Item riêng trong test/demo được tạo bằng fixture SQL, không có đường nhập paper mới.
+**M1b (PR #2, đã merge):** migration `0002` cho invitation/session/reset token (chỉ lưu hash); login/logout, thu hồi session, reset bằng link một lần; session server-side hết hạn theo idle/absolute trong config; CSRF cho thao tác ghi; delivery adapter + dev outbox; Admin quản lý tài khoản; API metadata `list/count/detail` lọc common/private trước phân trang/đếm; web tối thiểu cho auth và xem metadata.
 
-Sau khi review M1b, giao **M1c** làm giao thức upload intent hai bước, original storage và demo cuối M1. **Bàn giao bắt buộc cho M1c:** `source_files.job_id` và `version_id` vẫn là hai FK độc lập; phải ràng buộc chúng cùng item trước khi mở đường tải file ([decisions](decisions.md#ghi-nhận-khi-triển-khai-m1a-2026-09-24)). Proxy web `/api/*` của M1b buffer toàn bộ request/response và timeout 15 giây, nên đường upload PDF cần thiết kế riêng ([decisions](decisions.md#ghi-nhận-khi-triển-khai-m1b-2026-09-24)). M1b chạy trên Compose chỉ dành cho dev; điều kiện trước khi triển khai ngoài dev ở [dev-setup](dev-setup.md#trước-khi-đưa-lên-server). Mỗi PR chỉ cập nhật docs/lệnh chạy khi đã kiểm chứng; không kéo parser/index/RAG vào M1. [Hợp đồng consent và thu hồi](access-and-data.md) cùng [kiểm thử](testing.md) là đầu vào cho các PR phụ thuộc.
+**M1c (PR #3, đang review):** có hai bước intent không file rồi upload, lưu original private, download kiểm ACL, migration `0003`/`0004` ràng buộc job/version của file cùng item, đường streaming riêng trong Next.js. [Dev-setup](dev-setup.md) ghi cách kiểm chứng và giới hạn. Compose vẫn chỉ dành cho dev; M2 parser/index và các phần sau chưa nằm trong PR này.
 
 ## Ưu tiên sau MVP — đã xác nhận về thứ tự
 

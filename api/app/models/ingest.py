@@ -61,6 +61,7 @@ class IngestionJob(Base):
             name="uq_ingestion_jobs_scope_idempotency_key",
             postgresql_nulls_not_distinct=True,
         ),
+        UniqueConstraint("id", "item_id", name="uq_ingestion_jobs_id_item_id"),
         Index("ix_ingestion_jobs_item_id", "item_id"),
         Index("ix_ingestion_jobs_state", "state"),
     )
