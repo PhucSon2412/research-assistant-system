@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import io
 
+import pytest
+
 from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import IntegrityError
 
 from app.models import Base
 from tests.conftest import HEAD_REVISION, alembic_config, upgrade
@@ -25,6 +28,10 @@ EXPECTED_TABLES = {
     "password_reset_tokens",
     "processing_acknowledgements",
     "upload_intents",
+    "ingest_step_attempts",
+    "metadata_candidates",
+    "sections",
+    "chunks",
 }
 
 
@@ -138,4 +145,82 @@ def test_upgrade_from_0001_keeps_existing_data(empty_db_url: str) -> None:
     with eng.connect() as conn:
         assert _snapshot(conn) == before
     assert "sessions" not in _tables(empty_db_url)
+    eng.dispose()
+
+
+def test_0005_preserves_received_m1c_job_and_original_metadata(empty_db_url: str) -> None:
+    from app.identity.passwords import hash_password
+
+    upgrade(empty_db_url, "0004")
+    eng = create_engine(empty_db_url)
+    with eng.begin() as conn:
+        owner = conn.scalar(text("INSERT INTO users (email, password_verifier) VALUES ('m2a@example.org', :v) RETURNING id"),
+                            {"v": hash_password("test-password-long")})
+        item = conn.scalar(text("INSERT INTO library_items (visibility, owner_user_id, title)"
+                                " VALUES ('private', :o, 'User title') RETURNING id"), {"o": owner})
+        version = conn.scalar(text("INSERT INTO paper_versions (item_id) VALUES (:i) RETURNING id"), {"i": item})
+        job = conn.scalar(text("INSERT INTO ingestion_jobs (origin, actor_user_id, scope_visibility,"
+                               " scope_owner_user_id, item_id, version_id, idempotency_key, rights_epoch_at_start)"
+                               " VALUES ('upload', :o, 'private', :o, :i, :v, 'm1c-existing', 0) RETURNING id"),
+                          {"o": owner, "i": item, "v": version})
+        source = conn.scalar(text("INSERT INTO source_files (item_id, version_id, job_id, storage_key, verified_mime,"
+                                  " byte_size, checksum_sha256) VALUES (:i, :v, :j, 'originals/old', 'text/markdown',"
+                                  " 4, :h) RETURNING id"), {"i": item, "v": version, "j": job, "h": "a" * 64})
+    upgrade(empty_db_url, "0005")
+    with eng.begin() as conn:
+        conn.execute(text("INSERT INTO metadata_candidates (item_id, version_id, source_file_id, field_name,"
+                          " value, start_offset, end_offset, pipeline_version)"
+                          " VALUES (:i, :v, :s, 'title', 'Test', 2, 6, 'markdown-lines-v1')"),
+                     {"i": item, "v": version, "s": source})
+        section = conn.scalar(text("INSERT INTO sections (item_id, version_id, source_file_id, kind, ordinal,"
+                                   " text, start_offset, end_offset, start_line, end_line, pipeline_version)"
+                                   " VALUES (:i, :v, :s, 'body', 0, '# Test', 0, 6, 1, 1, 'markdown-lines-v1') RETURNING id"),
+                              {"i": item, "v": version, "s": source})
+        conn.execute(text("INSERT INTO chunks (section_id, item_id, version_id, source_file_id, ordinal, text,"
+                          " start_offset, end_offset, start_line, end_line, chunk_hash, pipeline_version)"
+                          " VALUES (:section, :i, :v, :s, 0, '# Test', 0, 6, 1, 1, :h, 'markdown-lines-v1')"),
+                     {"section": section, "i": item, "v": version, "s": source, "h": "b" * 64})
+    upgrade(empty_db_url)
+    with eng.connect() as conn:
+        row = conn.execute(text("SELECT state, attempt_count, lease_token FROM ingestion_jobs WHERE id=:j"),
+                           {"j": job}).one()
+        assert row == ("received", 0, None)
+        assert conn.scalar(text("SELECT id FROM source_files WHERE id=:s"), {"s": source}) == source
+        assert conn.scalar(text("SELECT title FROM library_items WHERE id=:i"), {"i": item}) == "User title"
+        assert conn.scalar(text("SELECT locator_kind FROM sections WHERE id=:s"), {"s": section}) == "markdown"
+        assert conn.scalar(text("SELECT locator_kind FROM chunks WHERE section_id=:s"), {"s": section}) == "markdown"
+        assert conn.scalar(text("SELECT locator_kind FROM metadata_candidates WHERE source_file_id=:s"),
+                           {"s": source}) == "markdown"
+    with pytest.raises(IntegrityError):
+        with eng.begin() as conn:
+            conn.execute(text("INSERT INTO chunks (section_id, item_id, version_id, source_file_id, ordinal, text,"
+                              " locator_kind, start_offset, start_line, end_line, chunk_hash, pipeline_version)"
+                              " VALUES (:section, :i, :v, :s, 1, 'bad', 'markdown', 0, 1, 1, :h, 'markdown-lines-v1')"),
+                         {"section": section, "i": item, "v": version, "s": source, "h": "c" * 64})
+    eng.dispose()
+
+
+def test_0007_backfills_handoff_without_completing_job(empty_db_url: str) -> None:
+    upgrade(empty_db_url, "0006")
+    eng = create_engine(empty_db_url)
+    with eng.begin() as conn:
+        handoff = conn.scalar(text("INSERT INTO ingestion_jobs (origin, scope_visibility, idempotency_key,"
+                                   " state, started_at, finished_at) VALUES ('discovery', 'common', 'handoff',"
+                                   " 'awaiting_index', now() - interval '1 minute', now()) RETURNING id"))
+        terminal = conn.scalar(text("INSERT INTO ingestion_jobs (origin, scope_visibility, idempotency_key,"
+                                    " state, started_at, finished_at) VALUES ('discovery', 'common', 'terminal',"
+                                    " 'terminal_failed', now() - interval '1 minute', now()) RETURNING id"))
+    upgrade(empty_db_url)
+    with eng.connect() as conn:
+        row = conn.execute(text("SELECT extraction_finished_at, finished_at FROM ingestion_jobs WHERE id=:id"),
+                           {"id": handoff}).one()
+        assert row.extraction_finished_at is not None
+        assert row.finished_at is None
+        other = conn.execute(text("SELECT extraction_finished_at, finished_at FROM ingestion_jobs WHERE id=:id"),
+                             {"id": terminal}).one()
+        assert other.extraction_finished_at is None
+        assert other.finished_at is not None
+    with pytest.raises(IntegrityError):
+        with eng.begin() as conn:
+            conn.execute(text("UPDATE ingestion_jobs SET finished_at=now() WHERE id=:id"), {"id": handoff})
     eng.dispose()

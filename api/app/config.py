@@ -14,6 +14,7 @@ from __future__ import annotations
 from datetime import timedelta
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import quote
 
 from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -113,6 +114,22 @@ class PdfBodyThreshold(BaseModel):
     min_total_body_chars: int = Field(default=2000, gt=0)
 
 
+class IngestPolicy(BaseModel):
+    poll_seconds: int = Field(default=5, gt=0)
+    lease_seconds: int = Field(default=120, gt=0)
+    max_attempts: int = Field(default=4, gt=0)
+    retry_base_seconds: int = Field(default=5, gt=0)
+    retry_max_seconds: int = Field(default=300, gt=0)
+    dispatch_batch: int = Field(default=40, gt=0)
+    markdown_max_chunk_chars: int = Field(default=1200, gt=0)
+
+    @model_validator(mode="after")
+    def _check_retry(self) -> "IngestPolicy":
+        if self.retry_max_seconds < self.retry_base_seconds:
+            raise ValueError("retry_max_seconds must be >= retry_base_seconds")
+        return self
+
+
 class Retention(BaseModel):
     """Cleanup and backup windows (M6)."""
 
@@ -210,11 +227,15 @@ class Settings(BaseSettings):
     files: FileLimits = FileLimits()
     upload_notice_version: str = Field(default="2026-09-24.v1", min_length=1)
     pdf_body: PdfBodyThreshold = PdfBodyThreshold()
+    ingest: IngestPolicy = IngestPolicy()
     retention: Retention = Retention()
     budget: ProviderBudget = ProviderBudget()
     http: HttpSecurity = HttpSecurity()
     delivery: Delivery = Delivery()
     storage: ObjectStorage | None = None
+    redis_host: str = "redis"
+    redis_port: int = Field(default=6379, gt=0, le=65535)
+    redis_password: SecretStr | None = None
 
     @model_validator(mode="after")
     def _check_database(self) -> "Settings":
@@ -237,6 +258,11 @@ class Settings(BaseSettings):
         if self.db is not None:
             return self.db.url()
         return make_url(self.database_url.get_secret_value())  # type: ignore[union-attr]
+
+    def celery_broker_url(self) -> str:
+        if self.redis_password is None:
+            raise ValueError("RAS_REDIS_PASSWORD is required for the worker")
+        return f"redis://:{quote(self.redis_password.get_secret_value(), safe='')}@{self.redis_host}:{self.redis_port}/0"
 
 
 @lru_cache

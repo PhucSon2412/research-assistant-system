@@ -64,6 +64,7 @@ class JobState(StrEnum):
     STORED = "stored"
     EXTRACTING = "extracting"
     CHUNKING = "chunking"
+    AWAITING_INDEX = "awaiting_index"
     INDEXING = "indexing"
     READY = "ready"
     FULLTEXT_REJECTED = "fulltext_rejected"

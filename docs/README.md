@@ -1,6 +1,6 @@
 # Tài liệu dự án
 
-Repo đang ở giai đoạn thiết kế và bắt đầu triển khai M1. Các tài liệu này mô tả yêu cầu và phương án đề xuất, không khẳng định tính năng đã được triển khai hay hiệu năng đã được đo; phần đã có code được ghi riêng ở [môi trường phát triển](dev-setup.md).
+Repo đã merge M1c; M2a Markdown đang ở PR #4 để review lại sau các sửa quyền đọc text, mốc extraction và cảnh báo duplicate. PDF extraction thuộc M2b, index thuộc M3. Các tài liệu này mô tả yêu cầu và phương án đề xuất, không khẳng định tính năng đã được triển khai hay hiệu năng đã được đo; phần đã có code được ghi riêng ở [môi trường phát triển](dev-setup.md).
 
 ## Cách đọc trạng thái quyết định
 
@@ -22,7 +22,7 @@ Khi có thay đổi quyết định, cập nhật tài liệu liên quan cùng t
 | [Yêu cầu phi chức năng](nonfunctional.md) | Cách đo hiệu suất, độ tin cậy, an toàn, vận hành |
 | [Chiến lược kiểm thử](testing.md) | Các tầng test, bộ đánh giá retrieval/RAG, chống rò rỉ |
 | [Roadmap](roadmap.md) | Milestone, phụ thuộc, đầu ra, rủi ro |
-| [Môi trường phát triển](dev-setup.md) | Lệnh dựng/hạ Compose, migrate, bootstrap, test đã kiểm; schema M1a/M1b; auth, phiên, dev outbox và API metadata có ACL (M1b) |
+| [Môi trường phát triển](dev-setup.md) | Lệnh dựng/hạ Compose, migrate, bootstrap, test đã kiểm; schema M1a–M2a, auth/ACL, upload original và worker Markdown |
 | [Nhật ký quyết định](decisions.md) | Những điều đã chốt ngày 2026-09-24 và các câu hỏi còn mở |
 
 Đọc [AGENTS.md](../AGENTS.md) trước khi giao task cho coding agent. Mọi mô tả “MVP” ở đây là phạm vi dự kiến, không phải trạng thái hoàn thành.

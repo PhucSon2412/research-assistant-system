@@ -1,4 +1,4 @@
-# Development stack (M1a–M1c). Copy .env.example to .env and fill every secret
+# Development stack (M1a–M2a). Copy .env.example to .env and fill every secret
 # before `docker compose up`; required values have no fallback on purpose.
 # Host ports bind to 127.0.0.1 only.
 
@@ -113,6 +113,40 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+
+  worker:
+    build: ./api
+    command: ["celery", "-A", "app.ingest.celery_app:celery_app", "worker", "--loglevel=WARNING", "--concurrency=2"]
+    environment:
+      <<: *db-env
+      RAS_REDIS_HOST: redis
+      RAS_REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+      RAS_STORAGE__ENDPOINT_URL: http://minio:9000
+      RAS_STORAGE__ACCESS_KEY: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}
+      RAS_STORAGE__SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+      RAS_STORAGE__BUCKET: ras-originals
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+
+  beat:
+    build: ./api
+    command: ["celery", "-A", "app.ingest.celery_app:celery_app", "beat", "--loglevel=WARNING", "--schedule=/tmp/celerybeat-schedule"]
+    environment:
+      <<: *db-env
+      RAS_REDIS_HOST: redis
+      RAS_REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
 
   web:
     build: ./web

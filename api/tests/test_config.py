@@ -11,6 +11,7 @@ from app.config import (
     MIB,
     AuthLifetimes,
     FileLimits,
+    IngestPolicy,
     PasswordPolicy,
     PdfBodyThreshold,
     ProviderBudget,
@@ -53,6 +54,8 @@ def test_defaults_match_documented_mvp_values() -> None:
     assert s.budget.app_daily_usd == 10.0
     assert s.budget.key_spending_cap_daily_usd == 50.0
     assert s.password.min_length == 12
+    assert (s.ingest.poll_seconds, s.ingest.lease_seconds, s.ingest.max_attempts,
+            s.ingest.markdown_max_chunk_chars) == (5, 120, 4, 1200)
 
 
 def test_nested_values_override_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -62,6 +65,11 @@ def test_nested_values_override_from_environment(monkeypatch: pytest.MonkeyPatch
     s = Settings()  # type: ignore[call-arg]
     assert s.auth.session_idle == timedelta(minutes=15)
     assert s.files.pdf_max_pages == 50
+
+
+def test_redis_broker_password_is_url_escaped() -> None:
+    s = Settings(database_url=URL, redis_host="redis", redis_password="a@b/c")
+    assert s.celery_broker_url() == "redis://:a%40b%2Fc@redis:6379/0"
 
 
 @pytest.mark.parametrize(
@@ -80,6 +88,8 @@ def test_nested_values_override_from_environment(monkeypatch: pytest.MonkeyPatch
         lambda: ProviderBudget(app_daily_usd=60.0),  # above the key cap
         lambda: PasswordPolicy(min_length=7),
         lambda: PasswordPolicy(min_length=20, max_length=19),
+        lambda: IngestPolicy(max_attempts=0),
+        lambda: IngestPolicy(retry_base_seconds=6, retry_max_seconds=5),
     ],
 )
 def test_invalid_values_are_rejected(build) -> None:

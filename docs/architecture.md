@@ -46,10 +46,11 @@ Mỗi ingest request có `origin`, scope đích, actor/source, `idempotency_key`
 | --- | --- |
 | `received` | Đã nhận request và xác định scope; chờ validate |
 | `validating` | Kiểm MIME/nội dung thật, kích thước/trang, an toàn file, nguồn/quyền phân phối, trùng trong scope; parser có giới hạn tài nguyên |
-| `duplicate` | Đã liên kết đến item/version hiện có trong cùng scope; kết thúc có thông báo, không lộ scope khác |
+| `duplicate` | M2a phát hiện cùng hash trong kho riêng của owner, giữ item/original riêng và kết thúc với cảnh báo; chưa có liên kết tới item/version trước, chưa dùng chung bản dẫn xuất, không tra cứu scope khác |
 | `stored` | File gốc đã lưu, hash và provenance ghi nhận |
 | `extracting` | Metadata, text, section, references; có thể ghi coverage và cảnh báo từng trang/đoạn |
 | `chunking` | Tạo chunk có locator vào version/file |
+| `awaiting_index` | Extraction/chunking đã commit (`extraction_finished_at`), chờ M3 lập cả keyword/vector index; job chưa kết thúc (`finished_at=NULL`), item vẫn `metadata_only` |
 | `indexing` | Ghi keyword và embedding index, kiểm số lượng/phiên bản |
 | `ready` | Keyword/vector index đã xong và active; paper tương ứng là `indexed`, có thể có `partial_extraction=true` và cảnh báo |
 | `fulltext_rejected` | File upload/PDF không trích xuất được phần thân; kết thúc, thông báo lý do; không lập index hoặc coi là paper ready |
@@ -60,6 +61,8 @@ Mỗi ingest request có `origin`, scope đích, actor/source, `idempotency_key`
 `metadata_only`/`indexed` là **trạng thái nội dung của paper daily**, không phải trạng thái job. Job có thể đi từ bước bất kỳ sang `retryable_failed`; retry quay lại bước thất bại hoặc bước an toàn gần nhất. `ready` không có nghĩa trích xuất hoàn hảo. Coverage phân biệt `complete`, `partial`, `none` theo version, cùng trang/khối lỗi khi xác định được; `partial` chỉ được `ready` nếu có body text hữu dụng, và RAG không được suy diễn vùng thiếu. PDF scan/body rỗng không được `ready`. Pipeline cho phép owner xem file upload gốc khi lưu thành công mà không lẫn với trạng thái index.
 
 ## Trùng, retry, reindex
+
+**Ranh giới M2a:** `finished_at` chỉ ghi khi job vào trạng thái kết thúc; `awaiting_index` là mốc bàn giao còn mở, ghi `extraction_finished_at`. API chunk và metadata candidate chỉ trả dữ liệu của item `private` cho owner, kể cả khi có dữ liệu dẫn xuất cài sẵn trên item chung `metadata_only`; Admin cũng không đọc được qua hai API này. M3 cần gate quyền trên đúng file/version trước khi mở đọc kho chung và trước retrieval.
 
 **Đề xuất:** Chống trùng bằng các mức: request idempotency; hash file trong **cùng scope**; DOI/arXiv và metadata chuẩn hóa là tín hiệu match cần xác minh, không dùng để gộp tự động các version khác nhau. Discovery đối chiếu trong kho chung; upload đối chiếu trong kho riêng của owner. Trùng xuyên scope chỉ được xử lý nội bộ nếu bảo đảm không tạo oracle rò rỉ; MVP nên không dùng kết quả đối chiếu xuyên scope trong luồng User. Hai bản thuộc các scope khác nhau giữ item và ACL độc lập.
 
