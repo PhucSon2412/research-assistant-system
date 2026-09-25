@@ -44,6 +44,7 @@ class IngestionJob(Base):
         CheckConstraint("origin <> 'upload' OR scope_visibility = 'private'", name="upload_is_private"),
         CheckConstraint("length(idempotency_key) > 0", name="idempotency_key_not_empty"),
         CheckConstraint("attempt_count >= 0", name="attempt_count_non_negative"),
+        CheckConstraint("state <> 'awaiting_index' OR finished_at IS NULL", name="awaiting_index_unfinished"),
         CheckConstraint(
             "cancel_requested = (cancel_requested_at IS NOT NULL)", name="cancel_requested_at_consistent"
         ),
@@ -93,6 +94,7 @@ class IngestionJob(Base):
     warnings: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    extraction_finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     lease_token: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

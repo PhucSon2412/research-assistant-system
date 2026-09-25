@@ -45,7 +45,10 @@ def test_private_markdown_pipeline_locators_metadata_and_acl(upload_api):
     assert detail["jobs"][0]["state"] == "awaiting_index"
     assert detail["jobs"][0]["attempt_count"] == 1
     assert detail["jobs"][0]["queue_wait_ms"] is not None
-    assert detail["jobs"][0]["processing_ms"] is not None
+    assert detail["jobs"][0]["extraction_finished_at"] is not None
+    assert detail["jobs"][0]["extraction_processing_ms"] is not None
+    assert detail["jobs"][0]["finished_at"] is None
+    assert detail["jobs"][0]["processing_ms"] is None
     candidates = a.get(f"/library/items/{ids['item_id']}/metadata-candidates").json()["candidates"]
     assert candidates[0]["value"] == "Extracted title"
     chunks = a.get(f"/library/items/{ids['item_id']}/chunks").json()["chunks"]
@@ -71,8 +74,18 @@ def test_duplicate_is_scoped_to_owner(upload_api):
     assert process_job(uuid.UUID(first["job_id"]), storage=storage) == "awaiting_index"
     assert process_job(uuid.UUID(second["job_id"]), storage=storage) == "duplicate"
     assert process_job(uuid.UUID(third["job_id"]), storage=storage) == "awaiting_index"
-    assert a.get(f"/library/items/{second['item_id']}").json()["item"]["jobs"][0]["warnings"] == ["duplicate_in_private_library"]
+    duplicate = a.get(f"/library/items/{second['item_id']}").json()["item"]
+    assert duplicate["jobs"][0]["warnings"] == ["duplicate_in_private_library"]
+    assert duplicate["jobs"][0]["finished_at"] is not None
+    assert duplicate["jobs"][0]["extraction_finished_at"] is None
+    assert not any(key.startswith("duplicate_of") for key in duplicate)
+    assert duplicate["id"] != first["item_id"]
+    assert duplicate["versions"][0]["id"] != first["version_id"]
     assert api.scalar("SELECT count(*) FROM chunks WHERE item_id=:i", i=uuid.UUID(second["item_id"])) == 0
+    assert api.scalar("SELECT count(*) FROM metadata_candidates WHERE item_id=:i", i=uuid.UUID(second["item_id"])) == 0
+    assert api.scalar("SELECT count(*) FROM chunks WHERE item_id=:i", i=uuid.UUID(third["item_id"])) > 0
+    assert b.get(f"/library/items/{first['item_id']}").status_code == 404
+    assert a.get(f"/library/items/{third['item_id']}").status_code == 404
     assert api.scalar("SELECT count(*) FROM source_files") == 3
 
 
@@ -93,8 +106,10 @@ def test_simultaneous_same_owner_validation_picks_one_canonical(upload_api):
 
 def test_common_full_text_has_no_rights_gate(upload_api):
     api, storage = upload_api
+    api.bootstrap_admin()
     api.create_user("a@example.org")
-    a = api.user_browser("a@example.org")
+    api.create_user("b@example.org")
+    a, b, admin = api.user_browser("a@example.org"), api.user_browser("b@example.org"), api.admin_browser()
     original = b"# Private source\n\nBody.\n"
     private = upload(a, original)
     with Session(api.engine) as db:
@@ -106,14 +121,34 @@ def test_common_full_text_has_no_rights_gate(upload_api):
                                    " idempotency_key, rights_epoch_at_start)"
                                    " VALUES ('discovery', 'common', :i, :v, :k, 0) RETURNING id"),
                               {"i": item, "v": version, "k": str(uuid.uuid4())})
-            conn.execute(text("INSERT INTO source_files (item_id, version_id, job_id, storage_key, verified_mime,"
-                              " byte_size, checksum_sha256) VALUES (:i, :v, :j, :k, 'text/markdown', :n, :h)"),
+            source = conn.scalar(text("INSERT INTO source_files (item_id, version_id, job_id, storage_key, verified_mime,"
+                              " byte_size, checksum_sha256) VALUES (:i, :v, :j, :k, 'text/markdown', :n, :h) RETURNING id"),
                          {"i": item, "v": version, "j": job, "k": private_source.storage_key,
                           "n": len(original), "h": private_source.checksum_sha256})
+            conn.execute(text("INSERT INTO metadata_candidates (item_id, version_id, source_file_id, field_name,"
+                              " value, locator_kind, start_offset, end_offset, pipeline_version)"
+                              " VALUES (:i, :v, :s, 'title', 'COMMON_CANDIDATE_SECRET', 'markdown', 0, 5, 'seed')"),
+                         {"i": item, "v": version, "s": source})
+            section = conn.scalar(text("INSERT INTO sections (item_id, version_id, source_file_id, kind, ordinal,"
+                                       " text, locator_kind, start_offset, end_offset, start_line, end_line, pipeline_version)"
+                                       " VALUES (:i, :v, :s, 'body', 0, 'COMMON_CHUNK_SECRET', 'markdown', 0, 19, 1, 1, 'seed') RETURNING id"),
+                                  {"i": item, "v": version, "s": source})
+            conn.execute(text("INSERT INTO chunks (section_id, item_id, version_id, source_file_id, ordinal, text,"
+                              " locator_kind, start_offset, end_offset, start_line, end_line, chunk_hash, pipeline_version)"
+                              " VALUES (:section, :i, :v, :s, 0, 'COMMON_CHUNK_SECRET', 'markdown', 0, 19, 1, 1, :h, 'seed')"),
+                         {"section": section, "i": item, "v": version, "s": source, "h": "a" * 64})
+    assert api.scalar("SELECT count(*) FROM chunks WHERE item_id=:i", i=item) == 1
+    assert api.scalar("SELECT count(*) FROM metadata_candidates WHERE item_id=:i", i=item) == 1
+    for browser in (a, b, admin):
+        assert browser.get(f"/library/items/{item}").status_code == 200
+        for path in ("/chunks", "/metadata-candidates"):
+            response = browser.get(f"/library/items/{item}{path}")
+            assert response.status_code == 404
+            assert "COMMON_" not in response.text
     with Session(api.engine) as db:
         assert job not in due_job_ids(db, get_settings())
     assert process_job(job, storage=storage) == "rights_gate_missing"
-    assert api.scalar("SELECT count(*) FROM chunks WHERE item_id=:i", i=item) == 0
+    assert api.scalar("SELECT count(*) FROM chunks WHERE item_id=:i", i=item) == 1
 
 
 def test_two_claims_and_expired_worker_do_not_duplicate(upload_api):
@@ -157,12 +192,16 @@ def test_storage_retry_and_epoch_cancel(upload_api):
     storage.delete(key)
     assert process_job(job_id, storage=storage) == "storage_unavailable"
     assert api.scalar("SELECT state FROM ingestion_jobs WHERE id=:i", i=job_id) == "retryable_failed"
+    assert api.scalar("SELECT finished_at FROM ingestion_jobs WHERE id=:i", i=job_id) is None
+    assert api.scalar("SELECT extraction_finished_at FROM ingestion_jobs WHERE id=:i", i=job_id) is None
     storage.put(key, io.BytesIO(original), "text/markdown")
     with Session(api.engine) as db:
         job = db.get(IngestionJob, job_id)
         job.next_attempt_at = utcnow() - timedelta(seconds=1)
         db.commit()
     assert process_job(job_id, storage=storage) == "awaiting_index"
+    assert api.scalar("SELECT finished_at FROM ingestion_jobs WHERE id=:i", i=job_id) is None
+    assert api.scalar("SELECT extraction_finished_at FROM ingestion_jobs WHERE id=:i", i=job_id) is not None
 
     assert api.scalar("SELECT last_error_code FROM ingestion_jobs WHERE id=:i", i=job_id) is None
 
@@ -171,6 +210,9 @@ def test_storage_retry_and_epoch_cancel(upload_api):
         conn.execute(text("UPDATE library_items SET rights_epoch=rights_epoch+1 WHERE id=:i"),
                      {"i": uuid.UUID(other["item_id"])})
     assert process_job(uuid.UUID(other["job_id"]), storage=storage) == "cancelled"
+    assert api.scalar("SELECT finished_at FROM ingestion_jobs WHERE id=:i", i=uuid.UUID(other["job_id"])) is not None
+    assert api.scalar("SELECT extraction_finished_at FROM ingestion_jobs WHERE id=:i",
+                      i=uuid.UUID(other["job_id"])) is None
     assert api.scalar("SELECT count(*) FROM chunks WHERE item_id=:i", i=uuid.UUID(other["item_id"])) == 0
 
 
@@ -212,6 +254,8 @@ def test_parser_failure_retries_with_bounded_policy(upload_api, monkeypatch):
     monkeypatch.setattr(worker, "extract", failed_parser)
     assert process_job(job_id, storage=storage) == "processing_unavailable"
     assert api.scalar("SELECT state FROM ingestion_jobs WHERE id=:i", i=job_id) == "retryable_failed"
+    assert api.scalar("SELECT finished_at FROM ingestion_jobs WHERE id=:i", i=job_id) is None
+    assert api.scalar("SELECT extraction_finished_at FROM ingestion_jobs WHERE id=:i", i=job_id) is None
     assert "private text" not in str(a.get(f"/library/items/{ids['item_id']}").json())
     monkeypatch.setattr(worker, "extract", original_extract)
     with Session(api.engine) as db:
@@ -229,6 +273,9 @@ def test_bibliography_only_is_not_awaiting_index(upload_api):
     assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "no_body_text"
     detail = a.get(f"/library/items/{ids['item_id']}").json()["item"]
     assert detail["jobs"][0]["state"] == "fulltext_rejected"
+    assert detail["jobs"][0]["finished_at"] is not None
+    assert detail["jobs"][0]["extraction_finished_at"] is None
+    assert detail["jobs"][0]["processing_ms"] is not None
     assert detail["versions"][0]["coverage"] == "none"
     assert detail["content_status"] == "metadata_only"
     assert a.get(f"/library/items/{ids['item_id']}/chunks").json()["chunks"] == []

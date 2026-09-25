@@ -24,9 +24,10 @@ from app.storage import OriginalStorage
 
 STEPS = {"validate": JobState.VALIDATING.value, "extract": JobState.EXTRACTING.value,
          "chunk": JobState.CHUNKING.value}
-FINAL = {JobState.DUPLICATE.value, JobState.AWAITING_INDEX.value, JobState.TERMINAL_FAILED.value,
+TERMINAL = {JobState.DUPLICATE.value, JobState.TERMINAL_FAILED.value,
          JobState.FULLTEXT_REJECTED.value, JobState.NEEDS_REVIEW.value, JobState.CANCELLED.value,
          JobState.READY.value}
+WORKER_STOP = TERMINAL | {JobState.AWAITING_INDEX.value}
 CLAIMABLE = {JobState.RECEIVED.value, JobState.VALIDATING.value, JobState.STORED.value,
              JobState.EXTRACTING.value, JobState.CHUNKING.value, JobState.RETRYABLE_FAILED.value}
 
@@ -131,8 +132,11 @@ def _finish(db: Session, job_id: uuid.UUID, token: uuid.UUID, step: str,
     job.last_error_code = None
     job.resume_state = None
     job.updated_at = utcnow()
-    if new_state in FINAL:
-        job.finished_at = utcnow()
+    if new_state == JobState.AWAITING_INDEX.value:
+        job.extraction_finished_at = job.updated_at
+    if new_state in WORKER_STOP:
+        if new_state in TERMINAL:
+            job.finished_at = job.updated_at
         job.lease_token = None
         job.lease_until = None
     db.commit()
@@ -301,7 +305,7 @@ def process_job(job_id: uuid.UUID, settings: Settings | None = None,
         while True:
             job = db.get(IngestionJob, job_id)
             state = job.state
-            if state in FINAL:
+            if state in WORKER_STOP:
                 return state
             step = "validate" if state == JobState.VALIDATING.value else \
                    "extract" if state in (JobState.STORED.value, JobState.EXTRACTING.value) else "chunk"

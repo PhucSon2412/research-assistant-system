@@ -18,7 +18,8 @@ type Version = {
 type Detail = Item & { versions: Version[] };
 type FileInfo = { id: string; filename: string | null; byte_size: number; verified_mime: string; page_count: number | null };
 type JobInfo = { id: string; state: string; origin: string; attempt_count: number;
-  last_error_code: string | null; warnings: string[] };
+  last_error_code: string | null; warnings: string[];
+  extraction_finished_at: string | null; finished_at: string | null };
 
 const stateText: Record<string, string> = {
   received: "Đã nhận file, chờ xử lý",
@@ -27,14 +28,14 @@ const stateText: Record<string, string> = {
   extracting: "Đang trích xuất Markdown",
   chunking: "Đang chia đoạn",
   awaiting_index: "Đã trích xuất, chờ lập chỉ mục",
-  duplicate: "Trùng file trong kho riêng của bạn",
+  duplicate: "Cảnh báo trùng file trong kho riêng của bạn",
   retryable_failed: "Lỗi tạm thời, sẽ thử lại",
   terminal_failed: "Không thể xử lý file",
   fulltext_rejected: "Không có phần thân đủ để xử lý toàn văn",
   cancelled: "Đã hủy xử lý",
 };
 const issueText: Record<string, string> = {
-  duplicate_in_private_library: "File này đã được nhận trong kho riêng của bạn; bản gốc vẫn được giữ.",
+  duplicate_in_private_library: "Chỉ là cảnh báo trùng: chưa liên kết với bản khác hoặc dùng lại nội dung đã trích xuất; bản gốc vẫn được giữ.",
   storage_unavailable: "Chưa đọc được file gốc; hệ thống sẽ thử lại.",
   checksum_mismatch: "File gốc không khớp bản đã nhận.",
   invalid_markdown: "Markdown không hợp lệ.",
@@ -114,6 +115,8 @@ export default function ItemPage() {
           <ul>{item.jobs.map((j) => <li key={j.id}>
             {stateText[j.state] ?? j.state}
             {` · lần thử: ${j.attempt_count}`}
+            {j.extraction_finished_at && ` · trích xuất xong ${new Date(j.extraction_finished_at).toLocaleString("vi-VN")}`}
+            {j.finished_at && ` · job kết thúc ${new Date(j.finished_at).toLocaleString("vi-VN")}`}
             {j.last_error_code && ` · lỗi: ${issueText[j.last_error_code] ?? j.last_error_code}`}
             {j.warnings.length > 0 && ` · cảnh báo: ${j.warnings.map((w) => issueText[w] ?? w).join(", ")}`}
           </li>)}</ul>

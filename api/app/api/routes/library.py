@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_now, get_principal
 from app.api.errors import ApiError
 from app.audit import record_event
-from app.authz import Principal, can_edit_item, visible_items_clause
+from app.authz import Principal, can_edit_item, m2a_private_derivatives_clause, visible_items_clause
 from app.models import Chunk, IngestionJob, LibraryItem, MetadataCandidate, PaperVersion, SourceFile
 from app.models.enums import AuditActorType, AuditOutcome, Visibility
 
@@ -72,6 +72,18 @@ def _get_visible_item(db: Session, principal: Principal, item_id: str, *, for_up
     if for_update:
         stmt = stmt.with_for_update()
     item = db.scalar(stmt)
+    if item is None:
+        raise ApiError(404, "not_found")
+    return item
+
+
+def _get_private_derivative_item(db: Session, principal: Principal, item_id: str) -> LibraryItem:
+    try:
+        parsed = uuid.UUID(item_id)
+    except ValueError:
+        raise ApiError(404, "not_found") from None
+    item = db.scalar(select(LibraryItem).where(
+        LibraryItem.id == parsed, m2a_private_derivatives_clause(principal)))
     if item is None:
         raise ApiError(404, "not_found")
     return item
@@ -145,6 +157,11 @@ def get_item(item_id: str, principal: Principal = Depends(get_principal), db: Se
                       "warnings": j.warnings,
                       "queue_wait_ms": int((j.started_at - j.created_at).total_seconds() * 1000)
                           if j.started_at else None,
+                      "extraction_finished_at": j.extraction_finished_at.isoformat()
+                          if j.extraction_finished_at else None,
+                      "extraction_processing_ms": int((j.extraction_finished_at - j.started_at).total_seconds() * 1000)
+                          if j.extraction_finished_at and j.started_at else None,
+                      "finished_at": j.finished_at.isoformat() if j.finished_at else None,
                       "processing_ms": int((j.finished_at - j.started_at).total_seconds() * 1000)
                           if j.finished_at and j.started_at else None}
                      for j in jobs],
@@ -160,9 +177,9 @@ def get_chunks(
     principal: Principal = Depends(get_principal),
     db: Session = Depends(get_db),
 ) -> dict:
-    item = _get_visible_item(db, principal, item_id)
+    item = _get_private_derivative_item(db, principal, item_id)
     rows = db.scalars(select(Chunk).join(LibraryItem, Chunk.item_id == LibraryItem.id)
-        .where(Chunk.item_id == item.id, visible_items_clause(principal))
+        .where(Chunk.item_id == item.id, m2a_private_derivatives_clause(principal))
         .order_by(Chunk.version_id, Chunk.source_file_id, Chunk.start_offset)
         .limit(limit).offset(offset)).all()
     return {"chunks": [{"id": str(c.id), "version_id": str(c.version_id),
@@ -181,9 +198,9 @@ def get_metadata_candidates(
     principal: Principal = Depends(get_principal),
     db: Session = Depends(get_db),
 ) -> dict:
-    item = _get_visible_item(db, principal, item_id)
+    item = _get_private_derivative_item(db, principal, item_id)
     rows = db.scalars(select(MetadataCandidate).join(LibraryItem, MetadataCandidate.item_id == LibraryItem.id)
-        .where(MetadataCandidate.item_id == item.id, visible_items_clause(principal))).all()
+        .where(MetadataCandidate.item_id == item.id, m2a_private_derivatives_clause(principal))).all()
     return {"candidates": [{"field_name": r.field_name, "value": r.value,
             "version_id": str(r.version_id), "source_file_id": str(r.source_file_id),
             "locator_kind": r.locator_kind, "start_offset": r.start_offset,

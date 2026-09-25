@@ -1,6 +1,6 @@
 # Tài liệu dự án
 
-Repo đã merge M1c và đang triển khai M2a. Các tài liệu này mô tả yêu cầu và phương án đề xuất, không khẳng định tính năng đã được triển khai hay hiệu năng đã được đo; phần đã có code được ghi riêng ở [môi trường phát triển](dev-setup.md).
+Repo đã merge M1c; M2a Markdown đang ở PR #4 để review lại sau các sửa quyền đọc text, mốc extraction và cảnh báo duplicate. PDF extraction thuộc M2b, index thuộc M3. Các tài liệu này mô tả yêu cầu và phương án đề xuất, không khẳng định tính năng đã được triển khai hay hiệu năng đã được đo; phần đã có code được ghi riêng ở [môi trường phát triển](dev-setup.md).
 
 ## Cách đọc trạng thái quyết định
 

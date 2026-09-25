@@ -198,3 +198,29 @@ def test_0005_preserves_received_m1c_job_and_original_metadata(empty_db_url: str
                               " VALUES (:section, :i, :v, :s, 1, 'bad', 'markdown', 0, 1, 1, :h, 'markdown-lines-v1')"),
                          {"section": section, "i": item, "v": version, "s": source, "h": "c" * 64})
     eng.dispose()
+
+
+def test_0007_backfills_handoff_without_completing_job(empty_db_url: str) -> None:
+    upgrade(empty_db_url, "0006")
+    eng = create_engine(empty_db_url)
+    with eng.begin() as conn:
+        handoff = conn.scalar(text("INSERT INTO ingestion_jobs (origin, scope_visibility, idempotency_key,"
+                                   " state, started_at, finished_at) VALUES ('discovery', 'common', 'handoff',"
+                                   " 'awaiting_index', now() - interval '1 minute', now()) RETURNING id"))
+        terminal = conn.scalar(text("INSERT INTO ingestion_jobs (origin, scope_visibility, idempotency_key,"
+                                    " state, started_at, finished_at) VALUES ('discovery', 'common', 'terminal',"
+                                    " 'terminal_failed', now() - interval '1 minute', now()) RETURNING id"))
+    upgrade(empty_db_url)
+    with eng.connect() as conn:
+        row = conn.execute(text("SELECT extraction_finished_at, finished_at FROM ingestion_jobs WHERE id=:id"),
+                           {"id": handoff}).one()
+        assert row.extraction_finished_at is not None
+        assert row.finished_at is None
+        other = conn.execute(text("SELECT extraction_finished_at, finished_at FROM ingestion_jobs WHERE id=:id"),
+                             {"id": terminal}).one()
+        assert other.extraction_finished_at is None
+        assert other.finished_at is not None
+    with pytest.raises(IntegrityError):
+        with eng.begin() as conn:
+            conn.execute(text("UPDATE ingestion_jobs SET finished_at=now() WHERE id=:id"), {"id": handoff})
+    eng.dispose()
