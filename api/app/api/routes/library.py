@@ -21,7 +21,7 @@ from app.api.deps import get_db, get_now, get_principal
 from app.api.errors import ApiError
 from app.audit import record_event
 from app.authz import Principal, can_edit_item, visible_items_clause
-from app.models import IngestionJob, LibraryItem, PaperVersion, SourceFile
+from app.models import Chunk, IngestionJob, LibraryItem, MetadataCandidate, PaperVersion, SourceFile
 from app.models.enums import AuditActorType, AuditOutcome, Visibility
 
 router = APIRouter(prefix="/library", tags=["library"])
@@ -140,10 +140,55 @@ def get_item(item_id: str, principal: Principal = Depends(get_principal), db: Se
                          "filename": f.original_filename, "byte_size": f.byte_size,
                          "verified_mime": f.verified_mime, "page_count": f.page_count}
                         for f in files],
-            "jobs": [{"id": str(j.id), "state": j.state, "origin": j.origin}
+            "jobs": [{"id": str(j.id), "state": j.state, "origin": j.origin,
+                      "attempt_count": j.attempt_count, "last_error_code": j.last_error_code,
+                      "warnings": j.warnings,
+                      "queue_wait_ms": int((j.started_at - j.created_at).total_seconds() * 1000)
+                          if j.started_at else None,
+                      "processing_ms": int((j.finished_at - j.started_at).total_seconds() * 1000)
+                          if j.finished_at and j.started_at else None}
                      for j in jobs],
         }
     }
+
+
+@router.get("/items/{item_id}/chunks")
+def get_chunks(
+    item_id: str,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0, le=100_000),
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> dict:
+    item = _get_visible_item(db, principal, item_id)
+    rows = db.scalars(select(Chunk).join(LibraryItem, Chunk.item_id == LibraryItem.id)
+        .where(Chunk.item_id == item.id, visible_items_clause(principal))
+        .order_by(Chunk.version_id, Chunk.source_file_id, Chunk.start_offset)
+        .limit(limit).offset(offset)).all()
+    return {"chunks": [{"id": str(c.id), "version_id": str(c.version_id),
+            "source_file_id": str(c.source_file_id), "text": c.text,
+            "locator_kind": c.locator_kind,
+            "start_offset": c.start_offset, "end_offset": c.end_offset,
+            "start_line": c.start_line, "end_line": c.end_line,
+            "start_page": c.start_page, "end_page": c.end_page,
+            "locator_detail": c.locator_detail}
+            for c in rows], "limit": limit, "offset": offset}
+
+
+@router.get("/items/{item_id}/metadata-candidates")
+def get_metadata_candidates(
+    item_id: str,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> dict:
+    item = _get_visible_item(db, principal, item_id)
+    rows = db.scalars(select(MetadataCandidate).join(LibraryItem, MetadataCandidate.item_id == LibraryItem.id)
+        .where(MetadataCandidate.item_id == item.id, visible_items_clause(principal))).all()
+    return {"candidates": [{"field_name": r.field_name, "value": r.value,
+            "version_id": str(r.version_id), "source_file_id": str(r.source_file_id),
+            "locator_kind": r.locator_kind, "start_offset": r.start_offset,
+            "end_offset": r.end_offset, "start_page": r.start_page}
+            for r in rows]}
 
 
 @router.patch("/items/{item_id}")

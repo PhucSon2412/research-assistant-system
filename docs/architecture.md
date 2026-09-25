@@ -46,10 +46,11 @@ Mỗi ingest request có `origin`, scope đích, actor/source, `idempotency_key`
 | --- | --- |
 | `received` | Đã nhận request và xác định scope; chờ validate |
 | `validating` | Kiểm MIME/nội dung thật, kích thước/trang, an toàn file, nguồn/quyền phân phối, trùng trong scope; parser có giới hạn tài nguyên |
-| `duplicate` | Đã liên kết đến item/version hiện có trong cùng scope; kết thúc có thông báo, không lộ scope khác |
+| `duplicate` | M2a phát hiện cùng hash trong kho riêng của owner, giữ item/original riêng và kết thúc với cảnh báo; chưa liên kết/dùng chung bản dẫn xuất, không lộ scope khác |
 | `stored` | File gốc đã lưu, hash và provenance ghi nhận |
 | `extracting` | Metadata, text, section, references; có thể ghi coverage và cảnh báo từng trang/đoạn |
 | `chunking` | Tạo chunk có locator vào version/file |
+| `awaiting_index` | Extraction/chunking đã commit, chờ M3 lập cả keyword/vector index; item vẫn `metadata_only` |
 | `indexing` | Ghi keyword và embedding index, kiểm số lượng/phiên bản |
 | `ready` | Keyword/vector index đã xong và active; paper tương ứng là `indexed`, có thể có `partial_extraction=true` và cảnh báo |
 | `fulltext_rejected` | File upload/PDF không trích xuất được phần thân; kết thúc, thông báo lý do; không lập index hoặc coi là paper ready |

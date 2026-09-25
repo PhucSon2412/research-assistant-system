@@ -105,3 +105,12 @@ Các lựa chọn dưới đây là **quyết định kỹ thuật của PR M1b 
 - Không thêm tính năng AI tự động tóm tắt paper nếu không có yêu cầu mới.
 
 Những mục từ brief này vẫn giữ hiệu lực cùng quyết định ngày 2026-09-24. Khi phát hiện xung đột docs/code, ghi rõ vấn đề trước khi sửa; cập nhật quyết định cùng thay đổi.
+
+## Quyết định kỹ thuật M2a (2026-09-25)
+
+- M1c PR #3 đã merge vào `main` (`9f4d58d`). M2a triển khai trên nhánh tách từ `origin/main`; M2b chưa bắt đầu.
+- PostgreSQL là nguồn job bền; Celery beat quét `received` và job đến hạn rồi gửi **chỉ job ID** qua Redis. Upload không phụ thuộc enqueue thành công. Redis/worker/beat ngắt thì job vẫn trong DB và được quét lại. `SELECT FOR UPDATE SKIP LOCKED` claim lease; token lease và `rights_epoch` được đọc mới dưới row lock job/item ở mọi commit kết quả; attempt tối đa/backoff ở `Settings.ingest`. Worker chết giữa bước để lại attempt `running`, claim kế tiếp ghi `worker_lost` rồi chạy lại bước. Các bảng dẫn xuất có unique key và kết quả/đổi state trong cùng transaction.
+- M2a chỉ chọn `origin=upload`, `private`, Markdown. Common/discovery/promotion full text chưa có gate `AccessRights` đúng file version, nên không được worker chọn hoặc xử lý. PDF upload M1c vẫn `received` cho M2b.
+- Markdown dùng parser dòng từ Python stdlib thay vì renderer: giữ nguyên UTF-8 decoded original, offset theo code point từ 0 và dòng từ 1, kể cả CRLF. Heading ATX chia `body`/`abstract`/`references`, bỏ qua heading trong fenced code; title/abstract/bibliography không có thân bài bị `fulltext_rejected` với `coverage=none`. Chunk tối đa theo config, hash SHA-256 text. Hạn chế: chưa xử lý đầy đủ Setext, bảng và Markdown phức tạp; cần fixture để cải thiện sau review.
+- `awaiting_index` là trạng thái bền sau chunking. `ready`/`indexed` chỉ M3 sau keyword và vector index. `metadata_candidates` giữ giá trị parser và locator, không ghi đè `library_items.title` do User sửa. Bibliography được gắn `references`, không tự là bằng chứng khoa học về paper được trích. Migration `0006` bổ sung union locator: Markdown dùng dòng/offset, PDF M2b sẽ dùng trang/vùng; các CHECK loại bỏ locator thiếu hoặc trộn kiểu.
+- Trùng hash chỉ xét trong kho riêng một owner và serialization bằng PostgreSQL advisory lock theo owner/hash. Job đầu tiên **xác thực xong** làm bản xử lý; job sau kết thúc `duplicate`, vẫn giữ item/original riêng, không công bố hay dùng lại dữ liệu dẫn xuất. Hai upload đồng thời có thể chọn bản hoàn tất validate trước thay vì bản có thời điểm upload sớm hơn; không có tín hiệu xuyên User trong API.

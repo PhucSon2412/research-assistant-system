@@ -2,7 +2,7 @@
 
 [Mục lục](README.md) · [Kiến trúc](architecture.md) · [Quyền và dữ liệu](access-and-data.md)
 
-Đây là schema khái niệm **đề xuất** trên PostgreSQL + pgvector đã chốt. Tập con đã thành migration ở M1a (`users`, `bootstrap_state`, `library_items`, `paper_versions`, `source_files`, `ingestion_jobs`, `audit_events`), M1b (`invitations`, `sessions`, `password_reset_tokens`) và M1c (`processing_acknowledgements`, `upload_intents`, FK kép file/job/version cùng item) được mô tả ở [dev-setup](dev-setup.md#schema-nền); các entity còn lại vẫn là thiết kế. ID ổn định và scope được mang qua mọi bản ghi dẫn xuất để kiểm quyền, xóa và reindex.
+Đây là schema khái niệm **đề xuất** trên PostgreSQL + pgvector đã chốt. Migration M1a–M1c đã tạo nền, auth và upload; M2a `0005`/`0006` thêm `ingest_step_attempts`, `metadata_candidates`, `sections`, `chunks` cho Markdown và kiểu locator theo trang để M2b dùng (xem [dev-setup](dev-setup.md#schema-nền)). Reference fields, PDF extraction, index và các entity còn lại vẫn là thiết kế. ID ổn định và scope được mang qua mọi bản ghi dẫn xuất để kiểm quyền, xóa và reindex.
 
 | Entity | Trường / quan hệ quan trọng | Ràng buộc |
 | --- | --- | --- |

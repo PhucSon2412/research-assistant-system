@@ -2,7 +2,7 @@
 
 [Mục lục](README.md) · [Quyết định còn mở](decisions.md) · [Kiểm thử](testing.md)
 
-Các milestone nhỏ, có thể review riêng. Thứ tự và phạm vi dưới đây là **đề xuất**. **Trạng thái:** M1a đã merge (PR #1); M1b đã merge vào `main` tại `b20b552` (PR #2). M1c đang triển khai trên nhánh `feat/m1c-upload-intent-original`; M2 trở đi chưa bắt đầu. Mỗi bước giữ khả năng kiểm quyền và khả năng truy nguyên từ file/version đến chunk.
+Các milestone nhỏ, có thể review riêng. Thứ tự và phạm vi dưới đây là **đề xuất**. **Trạng thái:** M1a, M1b và M1c đã merge (PR #1–#3; M1c tại `9f4d58d`). M2a đang triển khai trên nhánh `feat/m2a-worker-markdown`; M2b/PDF chưa bắt đầu. Mỗi bước giữ khả năng kiểm quyền và khả năng truy nguyên từ file/version đến chunk.
 
 | Mốc | Phụ thuộc | Đầu ra kiểm chứng được | Rủi ro / phép thử then chốt |
 | --- | --- | --- | --- |
@@ -24,7 +24,9 @@ Các milestone nhỏ, có thể review riêng. Thứ tự và phạm vi dưới 
 
 **M1b (PR #2, đã merge):** migration `0002` cho invitation/session/reset token (chỉ lưu hash); login/logout, thu hồi session, reset bằng link một lần; session server-side hết hạn theo idle/absolute trong config; CSRF cho thao tác ghi; delivery adapter + dev outbox; Admin quản lý tài khoản; API metadata `list/count/detail` lọc common/private trước phân trang/đếm; web tối thiểu cho auth và xem metadata.
 
-**M1c (PR #3, đang review):** có hai bước intent không file rồi upload, lưu original private, download kiểm ACL, migration `0003`/`0004` ràng buộc job/version của file cùng item, đường streaming riêng trong Next.js. [Dev-setup](dev-setup.md) ghi cách kiểm chứng và giới hạn. Compose vẫn chỉ dành cho dev; M2 parser/index và các phần sau chưa nằm trong PR này.
+**M1c (PR #3, đã merge):** có hai bước intent không file rồi upload, lưu original private, download kiểm ACL, migration `0003`/`0004` ràng buộc job/version của file cùng item, đường streaming riêng trong Next.js. [Dev-setup](dev-setup.md) ghi cách kiểm chứng và giới hạn.
+
+**M2a (PR kế tiếp):** worker Celery và bộ quét job bền trên PostgreSQL, Markdown extraction/section/chunk có locator, retry/duplicate trong phạm vi owner, trạng thái `awaiting_index`. Item vẫn `metadata_only`. M2b sẽ dùng schema kết quả và thêm adapter PDF/coverage theo trang; M3 mới index.
 
 ## Ưu tiên sau MVP — đã xác nhận về thứ tự
 
