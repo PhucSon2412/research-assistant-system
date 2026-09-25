@@ -90,6 +90,7 @@ def test_redis_broker_password_is_url_escaped() -> None:
         lambda: PasswordPolicy(min_length=20, max_length=19),
         lambda: IngestPolicy(max_attempts=0),
         lambda: IngestPolicy(retry_base_seconds=6, retry_max_seconds=5),
+        lambda: IngestPolicy(pdf_parser_timeout_seconds=91),
     ],
 )
 def test_invalid_values_are_rejected(build) -> None:

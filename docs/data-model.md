@@ -2,7 +2,9 @@
 
 [Mục lục](README.md) · [Kiến trúc](architecture.md) · [Quyền và dữ liệu](access-and-data.md)
 
-Đây là schema khái niệm **đề xuất** trên PostgreSQL + pgvector đã chốt. Migration M1a–M1c đã tạo nền, auth và upload; M2a `0005`/`0006` thêm `ingest_step_attempts`, `metadata_candidates`, `sections`, `chunks` cho Markdown và kiểu locator theo trang để M2b dùng (xem [dev-setup](dev-setup.md#schema-nền)). Reference fields, PDF extraction, index và các entity còn lại vẫn là thiết kế. ID ổn định và scope được mang qua mọi bản ghi dẫn xuất để kiểm quyền, xóa và reindex.
+Đây là schema khái niệm **đề xuất** trên PostgreSQL + pgvector đã chốt. Migration M1a–M1c đã tạo nền, auth và upload; M2a `0005`–`0007` (đã merge PR #4) thêm `ingest_step_attempts`, `metadata_candidates`, `sections`, `chunks` và mốc handoff. M2b `0008` thêm `pdf_pages` và `reference_entries` trên nhánh review; index và các entity còn lại vẫn là thiết kế. ID ổn định và scope được mang qua mọi bản ghi dẫn xuất để kiểm quyền, xóa và reindex. Xem [hợp đồng M2b](m2b-pdf.md).
+
+`pdf_pages` khóa duy nhất `(source_file_id, pipeline_version, page_number)`, giữ text parser, chiều trang point, vai trò, `body_page`, ký tự body, kết quả ngưỡng và lỗi/layout. `reference_entries` khóa duy nhất `(source_file_id, pipeline_version, ordinal)`, mang item/version/file bằng FK kép, raw citation, fields JSON, confidence/provenance và offset Markdown hoặc PDF page text. `sections`/`chunks` dùng locator PDF 1-based page + `locator_detail` half-open code point offset trong `pdf_pages.text`; hình học `null`. Những bảng dẫn xuất này chỉ có read gate private owner ở M2b; index/AccessRights M3+ là thay đổi riêng.
 
 | Entity | Trường / quan hệ quan trọng | Ràng buộc |
 | --- | --- | --- |

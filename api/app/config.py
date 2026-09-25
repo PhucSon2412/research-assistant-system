@@ -122,11 +122,17 @@ class IngestPolicy(BaseModel):
     retry_max_seconds: int = Field(default=300, gt=0)
     dispatch_batch: int = Field(default=40, gt=0)
     markdown_max_chunk_chars: int = Field(default=1200, gt=0)
+    pdf_parser_timeout_seconds: int = Field(default=60, gt=0)
+    pdf_parser_memory_bytes: int = Field(default=512 * MIB, gt=0)
+    pdf_parser_output_bytes: int = Field(default=64 * MIB, gt=0)
+    pdf_parser_lease_margin_seconds: int = Field(default=30, gt=0)
 
     @model_validator(mode="after")
     def _check_retry(self) -> "IngestPolicy":
         if self.retry_max_seconds < self.retry_base_seconds:
             raise ValueError("retry_max_seconds must be >= retry_base_seconds")
+        if self.pdf_parser_timeout_seconds + self.pdf_parser_lease_margin_seconds > self.lease_seconds:
+            raise ValueError("PDF parser timeout must leave the configured lease margin")
         return self
 
 

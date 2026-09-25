@@ -52,6 +52,10 @@ def test_private_markdown_pipeline_locators_metadata_and_acl(upload_api):
     candidates = a.get(f"/library/items/{ids['item_id']}/metadata-candidates").json()["candidates"]
     assert candidates[0]["value"] == "Extracted title"
     chunks = a.get(f"/library/items/{ids['item_id']}/chunks").json()["chunks"]
+    references = a.get(f"/library/items/{ids['item_id']}/references").json()["references"]
+    assert len(references) == 1
+    assert references[0]["raw_citation"] == original.decode()[references[0]["start_offset"]:references[0]["end_offset"]]
+    assert "## References" not in references[0]["raw_citation"]
     assert len(chunks) >= 4
     decoded = original.decode()
     for chunk in chunks:
@@ -137,11 +141,20 @@ def test_common_full_text_has_no_rights_gate(upload_api):
                               " locator_kind, start_offset, end_offset, start_line, end_line, chunk_hash, pipeline_version)"
                               " VALUES (:section, :i, :v, :s, 0, 'COMMON_CHUNK_SECRET', 'markdown', 0, 19, 1, 1, :h, 'seed')"),
                          {"section": section, "i": item, "v": version, "s": source, "h": "a" * 64})
+            conn.execute(text("INSERT INTO reference_entries (item_id, version_id, source_file_id, ordinal,"
+                              " raw_citation, fields, confidence, provenance, locator_kind, start_offset,"
+                              " end_offset, pipeline_version) VALUES (:i, :v, :s, 0,"
+                              " 'COMMON_REFERENCE_SECRET', '{}'::jsonb, 'raw_only', 'seed', 'markdown', 0, 23, 'seed')"),
+                         {"i": item, "v": version, "s": source})
     assert api.scalar("SELECT count(*) FROM chunks WHERE item_id=:i", i=item) == 1
     assert api.scalar("SELECT count(*) FROM metadata_candidates WHERE item_id=:i", i=item) == 1
     for browser in (a, b, admin):
-        assert browser.get(f"/library/items/{item}").status_code == 200
-        for path in ("/chunks", "/metadata-candidates"):
+        detail = browser.get(f"/library/items/{item}")
+        assert detail.status_code == 200
+        assert detail.json()["item"]["files"] == []
+        assert detail.json()["item"]["jobs"] == []
+        assert browser.get(f"/files/{source}/original").status_code == 404
+        for path in ("/chunks", "/metadata-candidates", "/coverage", "/references"):
             response = browser.get(f"/library/items/{item}{path}")
             assert response.status_code == 404
             assert "COMMON_" not in response.text
@@ -270,7 +283,7 @@ def test_bibliography_only_is_not_awaiting_index(upload_api):
     api.create_user("a@example.org")
     a = api.user_browser("a@example.org")
     ids = upload(a, b"# Bibliography only\n\n## References\n[1] A cited work.\n")
-    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "no_body_text"
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "fulltext_rejected"
     detail = a.get(f"/library/items/{ids['item_id']}").json()["item"]
     assert detail["jobs"][0]["state"] == "fulltext_rejected"
     assert detail["jobs"][0]["finished_at"] is not None
@@ -279,3 +292,4 @@ def test_bibliography_only_is_not_awaiting_index(upload_api):
     assert detail["versions"][0]["coverage"] == "none"
     assert detail["content_status"] == "metadata_only"
     assert a.get(f"/library/items/{ids['item_id']}/chunks").json()["chunks"] == []
+    assert len(a.get(f"/library/items/{ids['item_id']}/references").json()["references"]) == 1

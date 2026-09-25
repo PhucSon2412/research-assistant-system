@@ -11,6 +11,7 @@ import hashlib
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Callable
+from types import SimpleNamespace
 
 from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session
@@ -18,7 +19,8 @@ from sqlalchemy.orm import Session
 from app.config import Settings, get_settings
 from app.db import get_sessionmaker
 from app.ingest.markdown import PIPELINE_VERSION, chunk_hash, chunk_section, extract, has_body_text
-from app.models import Chunk, IngestionJob, IngestStepAttempt, LibraryItem, MetadataCandidate, PaperVersion, Section, SourceFile
+from app.ingest import pdf
+from app.models import Chunk, IngestionJob, IngestStepAttempt, LibraryItem, MetadataCandidate, PaperVersion, PdfPage, ReferenceEntry, Section, SourceFile
 from app.models.enums import JobState, VerifiedMime, Visibility
 from app.storage import OriginalStorage
 
@@ -57,7 +59,7 @@ def _context(db: Session, job: IngestionJob) -> tuple[LibraryItem, PaperVersion,
     if (job.origin != "upload" or job.scope_visibility != Visibility.PRIVATE.value
             or item.visibility != Visibility.PRIVATE.value or job.scope_owner_user_id != item.owner_user_id):
         raise StepError("rights_gate_missing")
-    if files[0].verified_mime != VerifiedMime.MARKDOWN.value:
+    if files[0].verified_mime not in (VerifiedMime.MARKDOWN.value, VerifiedMime.PDF.value):
         raise StepError("unsupported_file_kind")
     return item, version, files[0]
 
@@ -129,7 +131,8 @@ def _finish(db: Session, job_id: uuid.UUID, token: uuid.UUID, step: str,
     attempt.outcome = "success"
     attempt.finished_at = utcnow()
     job.state = new_state
-    job.last_error_code = None
+    if new_state not in (JobState.FULLTEXT_REJECTED.value, JobState.NEEDS_REVIEW.value):
+        job.last_error_code = None
     job.resume_state = None
     job.updated_at = utcnow()
     if new_state == JobState.AWAITING_INDEX.value:
@@ -212,9 +215,30 @@ def _read_markdown(source: SourceFile, storage: OriginalStorage, settings: Setti
     return original
 
 
+def _read_pdf(source: SourceFile, storage: OriginalStorage, settings: Settings) -> bytes:
+    if source.byte_size > settings.files.pdf_max_bytes or not source.page_count or source.page_count > settings.files.pdf_max_pages:
+        raise StepError("pdf_limit_invalid")
+    try:
+        body = storage.open(source.storage_key)
+        try:
+            raw = body.read(settings.files.pdf_max_bytes + 1)
+        finally:
+            body.close()
+    except Exception:
+        raise StepError("storage_unavailable", retryable=True) from None
+    if len(raw) != source.byte_size or hashlib.sha256(raw).hexdigest() != source.checksum_sha256:
+        raise StepError("checksum_mismatch")
+    if not raw.startswith(b"%PDF-"):
+        raise StepError("pdf_invalid")
+    return raw
+
+
 def _validate(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceFile,
               storage: OriginalStorage, settings: Settings) -> str:
-    _read_markdown(source, storage, settings)
+    if source.verified_mime == VerifiedMime.PDF.value:
+        _read_pdf(source, storage, settings)
+    else:
+        _read_markdown(source, storage, settings)
 
     def save(db: Session, job: IngestionJob, item: LibraryItem, _version: PaperVersion, source: SourceFile) -> str:
         # Transaction advisory lock serializes same-owner/same-hash validation.
@@ -238,10 +262,11 @@ def _validate(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceFi
 
 def _extract(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceFile,
              storage: OriginalStorage, settings: Settings) -> str:
+    if source.verified_mime == VerifiedMime.PDF.value:
+        return _extract_pdf(db, job_id, token, source, storage, settings)
     original = _read_markdown(source, storage, settings)
     result = extract(original)
-    if not has_body_text(result):
-        raise StepError("no_body_text")
+    body_present = has_body_text(result)
 
     def save(db: Session, job: IngestionJob, item: LibraryItem, version: PaperVersion, source: SourceFile) -> str:
         for candidate in result.candidates:
@@ -250,21 +275,81 @@ def _extract(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceFil
                    locator_kind="markdown",
                    start_offset=candidate.start_offset, end_offset=candidate.end_offset,
                    pipeline_version=PIPELINE_VERSION))
+        ref_ordinal = 0
         for section in result.sections:
             db.add(Section(item_id=item.id, version_id=version.id, source_file_id=source.id,
                    kind=section.kind, heading=section.heading, ordinal=section.ordinal, text=section.text,
                    locator_kind="markdown",
                    start_offset=section.start_offset, end_offset=section.end_offset,
                    start_line=section.start_line, end_line=section.end_line, pipeline_version=PIPELINE_VERSION))
+            if section.kind == "references":
+                for ref in pdf._references(0, original, section.start_offset, section.end_offset):
+                    db.add(ReferenceEntry(item_id=item.id, version_id=version.id, source_file_id=source.id,
+                        ordinal=ref_ordinal, raw_citation=ref.raw, fields=ref.fields, confidence=ref.confidence,
+                        provenance=PIPELINE_VERSION, locator_kind="markdown", page_number=None,
+                        start_offset=ref.start, end_offset=ref.end, pipeline_version=PIPELINE_VERSION))
+                    ref_ordinal += 1
+        version.coverage = result.coverage if body_present else "none"
+        job.warnings = result.warnings if body_present else result.warnings + ["no_body_text"]
+        if not body_present:
+            job.last_error_code = "no_body_text"
+        return JobState.CHUNKING.value if body_present else JobState.FULLTEXT_REJECTED.value
+
+    return _finish(db, job_id, token, "extract", save)
+
+
+def _extract_pdf(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceFile,
+                 storage: OriginalStorage, settings: Settings) -> str:
+    raw = _read_pdf(source, storage, settings)
+    try:
+        result = pdf.classify(pdf.parse(raw, source.page_count, settings), settings)
+    except pdf.PdfError as exc:
+        raise StepError(exc.code, exc.retryable) from None
+
+    def save(db: Session, job: IngestionJob, item: LibraryItem, version: PaperVersion, source: SourceFile) -> str:
+        body_chars = {n: 0 for n in result.body_pages}
+        for segment in result.segments:
+            if segment.kind == "body":
+                body_chars[segment.page] += sum(not c.isspace() for c in segment.text)
+        for page in result.pages:
+            kinds = {s.kind for s in result.segments if s.page == page.number}
+            role = "unextractable" if page.error else "mixed" if len(kinds) > 1 else next(iter(kinds), "cover_or_unknown" if page.text.strip() else "empty")
+            db.add(PdfPage(item_id=item.id, version_id=version.id, source_file_id=source.id,
+                page_number=page.number, text=page.text, width=page.width, height=page.height,
+                role=role, body_chars=body_chars.get(page.number, 0),
+                body_page=page.number in result.body_pages,
+                qualifies=page.number in result.qualifying_pages, error_code=page.error,
+                layout_mode=page.layout_mode,
+                pipeline_version=pdf.PIPELINE_VERSION))
+        for ordinal, segment in enumerate(result.segments):
+            if not segment.text:
+                continue
+            page = result.pages[segment.page - 1]
+            db.add(Section(item_id=item.id, version_id=version.id, source_file_id=source.id,
+                kind=segment.kind, heading=None, ordinal=ordinal, text=segment.text,
+                locator_kind="pdf", start_page=segment.page, end_page=segment.page,
+                locator_detail={"start_offset": segment.start, "end_offset": segment.end,
+                                "offset_unit": "page_text_codepoint", "page_width_pt": page.width,
+                                "page_height_pt": page.height, "geometry": None,
+                                "parser": pdf.PIPELINE_VERSION}, pipeline_version=pdf.PIPELINE_VERSION))
+        for ordinal, ref in enumerate(result.references):
+            db.add(ReferenceEntry(item_id=item.id, version_id=version.id, source_file_id=source.id,
+                ordinal=ordinal, raw_citation=ref.raw, fields=ref.fields, confidence=ref.confidence,
+                provenance=pdf.PIPELINE_VERSION, locator_kind="pdf", page_number=ref.page,
+                start_offset=ref.start, end_offset=ref.end, pipeline_version=pdf.PIPELINE_VERSION))
         version.coverage = result.coverage
         job.warnings = result.warnings
-        return JobState.CHUNKING.value
+        if result.disposition != JobState.AWAITING_INDEX.value:
+            job.last_error_code = "pdf_body_uncertain" if result.uncertain else "pdf_body_below_threshold"
+        return JobState.CHUNKING.value if result.disposition == JobState.AWAITING_INDEX.value else result.disposition
 
     return _finish(db, job_id, token, "extract", save)
 
 
 def _chunk(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceFile,
            storage: OriginalStorage, settings: Settings) -> str:
+    if source.verified_mime == VerifiedMime.PDF.value:
+        return _chunk_pdf(db, job_id, token, source, storage, settings)
     original = _read_markdown(source, storage, settings)
     sections = db.scalars(select(Section).where(Section.source_file_id == source.id,
                           Section.pipeline_version == PIPELINE_VERSION).order_by(Section.ordinal)).all()
@@ -288,6 +373,44 @@ def _chunk(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceFile,
                          start_offset=span.start_offset, end_offset=span.end_offset,
                          start_line=span.start_line, end_line=span.end_line,
                          chunk_hash=chunk_hash(span.text), pipeline_version=PIPELINE_VERSION))
+        return JobState.AWAITING_INDEX.value
+
+    return _finish(db, job_id, token, "chunk", save)
+
+
+def _chunk_pdf(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceFile,
+               storage: OriginalStorage, settings: Settings) -> str:
+    _read_pdf(source, storage, settings)
+    pages = {p.page_number: p for p in db.scalars(select(PdfPage).where(
+        PdfPage.source_file_id == source.id, PdfPage.pipeline_version == pdf.PIPELINE_VERSION)).all()}
+    sections = db.scalars(select(Section).where(Section.source_file_id == source.id,
+        Section.pipeline_version == pdf.PIPELINE_VERSION).order_by(Section.ordinal)).all()
+    if not sections:
+        raise StepError("missing_sections")
+    chunks = []
+    for section in sections:
+        page = pages.get(section.start_page)
+        detail = section.locator_detail or {}
+        start, end = detail.get("start_offset"), detail.get("end_offset")
+        if page is None or start is None or end is None or page.text[start:end] != section.text:
+            raise StepError("locator_mismatch")
+        span_section = SimpleNamespace(kind=section.kind, heading=None, start_offset=start, end_offset=end)
+        for span in chunk_section(page.text, span_section, settings.ingest.markdown_max_chunk_chars):
+            chunks.append((section, span, page))
+    if not chunks:
+        raise StepError("no_extractable_text")
+
+    def save(db: Session, _job: IngestionJob, _item: LibraryItem, _version: PaperVersion,
+             _source: SourceFile) -> str:
+        for section, span, page in chunks:
+            db.add(Chunk(section_id=section.id, item_id=section.item_id, version_id=section.version_id,
+                source_file_id=section.source_file_id, ordinal=span.ordinal, text=span.text,
+                locator_kind="pdf", start_page=page.page_number, end_page=page.page_number,
+                locator_detail={"start_offset": span.start_offset, "end_offset": span.end_offset,
+                                "offset_unit": "page_text_codepoint", "page_width_pt": page.width,
+                                "page_height_pt": page.height, "geometry": None,
+                                "parser": pdf.PIPELINE_VERSION},
+                chunk_hash=chunk_hash(span.text), pipeline_version=pdf.PIPELINE_VERSION))
         return JobState.AWAITING_INDEX.value
 
     return _finish(db, job_id, token, "chunk", save)
@@ -332,7 +455,7 @@ def due_job_ids(db: Session, settings: Settings, now: datetime | None = None) ->
     now = now or utcnow()
     return list(db.scalars(select(IngestionJob.id).join(SourceFile, SourceFile.job_id == IngestionJob.id)
         .where(IngestionJob.origin == "upload", IngestionJob.scope_visibility == Visibility.PRIVATE.value,
-               SourceFile.verified_mime == VerifiedMime.MARKDOWN.value,
+               SourceFile.verified_mime.in_([VerifiedMime.MARKDOWN.value, VerifiedMime.PDF.value]),
                IngestionJob.state.in_([JobState.RECEIVED.value, JobState.VALIDATING.value,
                                       JobState.STORED.value, JobState.EXTRACTING.value,
                                       JobState.CHUNKING.value, JobState.RETRYABLE_FAILED.value]),

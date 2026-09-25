@@ -21,7 +21,7 @@ from app.api.deps import get_db, get_now, get_principal
 from app.api.errors import ApiError
 from app.audit import record_event
 from app.authz import Principal, can_edit_item, m2a_private_derivatives_clause, visible_items_clause
-from app.models import Chunk, IngestionJob, LibraryItem, MetadataCandidate, PaperVersion, SourceFile
+from app.models import Chunk, IngestionJob, LibraryItem, MetadataCandidate, PaperVersion, PdfPage, ReferenceEntry, Section, SourceFile
 from app.models.enums import AuditActorType, AuditOutcome, Visibility
 
 router = APIRouter(prefix="/library", tags=["library"])
@@ -132,8 +132,9 @@ def get_item(item_id: str, principal: Principal = Depends(get_principal), db: Se
     files = db.scalars(
         select(SourceFile).join(PaperVersion, SourceFile.version_id == PaperVersion.id)
         .where(PaperVersion.item_id == item.id)
-    ).all()
-    jobs = db.scalars(select(IngestionJob).where(IngestionJob.item_id == item.id)).all()
+    ).all() if item.visibility == Visibility.PRIVATE.value else []
+    jobs = db.scalars(select(IngestionJob).where(IngestionJob.item_id == item.id)).all() \
+        if item.visibility == Visibility.PRIVATE.value else []
     return {
         "item": _item_out(item, principal)
         | {
@@ -143,7 +144,7 @@ def get_item(item_id: str, principal: Principal = Depends(get_principal), db: Se
                     "version_label": v.version_label,
                     "source_identifier": v.source_identifier,
                     "source_url": v.source_url,
-                    "coverage": v.coverage,
+                    "coverage": v.coverage if item.visibility == Visibility.PRIVATE.value else None,
                     "received_at": v.received_at.isoformat(),
                 }
                 for v in versions
@@ -154,7 +155,7 @@ def get_item(item_id: str, principal: Principal = Depends(get_principal), db: Se
                         for f in files],
             "jobs": [{"id": str(j.id), "state": j.state, "origin": j.origin,
                       "attempt_count": j.attempt_count, "last_error_code": j.last_error_code,
-                      "warnings": j.warnings,
+                      "warnings": j.warnings if item.visibility == Visibility.PRIVATE.value else [],
                       "queue_wait_ms": int((j.started_at - j.created_at).total_seconds() * 1000)
                           if j.started_at else None,
                       "extraction_finished_at": j.extraction_finished_at.isoformat()
@@ -178,18 +179,20 @@ def get_chunks(
     db: Session = Depends(get_db),
 ) -> dict:
     item = _get_private_derivative_item(db, principal, item_id)
-    rows = db.scalars(select(Chunk).join(LibraryItem, Chunk.item_id == LibraryItem.id)
+    rows = db.execute(select(Chunk, Section.kind).join(Section, Chunk.section_id == Section.id)
+        .join(LibraryItem, Chunk.item_id == LibraryItem.id)
         .where(Chunk.item_id == item.id, m2a_private_derivatives_clause(principal))
-        .order_by(Chunk.version_id, Chunk.source_file_id, Chunk.start_offset)
+        .order_by(Chunk.version_id, Chunk.source_file_id, Chunk.start_page, Chunk.start_offset, Chunk.id)
         .limit(limit).offset(offset)).all()
     return {"chunks": [{"id": str(c.id), "version_id": str(c.version_id),
             "source_file_id": str(c.source_file_id), "text": c.text,
+            "section_kind": kind,
             "locator_kind": c.locator_kind,
             "start_offset": c.start_offset, "end_offset": c.end_offset,
             "start_line": c.start_line, "end_line": c.end_line,
             "start_page": c.start_page, "end_page": c.end_page,
             "locator_detail": c.locator_detail}
-            for c in rows], "limit": limit, "offset": offset}
+            for c, kind in rows], "limit": limit, "offset": offset}
 
 
 @router.get("/items/{item_id}/metadata-candidates")
@@ -206,6 +209,46 @@ def get_metadata_candidates(
             "locator_kind": r.locator_kind, "start_offset": r.start_offset,
             "end_offset": r.end_offset, "start_page": r.start_page}
             for r in rows]}
+
+
+@router.get("/items/{item_id}/coverage")
+def get_coverage(item_id: str, principal: Principal = Depends(get_principal),
+                 db: Session = Depends(get_db)) -> dict:
+    item = _get_private_derivative_item(db, principal, item_id)
+    rows = db.scalars(select(PdfPage).join(LibraryItem, PdfPage.item_id == LibraryItem.id)
+        .where(PdfPage.item_id == item.id, m2a_private_derivatives_clause(principal))
+        .order_by(PdfPage.version_id, PdfPage.source_file_id, PdfPage.page_number)).all()
+    summaries = {}
+    for p in rows:
+        summary = summaries.setdefault(str(p.source_file_id), {"source_file_id": str(p.source_file_id),
+            "version_id": str(p.version_id), "body_pages": 0, "qualifying_pages": 0,
+            "deficient_pages": 0, "unextractable_pages": [], "total_body_chars": 0})
+        if p.body_page:
+            summary["body_pages"] += 1
+            summary["qualifying_pages" if p.qualifies else "deficient_pages"] += 1
+        summary["total_body_chars"] += p.body_chars
+        if p.error_code:
+            summary["unextractable_pages"].append(p.page_number)
+    return {"summary": list(summaries.values()), "pages": [{"version_id": str(p.version_id), "source_file_id": str(p.source_file_id),
+        "page": p.page_number, "role": p.role, "body_chars": p.body_chars,
+        "body_page": p.body_page, "qualifies": p.qualifies, "error_code": p.error_code,
+        "layout_mode": p.layout_mode,
+        "page_width_pt": p.width, "page_height_pt": p.height, "parser": p.pipeline_version}
+        for p in rows]}
+
+
+@router.get("/items/{item_id}/references")
+def get_references(item_id: str, principal: Principal = Depends(get_principal),
+                   db: Session = Depends(get_db)) -> dict:
+    item = _get_private_derivative_item(db, principal, item_id)
+    rows = db.scalars(select(ReferenceEntry).join(LibraryItem, ReferenceEntry.item_id == LibraryItem.id)
+        .where(ReferenceEntry.item_id == item.id, m2a_private_derivatives_clause(principal))
+        .order_by(ReferenceEntry.version_id, ReferenceEntry.source_file_id, ReferenceEntry.ordinal)).all()
+    return {"references": [{"version_id": str(r.version_id), "source_file_id": str(r.source_file_id),
+        "raw_citation": r.raw_citation, "fields": r.fields, "confidence": r.confidence,
+        "provenance": r.provenance, "locator_kind": r.locator_kind,
+        "page": r.page_number, "start_offset": r.start_offset, "end_offset": r.end_offset,
+        "evidence_kind": "bibliography_entry"} for r in rows]}
 
 
 @router.patch("/items/{item_id}")

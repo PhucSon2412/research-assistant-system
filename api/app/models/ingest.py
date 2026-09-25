@@ -10,6 +10,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Float,
     Index,
     Integer,
     Text,
@@ -227,4 +228,61 @@ class Chunk(Base):
     end_page: Mapped[int | None] = mapped_column(Integer)
     locator_detail: Mapped[dict | None] = mapped_column(JSONB)
     chunk_hash: Mapped[str] = mapped_column(Text)
+    pipeline_version: Mapped[str] = mapped_column(Text)
+
+
+class PdfPage(Base):
+    __tablename__ = "pdf_pages"
+    __table_args__ = (
+        ForeignKeyConstraint(["version_id", "item_id"], ["paper_versions.id", "paper_versions.item_id"],
+                             name="fk_pdf_page_version_item", ondelete="RESTRICT"),
+        ForeignKeyConstraint(["source_file_id", "version_id"], ["source_files.id", "source_files.version_id"],
+                             name="fk_pdf_page_file_version", ondelete="RESTRICT"),
+        CheckConstraint("page_number > 0 AND body_chars >= 0", name="page_and_chars_valid"),
+        UniqueConstraint("source_file_id", "pipeline_version", "page_number", name="uq_pdf_page_number"),
+        Index("ix_pdf_pages_item_id", "item_id"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    source_file_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    page_number: Mapped[int] = mapped_column(Integer)
+    text: Mapped[str] = mapped_column(Text)
+    width: Mapped[float] = mapped_column(Float)
+    height: Mapped[float] = mapped_column(Float)
+    role: Mapped[str] = mapped_column(Text)
+    body_chars: Mapped[int] = mapped_column(Integer)
+    body_page: Mapped[bool] = mapped_column(Boolean)
+    qualifies: Mapped[bool] = mapped_column(Boolean)
+    error_code: Mapped[str | None] = mapped_column(Text)
+    layout_mode: Mapped[str] = mapped_column(Text)
+    pipeline_version: Mapped[str] = mapped_column(Text)
+
+
+class ReferenceEntry(Base):
+    __tablename__ = "reference_entries"
+    __table_args__ = (
+        ForeignKeyConstraint(["version_id", "item_id"], ["paper_versions.id", "paper_versions.item_id"],
+                             name="fk_reference_version_item", ondelete="RESTRICT"),
+        ForeignKeyConstraint(["source_file_id", "version_id"], ["source_files.id", "source_files.version_id"],
+                             name="fk_reference_file_version", ondelete="RESTRICT"),
+        CheckConstraint("ordinal >= 0 AND start_offset >= 0 AND end_offset > start_offset", name="span_valid"),
+        CheckConstraint("(locator_kind = 'markdown' AND page_number IS NULL) OR "
+                        "(locator_kind = 'pdf' AND page_number > 0)", name="locator_valid"),
+        UniqueConstraint("source_file_id", "pipeline_version", "ordinal", name="uq_reference_ordinal"),
+        Index("ix_reference_entries_item_id", "item_id"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    source_file_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    ordinal: Mapped[int] = mapped_column(Integer)
+    raw_citation: Mapped[str] = mapped_column(Text)
+    fields: Mapped[dict] = mapped_column(JSONB)
+    confidence: Mapped[str] = mapped_column(Text)
+    provenance: Mapped[str] = mapped_column(Text)
+    locator_kind: Mapped[str] = mapped_column(Text)
+    page_number: Mapped[int | None] = mapped_column(Integer)
+    start_offset: Mapped[int] = mapped_column(Integer)
+    end_offset: Mapped[int] = mapped_column(Integer)
     pipeline_version: Mapped[str] = mapped_column(Text)

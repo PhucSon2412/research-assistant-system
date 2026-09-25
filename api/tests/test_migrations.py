@@ -32,6 +32,8 @@ EXPECTED_TABLES = {
     "metadata_candidates",
     "sections",
     "chunks",
+    "pdf_pages",
+    "reference_entries",
 }
 
 
