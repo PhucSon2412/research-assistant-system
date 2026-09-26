@@ -52,12 +52,16 @@ class EmbeddingCall(Base):
         CheckConstraint("vector IS NULL OR (dimensions IS NOT NULL AND vector_dims(vector) = dimensions)", name="vector_dimensions_match"),
         UniqueConstraint("source_file_id", "model_id", "pipeline_version", "chunk_hash", name="uq_embedding_call_content"),
         Index("ix_embedding_calls_status", "status"),
+        Index("ix_embedding_calls_reserved_lease", "lease_until",
+              postgresql_where=text("status = 'reserved'")),
     )
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     source_file_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("source_files.id", ondelete="RESTRICT"))
     owner_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"))
     model_id: Mapped[str] = mapped_column(Text)
     provider: Mapped[str] = mapped_column(Text)
+    response_model_id: Mapped[str | None] = mapped_column(Text)
+    response_provider: Mapped[str | None] = mapped_column(Text)
     pipeline_version: Mapped[str] = mapped_column(Text)
     chunk_hash: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text)
@@ -68,6 +72,7 @@ class EmbeddingCall(Base):
     cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(14, 8))
     cost_status: Mapped[str] = mapped_column(Text)
     reserved_day: Mapped[date] = mapped_column(Date)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

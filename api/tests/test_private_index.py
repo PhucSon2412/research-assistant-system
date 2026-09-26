@@ -4,11 +4,12 @@ import io
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
-from threading import Barrier
+from threading import Barrier, Event
 
 import pytest
 from pydantic import SecretStr
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import get_sessionmaker
@@ -40,6 +41,41 @@ def fake_provider(monkeypatch, dimensions=3, action=None):
 
     monkeypatch.setattr("app.ingest.indexer.embed", fake)
     return calls
+
+
+def test_document_embedding_audits_response_identity(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    ids = upload(api.user_browser("a@example.org"), b"## Methods\nSynthetic body.\n")
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "awaiting_index"
+    settings = settings_with_fake_key()
+    monkeypatch.setattr("app.ingest.indexer.embed", lambda value, selected:
+        EmbeddingResult([.1, .2, .3], selected.embedding.model_id, 3,
+                        "text-embedding-3-small", "Azure"))
+    assert process_job(uuid.UUID(ids["job_id"]), settings, storage) == "ready"
+    with api.engine.connect() as conn:
+        row = conn.execute(text("SELECT model_id,provider,response_model_id,response_provider"
+                                " FROM embedding_calls")).one()
+    assert row == (settings.embedding.model_id, "openrouter", "text-embedding-3-small", "Azure")
+
+
+def test_document_identity_rejection_keeps_reservation_and_audit(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    ids = upload(api.user_browser("a@example.org"), b"## Methods\nSynthetic body.\n")
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "awaiting_index"
+    settings = settings_with_fake_key()
+    def reject(value, selected):
+        raise EmbeddingError("provider_response_invalid", response_model_id="other",
+                             response_provider="Azure")
+    monkeypatch.setattr("app.ingest.indexer.embed", reject)
+    assert process_job(uuid.UUID(ids["job_id"]), settings, storage) == "provider_response_invalid"
+    with api.engine.connect() as conn:
+        row = conn.execute(text("SELECT status,cost_status,reserved_usd,cost_usd,"
+                                " response_model_id,response_provider FROM embedding_calls")).one()
+    assert row.status == "uncertain" and row.cost_status == "unknown_reserved_ceiling"
+    assert row.reserved_usd > 0 and row.cost_usd is None
+    assert (row.response_model_id, row.response_provider) == ("other", "Azure")
 
 
 def test_markdown_indexes_once_and_isolated_by_owner(upload_api, monkeypatch):
@@ -326,6 +362,8 @@ def test_worker_death_after_request_reservation_does_not_reissue(upload_api, mon
     with api.engine.begin() as conn:
         conn.execute(text("UPDATE ingestion_jobs SET lease_until=now()-interval '1 second' WHERE id=:j"),
                      {"j": uuid.UUID(ids["job_id"])})
+        conn.execute(text("UPDATE embedding_calls SET lease_until=now()-interval '1 second'"
+                          " WHERE status='reserved'"))
     assert process_job(uuid.UUID(ids["job_id"]), settings, storage) == "embedding_outcome_uncertain"
     assert len(calls) == 1
     assert api.scalar("SELECT count(*) FROM embedding_calls WHERE status='uncertain'") == 1
@@ -410,6 +448,49 @@ def test_provider_concurrency_limit_is_durable_across_jobs(upload_api, monkeypat
         conn.execute(text("UPDATE ingestion_jobs SET next_attempt_at=NULL WHERE id=:j"), {"j": uuid.UUID(second["job_id"])})
     assert process_job(uuid.UUID(second["job_id"]), settings, storage) == "ready"
     assert len(seen) == 2
+
+
+def test_dead_document_reservation_reaped_and_late_response_reconciles_once(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    api.create_user("b@example.org")
+    first = upload(api.user_browser("a@example.org"), b"## Methods\nSynthetic first body.\n")
+    assert process_job(uuid.UUID(first["job_id"]), storage=storage) == "awaiting_index"
+    settings = settings_with_fake_key()
+    settings.embedding.max_concurrent_requests = 1
+    entered, release = Event(), Event()
+    def provider(value, selected):
+        entered.set()
+        assert release.wait(10)
+        return EmbeddingResult([0.1, 0.2], selected.embedding.model_id, 3)
+    monkeypatch.setattr("app.ingest.indexer.embed", provider)
+    from app.authz import Principal
+    from app.search import reserve
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        running = pool.submit(process_job, uuid.UUID(first["job_id"]), settings, storage)
+        assert entered.wait(10)
+        with api.engine.begin() as conn:
+            conn.execute(text("UPDATE embedding_calls SET lease_until=now()-interval '1 second'"
+                              " WHERE status='reserved'"))
+        user = api.create_user("c@example.org")
+        principal = Principal(user, "user", uuid.uuid4(), "c@example.org", None)
+        with Session(api.engine) as db:
+            new_id = reserve(db, principal, settings, "embed_query", Decimal("0.00000010"))
+        assert new_id is not None
+        assert api.scalar("SELECT count(*) FROM embedding_calls WHERE status='uncertain' AND cost_status='lease_expired_reserved_ceiling'") == 1
+        before = api.scalar("SELECT reserved_usd FROM embedding_budget_days")
+        assert before > 0
+        release.set()
+        assert running.result() == "ready"
+    assert api.scalar("SELECT count(*) FROM embedding_calls WHERE status='completed'") == 1
+    assert api.scalar("SELECT reserved_usd FROM embedding_budget_days") == 0
+    committed = api.scalar("SELECT committed_usd FROM embedding_budget_days")
+    from app.ingest.indexer import _provider_failure
+    from app.ingest.embedding import EmbeddingError
+    call_id = api.scalar("SELECT id FROM embedding_calls")
+    with Session(api.engine) as db:
+        _provider_failure(db, call_id, EmbeddingError("late_duplicate"))
+    assert api.scalar("SELECT committed_usd FROM embedding_budget_days") == committed
 
 
 def test_same_user_quota_is_atomic_and_warns_near_limit(upload_api, monkeypatch):

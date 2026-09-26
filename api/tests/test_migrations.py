@@ -37,6 +37,7 @@ EXPECTED_TABLES = {
     "reference_entries",
     "index_generations", "embedding_calls", "index_entries", "embedding_budget_days",
     "embedding_user_budget_days",
+    "search_request_days", "search_usage",
 }
 
 
@@ -137,6 +138,88 @@ def test_0010_backfills_existing_embedding_calls_by_owner(empty_db_url: str) -> 
     with eng.connect() as conn:
         assert conn.scalar(text("SELECT owner_user_id FROM embedding_calls")) == owner
         assert conn.scalar(text("SELECT reserved_usd FROM embedding_user_budget_days WHERE user_id=:o"), {"o": owner}) == Decimal("0.00000100")
+    eng.dispose()
+
+
+def test_0011_upgrades_m3a_data_without_changing_it(empty_db_url: str) -> None:
+    from app.identity.passwords import hash_password
+
+    upgrade(empty_db_url, "0010")
+    eng = create_engine(empty_db_url)
+    with eng.begin() as conn:
+        owner = conn.scalar(text("INSERT INTO users(email,password_verifier) VALUES('m3b-owner@example.org',:p) RETURNING id"),
+                            {"p": hash_password("synthetic-password-long")})
+        item = conn.scalar(text("INSERT INTO library_items(visibility,owner_user_id,title) VALUES('private',:o,'M3a existing') RETURNING id"), {"o": owner})
+        conn.execute(text("INSERT INTO embedding_budget_days(day,committed_usd,reserved_usd) VALUES(CURRENT_DATE,0.001,0.002)"))
+        conn.execute(text("INSERT INTO embedding_user_budget_days(day,user_id,committed_usd,reserved_usd) VALUES(CURRENT_DATE,:o,0.001,0.002)"), {"o": owner})
+    upgrade(empty_db_url)
+    with eng.connect() as conn:
+        assert conn.scalar(text("SELECT title FROM library_items WHERE id=:i"), {"i": item}) == "M3a existing"
+        assert conn.scalar(text("SELECT committed_usd+reserved_usd FROM embedding_budget_days")) == Decimal("0.00300000")
+        assert conn.scalar(text("SELECT committed_usd+reserved_usd FROM embedding_user_budget_days")) == Decimal("0.00300000")
+        assert conn.scalar(text("SELECT count(*) FROM search_usage")) == 0
+    eng.dispose()
+
+
+def test_0012_backfills_existing_search_usage_warnings(empty_db_url: str) -> None:
+    from app.identity.passwords import hash_password
+
+    upgrade(empty_db_url, "0011")
+    eng = create_engine(empty_db_url)
+    with eng.begin() as conn:
+        owner = conn.scalar(text("INSERT INTO users(email,password_verifier) VALUES('m3b-review@example.org',:p) RETURNING id"),
+                            {"p": hash_password("synthetic-password-long")})
+        usage = conn.scalar(text("""INSERT INTO search_usage(user_id,day,task_type,model_id,provider,status,
+            reserved_usd,cost_status) VALUES(:u,CURRENT_DATE,'rerank','model','openrouter','uncertain',
+            0.00000100,'unknown_reserved_ceiling') RETURNING id"""), {"u": owner})
+    upgrade(empty_db_url)
+    with eng.connect() as conn:
+        row = conn.execute(text("SELECT status,reserved_usd,warnings FROM search_usage WHERE id=:i"), {"i": usage}).one()
+    assert row.status == "uncertain" and row.reserved_usd == Decimal("0.00000100")
+    assert row.warnings == []
+    eng.dispose()
+
+
+def test_0013_marks_prelease_reservations_uncertain_without_releasing_cost(empty_db_url: str) -> None:
+    from app.identity.passwords import hash_password
+
+    upgrade(empty_db_url, "0012")
+    eng = create_engine(empty_db_url)
+    with eng.begin() as conn:
+        owner = conn.scalar(text("INSERT INTO users(email,password_verifier) VALUES('lease@example.org',:p) RETURNING id"),
+                            {"p": hash_password("synthetic-password-long")})
+        usage = conn.scalar(text("""INSERT INTO search_usage(user_id,day,task_type,model_id,provider,status,
+            reserved_usd,cost_status) VALUES(:u,CURRENT_DATE,'embed_query','model','openrouter','reserved',
+            0.00000100,'unknown') RETURNING id"""), {"u": owner})
+        item = conn.scalar(text("INSERT INTO library_items(visibility,owner_user_id,title)"
+                                " VALUES('private',:u,'Lease fixture') RETURNING id"), {"u": owner})
+        version = conn.scalar(text("INSERT INTO paper_versions(item_id,coverage)"
+                                   " VALUES(:i,'complete') RETURNING id"), {"i": item})
+        job = conn.scalar(text("""INSERT INTO ingestion_jobs(origin,scope_visibility,scope_owner_user_id,
+            item_id,version_id,idempotency_key,rights_epoch_at_start) VALUES
+            ('upload','private',:u,:i,:v,'lease-fixture',0) RETURNING id"""),
+                          {"u": owner, "i": item, "v": version})
+        source = conn.scalar(text("""INSERT INTO source_files(item_id,version_id,job_id,storage_key,
+            verified_mime,byte_size,checksum_sha256) VALUES
+            (:i,:v,:j,'lease/original','text/markdown',1,:h) RETURNING id"""),
+                             {"i": item, "v": version, "j": job, "h": "a" * 64})
+        call = conn.scalar(text("""INSERT INTO embedding_calls(source_file_id,owner_user_id,model_id,
+            provider,pipeline_version,chunk_hash,status,reserved_usd,cost_status,reserved_day)
+            VALUES(:s,:u,'model','openrouter','pipeline',:h,'reserved',0.00000200,'unknown',CURRENT_DATE)
+            RETURNING id"""), {"s": source, "u": owner, "h": "b" * 64})
+    upgrade(empty_db_url)
+    with eng.connect() as conn:
+        row = conn.execute(text("SELECT status,reserved_usd,cost_usd,cost_status,lease_until,"
+                                " response_model_id,response_provider"
+                                " FROM search_usage WHERE id=:i"), {"i": usage}).one()
+    assert row == ("uncertain", Decimal("0.00000100"), None,
+                   "lease_expired_reserved_ceiling", None, None, None)
+    with eng.connect() as conn:
+        row = conn.execute(text("SELECT status,reserved_usd,cost_usd,cost_status,lease_until,"
+                                " response_model_id,response_provider"
+                                " FROM embedding_calls WHERE id=:i"), {"i": call}).one()
+    assert row == ("uncertain", Decimal("0.00000200"), None,
+                   "lease_expired_reserved_ceiling", None, None, None)
     eng.dispose()
 
 

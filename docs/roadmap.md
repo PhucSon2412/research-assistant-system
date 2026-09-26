@@ -2,7 +2,7 @@
 
 [Mục lục](README.md) · [Quyết định còn mở](decisions.md) · [Kiểm thử](testing.md)
 
-Các milestone nhỏ, có thể review riêng. Thứ tự và phạm vi dưới đây là **đề xuất**. **Trạng thái:** M1a–M1c đã merge (PR #1–#3); M2a đã merge (PR #4, `66ba1d5`), M2b đã merge (PR #5, `f5483c8`). M3a/private index đang review; hybrid search, query embedding, rerank và RAG chưa triển khai. Mỗi bước giữ khả năng kiểm quyền và khả năng truy nguyên từ file/version đến chunk.
+Các milestone nhỏ, có thể review riêng. Thứ tự và phạm vi dưới đây là **đề xuất**. **Trạng thái:** M1a–M1c đã merge (PR #1–#3); M2a đã merge (PR #4, `66ba1d5`), M2b đã merge (PR #5, `f5483c8`), M3a/private index đã merge (PR #6, `1c4a6f7`). M3b private search đang review; RAG chưa triển khai. Mỗi bước giữ khả năng kiểm quyền và khả năng truy nguyên từ file/version đến chunk.
 
 | Mốc | Phụ thuộc | Đầu ra kiểm chứng được | Rủi ro / phép thử then chốt |
 | --- | --- | --- | --- |

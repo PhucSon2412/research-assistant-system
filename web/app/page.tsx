@@ -43,6 +43,7 @@ export default function LibraryPage() {
 
   return (
     <Shell user={user}>
+      <p><Link href="/search">Tìm kiếm trong paper riêng đã index</Link></p>
       <h1>Thư viện</h1>
       <p style={{ color: "#555" }}>Kho chung và kho riêng của bạn.</p>
       {user?.role === "user" && <Upload onComplete={() => { setOffset(0); setRefresh((n) => n + 1); }} />}
