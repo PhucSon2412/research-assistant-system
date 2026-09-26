@@ -158,6 +158,7 @@ class ProviderBudget(BaseModel):
 
     app_daily_usd: float = Field(default=10.0, gt=0)
     embedding_daily_usd: float = Field(default=3.0, ge=0)
+    embedding_warning_fraction: float = Field(default=0.8, gt=0, le=1)
     user_embedding_daily_usd: float = Field(default=1.0, ge=0)
     user_embedding_warning_fraction: float = Field(default=0.8, gt=0, le=1)
     rerank_daily_usd: float = Field(default=2.0, ge=0)

@@ -142,6 +142,9 @@ def _reserve(db: Session, job: IngestionJob, item: LibraryItem, source: SourceFi
         raise StepError("embedding_user_quota_exhausted", retryable=True)
     budget.reserved_usd += amount
     user_budget.reserved_usd += amount
+    if (budget.committed_usd + budget.reserved_usd >=
+            cap * Decimal(str(settings.budget.embedding_warning_fraction))):
+        job.warnings = list(dict.fromkeys([*job.warnings, "embedding_bucket_near_limit"]))
     if (user_budget.committed_usd + user_budget.reserved_usd >=
             user_cap * Decimal(str(settings.budget.user_embedding_warning_fraction))):
         job.warnings = list(dict.fromkeys([*job.warnings, "embedding_user_quota_near_limit"]))

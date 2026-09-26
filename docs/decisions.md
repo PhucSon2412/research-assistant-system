@@ -141,6 +141,8 @@ PR #4 đã merge vào `main` ở `66ba1d5`; các dòng bên dưới ghi bối c�
 
 ### Quyết định review M3a PR #6
 
+- Bucket embedding toàn ứng dụng cảnh báo riêng khi `committed + reserved` đạt tỷ lệ cấu hình của bucket/ngày (mặc định 80%); quota User tiếp tục cảnh báo theo tỷ lệ độc lập. Cả hai được xét trong cùng transaction reservation đã khóa, nên hai worker cùng vượt ngưỡng không bỏ qua warning.
+
 - Markdown đổi parser sang `markdown-lines-v2`: bibliography heading tin cậy được cách ly tới cuối tài liệu; heading giống bibliography nhưng không chắc dẫn tới `needs_review`, không tạo chunk/index. Bản v1 cần trích lại, không được nâng trạng thái bằng dữ liệu cũ.
 - Kiểm SHA-256 trên toàn bytes original PDF ở MinIO khi index, trước provider và trước công bố. Kích thước và metadata object không chứng minh tính toàn vẹn nếu object bị thay cùng kích thước.
 - Revision `0010` tạo ledger quota/ngày/User, backfill call cũ theo owner. Reservation của User và ứng dụng được khóa nguyên tử. Giới hạn mặc định `$1/User/ngày`; warning ở 80% kể cả reservation đang giữ. Đặt chỗ theo giới hạn request byte và giá trần cấu hình; đối soát bằng token provider trả với **giá ước tính cấu hình**, hoặc giữ trần nếu usage thiếu. 429 được hoàn trả; outcome chưa chắc giữ chỗ. Việc đặt chỗ không chứng minh hóa đơn thực, nên phải smoke route/key bằng câu tổng hợp và kiểm charge trước khi bật `pricing_verified` cho tài liệu riêng. Giá mặc định `$0.10/M token` không được coi là báo giá.

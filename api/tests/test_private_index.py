@@ -4,6 +4,7 @@ import io
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
+from threading import Barrier
 
 import pytest
 from pydantic import SecretStr
@@ -349,6 +350,41 @@ def test_concurrent_jobs_share_daily_budget_reservation(upload_api, monkeypatch)
     assert len(calls) == 1
     assert api.scalar("SELECT committed_usd+reserved_usd FROM embedding_budget_days") <= 0.0000064
     assert api.scalar("SELECT count(*) FROM index_generations WHERE state='active'") == 1
+
+
+def test_concurrent_users_trigger_app_bucket_warning_without_user_warning(upload_api, monkeypatch):
+    api, storage = upload_api
+    ids = []
+    for name in ("a", "b", "c"):
+        email = f"{name}@example.org"
+        api.create_user(email)
+        job = upload(api.user_browser(email), f"## Methods\nSynthetic {name} finding.\n".encode())
+        assert process_job(uuid.UUID(job["job_id"]), storage=storage) == "awaiting_index"
+        ids.append(job)
+    settings = settings_with_fake_key()
+    settings.embedding.max_request_bytes = 64
+    settings.embedding.max_concurrent_requests = 3
+    settings.budget.embedding_daily_usd = 0.0000128  # two full reservations
+    settings.budget.embedding_warning_fraction = 0.75
+    settings.budget.user_embedding_daily_usd = 0.0000128
+    settings.budget.user_embedding_warning_fraction = 0.9
+    admitted = Barrier(2)
+    calls = []
+
+    def provider(value, selected):
+        calls.append(value)
+        admitted.wait(timeout=10)  # both reservations overlap before settlement
+        return EmbeddingResult([0.1, 0.2], selected.embedding.model_id, None)
+
+    monkeypatch.setattr("app.ingest.indexer.embed", provider)
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        states = list(pool.map(lambda job: process_job(uuid.UUID(job["job_id"]), settings, storage), ids))
+    assert sorted(states) == ["embedding_budget_exhausted", "ready", "ready"]
+    assert len(calls) == 2
+    assert api.scalar("SELECT committed_usd+reserved_usd FROM embedding_budget_days") == Decimal("0.0000128")
+    assert api.scalar("SELECT count(*) FROM ingestion_jobs WHERE warnings ? 'embedding_bucket_near_limit'") == 1
+    assert api.scalar("SELECT count(*) FROM ingestion_jobs WHERE warnings ? 'embedding_user_quota_near_limit'") == 0
+    assert api.scalar("SELECT count(*) FROM index_generations WHERE state='active'") == 2
 
 
 def test_provider_concurrency_limit_is_durable_across_jobs(upload_api, monkeypatch):

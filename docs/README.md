@@ -22,7 +22,7 @@ Khi có thay đổi quyết định, cập nhật tài liệu liên quan cùng t
 | [Yêu cầu phi chức năng](nonfunctional.md) | Cách đo hiệu suất, độ tin cậy, an toàn, vận hành |
 | [Chiến lược kiểm thử](testing.md) | Các tầng test, bộ đánh giá retrieval/RAG, chống rò rỉ |
 | [Roadmap](roadmap.md) | Milestone, phụ thuộc, đầu ra, rủi ro |
-| [Môi trường phát triển](dev-setup.md) | Lệnh dựng/hạ Compose, migrate, bootstrap, test đã kiểm; schema M1a–M2b, auth/ACL, upload original và worker ingest |
+| [Môi trường phát triển](dev-setup.md) | Lệnh dựng/hạ Compose, migrate, bootstrap, test đã kiểm; schema M1a–M3a, auth/ACL, upload original và worker ingest |
 | [M2b PDF/coverage/references](m2b-pdf.md) | Parser, ngưỡng body, locator, quyền, kiểm chứng và hợp đồng bàn giao M3 |
 | [Nhật ký quyết định](decisions.md) | Những điều đã chốt ngày 2026-09-24 và các câu hỏi còn mở |
 

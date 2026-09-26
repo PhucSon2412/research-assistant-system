@@ -55,6 +55,7 @@ def test_defaults_match_documented_mvp_values() -> None:
     assert s.budget.app_daily_usd == 10.0
     assert s.budget.key_spending_cap_daily_usd == 50.0
     assert s.budget.embedding_daily_usd == 3.0
+    assert s.budget.embedding_warning_fraction == 0.8
     assert s.budget.user_embedding_daily_usd == 1.0
     assert s.budget.user_embedding_warning_fraction == 0.8
     assert s.embedding.model_id == "openai/text-embedding-3-small"
@@ -70,9 +71,11 @@ def test_nested_values_override_from_environment(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setenv("RAS_DATABASE_URL", URL)
     monkeypatch.setenv("RAS_AUTH__SESSION_IDLE", "PT15M")
     monkeypatch.setenv("RAS_FILES__PDF_MAX_PAGES", "50")
+    monkeypatch.setenv("RAS_BUDGET__EMBEDDING_WARNING_FRACTION", "0.75")
     s = Settings()  # type: ignore[call-arg]
     assert s.auth.session_idle == timedelta(minutes=15)
     assert s.files.pdf_max_pages == 50
+    assert s.budget.embedding_warning_fraction == 0.75
 
 
 def test_redis_broker_password_is_url_escaped() -> None:
@@ -95,6 +98,8 @@ def test_redis_broker_password_is_url_escaped() -> None:
         lambda: ProviderBudget(generation_daily_usd=6.0),  # 3 + 2 + 6 > 10
         lambda: ProviderBudget(app_daily_usd=60.0),  # above the key cap
         lambda: ProviderBudget(user_embedding_daily_usd=4.0),
+        lambda: ProviderBudget(embedding_warning_fraction=0),
+        lambda: ProviderBudget(embedding_warning_fraction=1.01),
         lambda: ProviderBudget(user_embedding_warning_fraction=1.01),
         lambda: PasswordPolicy(min_length=7),
         lambda: PasswordPolicy(min_length=20, max_length=19),
