@@ -283,9 +283,10 @@ def test_bibliography_only_is_not_awaiting_index(upload_api):
     api.create_user("a@example.org")
     a = api.user_browser("a@example.org")
     ids = upload(a, b"# Bibliography only\n\n## References\n[1] A cited work.\n")
-    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "fulltext_rejected"
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "needs_review"
     detail = a.get(f"/library/items/{ids['item_id']}").json()["item"]
-    assert detail["jobs"][0]["state"] == "fulltext_rejected"
+    assert detail["jobs"][0]["state"] == "needs_review"
+    assert "bibliography_boundary_uncertain" in detail["jobs"][0]["warnings"]
     assert detail["jobs"][0]["finished_at"] is not None
     assert detail["jobs"][0]["extraction_finished_at"] is None
     assert detail["jobs"][0]["processing_ms"] is not None

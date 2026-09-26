@@ -2,9 +2,11 @@
 
 [Mục lục](README.md) · [Kiến trúc](architecture.md) · [Quyền và dữ liệu](access-and-data.md)
 
-Đây là schema khái niệm **đề xuất** trên PostgreSQL + pgvector đã chốt. Migration M1a–M1c đã tạo nền, auth và upload; M2a `0005`–`0007` (đã merge PR #4) thêm `ingest_step_attempts`, `metadata_candidates`, `sections`, `chunks` và mốc handoff. M2b `0008` thêm `pdf_pages` và `reference_entries` trên nhánh review; index và các entity còn lại vẫn là thiết kế. ID ổn định và scope được mang qua mọi bản ghi dẫn xuất để kiểm quyền, xóa và reindex. Xem [hợp đồng M2b](m2b-pdf.md).
+Đây là schema khái niệm **đề xuất** trên PostgreSQL + pgvector đã chốt. Migration M1a–M1c đã tạo nền, auth và upload; M2a `0005`–`0007` (đã merge PR #4) thêm `ingest_step_attempts`, `metadata_candidates`, `sections`, `chunks` và mốc handoff. M2b `0008` (đã merge PR #5) thêm `pdf_pages` và `reference_entries`. M3a `0009` trên nhánh review thêm generation/index private và budget embedding; các entity search/RAG/common còn lại vẫn là thiết kế. ID ổn định và scope được mang qua mọi bản ghi dẫn xuất để kiểm quyền, xóa và reindex. Xem [hợp đồng M2b](m2b-pdf.md).
 
 `pdf_pages` khóa duy nhất `(source_file_id, pipeline_version, page_number)`, giữ text parser, chiều trang point, vai trò, `body_page`, ký tự body, kết quả ngưỡng và lỗi/layout. `reference_entries` khóa duy nhất `(source_file_id, pipeline_version, ordinal)`, mang item/version/file bằng FK kép, raw citation, fields JSON, confidence/provenance và offset Markdown hoặc PDF page text. `sections`/`chunks` dùng locator PDF 1-based page + `locator_detail` half-open code point offset trong `pdf_pages.text`; hình học `null`. Những bảng dẫn xuất này chỉ có read gate private owner ở M2b; index/AccessRights M3+ là thay đổi riêng.
+
+M3a hiện thực `IndexGeneration` (item/version/file/job, model/dimensions, rights epoch, trạng thái), `IndexEntry` (chunk, text và GIN keyword), `EmbeddingCall` (vector pgvector, chunk hash, usage và reservation) cùng `EmbeddingBudgetDay`. `LibraryItem.active_index_generation_id` là con trỏ công bố. Vector không cố định dimensions trong schema vì live response chưa được kiểm; app và CHECK DB giữ vector cùng dimensions, còn transaction công bố kiểm mọi entry cùng model/chiều. `EmbeddingCall` chỉ dùng lại trong cùng source file, nên hai User có upload giống nhau không chia sẻ dữ liệu dẫn xuất. Chưa có ANN index cố định chiều hoặc truy vấn search trong M3a.
 
 | Entity | Trường / quan hệ quan trọng | Ràng buộc |
 | --- | --- | --- |
@@ -36,3 +38,5 @@
 **Đề xuất:** Citation graph có thể chứa nút identity cho tác phẩm chưa có full text; nút này chỉ hỗ trợ khám phá bibliographic. Khi trỏ vào LibraryItem, phép mở metadata/file/chunk phụ thuộc quyền của người xem. Identity hoặc match chỉ suy ra từ item riêng cũng theo quyền riêng; không đẩy chúng ra graph chung. Reference extraction từ item riêng cũng là dữ liệu riêng; không làm lộ cạnh riêng qua graph hay count.
 
 **Cần xác nhận qua triển khai/đo:** số version tối đa ngoài 30 ngày backup, metadata chuẩn bắt buộc, mức xử lý identifier thiếu/nhầm và số chiều vector thực. Các thời hạn session/invite/reset, cleanup 24 giờ và backup 30 ngày là cấu hình MVP được chủ dự án đưa ra, cần tập trung trong config/test; xem [decisions](decisions.md).
+
+**M3a revision `0010` (PR #6):** `EmbeddingCall.owner_user_id` nối mỗi request với chủ item; `EmbeddingUserBudgetDay(day,user_id)` giữ committed và reserved USD, backfill từ call `0009`. Tất cả số tiền sau response là ước tính theo giá cấu hình trừ khi có đối soát charge của route/key. Active generation vẫn chỉ đổi trong giao dịch công bố.

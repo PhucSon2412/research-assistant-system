@@ -48,6 +48,9 @@ class OriginalStorage:
     def open(self, key: str):
         return self.client.get_object(Bucket=self.bucket, Key=key)["Body"]
 
+    def size(self, key: str) -> int:
+        return int(self.client.head_object(Bucket=self.bucket, Key=key)["ContentLength"])
+
     def orphan_keys(self, prefix: str = "originals/") -> Iterator[tuple[str, object]]:
         paginator = self.client.get_paginator("list_objects_v2")
         for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):

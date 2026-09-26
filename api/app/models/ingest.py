@@ -107,7 +107,7 @@ class IngestionJob(Base):
 class IngestStepAttempt(Base):
     __tablename__ = "ingest_step_attempts"
     __table_args__ = (
-        CheckConstraint("step IN ('validate', 'extract', 'chunk')", name="step_valid"),
+        CheckConstraint("step IN ('validate', 'extract', 'chunk', 'index')", name="step_valid"),
         CheckConstraint("outcome IN ('running', 'success', 'retry', 'failed', 'cancelled')", name="outcome_valid"),
         CheckConstraint("attempt_no > 0", name="attempt_no_positive"),
         UniqueConstraint("job_id", "step", "attempt_no", name="uq_ingest_step_attempt"),

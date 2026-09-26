@@ -16,7 +16,7 @@ from functools import lru_cache
 from typing import Literal
 from urllib.parse import quote
 
-from pydantic import BaseModel, Field, SecretStr, model_validator
+from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
 
@@ -158,6 +158,9 @@ class ProviderBudget(BaseModel):
 
     app_daily_usd: float = Field(default=10.0, gt=0)
     embedding_daily_usd: float = Field(default=3.0, ge=0)
+    embedding_warning_fraction: float = Field(default=0.8, gt=0, le=1)
+    user_embedding_daily_usd: float = Field(default=1.0, ge=0)
+    user_embedding_warning_fraction: float = Field(default=0.8, gt=0, le=1)
     rerank_daily_usd: float = Field(default=2.0, ge=0)
     generation_daily_usd: float = Field(default=5.0, ge=0)
     key_spending_cap_daily_usd: float = Field(default=50.0, gt=0)
@@ -169,6 +172,34 @@ class ProviderBudget(BaseModel):
             raise ValueError("budget buckets must not exceed app_daily_usd")
         if self.app_daily_usd > self.key_spending_cap_daily_usd:
             raise ValueError("app_daily_usd must not exceed the key spending cap")
+        if self.user_embedding_daily_usd > self.embedding_daily_usd:
+            raise ValueError("user_embedding_daily_usd must not exceed embedding_daily_usd")
+        return self
+
+
+class EmbeddingPolicy(BaseModel):
+    model_id: str = "openai/text-embedding-3-small"
+    provider: str = "openrouter"
+    endpoint: str = "https://openrouter.ai/api/v1/embeddings"
+    api_key: SecretStr | None = None
+    request_timeout_seconds: int = Field(default=30, gt=0)
+    max_concurrent_requests: int = Field(default=2, gt=0)
+    max_batch_items: int = Field(default=1, ge=1, le=1)
+    max_request_bytes: int = Field(default=16_384, gt=0)
+    # Configured price ceiling/estimate; verify route price and usage with a tiny
+    # synthetic request before setting pricing_verified for private documents.
+    max_usd_per_million_tokens: float = Field(default=0.10, gt=0)
+    pricing_verified: bool = False
+
+    @field_validator("api_key", mode="before")
+    @classmethod
+    def _empty_key_is_absent(cls, value):
+        return None if value == "" else value
+
+    @model_validator(mode="after")
+    def _check_endpoint(self) -> "EmbeddingPolicy":
+        if not self.endpoint.startswith("https://"):
+            raise ValueError("embedding endpoint must use HTTPS")
         return self
 
 
@@ -236,6 +267,7 @@ class Settings(BaseSettings):
     ingest: IngestPolicy = IngestPolicy()
     retention: Retention = Retention()
     budget: ProviderBudget = ProviderBudget()
+    embedding: EmbeddingPolicy = EmbeddingPolicy()
     http: HttpSecurity = HttpSecurity()
     delivery: Delivery = Delivery()
     storage: ObjectStorage | None = None
@@ -251,6 +283,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _check_environment(self) -> "Settings":
+        if self.embedding.request_timeout_seconds + 10 >= self.ingest.lease_seconds:
+            raise ValueError("embedding timeout must leave at least 10 seconds of lease margin")
         if self.environment == "production":
             if not self.http.cookie_secure:
                 raise ValueError("production requires RAS_HTTP__COOKIE_SECURE=true")

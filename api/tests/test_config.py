@@ -11,6 +11,7 @@ from app.config import (
     MIB,
     AuthLifetimes,
     FileLimits,
+    EmbeddingPolicy,
     IngestPolicy,
     PasswordPolicy,
     PdfBodyThreshold,
@@ -53,6 +54,14 @@ def test_defaults_match_documented_mvp_values() -> None:
     assert s.retention.backup_retention == timedelta(days=30)
     assert s.budget.app_daily_usd == 10.0
     assert s.budget.key_spending_cap_daily_usd == 50.0
+    assert s.budget.embedding_daily_usd == 3.0
+    assert s.budget.embedding_warning_fraction == 0.8
+    assert s.budget.user_embedding_daily_usd == 1.0
+    assert s.budget.user_embedding_warning_fraction == 0.8
+    assert s.embedding.model_id == "openai/text-embedding-3-small"
+    assert s.embedding.max_batch_items == 1
+    assert s.embedding.api_key is None
+    assert s.embedding.pricing_verified is False
     assert s.password.min_length == 12
     assert (s.ingest.poll_seconds, s.ingest.lease_seconds, s.ingest.max_attempts,
             s.ingest.markdown_max_chunk_chars) == (5, 120, 4, 1200)
@@ -62,9 +71,11 @@ def test_nested_values_override_from_environment(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setenv("RAS_DATABASE_URL", URL)
     monkeypatch.setenv("RAS_AUTH__SESSION_IDLE", "PT15M")
     monkeypatch.setenv("RAS_FILES__PDF_MAX_PAGES", "50")
+    monkeypatch.setenv("RAS_BUDGET__EMBEDDING_WARNING_FRACTION", "0.75")
     s = Settings()  # type: ignore[call-arg]
     assert s.auth.session_idle == timedelta(minutes=15)
     assert s.files.pdf_max_pages == 50
+    assert s.budget.embedding_warning_fraction == 0.75
 
 
 def test_redis_broker_password_is_url_escaped() -> None:
@@ -86,11 +97,18 @@ def test_redis_broker_password_is_url_escaped() -> None:
         lambda: Retention(backup_retention=timedelta(0)),
         lambda: ProviderBudget(generation_daily_usd=6.0),  # 3 + 2 + 6 > 10
         lambda: ProviderBudget(app_daily_usd=60.0),  # above the key cap
+        lambda: ProviderBudget(user_embedding_daily_usd=4.0),
+        lambda: ProviderBudget(embedding_warning_fraction=0),
+        lambda: ProviderBudget(embedding_warning_fraction=1.01),
+        lambda: ProviderBudget(user_embedding_warning_fraction=1.01),
         lambda: PasswordPolicy(min_length=7),
         lambda: PasswordPolicy(min_length=20, max_length=19),
         lambda: IngestPolicy(max_attempts=0),
         lambda: IngestPolicy(retry_base_seconds=6, retry_max_seconds=5),
         lambda: IngestPolicy(pdf_parser_timeout_seconds=91),
+        lambda: EmbeddingPolicy(max_batch_items=2),
+        lambda: EmbeddingPolicy(endpoint="http://example.org/embeddings"),
+        lambda: EmbeddingPolicy(max_concurrent_requests=0),
     ],
 )
 def test_invalid_values_are_rejected(build) -> None:
@@ -104,6 +122,9 @@ def test_boundary_values_are_accepted() -> None:
     ProviderBudget(embedding_daily_usd=3, rerank_daily_usd=2, generation_daily_usd=5)  # sum == app budget
     ProviderBudget(app_daily_usd=50.0, key_spending_cap_daily_usd=50.0)
     PasswordPolicy(min_length=8)
+    assert EmbeddingPolicy(api_key="").api_key is None
+    with pytest.raises(ValidationError):
+        Settings(database_url=URL, embedding={"request_timeout_seconds": 110})
 
 
 # --- M1b: environment, cookies, delivery ---------------------------------------

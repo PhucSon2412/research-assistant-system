@@ -1,6 +1,6 @@
 # Tài liệu dự án
 
-Repo đã merge M1c và M2a Markdown (PR #4, merge commit `66ba1d5`). M2b PDF extraction/coverage/references đang ở nhánh review; index thuộc M3. Các tài liệu này mô tả yêu cầu và phương án đề xuất, không khẳng định tính năng đã được triển khai hay hiệu năng đã được đo; phần đã có code được ghi riêng ở [môi trường phát triển](dev-setup.md).
+Repo đã merge M2b PDF extraction/coverage/references (PR #5, merge commit `f5483c8`). M3a private index đang ở nhánh review; search/RAG thuộc các PR sau. Các tài liệu này mô tả yêu cầu và phương án đề xuất, không khẳng định tính năng đã được triển khai hay hiệu năng đã được đo; phần đã có code được ghi riêng ở [môi trường phát triển](dev-setup.md).
 
 ## Cách đọc trạng thái quyết định
 
@@ -22,7 +22,7 @@ Khi có thay đổi quyết định, cập nhật tài liệu liên quan cùng t
 | [Yêu cầu phi chức năng](nonfunctional.md) | Cách đo hiệu suất, độ tin cậy, an toàn, vận hành |
 | [Chiến lược kiểm thử](testing.md) | Các tầng test, bộ đánh giá retrieval/RAG, chống rò rỉ |
 | [Roadmap](roadmap.md) | Milestone, phụ thuộc, đầu ra, rủi ro |
-| [Môi trường phát triển](dev-setup.md) | Lệnh dựng/hạ Compose, migrate, bootstrap, test đã kiểm; schema M1a–M2b, auth/ACL, upload original và worker ingest |
+| [Môi trường phát triển](dev-setup.md) | Lệnh dựng/hạ Compose, migrate, bootstrap, test đã kiểm; schema M1a–M3a, auth/ACL, upload original và worker ingest |
 | [M2b PDF/coverage/references](m2b-pdf.md) | Parser, ngưỡng body, locator, quyền, kiểm chứng và hợp đồng bàn giao M3 |
 | [Nhật ký quyết định](decisions.md) | Những điều đã chốt ngày 2026-09-24 và các câu hỏi còn mở |
 
