@@ -10,6 +10,8 @@
 
 **Đã xác nhận:** PostgreSQL full-text search và pgvector phục vụ hybrid retrieval. Model OpenRouter được chọn trong config: embedding `openai/text-embedding-3-small`, rerank `qwen/qwen3-reranker-8b`, generation `openai/gpt-6-sol`. Query search/RAG phải embed bằng cùng model và kích thước vector với active index; số chiều được xác minh từ response/config trước khi tạo index. Paper daily `metadata_only` hiện ở **trang khám phá** nhưng không vào full-text search/RAG, kể cả result, count, facet, snippet, citation hoặc context gửi LLM. Chỉ paper `indexed` có active keyword/vector index và quyền phù hợp mới vào retrieval. Việc lọc metadata theo tiêu đề/chủ đề trên trang khám phá là luồng riêng, có nhãn chỉ metadata và link gốc; abstract/link gốc không là evidence của câu trả lời toàn văn.
 
+**Hiện trạng M3a:** Chỉ index upload private. `index_entries` có GIN keyword; `embedding_calls.vector` lưu pgvector với dimensions thực từ response, liên kết qua generation. Không có API retrieval/query embedding hay ANN index cố định chiều trong PR này. M3b phải lấy `active_index_generation_id`, xác nhận model/dimensions của query và lọc ACL theo item/version/file trước khi đọc entry hoặc vector. Bibliography không có entry trong index nội dung.
+
 ```mermaid
 flowchart LR
   A[Identity + allowed item set] --> F[Scope intersection]

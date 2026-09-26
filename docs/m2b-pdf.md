@@ -1,4 +1,4 @@
-# M2b — PDF extraction, coverage và references (nhánh review)
+# M2b — PDF extraction, coverage và references (đã merge PR #5)
 
 [Mục lục](README.md) · [Quyền và dữ liệu](access-and-data.md) · [Môi trường phát triển](dev-setup.md)
 

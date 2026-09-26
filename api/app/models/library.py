@@ -53,6 +53,9 @@ class LibraryItem(Base):
             use_alter=True,
             ondelete="RESTRICT",
         ),
+        ForeignKeyConstraint(["active_index_generation_id", "id"],
+                             ["index_generations.id", "index_generations.item_id"],
+                             name="fk_library_items_active_index_generation", use_alter=True, ondelete="RESTRICT"),
         Index("ix_library_items_owner_user_id", "owner_user_id"),
     )
 
@@ -65,6 +68,7 @@ class LibraryItem(Base):
     )
     content_status: Mapped[str] = mapped_column(Text, server_default=ContentStatus.METADATA_ONLY.value)
     active_version_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    active_index_generation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     title: Mapped[str | None] = mapped_column(Text)
     # Bumped on every revoke/delete (M5/M6); workers compare against the
     # epoch recorded on their job before calling out or publishing.

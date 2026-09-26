@@ -121,6 +121,7 @@ services:
       <<: *db-env
       RAS_REDIS_HOST: redis
       RAS_REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+      RAS_EMBEDDING__API_KEY: ${OPENROUTER_API_KEY:-}
       RAS_STORAGE__ENDPOINT_URL: http://minio:9000
       RAS_STORAGE__ACCESS_KEY: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}
       RAS_STORAGE__SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
@@ -141,6 +142,7 @@ services:
       <<: *db-env
       RAS_REDIS_HOST: redis
       RAS_REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+      RAS_EMBEDDING__API_KEY: ${OPENROUTER_API_KEY:-}
     depends_on:
       migrate:
         condition: service_completed_successfully

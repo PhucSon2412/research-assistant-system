@@ -1,6 +1,6 @@
 # Tài liệu dự án
 
-Repo đã merge M1c và M2a Markdown (PR #4, merge commit `66ba1d5`). M2b PDF extraction/coverage/references đang ở nhánh review; index thuộc M3. Các tài liệu này mô tả yêu cầu và phương án đề xuất, không khẳng định tính năng đã được triển khai hay hiệu năng đã được đo; phần đã có code được ghi riêng ở [môi trường phát triển](dev-setup.md).
+Repo đã merge M2b PDF extraction/coverage/references (PR #5, merge commit `f5483c8`). M3a private index đang ở nhánh review; search/RAG thuộc các PR sau. Các tài liệu này mô tả yêu cầu và phương án đề xuất, không khẳng định tính năng đã được triển khai hay hiệu năng đã được đo; phần đã có code được ghi riêng ở [môi trường phát triển](dev-setup.md).
 
 ## Cách đọc trạng thái quyết định
 

@@ -16,7 +16,7 @@ from functools import lru_cache
 from typing import Literal
 from urllib.parse import quote
 
-from pydantic import BaseModel, Field, SecretStr, model_validator
+from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
 
@@ -172,6 +172,30 @@ class ProviderBudget(BaseModel):
         return self
 
 
+class EmbeddingPolicy(BaseModel):
+    model_id: str = "openai/text-embedding-3-small"
+    provider: str = "openrouter"
+    endpoint: str = "https://openrouter.ai/api/v1/embeddings"
+    api_key: SecretStr | None = None
+    request_timeout_seconds: int = Field(default=30, gt=0)
+    max_concurrent_requests: int = Field(default=2, gt=0)
+    max_batch_items: int = Field(default=1, ge=1, le=1)
+    max_request_bytes: int = Field(default=16_384, gt=0)
+    # Conservative ceiling for reservations; review against live route pricing.
+    max_usd_per_million_tokens: float = Field(default=0.10, gt=0)
+
+    @field_validator("api_key", mode="before")
+    @classmethod
+    def _empty_key_is_absent(cls, value):
+        return None if value == "" else value
+
+    @model_validator(mode="after")
+    def _check_endpoint(self) -> "EmbeddingPolicy":
+        if not self.endpoint.startswith("https://"):
+            raise ValueError("embedding endpoint must use HTTPS")
+        return self
+
+
 class HttpSecurity(BaseModel):
     """Cookie and request-origin policy (M1b).
 
@@ -236,6 +260,7 @@ class Settings(BaseSettings):
     ingest: IngestPolicy = IngestPolicy()
     retention: Retention = Retention()
     budget: ProviderBudget = ProviderBudget()
+    embedding: EmbeddingPolicy = EmbeddingPolicy()
     http: HttpSecurity = HttpSecurity()
     delivery: Delivery = Delivery()
     storage: ObjectStorage | None = None
@@ -251,6 +276,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _check_environment(self) -> "Settings":
+        if self.embedding.request_timeout_seconds + 10 >= self.ingest.lease_seconds:
+            raise ValueError("embedding timeout must leave at least 10 seconds of lease margin")
         if self.environment == "production":
             if not self.http.cookie_secure:
                 raise ValueError("production requires RAS_HTTP__COOKIE_SECURE=true")

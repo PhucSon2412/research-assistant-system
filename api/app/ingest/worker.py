@@ -13,25 +13,26 @@ from datetime import datetime, timedelta, timezone
 from typing import Callable
 from types import SimpleNamespace
 
-from sqlalchemy import select, text, update
+from sqlalchemy import or_, select, text, true, update
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
 from app.db import get_sessionmaker
 from app.ingest.markdown import PIPELINE_VERSION, chunk_hash, chunk_section, extract, has_body_text
 from app.ingest import pdf
-from app.models import Chunk, IngestionJob, IngestStepAttempt, LibraryItem, MetadataCandidate, PaperVersion, PdfPage, ReferenceEntry, Section, SourceFile
+from app.models import Chunk, EmbeddingCall, IngestionJob, IngestStepAttempt, LibraryItem, MetadataCandidate, PaperVersion, PdfPage, ReferenceEntry, Section, SourceFile
 from app.models.enums import JobState, VerifiedMime, Visibility
 from app.storage import OriginalStorage
 
 STEPS = {"validate": JobState.VALIDATING.value, "extract": JobState.EXTRACTING.value,
-         "chunk": JobState.CHUNKING.value}
+         "chunk": JobState.CHUNKING.value, "index": JobState.INDEXING.value}
 TERMINAL = {JobState.DUPLICATE.value, JobState.TERMINAL_FAILED.value,
          JobState.FULLTEXT_REJECTED.value, JobState.NEEDS_REVIEW.value, JobState.CANCELLED.value,
          JobState.READY.value}
 WORKER_STOP = TERMINAL | {JobState.AWAITING_INDEX.value}
 CLAIMABLE = {JobState.RECEIVED.value, JobState.VALIDATING.value, JobState.STORED.value,
-             JobState.EXTRACTING.value, JobState.CHUNKING.value, JobState.RETRYABLE_FAILED.value}
+             JobState.EXTRACTING.value, JobState.CHUNKING.value, JobState.AWAITING_INDEX.value,
+             JobState.INDEXING.value, JobState.RETRYABLE_FAILED.value}
 
 
 class StepError(Exception):
@@ -80,6 +81,9 @@ def claim_job(db: Session, job_id: uuid.UUID, settings: Settings, now: datetime 
         db.rollback()
         return None
     if job.attempt_count >= settings.ingest.max_attempts:
+        db.execute(update(EmbeddingCall).where(EmbeddingCall.source_file_id.in_(
+            select(SourceFile.id).where(SourceFile.job_id == job.id)),
+            EmbeddingCall.status == "reserved").values(status="uncertain"))
         job.state = JobState.TERMINAL_FAILED.value
         job.last_error_code = "attempts_exhausted"
         job.finished_at = now
@@ -89,6 +93,8 @@ def claim_job(db: Session, job_id: uuid.UUID, settings: Settings, now: datetime 
                  IngestStepAttempt.outcome == "running").values(outcome="retry", error_code="worker_lost", finished_at=now))
     if job.state == JobState.RETRYABLE_FAILED.value:
         job.state = job.resume_state or JobState.VALIDATING.value
+    if job.state == JobState.AWAITING_INDEX.value:
+        job.state = JobState.INDEXING.value
     if job.state == JobState.RECEIVED.value:
         job.state = JobState.VALIDATING.value
     job.attempt_count += 1
@@ -185,7 +191,8 @@ def _fail(db: Session, job_id: uuid.UUID, token: uuid.UUID, step: str, exc: Step
         job.state = JobState.RETRYABLE_FAILED.value
         delay = min(settings.ingest.retry_base_seconds * 2 ** (job.attempt_count - 1),
                     settings.ingest.retry_max_seconds)
-        job.next_attempt_at = now + timedelta(seconds=delay)
+        job.next_attempt_at = ((now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+                               if exc.code == "embedding_budget_exhausted" else now + timedelta(seconds=delay))
     else:
         job.state = JobState.TERMINAL_FAILED.value
         job.finished_at = now
@@ -423,6 +430,14 @@ def _chunk_pdf(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceF
 def process_job(job_id: uuid.UUID, settings: Settings | None = None,
                 storage: OriginalStorage | None = None) -> str:
     settings = settings or get_settings()
+    # Leave extracted jobs durable until a provider key is configured.
+    if settings.embedding.api_key is None:
+        with get_sessionmaker()() as check_db:
+            current = check_db.get(IngestionJob, job_id)
+            if current and (current.state in (JobState.AWAITING_INDEX.value, JobState.INDEXING.value)
+                            or (current.state == JobState.RETRYABLE_FAILED.value
+                                and current.resume_state == JobState.INDEXING.value)):
+                return "not_claimed"
     storage = storage or OriginalStorage(settings)
     maker = get_sessionmaker()
     with maker() as db:
@@ -435,13 +450,17 @@ def process_job(job_id: uuid.UUID, settings: Settings | None = None,
             if state in WORKER_STOP:
                 return state
             step = "validate" if state == JobState.VALIDATING.value else \
-                   "extract" if state in (JobState.STORED.value, JobState.EXTRACTING.value) else "chunk"
+                   "extract" if state in (JobState.STORED.value, JobState.EXTRACTING.value) else \
+                   "index" if state in (JobState.AWAITING_INDEX.value, JobState.INDEXING.value) else "chunk"
             try:
                 source = _begin(db, job_id, token, step)
                 if step == "validate":
                     state = _validate(db, job_id, token, source, storage, settings)
                 elif step == "extract":
                     state = _extract(db, job_id, token, source, storage, settings)
+                elif step == "index":
+                    from app.ingest.indexer import process_index
+                    state = process_index(db, job_id, token, storage, settings)
                 else:
                     state = _chunk(db, job_id, token, source, storage, settings)
             except StepError as exc:
@@ -457,12 +476,18 @@ def process_job(job_id: uuid.UUID, settings: Settings | None = None,
 
 def due_job_ids(db: Session, settings: Settings, now: datetime | None = None) -> list[uuid.UUID]:
     now = now or utcnow()
+    states = [JobState.RECEIVED.value, JobState.VALIDATING.value, JobState.STORED.value,
+              JobState.EXTRACTING.value, JobState.CHUNKING.value, JobState.RETRYABLE_FAILED.value]
+    if settings.embedding.api_key is not None:
+        states += [JobState.AWAITING_INDEX.value, JobState.INDEXING.value]
+    configured = (true() if settings.embedding.api_key is not None else
+                  or_(IngestionJob.state != JobState.RETRYABLE_FAILED.value,
+                      IngestionJob.resume_state.is_distinct_from(JobState.INDEXING.value)))
     return list(db.scalars(select(IngestionJob.id).join(SourceFile, SourceFile.job_id == IngestionJob.id)
         .where(IngestionJob.origin == "upload", IngestionJob.scope_visibility == Visibility.PRIVATE.value,
                SourceFile.verified_mime.in_([VerifiedMime.MARKDOWN.value, VerifiedMime.PDF.value]),
-               IngestionJob.state.in_([JobState.RECEIVED.value, JobState.VALIDATING.value,
-                                      JobState.STORED.value, JobState.EXTRACTING.value,
-                                      JobState.CHUNKING.value, JobState.RETRYABLE_FAILED.value]),
+               IngestionJob.state.in_(states),
+               configured,
                (IngestionJob.lease_until.is_(None) | (IngestionJob.lease_until <= now)),
                (IngestionJob.next_attempt_at.is_(None) | (IngestionJob.next_attempt_at <= now)))
         .order_by(IngestionJob.created_at, IngestionJob.id).limit(settings.ingest.dispatch_batch)))
