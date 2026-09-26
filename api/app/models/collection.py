@@ -28,6 +28,6 @@ class CollectionItem(Base):
     __tablename__ = "collection_items"
     __table_args__ = (Index("ix_collection_items_item_id", "item_id"),)
 
-    collection_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("collections.id", ondelete="CASCADE"), primary_key=True)
-    item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("library_items.id", ondelete="CASCADE"), primary_key=True)
+    collection_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("collections.id", ondelete="RESTRICT"), primary_key=True)
+    item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("library_items.id", ondelete="RESTRICT"), primary_key=True)
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

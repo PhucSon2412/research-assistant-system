@@ -93,6 +93,15 @@ def test_orm_models_match_migrated_schema(migrated_db_url: str) -> None:
     assert diff == []
 
 
+def test_collection_membership_foreign_keys_restrict(migrated_db_url: str) -> None:
+    eng = create_engine(migrated_db_url)
+    with eng.connect() as conn:
+        delete_actions = conn.scalars(text("""SELECT confdeltype FROM pg_constraint
+            WHERE conrelid='collection_items'::regclass AND contype='f'""")).all()
+    eng.dispose()
+    assert delete_actions == ["r", "r"]
+
+
 def test_0015_upgrades_m3b_database_with_existing_data(empty_db_url: str) -> None:
     from app.identity.passwords import hash_password
 

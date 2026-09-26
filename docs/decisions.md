@@ -171,3 +171,5 @@ Warning `embedding_user_quota_near_limit` ở cả index và query tính tổng 
 ## Quyết định triển khai M3c (2026-09-26)
 
 PR #7 đã merge ở `5911038`. M3c giữ gate private full text của PR #7; collection là bộ lọc phạm vi, không phải grant. Revision `0015` chỉ thêm owner collection và membership, cho phép metadata item chung trong list nhưng không mở common full text. `collection_id` và `item_id` loại trừ; ID collection trái quyền và không tồn tại cùng `404`. Keyword/vector lọc membership trước top-k, hydrate kiểm lại trước rerank/response. M4 nhận hợp đồng scope này cho RAG, vẫn phải kiểm ACL và nguồn khi tạo evidence/citation. Giá provider chưa được đối soát; gate `pricing_verified` giữ nguyên.
+
+**Review PR #8:** Vì `0015` chưa merge, sửa trực tiếp hai FK membership từ `CASCADE` sang `RESTRICT` cho đúng hợp đồng xóa. Endpoint xóa collection sau khi kiểm owner sẽ xóa membership tường minh rồi collection trong một transaction, rollback khi lỗi; không xóa `LibraryItem`. DB dev đã áp bản `0015` cũ cần đổi ràng buộc tại chỗ hoặc dựng lại DB thử, vì Alembic không chạy lại revision cùng số. PR chờ review lại trước merge.

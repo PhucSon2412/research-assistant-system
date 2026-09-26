@@ -3,12 +3,16 @@ from __future__ import annotations
 
 import uuid
 
+import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.ingest.embedding import EmbeddingResult
 from app.ingest.worker import process_job
 from app.main import app
+from app.models import Collection
 from tests.test_ingest_worker import upload
 from tests.test_private_index import fake_provider, settings_with_fake_key
 from tests.test_uploads import upload_api
@@ -22,6 +26,11 @@ def _create(browser, name="Reading") -> str:
 
 def _add(browser, collection, item):
     return browser.post(f"/collections/{collection}/items", {"item_id": str(item)})
+
+
+def _delete(browser, collection):
+    return browser.client.request("DELETE", f"/collections/{collection}",
+                                  headers={"X-CSRF-Token": browser.csrf()})
 
 
 def _indexed(storage, browser, body, settings):
@@ -61,6 +70,57 @@ def test_collection_owner_matrix_metadata_and_crud(api):
     assert a.get(f"/collections/{collection}/items").json()["total"] == 1
     assert a.client.request("DELETE", f"/collections/{collection}", headers={"X-CSRF-Token": a.csrf()}).status_code == 204
     assert a.get(f"/collections/{collection}/items").status_code == 404
+
+
+def test_delete_collection_removes_memberships_but_preserves_items(api):
+    owner = api.create_user("owner@example.org")
+    browser = api.user_browser("owner@example.org")
+    own = api.add_item(owner=owner, title="Private stays")
+    common = api.add_item(owner=None, title="Common stays")
+    collection = _create(browser)
+    assert _add(browser, collection, own).status_code == 201
+    assert _add(browser, collection, common).status_code == 201
+
+    assert _delete(browser, collection).status_code == 204
+    assert api.scalar("SELECT count(*) FROM collections WHERE id=:c", c=uuid.UUID(collection)) == 0
+    assert api.scalar("SELECT count(*) FROM collection_items WHERE collection_id=:c", c=uuid.UUID(collection)) == 0
+    for item in (own, common):
+        assert api.scalar("SELECT count(*) FROM library_items WHERE id=:i", i=item) == 1
+        assert browser.get(f"/library/items/{item}").status_code == 200
+
+
+def test_database_rejects_direct_collection_delete_while_members_exist(api):
+    owner = api.create_user("owner@example.org")
+    browser = api.user_browser("owner@example.org")
+    item = api.add_item(owner=owner, title="Still linked")
+    collection = _create(browser)
+    assert _add(browser, collection, item).status_code == 201
+
+    with pytest.raises(IntegrityError):
+        with api.engine.begin() as conn:
+            conn.execute(text("DELETE FROM collections WHERE id=:c"), {"c": uuid.UUID(collection)})
+    assert api.scalar("SELECT count(*) FROM collections WHERE id=:c", c=uuid.UUID(collection)) == 1
+    assert api.scalar("SELECT count(*) FROM collection_items WHERE collection_id=:c", c=uuid.UUID(collection)) == 1
+
+
+def test_delete_collection_failure_rolls_back_memberships(api, monkeypatch):
+    owner = api.create_user("owner@example.org")
+    browser = api.user_browser("owner@example.org")
+    item = api.add_item(owner=owner, title="Rollback item")
+    collection = _create(browser)
+    assert _add(browser, collection, item).status_code == 201
+
+    original_delete = Session.delete
+    def fail_collection_delete(self, instance):
+        if isinstance(instance, Collection):
+            raise RuntimeError("synthetic failure after membership delete")
+        return original_delete(self, instance)
+    monkeypatch.setattr(Session, "delete", fail_collection_delete)
+    with pytest.raises(RuntimeError, match="synthetic failure after membership delete"):
+        _delete(browser, collection)
+    assert api.scalar("SELECT count(*) FROM collections WHERE id=:c", c=uuid.UUID(collection)) == 1
+    assert api.scalar("SELECT count(*) FROM collection_items WHERE collection_id=:c", c=uuid.UUID(collection)) == 1
+    assert api.scalar("SELECT count(*) FROM library_items WHERE id=:i", i=item) == 1
 
 
 def test_scope_before_keyword_vector_topk_and_rerank_payload(upload_api, monkeypatch):

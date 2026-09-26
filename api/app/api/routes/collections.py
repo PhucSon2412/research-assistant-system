@@ -78,8 +78,13 @@ def rename_collection(collection_id: uuid.UUID, body: CollectionInput,
 def delete_collection(collection_id: uuid.UUID, principal: Principal = Depends(get_principal),
                       db: Session = Depends(get_db)) -> None:
     row = _owned(db, principal, collection_id, lock=True)
-    db.delete(row)
-    db.commit()
+    try:
+        db.execute(delete(CollectionItem).where(CollectionItem.collection_id == row.id))
+        db.delete(row)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.get("/{collection_id}/items")
