@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import httpx
 
 from app.config import Settings
+from app.provider_identity import VERIFIED_EMBEDDING_IDENTITIES, audit_identity, verified_identity
 
 
 @dataclass(frozen=True)
@@ -15,12 +16,17 @@ class EmbeddingResult:
     vector: list[float]
     model_id: str
     input_tokens: int | None
+    response_model_id: str | None = None
+    response_provider: str | None = None
 
 
 class EmbeddingError(Exception):
-    def __init__(self, code: str, definitely_rejected: bool = False):
+    def __init__(self, code: str, definitely_rejected: bool = False,
+                 response_model_id: str | None = None, response_provider: str | None = None):
         self.code = code
         self.definitely_rejected = definitely_rejected
+        self.response_model_id = response_model_id
+        self.response_provider = response_provider
         super().__init__(code)
 
 
@@ -43,16 +49,27 @@ def embed(text: str, settings: Settings, *, input_type: str = "search_document")
         raise EmbeddingError("provider_outcome_uncertain")
     if response.status_code != 200:
         raise EmbeddingError("provider_rejected", definitely_rejected=True)
+    response_model = response_provider = None
     try:
         payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError()
+        response_model = audit_identity(payload.get("model"))
+        response_provider = audit_identity(payload.get("provider"))
+        if not verified_identity(policy.model_id, response_model, response_provider,
+                                 VERIFIED_EMBEDDING_IDENTITIES):
+            raise EmbeddingError("provider_response_invalid", response_model_id=response_model,
+                                 response_provider=response_provider)
         entries = payload["data"]
         vector = entries[0]["embedding"]
-        model_id = payload["model"]
         tokens = payload.get("usage", {}).get("prompt_tokens")
         if (len(entries) != 1 or not isinstance(vector, list) or not vector
                 or not all(isinstance(v, (float, int)) and math.isfinite(v) for v in vector)
-                or model_id != policy.model_id or (tokens is not None and (not isinstance(tokens, int) or tokens < 0))):
+                or (tokens is not None and (not isinstance(tokens, int) or tokens < 0))):
             raise ValueError()
-        return EmbeddingResult([float(v) for v in vector], model_id, tokens)
+        return EmbeddingResult([float(v) for v in vector], policy.model_id, tokens,
+                               response_model, response_provider)
     except (KeyError, IndexError, TypeError, ValueError):
-        raise EmbeddingError("provider_response_invalid") from None
+        raise EmbeddingError("provider_response_invalid",
+                             response_model_id=response_model,
+                             response_provider=response_provider) from None

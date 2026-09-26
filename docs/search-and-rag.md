@@ -18,6 +18,8 @@ Review PR #7: rerank mặc định tắt trên web và API. Khi User bật, **c�
 
 Review lease PR #7: reservation provider có thời hạn và được gia hạn khi lời gọi còn chạy. Reservation quá hạn chuyển `uncertain` trước khi xét slot mới, kể cả ngày khác; USD dự phòng vẫn giữ đến đối soát, không tự retry. Warning quota embedding của User tính cả document và query, cùng phần đã commit và đang dự phòng; query warning được trả qua `cost.embed_query.warnings`.
 
+Sau live smoke bằng dữ liệu tổng hợp, adapter dùng ánh xạ chính xác model yêu cầu → response model/provider được xác minh: embedding `openai/text-embedding-3-small` → `text-embedding-3-small`/`Azure`; rerank `qwen/qwen3-reranker-8b` → `accounts/fireworks/models/qwen3-reranker-8b`/`Fireworks`. Tên/provider lạ hoặc thiếu bị từ chối có kiểm soát và audit trong ledger. Vector embedding được quan sát 1536 chiều nhưng code tiếp tục lấy chiều từ response và đối chiếu active index. Giá thực trên key chưa đối soát, nên cờ xác minh giá vẫn tắt cho dữ liệu riêng.
+
 ```mermaid
 flowchart LR
   A[Identity + allowed item set] --> F[Scope intersection]

@@ -1,8 +1,14 @@
-"""One synthetic OpenRouter rerank request; compare the key's actual charge manually."""
+"""One synthetic OpenRouter request through the production rerank adapter."""
+from __future__ import annotations
+
 import os
+import uuid
 from decimal import Decimal
 
-import httpx
+from pydantic import SecretStr
+
+from app.config import Settings
+from app.search import RerankError, rerank, rerank_order
 
 
 def main() -> None:
@@ -14,23 +20,23 @@ def main() -> None:
     if endpoint != "https://openrouter.ai/api/v1/rerank":
         raise SystemExit("Probe requires the reviewed OpenRouter rerank route")
     try:
-        with httpx.Client(timeout=20) as client:
-            response = client.post(endpoint, headers={"Authorization": f"Bearer {key}"},
-                json={"model": model, "query": "synthetic apple query",
-                      "documents": ["synthetic apple document", "synthetic orange document"], "top_n": 2})
-            response.raise_for_status()
-            data = response.json()
-            if data["model"] != model or {row["index"] for row in data["results"]} != {0, 1}:
-                raise ValueError("unexpected model or mapping")
-            tokens = data.get("usage", {}).get("total_tokens")
-            if tokens is not None and (not isinstance(tokens, int) or tokens < 0):
-                raise ValueError("unexpected usage")
-    except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
+        settings = Settings(_env_prefix="RAS_SMOKE_UNUSED_",
+            database_url="postgresql+psycopg://unused@localhost/unused",
+            embedding={"api_key": SecretStr(key)},
+            rerank={"model_id": model, "endpoint": endpoint, "pricing_verified": False})
+        result = rerank("synthetic apple query",
+                        ["synthetic apple document", "synthetic orange document"], settings)
+        rerank_order([uuid.uuid4(), uuid.uuid4()], result.results)
+    except (KeyError, TypeError, ValueError) as exc:
         raise SystemExit(f"Live rerank probe failed: {type(exc).__name__}") from None
+    except RerankError as exc:
+        raise SystemExit(f"Live rerank adapter rejected response: {exc.code}") from None
     quote = Decimal(os.environ.get("RAS_RERANK__MAX_USD_PER_MILLION_TOKENS", "0.20"))
-    print(f"model={model} total_tokens={tokens} configured_usd_per_million={quote} "
-          f"estimated_request_usd={quote * tokens / 1_000_000 if tokens is not None else 'unknown'}")
-    print("Check the actual key charge, route and provider before enabling private rerank.")
+    print(f"requested_model={model} response_model={result.response_model_id} "
+          f"response_provider={result.response_provider} total_tokens={result.tokens} "
+          f"configured_usd_per_million={quote} "
+          f"estimated_request_usd={quote * result.tokens / 1_000_000 if result.tokens is not None else 'unknown'}")
+    print("Catalog/config quote is an estimate. Reconcile actual key charge later; an unchanged GET /api/v1/key immediately after the call does not prove zero charge. Pricing flags remain off.")
 
 
 if __name__ == "__main__":

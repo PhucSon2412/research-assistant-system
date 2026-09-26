@@ -60,6 +60,8 @@ class EmbeddingCall(Base):
     owner_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"))
     model_id: Mapped[str] = mapped_column(Text)
     provider: Mapped[str] = mapped_column(Text)
+    response_model_id: Mapped[str | None] = mapped_column(Text)
+    response_provider: Mapped[str | None] = mapped_column(Text)
     pipeline_version: Mapped[str] = mapped_column(Text)
     chunk_hash: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text)

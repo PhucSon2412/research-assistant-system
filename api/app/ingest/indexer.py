@@ -175,6 +175,8 @@ def _reserve(db: Session, job: IngestionJob, item: LibraryItem, source: SourceFi
         existing.reserved_day = day
         existing.cost_usd = None
         existing.cost_status = "unknown"
+        existing.response_model_id = None
+        existing.response_provider = None
         existing.finished_at = None
         existing.lease_until = lease_deadline(settings.embedding.reservation_lease_seconds)
     db.flush()
@@ -247,6 +249,8 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
             call.vector = result.vector
             call.dimensions = len(result.vector)
             call.input_tokens = result.input_tokens
+            call.response_model_id = result.response_model_id
+            call.response_provider = result.response_provider
             call.status = "completed"
             if result.input_tokens is not None and result.input_tokens > settings.embedding.max_request_bytes:
                 raise StepError("embedding_usage_exceeds_reservation")
@@ -269,7 +273,9 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
         except Exception:
             db.rollback()
             # A response may have been billed. Never automatically call it again.
-            _provider_failure(db, call_id, EmbeddingError("embedding_outcome_uncertain"))
+            _provider_failure(db, call_id, EmbeddingError("embedding_outcome_uncertain",
+                response_model_id=result.response_model_id,
+                response_provider=result.response_provider))
             raise
 
 
@@ -279,6 +285,8 @@ def _provider_failure(db: Session, call_id: uuid.UUID, error: EmbeddingError) ->
     call = db.scalar(select(EmbeddingCall).where(EmbeddingCall.id == call_id).with_for_update())
     if (call is not None and (call.status == "reserved" or
             (call.status == "uncertain" and call.cost_status == "lease_expired_reserved_ceiling"))):
+        call.response_model_id = error.response_model_id
+        call.response_provider = error.response_provider
         call.status = "rejected" if error.definitely_rejected else "uncertain"
         call.finished_at = utcnow()
         call.lease_until = None

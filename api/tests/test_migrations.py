@@ -209,15 +209,17 @@ def test_0013_marks_prelease_reservations_uncertain_without_releasing_cost(empty
             RETURNING id"""), {"s": source, "u": owner, "h": "b" * 64})
     upgrade(empty_db_url)
     with eng.connect() as conn:
-        row = conn.execute(text("SELECT status,reserved_usd,cost_usd,cost_status,lease_until"
+        row = conn.execute(text("SELECT status,reserved_usd,cost_usd,cost_status,lease_until,"
+                                " response_model_id,response_provider"
                                 " FROM search_usage WHERE id=:i"), {"i": usage}).one()
     assert row == ("uncertain", Decimal("0.00000100"), None,
-                   "lease_expired_reserved_ceiling", None)
+                   "lease_expired_reserved_ceiling", None, None, None)
     with eng.connect() as conn:
-        row = conn.execute(text("SELECT status,reserved_usd,cost_usd,cost_status,lease_until"
+        row = conn.execute(text("SELECT status,reserved_usd,cost_usd,cost_status,lease_until,"
+                                " response_model_id,response_provider"
                                 " FROM embedding_calls WHERE id=:i"), {"i": call}).one()
     assert row == ("uncertain", Decimal("0.00000200"), None,
-                   "lease_expired_reserved_ceiling", None)
+                   "lease_expired_reserved_ceiling", None, None, None)
     eng.dispose()
 
 

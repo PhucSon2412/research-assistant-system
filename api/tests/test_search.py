@@ -15,7 +15,7 @@ from app.config import Settings, get_settings
 from app.ingest.embedding import EmbeddingError, EmbeddingResult
 from app.ingest.worker import process_job
 from app.main import app
-from app.search import RerankError, fuse, rerank_order, reserve, rerank, settle
+from app.search import RerankError, RerankResult, fuse, rerank_order, reserve, rerank, settle
 from app.provider_capacity import reap_expired, reservation_heartbeat
 from app.models import SearchUsage
 from app.authz import Principal
@@ -242,18 +242,48 @@ def test_rerank_transport_contract_and_bad_response(monkeypatch):
         captured.append(payload)
         assert payload == {"model": settings.rerank.model_id, "query": "synthetic query",
                            "documents": ["synthetic body"], "top_n": 1}
-        return httpx.Response(200, json={"model": settings.rerank.model_id,
+        return httpx.Response(200, json={"model": "accounts/fireworks/models/qwen3-reranker-8b",
+            "provider": "Fireworks",
             "results": [{"index": 0, "relevance_score": .8}], "usage": {"total_tokens": 5}})
     monkeypatch.setattr("app.search.httpx.Client", lambda timeout: original_client(
         transport=httpx.MockTransport(handler), timeout=timeout))
-    results, tokens, units = rerank("synthetic query", ["synthetic body"], settings)
+    response = rerank("synthetic query", ["synthetic body"], settings)
+    results, tokens, units = response
     assert rerank_order([uuid.uuid4()], results)
     assert tokens == 5 and units is None and len(captured) == 1
+    assert response.response_model_id == "accounts/fireworks/models/qwen3-reranker-8b"
+    assert response.response_provider == "Fireworks"
     monkeypatch.setattr("app.search.httpx.Client", lambda timeout: original_client(
-        transport=httpx.MockTransport(lambda request: httpx.Response(200, json={"model": "wrong", "results": []})), timeout=timeout))
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, json={
+            "model": "wrong", "provider": "Fireworks", "results": []})), timeout=timeout))
     with pytest.raises(RerankError) as error:
         rerank("synthetic query", ["synthetic body"], settings)
     assert error.value.code == "rerank_response_invalid"
+    assert error.value.response_model_id == "wrong"
+    assert error.value.response_provider == "Fireworks"
+
+
+@pytest.mark.parametrize("response_model,response_provider", [
+    ("accounts/fireworks/models/qwen3-reranker-8b", "Other"),
+    ("accounts/fireworks/models/qwen3-reranker-8b", None),
+    (None, "Fireworks"),
+])
+def test_rerank_transport_rejects_unknown_identity(monkeypatch, response_model, response_provider):
+    settings = Settings(database_url="postgresql+psycopg://test@localhost/test")
+    settings.embedding.api_key = SecretStr("synthetic-test-key")
+    payload = {"results": [{"index": 0, "relevance_score": .8}]}
+    if response_model is not None:
+        payload["model"] = response_model
+    if response_provider is not None:
+        payload["provider"] = response_provider
+    original_client = httpx.Client
+    monkeypatch.setattr("app.search.httpx.Client", lambda timeout: original_client(
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, json=payload)), timeout=timeout))
+    with pytest.raises(RerankError) as error:
+        rerank("synthetic query", ["synthetic body"], settings)
+    assert error.value.code == "rerank_response_invalid"
+    assert error.value.response_model_id == response_model
+    assert error.value.response_provider == response_provider
 
 
 def test_rerank_transport_429_and_timeout(monkeypatch):
@@ -294,6 +324,63 @@ def test_malformed_rerank_result_reconciles_reservation(upload_api, monkeypatch)
         row = conn.execute(text("SELECT status,cost_status,reserved_usd,cost_usd FROM search_usage WHERE task_type='rerank'")).one()
     assert row.status == "uncertain" and row.cost_status == "unknown_reserved_ceiling"
     assert row.reserved_usd > 0 and row.cost_usd is None
+
+
+def test_search_audits_query_and_rerank_response_identity(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    browser = api.user_browser("a@example.org")
+    settings = settings_with_fake_key()
+    settings.rerank.pricing_verified = True
+    fake_provider(monkeypatch)
+    indexed(api, storage, browser, b"## Methods\nSynthetic keyword body.\n", settings)
+    configured(settings)
+    monkeypatch.setattr("app.search.embed", lambda value, cfg, input_type:
+        EmbeddingResult([.1, .1, .1], cfg.embedding.model_id, 2,
+                        "text-embedding-3-small", "Azure"))
+    monkeypatch.setattr("app.search.rerank", lambda query, docs, cfg:
+        RerankResult([{"index": i, "relevance_score": 1.0} for i in range(len(docs))],
+                     3, None, "accounts/fireworks/models/qwen3-reranker-8b", "Fireworks"))
+    response = browser.post("/search", {"query": "keyword", "mode": "hybrid", "rerank": True})
+    assert response.status_code == 200 and response.json()["rerank_status"] == "applied"
+    with api.engine.connect() as conn:
+        rows = conn.execute(text("SELECT task_type,model_id,provider,response_model_id,response_provider"
+                                 " FROM search_usage ORDER BY task_type")).all()
+    assert rows == [
+        ("embed_query", settings.embedding.model_id, "openrouter", "text-embedding-3-small", "Azure"),
+        ("rerank", settings.rerank.model_id, "openrouter",
+         "accounts/fireworks/models/qwen3-reranker-8b", "Fireworks"),
+    ]
+
+
+def test_identity_rejection_keeps_reservation_and_audits_response(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    browser = api.user_browser("a@example.org")
+    settings = settings_with_fake_key()
+    settings.rerank.pricing_verified = True
+    fake_provider(monkeypatch)
+    indexed(api, storage, browser, b"## Methods\nSynthetic keyword body.\n", settings)
+    configured(settings)
+    monkeypatch.setattr("app.search.embed", lambda value, cfg, input_type:
+        (_ for _ in ()).throw(EmbeddingError("provider_response_invalid",
+            response_model_id="other", response_provider="Azure")))
+    failed = browser.post("/search", {"query": "keyword", "mode": "hybrid", "rerank": False})
+    assert failed.status_code == 503 and failed.json()["error"] == "provider_response_invalid"
+    monkeypatch.setattr("app.search.rerank", lambda query, docs, cfg:
+        (_ for _ in ()).throw(RerankError("rerank_response_invalid",
+            response_model_id="other", response_provider="Fireworks")))
+    degraded = browser.post("/search", {"query": "keyword", "mode": "keyword", "rerank": True})
+    assert degraded.status_code == 200
+    assert degraded.json()["rerank_status"] == "degraded_rerank_response_invalid"
+    with api.engine.connect() as conn:
+        rows = conn.execute(text("SELECT task_type,status,cost_status,reserved_usd,cost_usd,"
+                                 " response_model_id,response_provider FROM search_usage ORDER BY task_type")).all()
+    assert len(rows) == 2
+    assert all(row.status == "uncertain" and row.cost_status == "unknown_reserved_ceiling"
+               and row.reserved_usd > 0 and row.cost_usd is None for row in rows)
+    assert [(row.task_type, row.response_model_id, row.response_provider) for row in rows] == [
+        ("embed_query", "other", "Azure"), ("rerank", "other", "Fireworks")]
 
 
 def test_rerank_payload_is_opt_in(upload_api, monkeypatch):

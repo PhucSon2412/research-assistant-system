@@ -5,6 +5,7 @@ import logging
 import math
 import time
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_UP
 
@@ -18,6 +19,7 @@ from app.config import Settings
 from app.ingest.embedding import EmbeddingError, embed
 from app.models import EmbeddingBudgetDay, EmbeddingCall, EmbeddingUserBudgetDay, LibraryItem, SearchRequestDay, SearchUsage
 from app.provider_capacity import LOCK, lease_deadline, reap_expired, reservation_heartbeat
+from app.provider_identity import VERIFIED_RERANK_IDENTITIES, audit_identity, verified_identity
 
 log = logging.getLogger(__name__)
 MONEY = Decimal("0.00000001")
@@ -155,12 +157,15 @@ def reserve(db: Session, principal: Principal, settings: Settings, task: str, am
 
 
 def settle(db: Session, usage_id: uuid.UUID, *, tokens: int | None = None,
-           units: int | None = None, price: float | None = None, rejected: bool = False) -> str:
+           units: int | None = None, price: float | None = None, rejected: bool = False,
+           response_model_id: str | None = None, response_provider: str | None = None) -> str:
     usage = db.get(SearchUsage, usage_id, with_for_update=True)
     if usage.status in ("completed", "rejected"):
         status = usage.cost_status
         db.commit()
         return status
+    usage.response_model_id = response_model_id
+    usage.response_provider = response_provider
     if rejected:
         usage.status, usage.cost_usd, usage.cost_status = "rejected", Decimal(0), "rejected_no_charge"
     elif tokens is not None and price is not None:
@@ -270,11 +275,26 @@ def open_chunk(db: Session, principal: Principal, chunk_id: uuid.UUID) -> dict:
 
 
 class RerankError(Exception):
-    def __init__(self, code: str, rejected: bool = False):
+    def __init__(self, code: str, rejected: bool = False,
+                 response_model_id: str | None = None, response_provider: str | None = None):
         self.code, self.rejected = code, rejected
+        self.response_model_id, self.response_provider = response_model_id, response_provider
 
 
-def rerank(query: str, docs: list[str], settings: Settings) -> tuple[list[dict], int | None, int | None]:
+@dataclass(frozen=True)
+class RerankResult:
+    results: list[dict]
+    tokens: int | None
+    units: int | None
+    response_model_id: str
+    response_provider: str
+
+    def __iter__(self):
+        # Existing callers can still unpack the ranking, tokens and units.
+        return iter((self.results, self.tokens, self.units))
+
+
+def rerank(query: str, docs: list[str], settings: Settings) -> RerankResult:
     policy = settings.rerank
     try:
         with httpx.Client(timeout=policy.request_timeout_seconds) as client:
@@ -290,10 +310,18 @@ def rerank(query: str, docs: list[str], settings: Settings) -> tuple[list[dict],
         raise RerankError("rerank_outcome_uncertain")
     if response.status_code != 200:
         raise RerankError("rerank_rejected", True)
+    response_model = response_provider = None
     try:
         data = response.json()
-        if (not isinstance(data, dict) or data.get("model") != policy.model_id
-                or not isinstance(data.get("results"), list)
+        if not isinstance(data, dict):
+            raise ValueError()
+        response_model = audit_identity(data.get("model"))
+        response_provider = audit_identity(data.get("provider"))
+        if not verified_identity(policy.model_id, response_model, response_provider,
+                                 VERIFIED_RERANK_IDENTITIES):
+            raise RerankError("rerank_response_invalid", response_model_id=response_model,
+                              response_provider=response_provider)
+        if (not isinstance(data.get("results"), list)
                 or any(not isinstance(row, dict) for row in data["results"])):
             raise ValueError()
         usage = data.get("usage")
@@ -306,9 +334,10 @@ def rerank(query: str, docs: list[str], settings: Settings) -> tuple[list[dict],
             raise ValueError()
         if units is not None and (type(units) is not int or units < 0):
             raise ValueError()
-        return data["results"], tokens, units
+        return RerankResult(data["results"], tokens, units, response_model, response_provider)
     except (KeyError, TypeError, ValueError):
-        raise RerankError("rerank_response_invalid") from None
+        raise RerankError("rerank_response_invalid", response_model_id=response_model,
+                          response_provider=response_provider) from None
 
 
 def search(db: Session, principal: Principal, settings: Settings, query: str,
@@ -339,16 +368,22 @@ def search(db: Session, principal: Principal, settings: Settings, query: str,
                 result = embed(query, settings, input_type="search_query")
             timings["provider_ms"] += int((time.perf_counter() - start) * 1000)
         except EmbeddingError as exc:
-            settle(db, embed_usage, rejected=exc.definitely_rejected)
+            settle(db, embed_usage, rejected=exc.definitely_rejected,
+                   response_model_id=exc.response_model_id,
+                   response_provider=exc.response_provider)
             raise ApiError(503, exc.code) from None
         if result.model_id != settings.embedding.model_id or len(result.vector) != dimension:
-            settle(db, embed_usage)
+            settle(db, embed_usage, response_model_id=result.response_model_id,
+                   response_provider=result.response_provider)
             raise ApiError(503, "search_embedding_dimensions_mismatch")
         if result.input_tokens is not None and result.input_tokens > settings.search.max_query_bytes:
-            settle(db, embed_usage)
+            settle(db, embed_usage, response_model_id=result.response_model_id,
+                   response_provider=result.response_provider)
             raise ApiError(503, "search_embedding_usage_exceeds_reservation")
         settle(db, embed_usage, tokens=result.input_tokens,
-               price=settings.embedding.max_usd_per_million_tokens)
+               price=settings.embedding.max_usd_per_million_tokens,
+               response_model_id=result.response_model_id,
+               response_provider=result.response_provider)
         vector = result.vector
     keyword, semantic, timings["keyword_ms"], timings["vector_ms"] = _rank(
         db, principal, item_id, settings, query, vector)
@@ -378,21 +413,29 @@ def search(db: Session, principal: Principal, settings: Settings, query: str,
                     start = time.perf_counter()
                     with reservation_heartbeat(db.get_bind(), SearchUsage, rerank_usage,
                                                policy.reservation_lease_seconds):
-                        results, tokens, units = rerank(query, documents, settings)
+                        ranked = rerank(query, documents, settings)
+                    results, tokens, units = ranked
+                    response_model = getattr(ranked, "response_model_id", None)
+                    response_provider = getattr(ranked, "response_provider", None)
                     timings["rerank_ms"] = int((time.perf_counter() - start) * 1000)
                     timings["provider_ms"] += timings["rerank_ms"]
                     try:
                         ordered = rerank_order(sent_ids, results)
                     except ValueError:
-                        raise RerankError("rerank_response_invalid") from None
+                        raise RerankError("rerank_response_invalid",
+                            response_model_id=response_model, response_provider=response_provider) from None
                     if tokens is not None and tokens > sum(len(d.encode("utf-8")) for d in documents) + len(sent_ids) * len(query.encode("utf-8")) + 1024:
-                        raise RerankError("rerank_usage_exceeds_reservation")
-                    settle(db, rerank_usage, tokens=tokens, units=units, price=policy.max_usd_per_million_tokens)
+                        raise RerankError("rerank_usage_exceeds_reservation",
+                            response_model_id=response_model, response_provider=response_provider)
+                    settle(db, rerank_usage, tokens=tokens, units=units, price=policy.max_usd_per_million_tokens,
+                           response_model_id=response_model, response_provider=response_provider)
                     ids = ordered + [i for i in ids if i not in set(sent_ids)]
                     rerank_status = "applied"
                 except RerankError as exc:
                     if rerank_usage is not None:
-                        settle(db, rerank_usage, rejected=exc.rejected)
+                        settle(db, rerank_usage, rejected=exc.rejected,
+                               response_model_id=exc.response_model_id,
+                               response_provider=exc.response_provider)
                     rerank_status = "degraded_" + exc.code
                 except ApiError as exc:
                     if exc.code == "search_scope_changed":

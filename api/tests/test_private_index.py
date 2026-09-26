@@ -43,6 +43,41 @@ def fake_provider(monkeypatch, dimensions=3, action=None):
     return calls
 
 
+def test_document_embedding_audits_response_identity(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    ids = upload(api.user_browser("a@example.org"), b"## Methods\nSynthetic body.\n")
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "awaiting_index"
+    settings = settings_with_fake_key()
+    monkeypatch.setattr("app.ingest.indexer.embed", lambda value, selected:
+        EmbeddingResult([.1, .2, .3], selected.embedding.model_id, 3,
+                        "text-embedding-3-small", "Azure"))
+    assert process_job(uuid.UUID(ids["job_id"]), settings, storage) == "ready"
+    with api.engine.connect() as conn:
+        row = conn.execute(text("SELECT model_id,provider,response_model_id,response_provider"
+                                " FROM embedding_calls")).one()
+    assert row == (settings.embedding.model_id, "openrouter", "text-embedding-3-small", "Azure")
+
+
+def test_document_identity_rejection_keeps_reservation_and_audit(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    ids = upload(api.user_browser("a@example.org"), b"## Methods\nSynthetic body.\n")
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "awaiting_index"
+    settings = settings_with_fake_key()
+    def reject(value, selected):
+        raise EmbeddingError("provider_response_invalid", response_model_id="other",
+                             response_provider="Azure")
+    monkeypatch.setattr("app.ingest.indexer.embed", reject)
+    assert process_job(uuid.UUID(ids["job_id"]), settings, storage) == "provider_response_invalid"
+    with api.engine.connect() as conn:
+        row = conn.execute(text("SELECT status,cost_status,reserved_usd,cost_usd,"
+                                " response_model_id,response_provider FROM embedding_calls")).one()
+    assert row.status == "uncertain" and row.cost_status == "unknown_reserved_ceiling"
+    assert row.reserved_usd > 0 and row.cost_usd is None
+    assert (row.response_model_id, row.response_provider) == ("other", "Azure")
+
+
 def test_markdown_indexes_once_and_isolated_by_owner(upload_api, monkeypatch):
     api, storage = upload_api
     api.create_user("a@example.org")

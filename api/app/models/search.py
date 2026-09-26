@@ -33,6 +33,8 @@ class SearchUsage(Base):
     task_type: Mapped[str] = mapped_column(Text)
     model_id: Mapped[str] = mapped_column(Text)
     provider: Mapped[str] = mapped_column(Text)
+    response_model_id: Mapped[str | None] = mapped_column(Text)
+    response_provider: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text)
     input_tokens: Mapped[int | None] = mapped_column(Integer)
     search_units: Mapped[int | None] = mapped_column(Integer)
