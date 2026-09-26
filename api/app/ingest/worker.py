@@ -313,12 +313,16 @@ def _extract_pdf(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: Sourc
                 body_chars[segment.page] += sum(not c.isspace() for c in segment.text)
         for page in result.pages:
             kinds = {s.kind for s in result.segments if s.page == page.number}
-            role = "unextractable" if page.error else "mixed" if len(kinds) > 1 else next(iter(kinds), "cover_or_unknown" if page.text.strip() else "empty")
+            role = ("unextractable" if page.number in result.failed_pages else
+                    "bibliography_uncertain" if page.number in result.uncertain_reference_pages else
+                    "mixed" if len(kinds) > 1 else
+                    next(iter(kinds), "cover_or_unknown" if page.text.strip() else "empty"))
             db.add(PdfPage(item_id=item.id, version_id=version.id, source_file_id=source.id,
                 page_number=page.number, text=page.text, width=page.width, height=page.height,
                 role=role, body_chars=body_chars.get(page.number, 0),
                 body_page=page.number in result.body_pages,
-                qualifies=page.number in result.qualifying_pages, error_code=page.error,
+                qualifies=page.number in result.qualifying_pages,
+                error_code=page.error or ("page_text_missing" if page.number in result.failed_pages else None),
                 layout_mode=page.layout_mode,
                 pipeline_version=pdf.PIPELINE_VERSION))
         for ordinal, segment in enumerate(result.segments):

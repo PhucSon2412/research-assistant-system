@@ -130,6 +130,65 @@ def test_pdf_classification_threshold_denominator_and_uncertainty(app_env):
     assert interrupted.coverage == "partial"
 
 
+@pytest.mark.parametrize("heading", [
+    "References and Notes", "References & Notes", "Notes and References",
+    "References Cited", "Literature Cited", "2. References and Notes:",
+])
+def test_pdf_bibliography_heading_variants_never_become_body(app_env, heading):
+    settings = Settings(database_url="postgresql+psycopg://dummy:dummy@localhost/dummy")
+    pages = [Page(1, "Introduction\n" + BODY_LINE * 35, 612, 792),
+             Page(2, heading + "\n[1] A cited work. 2020.\n", 612, 792)]
+    result = classify(pages, settings)
+    assert result.disposition == "awaiting_index"
+    assert result.body_pages == [1]
+    assert result.coverage == "complete"
+    assert any(s.kind == "references" and heading in s.text for s in result.segments)
+    assert all("A cited work" not in s.text for s in result.segments if s.kind == "body")
+    assert len(result.references) == 1
+
+
+def test_pdf_uncertain_bibliography_boundary_is_quarantined(app_env):
+    settings = Settings(database_url="postgresql+psycopg://dummy:dummy@localhost/dummy")
+    pages = [Page(1, "Introduction\n" + BODY_LINE * 35, 612, 792),
+             Page(2, "References to Earlier Work\n[1] A cited work. 2020.\n", 612, 792)]
+    result = classify(pages, settings)
+    assert result.disposition == "needs_review"
+    assert result.coverage == "partial"
+    assert "bibliography_boundary_uncertain" in result.warnings
+    assert result.body_pages == [1]
+    assert all(segment.page != 2 for segment in result.segments)
+
+
+def test_successfully_parsed_blank_page_between_body_pages_counts_as_missing(app_env):
+    settings = Settings(database_url="postgresql+psycopg://dummy:dummy@localhost/dummy")
+    pages = [Page(1, "Introduction\n" + "a" * 1100, 612, 792),
+             Page(2, "", 612, 792),
+             Page(3, "Methods\n" + "b" * 1100, 612, 792)]
+    result = classify(pages, settings)
+    assert result.body_pages == [1, 2, 3]
+    assert result.qualifying_pages == [1, 3]
+    assert result.deficient_pages == result.failed_pages == [2]
+    assert result.total_body_chars >= 2000
+    assert result.coverage == "partial"
+    assert result.disposition == "needs_review"  # 2/3 < 70%
+    assert "body_page_without_text" in result.warnings
+    assert "body_pages_below_min_chars" in result.warnings
+    assert all(not segment.text for segment in result.segments if segment.page == 2)
+
+
+def test_blank_cover_and_bibliography_pages_are_not_body_pages(app_env):
+    settings = Settings(database_url="postgresql+psycopg://dummy:dummy@localhost/dummy")
+    pages = [Page(1, "", 612, 792),
+             Page(2, "Introduction\n" + "a" * 2200, 612, 792),
+             Page(3, "References\n[1] Citation.\n", 612, 792),
+             Page(4, "", 612, 792)]
+    result = classify(pages, settings)
+    assert result.body_pages == result.qualifying_pages == [2]
+    assert result.failed_pages == []
+    assert result.coverage == "complete"
+    assert result.disposition == "awaiting_index"
+
+
 def test_scan_figures_margin_and_two_column_uncertainty(app_env):
     settings = Settings(database_url="postgresql+psycopg://dummy:dummy@localhost/dummy")
     scan = classify([Page(1, "", 612, 792), Page(2, "", 612, 792)], settings)
@@ -256,6 +315,78 @@ def test_partial_pdf_passes_with_explicit_deficient_body_page(upload_api):
     coverage = a.get(f"/library/items/{ids['item_id']}/coverage").json()["summary"][0]
     assert coverage["body_pages"] == 4 and coverage["qualifying_pages"] == 3
     assert coverage["deficient_pages"] == 1
+
+
+def test_pdf_references_and_notes_worker_handoff_has_no_bibliography_body_chunk(upload_api):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    a = api.user_browser("a@example.org")
+    original = pdf_bytes([["Introduction"] + [BODY_LINE] * 35,
+                          ["References and Notes", "[1] A cited work. 2020."]])
+    ids = upload_pdf(a, original)
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "awaiting_index"
+    chunks = a.get(f"/library/items/{ids['item_id']}/chunks?limit=100").json()["chunks"]
+    pages = parse(original, 2, get_settings())
+    assert {chunk["section_kind"] for chunk in chunks} == {"body", "references"}
+    for chunk in chunks:
+        detail = chunk["locator_detail"]
+        assert chunk["text"] == pages[chunk["start_page"] - 1].text[detail["start_offset"]:detail["end_offset"]]
+        assert detail["parser"].endswith("layout-v2")
+        if chunk["section_kind"] == "body":
+            assert chunk["start_page"] == 1
+            assert "A cited work" not in chunk["text"]
+    refs = a.get(f"/library/items/{ids['item_id']}/references").json()["references"]
+    assert len(refs) == 1 and "A cited work" in refs[0]["raw_citation"]
+
+
+def test_blank_body_page_from_successful_parser_is_reported_by_worker(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    a = api.user_browser("a@example.org")
+    original = pdf_bytes([["Introduction"] + [BODY_LINE] * 18, [],
+                          ["Methods"] + [BODY_LINE] * 18])
+    ids = upload_pdf(a, original)
+    from app.ingest import pdf as parser
+
+    actual = parser.parse
+    def blank_middle(*args):
+        pages = actual(*args)
+        assert pages[1].text == ""
+        return pages
+
+    monkeypatch.setattr(parser, "parse", blank_middle)
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "needs_review"
+    item = a.get(f"/library/items/{ids['item_id']}").json()["item"]
+    assert item["versions"][0]["coverage"] == "partial"
+    assert "body_page_without_text" in item["jobs"][0]["warnings"]
+    report = a.get(f"/library/items/{ids['item_id']}/coverage").json()
+    assert report["summary"][0]["body_pages"] == 3
+    assert report["summary"][0]["qualifying_pages"] == 2
+    assert report["summary"][0]["unextractable_pages"] == [2]
+    assert report["pages"][1]["body_page"] is True
+    assert report["pages"][1]["role"] == "unextractable"
+    assert report["pages"][1]["error_code"] == "page_text_missing"
+    assert a.get(f"/library/items/{ids['item_id']}/chunks").json()["chunks"] == []
+
+
+def test_uncertain_pdf_bibliography_is_not_handed_off_as_body(upload_api):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    a = api.user_browser("a@example.org")
+    original = pdf_bytes([["Introduction"] + [BODY_LINE] * 35,
+                          ["References to Earlier Work", "[1] A cited work. 2020."]])
+    ids = upload_pdf(a, original)
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "needs_review"
+    item = a.get(f"/library/items/{ids['item_id']}").json()["item"]
+    assert item["versions"][0]["coverage"] == "partial"
+    assert "bibliography_boundary_uncertain" in item["jobs"][0]["warnings"]
+    assert item["jobs"][0]["last_error_code"] == "pdf_body_uncertain"
+    report = a.get(f"/library/items/{ids['item_id']}/coverage").json()
+    assert report["pages"][1]["role"] == "bibliography_uncertain"
+    assert a.get(f"/library/items/{ids['item_id']}/chunks").json()["chunks"] == []
+    with api.engine.connect() as conn:
+        assert conn.scalar(text("SELECT count(*) FROM sections WHERE source_file_id=:f AND kind='body' AND start_page=2"),
+                           {"f": uuid.UUID(ids["file_id"])}) == 0
 
 
 @pytest.mark.parametrize("revoke_kind", ["epoch", "cancel"])

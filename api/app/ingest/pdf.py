@@ -19,10 +19,17 @@ from pathlib import Path
 
 from app.config import Settings
 
-PIPELINE_VERSION = f"pypdf-{version('pypdf')}-layout-v1"
+PIPELINE_VERSION = f"pypdf-{version('pypdf')}-layout-v2"
 BODY = re.compile(r"^\s*(?:\d+(?:\.\d+)*[. ]+)?(?:introduction|background|methods?|materials(?: and methods)?|results?|discussion|conclusion|related work)\s*$", re.I)
 ABSTRACT = re.compile(r"^\s*abstract\s*$", re.I)
-REFERENCES = re.compile(r"^\s*(?:references|bibliography|works cited|tài liệu tham khảo)\s*$", re.I)
+SECTION_NUMBER = r"(?:\d+(?:\.\d+)*[.)]?\s+)?"
+REFERENCES = re.compile(
+    rf"^\s*{SECTION_NUMBER}(?:references(?:\s+(?:cited|(?:and|&)\s+(?:notes?|footnotes|further reading)))?"
+    r"|(?:notes?|footnotes)\s+(?:and|&)\s+references|cited references"
+    r"|bibliography|works cited|literature cited|tài liệu tham khảo)\s*[.:]?\s*$", re.I)
+BIBLIOGRAPHY_CANDIDATE = re.compile(
+    rf"^\s*{SECTION_NUMBER}(?:references?\b|bibliograph(?:y|ies)\b|works cited\b"
+    r"|literature cited\b|cited references\b|(?:notes?|footnotes)\s+(?:and|&)\s+references\b)", re.I)
 ENTRY = re.compile(r"^\s*(?:\[\d+\]|\d+[.)])\s+")
 DOI = re.compile(r"\b10\.\d{4,9}/[-._;()/:A-Za-z0-9]+", re.I)
 YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
@@ -77,6 +84,7 @@ class Result:
     failed_pages: list[int]
     total_body_chars: int
     uncertain: bool
+    uncertain_reference_pages: list[int]
 
 
 def _lines(text: str):
@@ -155,9 +163,7 @@ def classify(pages: list[Page], settings: Settings) -> Result:
     segments: list[Segment] = []
     references: list[Reference] = []
     warnings: list[str] = []
-    failed = [p.number for p in pages if p.error]
-    if failed:
-        warnings.append("pages_unextractable")
+    parse_failed = [p.number for p in pages if p.error]
     if any(p.layout_mode == "columns_reordered" for p in pages):
         warnings.append("two_column_order_heuristic")
     if any(p.layout_mode == "layout_ambiguous" for p in pages):
@@ -188,7 +194,11 @@ def classify(pages: list[Page], settings: Settings) -> Result:
     seen_body = False
     seen_references = False
     body_page_candidates: set[int] = set()
+    blank_body_pages: set[int] = set()
+    uncertain_reference_pages: set[int] = set()
     for page in pages:
+        if state == "uncertain_references":
+            uncertain_reference_pages.add(page.number)
         if page.error:
             if state == "body":
                 # A failed page between body headings is still in the body
@@ -196,11 +206,23 @@ def classify(pages: list[Page], settings: Settings) -> Result:
                 segments.append(Segment(page.number, "body", "", 0, 0))
                 body_page_candidates.add(page.number)
             continue
+        if not page.text.strip() and state == "body":
+            body_page_candidates.add(page.number)
+            blank_body_pages.add(page.number)
+            continue
         boundaries = [(0, state)]
         for a, _b, line in _lines(page.text):
             stripped = line.strip()
+            if state == "uncertain_references":
+                break
             if REFERENCES.fullmatch(stripped):
                 state, seen_references = "references", True
+                boundaries.append((a, state))
+            elif len(stripped) <= 80 and BIBLIOGRAPHY_CANDIDATE.match(stripped):
+                # Stop handing text to M3 at a plausible but unverified
+                # bibliography boundary, including the heading's own line.
+                state = "uncertain_references"
+                uncertain_reference_pages.add(page.number)
                 boundaries.append((a, state))
             elif ABSTRACT.fullmatch(stripped) and not seen_body and not seen_references:
                 state = "abstract"
@@ -230,11 +252,17 @@ def classify(pages: list[Page], settings: Settings) -> Result:
         if segment.kind == "body":
             counts[segment.page] = counts.get(segment.page, 0) + sum(not c.isspace() for c in segment.text)
     body_pages = sorted(counts)
+    failed = sorted(set(parse_failed) | blank_body_pages)
+    if failed:
+        warnings.append("pages_unextractable")
+    if blank_body_pages:
+        warnings.append("body_page_without_text")
+    if uncertain_reference_pages:
+        warnings.append("bibliography_boundary_uncertain")
     good = [n for n in body_pages if counts[n] >= settings.pdf_body.min_chars_per_body_page]
     bad = [n for n in body_pages if n not in good]
     total = sum(counts.values())
-    uncertain = not seen_body
-    if uncertain:
+    if not seen_body:
         warnings.append("body_boundary_uncertain")
     if bad:
         warnings.append("body_pages_below_min_chars")
@@ -244,17 +272,17 @@ def classify(pages: list[Page], settings: Settings) -> Result:
         warnings.append("pages_without_text")
     ratio_ok = bool(body_pages) and len(good) / len(body_pages) >= settings.pdf_body.min_body_page_ratio
     enough = ratio_ok and total >= settings.pdf_body.min_total_body_chars
+    uncertain = not seen_body or bool(uncertain_reference_pages) or bool(blank_body_pages and not enough)
     if uncertain:
         disposition = "needs_review"
     elif not enough:
         disposition = "fulltext_rejected"
     else:
         disposition = "awaiting_index"
-    coverage = "none" if not good else "partial" if (failed or bad or not enough) else "complete"
-    if failed and disposition == "awaiting_index":
-        coverage = "partial"
+    coverage = "none" if not good else "partial" if (failed or bad or not enough or uncertain_reference_pages) else "complete"
     return Result(pages, segments, references, coverage, disposition, warnings,
-                  body_pages, good, bad, failed, total, uncertain)
+                  body_pages, good, bad, failed, total, uncertain,
+                  sorted(uncertain_reference_pages))
 
 
 def parse(raw: bytes, expected_pages: int, settings: Settings) -> list[Page]:
