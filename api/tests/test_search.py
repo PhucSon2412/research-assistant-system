@@ -1,0 +1,303 @@
+"""M3b integration against PostgreSQL/pgvector and fake external providers."""
+import uuid
+from concurrent.futures import ThreadPoolExecutor
+from decimal import Decimal
+import httpx
+from sqlalchemy.orm import Session
+
+import pytest
+from fastapi import FastAPI
+from pydantic import SecretStr
+from sqlalchemy import text
+
+from app.config import Settings, get_settings
+from app.ingest.embedding import EmbeddingError, EmbeddingResult
+from app.ingest.worker import process_job
+from app.main import app
+from app.search import RerankError, fuse, rerank_order, reserve, rerank
+from app.authz import Principal
+from tests.test_ingest_worker import upload
+from tests.test_pdf_ingest import partial_pdf, upload_pdf
+from tests.test_private_index import fake_provider, settings_with_fake_key
+from tests.test_uploads import upload_api
+
+
+def configured(settings):
+    app.dependency_overrides[get_settings] = lambda: settings
+
+
+def indexed(api, storage, browser, body, settings):
+    ids = upload(browser, body)
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "awaiting_index"
+    assert process_job(uuid.UUID(ids["job_id"]), settings, storage) == "ready"
+    return ids
+
+
+def test_fusion_and_rerank_mapping():
+    a, b, c = (uuid.uuid4() for _ in range(3))
+    assert fuse([a, b], [b, c]) == [b, a, c]
+    assert rerank_order([a, b], [{"index": 1, "relevance_score": .9},
+                                 {"index": 0, "relevance_score": .2}]) == [b, a]
+    with pytest.raises(ValueError):
+        rerank_order([a, b], [{"index": 0, "relevance_score": .2}])
+    with pytest.raises(ValueError):
+        rerank_order([a], [{"index": 2, "relevance_score": .2}])
+
+
+def test_search_acl_before_keyword_vector_topk_and_rerank_payload(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.bootstrap_admin()
+    api.create_user("a@example.org")
+    api.create_user("b@example.org")
+    a, b, admin = api.user_browser("a@example.org"), api.user_browser("b@example.org"), api.admin_browser()
+    settings = settings_with_fake_key()
+    settings.search.keyword_top_k = 1
+    settings.search.vector_top_k = 1
+    settings.rerank.pricing_verified = True
+    fake_provider(monkeypatch)
+    first = indexed(api, storage, a, b"## Methods\nRareword A body.\n## References\n[1] Bibliography secret.\n", settings)
+    second = indexed(api, storage, b, b"## Methods\nRareword B secret body.\n", settings)
+    api.add_item(owner=None, title="common metadata_only")
+    configured(settings)
+    sent = []
+    monkeypatch.setattr("app.search.embed", lambda value, cfg, input_type: (
+        sent.append(("embed", value, input_type)) or EmbeddingResult([.1, .1, .1], cfg.embedding.model_id, 2)))
+    def rerank(query, docs, cfg):
+        sent.append(("rerank", query, docs))
+        return ([{"index": i, "relevance_score": 1.0 - i / 10} for i in range(len(docs))], 10, None)
+    monkeypatch.setattr("app.search.rerank", rerank)
+    response = a.post("/search", {"query": "Rareword", "mode": "hybrid", "rerank": True})
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["mode"] == "hybrid" and data["rerank_status"] == "applied"
+    assert data["count"] == 1
+    assert data["hits"][0]["item_id"] == first["item_id"]
+    assert data["hits"][0]["source_file_id"] == first["file_id"]
+    chunk_id = data["hits"][0]["chunk_id"]
+    opened = a.get(f"/search/chunks/{chunk_id}")
+    assert opened.status_code == 200 and opened.json()["chunk_id"] == chunk_id
+    assert b.get(f"/search/chunks/{chunk_id}").status_code == 404
+    assert admin.get(f"/search/chunks/{chunk_id}").status_code == 404
+    assert "B secret" not in str(data) and "Bibliography" not in str(data)
+    assert sent[0] == ("embed", "Rareword", "search_query")
+    assert all("B secret" not in d and "Bibliography" not in d for d in sent[1][2])
+    assert b.post("/search", {"query": "Rareword", "mode": "keyword", "rerank": False}).json()["hits"][0]["item_id"] == second["item_id"]
+    assert admin.post("/search", {"query": "Rareword", "mode": "keyword", "rerank": False}).json()["count"] == 0
+    fake = str(uuid.uuid4())
+    for target in (second["item_id"], fake):
+        denied = a.post("/search", {"query": "Rareword", "mode": "keyword", "item_id": target})
+        assert denied.status_code == 404 and denied.json() == {"error": "not_found"}
+
+
+def test_search_stale_generation_epoch_and_model_dimension_gate(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    browser = api.user_browser("a@example.org")
+    settings = settings_with_fake_key()
+    fake_provider(monkeypatch)
+    ids = indexed(api, storage, browser, b"## Methods\nSynthetic keyword body.\n", settings)
+    configured(settings)
+    first = browser.post("/search", {"query": "keyword", "mode": "keyword", "rerank": False}).json()
+    assert first["count"] == 1
+    chunk_id = first["hits"][0]["chunk_id"]
+    with api.engine.begin() as conn:
+        conn.execute(text("UPDATE library_items SET rights_epoch=rights_epoch+1 WHERE id=:i"), {"i": uuid.UUID(ids["item_id"])})
+    assert browser.post("/search", {"query": "keyword", "mode": "keyword", "rerank": False}).json()["count"] == 0
+    assert browser.get(f"/search/chunks/{chunk_id}").status_code == 404
+    with api.engine.begin() as conn:
+        conn.execute(text("UPDATE library_items SET rights_epoch=rights_epoch-1 WHERE id=:i"), {"i": uuid.UUID(ids["item_id"])})
+        conn.execute(text("UPDATE index_generations SET dimensions=4 WHERE item_id=:i"), {"i": uuid.UUID(ids["item_id"])})
+    assert browser.post("/search", {"query": "keyword", "mode": "keyword", "rerank": False}).json()["count"] == 0
+    with api.engine.begin() as conn:
+        conn.execute(text("UPDATE index_generations SET dimensions=3 WHERE item_id=:i"), {"i": uuid.UUID(ids["item_id"])})
+        conn.execute(text("UPDATE index_generations SET state='superseded' WHERE item_id=:i"), {"i": uuid.UUID(ids["item_id"])})
+    assert browser.post("/search", {"query": "keyword", "mode": "keyword", "rerank": False}).json()["count"] == 0
+    with api.engine.begin() as conn:
+        conn.execute(text("UPDATE index_generations SET state='active' WHERE item_id=:i"), {"i": uuid.UUID(ids["item_id"])})
+        conn.execute(text("UPDATE library_items SET content_status='metadata_only' WHERE id=:i"), {"i": uuid.UUID(ids["item_id"])})
+    assert browser.post("/search", {"query": "keyword", "mode": "keyword", "rerank": False}).json()["count"] == 0
+    with api.engine.begin() as conn:
+        conn.execute(text("UPDATE library_items SET content_status='indexed' WHERE id=:i"), {"i": uuid.UUID(ids["item_id"])})
+        conn.execute(text("UPDATE index_generations SET model_id='other/model' WHERE item_id=:i"), {"i": uuid.UUID(ids["item_id"])})
+    assert browser.post("/search", {"query": "keyword", "mode": "hybrid", "rerank": False}).json()["error"] == "search_index_model_mismatch"
+    with api.engine.begin() as conn:
+        conn.execute(text("UPDATE index_generations SET model_id=:m WHERE item_id=:i"),
+                     {"i": uuid.UUID(ids["item_id"]), "m": settings.embedding.model_id})
+    monkeypatch.setattr("app.search.embed", lambda value, cfg, input_type: EmbeddingResult([.1, .1], cfg.embedding.model_id, 1))
+    resp = browser.post("/search", {"query": "keyword", "mode": "hybrid", "rerank": False})
+    assert resp.status_code == 503 and resp.json()["error"] == "search_embedding_dimensions_mismatch"
+    assert api.scalar("SELECT count(*) FROM search_usage WHERE status='uncertain'") == 1
+
+
+def test_partial_pdf_hit_keeps_coverage_and_page_locator(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    browser = api.user_browser("a@example.org")
+    settings = settings_with_fake_key()
+    fake_provider(monkeypatch)
+    ids = upload_pdf(browser, partial_pdf())
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "awaiting_index"
+    assert process_job(uuid.UUID(ids["job_id"]), settings, storage) == "ready"
+    configured(settings)
+    result = browser.post("/search", {"query": "observation", "mode": "keyword", "rerank": False}).json()
+    assert result["count"] > 0
+    assert all(hit["coverage"] == "partial" and hit["locator_kind"] == "pdf"
+               and hit["start_page"] is not None for hit in result["hits"])
+
+
+@pytest.mark.parametrize("failure,expected", [
+    (RerankError("rerank_rate_limited", True), "degraded_rerank_rate_limited"),
+    (RerankError("rerank_outcome_uncertain"), "degraded_rerank_outcome_uncertain"),
+])
+def test_rerank_degrades_with_accounting(upload_api, monkeypatch, failure, expected):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    browser = api.user_browser("a@example.org")
+    settings = settings_with_fake_key()
+    settings.rerank.pricing_verified = True
+    fake_provider(monkeypatch)
+    indexed(api, storage, browser, b"## Methods\nSynthetic keyword body.\n", settings)
+    configured(settings)
+    def fail(*args):
+        raise failure
+    monkeypatch.setattr("app.search.rerank", fail)
+    resp = browser.post("/search", {"query": "keyword", "mode": "keyword", "rerank": True})
+    assert resp.status_code == 200 and resp.json()["rerank_status"] == expected
+    status = "rejected" if failure.rejected else "uncertain"
+    assert api.scalar("SELECT status FROM search_usage") == status
+
+
+def test_scope_changes_before_rerank_and_response(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    browser = api.user_browser("a@example.org")
+    settings = settings_with_fake_key()
+    settings.rerank.pricing_verified = True
+    fake_provider(monkeypatch)
+    ids = indexed(api, storage, browser, b"## Methods\nSynthetic keyword body.\n", settings)
+    configured(settings)
+    payload = []
+    def revoke_before_hydrate(db, principal, item_id, chunk_ids):
+        if not payload:
+            payload.append("first")
+            with api.engine.begin() as conn:
+                conn.execute(text("UPDATE library_items SET rights_epoch=rights_epoch+1 WHERE id=:i"), {"i": uuid.UUID(ids["item_id"])})
+        return original(db, principal, item_id, chunk_ids)
+    from app import search as module
+    original = module.hydrate
+    monkeypatch.setattr(module, "hydrate", revoke_before_hydrate)
+    monkeypatch.setattr(module, "rerank", lambda *args: payload.append("provider"))
+    resp = browser.post("/search", {"query": "keyword", "mode": "keyword", "rerank": True})
+    assert resp.status_code == 200 and resp.json()["count"] == 0
+    assert "provider" not in payload
+
+
+def test_revoke_during_rerank_aborts_response(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    browser = api.user_browser("a@example.org")
+    settings = settings_with_fake_key()
+    settings.rerank.pricing_verified = True
+    fake_provider(monkeypatch)
+    ids = indexed(api, storage, browser, b"## Methods\nSynthetic keyword body.\n", settings)
+    configured(settings)
+    def revoke(query, docs, cfg):
+        with api.engine.begin() as conn:
+            conn.execute(text("UPDATE library_items SET rights_epoch=rights_epoch+1 WHERE id=:i"), {"i": uuid.UUID(ids["item_id"])})
+        return ([{"index": i, "relevance_score": 1.0} for i in range(len(docs))], 2, None)
+    monkeypatch.setattr("app.search.rerank", revoke)
+    resp = browser.post("/search", {"query": "keyword", "mode": "keyword", "rerank": True})
+    assert resp.status_code == 409 and resp.json()["error"] == "search_scope_changed"
+    assert api.scalar("SELECT status FROM search_usage") == "completed"
+
+
+def test_query_embedding_429_and_timeout_accounting(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    browser = api.user_browser("a@example.org")
+    settings = settings_with_fake_key()
+    fake_provider(monkeypatch)
+    indexed(api, storage, browser, b"## Methods\nSynthetic keyword body.\n", settings)
+    configured(settings)
+    for error, status in ((EmbeddingError("provider_rate_limited", True), "rejected"),
+                          (EmbeddingError("provider_outcome_uncertain"), "uncertain")):
+        def fail(*args, **kwargs):
+            raise error
+        monkeypatch.setattr("app.search.embed", fail)
+        response = browser.post("/search", {"query": "keyword", "mode": "hybrid", "rerank": False})
+        assert response.status_code == 503 and response.json()["error"] == error.code
+        assert api.scalar("SELECT status FROM search_usage ORDER BY created_at DESC,id DESC LIMIT 1") == status
+
+
+def test_rerank_transport_contract_and_bad_response(monkeypatch):
+    settings = Settings(database_url="postgresql+psycopg://test@localhost/test")
+    settings.embedding.api_key = SecretStr("synthetic-test-key")
+    captured = []
+    original_client = httpx.Client
+    def handler(request):
+        payload = __import__("json").loads(request.content)
+        captured.append(payload)
+        assert payload == {"model": settings.rerank.model_id, "query": "synthetic query",
+                           "documents": ["synthetic body"], "top_n": 1}
+        return httpx.Response(200, json={"model": settings.rerank.model_id,
+            "results": [{"index": 0, "relevance_score": .8}], "usage": {"total_tokens": 5}})
+    monkeypatch.setattr("app.search.httpx.Client", lambda timeout: original_client(
+        transport=httpx.MockTransport(handler), timeout=timeout))
+    results, tokens, units = rerank("synthetic query", ["synthetic body"], settings)
+    assert rerank_order([uuid.uuid4()], results)
+    assert tokens == 5 and units is None and len(captured) == 1
+    monkeypatch.setattr("app.search.httpx.Client", lambda timeout: original_client(
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, json={"model": "wrong", "results": []})), timeout=timeout))
+    with pytest.raises(RerankError) as error:
+        rerank("synthetic query", ["synthetic body"], settings)
+    assert error.value.code == "rerank_response_invalid"
+
+
+def test_rerank_transport_429_and_timeout(monkeypatch):
+    settings = Settings(database_url="postgresql+psycopg://test@localhost/test")
+    settings.embedding.api_key = SecretStr("synthetic-test-key")
+    original_client = httpx.Client
+    monkeypatch.setattr("app.search.httpx.Client", lambda timeout: original_client(
+        transport=httpx.MockTransport(lambda request: httpx.Response(429)), timeout=timeout))
+    with pytest.raises(RerankError) as error:
+        rerank("synthetic query", ["synthetic body"], settings)
+    assert error.value.code == "rerank_rate_limited" and error.value.rejected
+
+    def timeout_handler(request):
+        raise httpx.ReadTimeout("synthetic timeout")
+    monkeypatch.setattr("app.search.httpx.Client", lambda timeout: original_client(
+        transport=httpx.MockTransport(timeout_handler), timeout=timeout))
+    with pytest.raises(RerankError) as error:
+        rerank("synthetic query", ["synthetic body"], settings)
+    assert error.value.code == "rerank_outcome_uncertain" and not error.value.rejected
+
+
+def test_concurrent_search_reservations_share_bucket(upload_api):
+    api, _ = upload_api
+    user = api.create_user("a@example.org")
+    settings = settings_with_fake_key()
+    settings.budget.user_rerank_daily_usd = 0.000001
+    principal = Principal(user, "user", uuid.uuid4(), "a@example.org", None)
+    def one():
+        with Session(api.engine) as db:
+            try:
+                return reserve(db, principal, settings, "rerank", Decimal("0.00000060"))
+            except Exception as exc:
+                return exc
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _: one(), range(2)))
+    assert sum(isinstance(value, uuid.UUID) for value in results) == 1
+    assert sum(getattr(value, "code", None) == "search_user_rerank_budget_exhausted" for value in results) == 1
+    assert api.scalar("SELECT count(*) FROM search_usage") == 1
+
+
+def test_keyword_request_quota_and_concurrent_reservation(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    browser = api.user_browser("a@example.org")
+    settings = settings_with_fake_key()
+    settings.search.max_requests_per_user_day = 1
+    configured(settings)
+    assert browser.post("/search", {"query": "x", "mode": "keyword"}).status_code == 200
+    assert browser.post("/search", {"query": "x", "mode": "keyword"}).status_code == 429
+    assert api.scalar("SELECT request_count FROM search_request_days") == 1

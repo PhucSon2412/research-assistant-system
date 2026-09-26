@@ -162,6 +162,7 @@ class ProviderBudget(BaseModel):
     user_embedding_daily_usd: float = Field(default=1.0, ge=0)
     user_embedding_warning_fraction: float = Field(default=0.8, gt=0, le=1)
     rerank_daily_usd: float = Field(default=2.0, ge=0)
+    user_rerank_daily_usd: float = Field(default=0.5, ge=0)
     generation_daily_usd: float = Field(default=5.0, ge=0)
     key_spending_cap_daily_usd: float = Field(default=50.0, gt=0)
 
@@ -174,6 +175,8 @@ class ProviderBudget(BaseModel):
             raise ValueError("app_daily_usd must not exceed the key spending cap")
         if self.user_embedding_daily_usd > self.embedding_daily_usd:
             raise ValueError("user_embedding_daily_usd must not exceed embedding_daily_usd")
+        if self.user_rerank_daily_usd > self.rerank_daily_usd:
+            raise ValueError("user_rerank_daily_usd must not exceed rerank_daily_usd")
         return self
 
 
@@ -200,6 +203,32 @@ class EmbeddingPolicy(BaseModel):
     def _check_endpoint(self) -> "EmbeddingPolicy":
         if not self.endpoint.startswith("https://"):
             raise ValueError("embedding endpoint must use HTTPS")
+        return self
+
+
+class SearchPolicy(BaseModel):
+    max_query_bytes: int = Field(default=1024, gt=0)
+    keyword_top_k: int = Field(default=30, gt=0, le=100)
+    vector_top_k: int = Field(default=30, gt=0, le=100)
+    max_results: int = Field(default=20, gt=0, le=100)
+    max_requests_per_user_day: int = Field(default=200, gt=0)
+    max_query_request_usd: float = Field(default=0.0002, gt=0)
+
+
+class RerankPolicy(BaseModel):
+    model_id: str = "qwen/qwen3-reranker-8b"
+    endpoint: str = "https://openrouter.ai/api/v1/rerank"
+    pricing_verified: bool = False
+    max_candidates: int = Field(default=12, gt=0, le=50)
+    max_text_bytes: int = Field(default=2048, gt=0)
+    request_timeout_seconds: int = Field(default=20, gt=0)
+    max_usd_per_million_tokens: float = Field(default=0.20, gt=0)
+    max_request_usd: float = Field(default=0.01, gt=0)
+
+    @model_validator(mode="after")
+    def _check_endpoint(self) -> "RerankPolicy":
+        if not self.endpoint.startswith("https://"):
+            raise ValueError("rerank endpoint must use HTTPS")
         return self
 
 
@@ -268,6 +297,8 @@ class Settings(BaseSettings):
     retention: Retention = Retention()
     budget: ProviderBudget = ProviderBudget()
     embedding: EmbeddingPolicy = EmbeddingPolicy()
+    search: SearchPolicy = SearchPolicy()
+    rerank: RerankPolicy = RerankPolicy()
     http: HttpSecurity = HttpSecurity()
     delivery: Delivery = Delivery()
     storage: ObjectStorage | None = None

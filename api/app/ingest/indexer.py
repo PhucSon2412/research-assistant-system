@@ -15,7 +15,7 @@ from app.ingest.embedding import EmbeddingError, embed
 from app.ingest.worker import StepError, _locked, _read_markdown, _read_pdf, utcnow
 from app.models import (Chunk, EmbeddingBudgetDay, EmbeddingCall, EmbeddingUserBudgetDay, IndexEntry, IndexGeneration,
                         IngestionJob, IngestStepAttempt, LibraryItem, PaperVersion, PdfPage, ProcessingAcknowledgement,
-                        Section, SourceFile, UploadIntent)
+                        SearchUsage, Section, SourceFile, UploadIntent)
 from app.models.enums import JobState, VerifiedMime
 from app.storage import OriginalStorage
 
@@ -135,10 +135,20 @@ def _reserve(db: Session, job: IngestionJob, item: LibraryItem, source: SourceFi
     # reconciled later; concurrent requests cannot spend the same allowance.
     amount = _amount(settings.embedding.max_request_bytes, settings)
     cap = min(Decimal(str(settings.budget.app_daily_usd)), Decimal(str(settings.budget.embedding_daily_usd)))
-    if budget.committed_usd + budget.reserved_usd + amount > cap:
+    search_spend = db.scalar(select(func.coalesce(func.sum(func.coalesce(SearchUsage.cost_usd, SearchUsage.reserved_usd)), 0)).where(
+        SearchUsage.day == day, SearchUsage.status.in_(("reserved", "completed", "uncertain"))))
+    query_spend = db.scalar(select(func.coalesce(func.sum(func.coalesce(SearchUsage.cost_usd, SearchUsage.reserved_usd)), 0)).where(
+        SearchUsage.day == day, SearchUsage.task_type == "embed_query",
+        SearchUsage.status.in_(("reserved", "completed", "uncertain"))))
+    if budget.committed_usd + budget.reserved_usd + search_spend + amount > Decimal(str(settings.budget.app_daily_usd)):
+        raise StepError("embedding_budget_exhausted", retryable=True)
+    if budget.committed_usd + budget.reserved_usd + query_spend + amount > cap:
         raise StepError("embedding_budget_exhausted", retryable=True)
     user_cap = Decimal(str(settings.budget.user_embedding_daily_usd))
-    if user_budget.committed_usd + user_budget.reserved_usd + amount > user_cap:
+    user_query_spend = db.scalar(select(func.coalesce(func.sum(func.coalesce(SearchUsage.cost_usd, SearchUsage.reserved_usd)), 0)).where(
+        SearchUsage.day == day, SearchUsage.user_id == item.owner_user_id,
+        SearchUsage.task_type == "embed_query", SearchUsage.status.in_(("reserved", "completed", "uncertain"))))
+    if user_budget.committed_usd + user_budget.reserved_usd + user_query_spend + amount > user_cap:
         raise StepError("embedding_user_quota_exhausted", retryable=True)
     budget.reserved_usd += amount
     user_budget.reserved_usd += amount

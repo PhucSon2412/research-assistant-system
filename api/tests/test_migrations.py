@@ -37,6 +37,7 @@ EXPECTED_TABLES = {
     "reference_entries",
     "index_generations", "embedding_calls", "index_entries", "embedding_budget_days",
     "embedding_user_budget_days",
+    "search_request_days", "search_usage",
 }
 
 
@@ -137,6 +138,26 @@ def test_0010_backfills_existing_embedding_calls_by_owner(empty_db_url: str) -> 
     with eng.connect() as conn:
         assert conn.scalar(text("SELECT owner_user_id FROM embedding_calls")) == owner
         assert conn.scalar(text("SELECT reserved_usd FROM embedding_user_budget_days WHERE user_id=:o"), {"o": owner}) == Decimal("0.00000100")
+    eng.dispose()
+
+
+def test_0011_upgrades_m3a_data_without_changing_it(empty_db_url: str) -> None:
+    from app.identity.passwords import hash_password
+
+    upgrade(empty_db_url, "0010")
+    eng = create_engine(empty_db_url)
+    with eng.begin() as conn:
+        owner = conn.scalar(text("INSERT INTO users(email,password_verifier) VALUES('m3b-owner@example.org',:p) RETURNING id"),
+                            {"p": hash_password("synthetic-password-long")})
+        item = conn.scalar(text("INSERT INTO library_items(visibility,owner_user_id,title) VALUES('private',:o,'M3a existing') RETURNING id"), {"o": owner})
+        conn.execute(text("INSERT INTO embedding_budget_days(day,committed_usd,reserved_usd) VALUES(CURRENT_DATE,0.001,0.002)"))
+        conn.execute(text("INSERT INTO embedding_user_budget_days(day,user_id,committed_usd,reserved_usd) VALUES(CURRENT_DATE,:o,0.001,0.002)"), {"o": owner})
+    upgrade(empty_db_url)
+    with eng.connect() as conn:
+        assert conn.scalar(text("SELECT title FROM library_items WHERE id=:i"), {"i": item}) == "M3a existing"
+        assert conn.scalar(text("SELECT committed_usd+reserved_usd FROM embedding_budget_days")) == Decimal("0.00300000")
+        assert conn.scalar(text("SELECT committed_usd+reserved_usd FROM embedding_user_budget_days")) == Decimal("0.00300000")
+        assert conn.scalar(text("SELECT count(*) FROM search_usage")) == 0
     eng.dispose()
 
 

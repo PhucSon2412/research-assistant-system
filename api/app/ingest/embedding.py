@@ -24,7 +24,7 @@ class EmbeddingError(Exception):
         super().__init__(code)
 
 
-def embed(text: str, settings: Settings) -> EmbeddingResult:
+def embed(text: str, settings: Settings, *, input_type: str = "search_document") -> EmbeddingResult:
     policy = settings.embedding
     if policy.api_key is None:
         raise EmbeddingError("embedding_key_missing", definitely_rejected=True)
@@ -34,7 +34,7 @@ def embed(text: str, settings: Settings) -> EmbeddingResult:
                 headers={"Authorization": f"Bearer {policy.api_key.get_secret_value()}",
                          "Content-Type": "application/json"},
                 json={"model": policy.model_id, "input": text,
-                      "input_type": "search_document", "encoding_format": "float"})
+                      "input_type": input_type, "encoding_format": "float"})
     except httpx.RequestError:
         raise EmbeddingError("provider_outcome_uncertain") from None
     if response.status_code == 429:

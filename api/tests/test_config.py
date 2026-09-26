@@ -62,6 +62,10 @@ def test_defaults_match_documented_mvp_values() -> None:
     assert s.embedding.max_batch_items == 1
     assert s.embedding.api_key is None
     assert s.embedding.pricing_verified is False
+    assert s.rerank.pricing_verified is False
+    assert s.rerank.model_id == "qwen/qwen3-reranker-8b"
+    assert s.search.max_requests_per_user_day > 0
+    assert s.budget.user_rerank_daily_usd <= s.budget.rerank_daily_usd
     assert s.password.min_length == 12
     assert (s.ingest.poll_seconds, s.ingest.lease_seconds, s.ingest.max_attempts,
             s.ingest.markdown_max_chunk_chars) == (5, 120, 4, 1200)
@@ -98,6 +102,7 @@ def test_redis_broker_password_is_url_escaped() -> None:
         lambda: ProviderBudget(generation_daily_usd=6.0),  # 3 + 2 + 6 > 10
         lambda: ProviderBudget(app_daily_usd=60.0),  # above the key cap
         lambda: ProviderBudget(user_embedding_daily_usd=4.0),
+        lambda: ProviderBudget(user_rerank_daily_usd=3.0),
         lambda: ProviderBudget(embedding_warning_fraction=0),
         lambda: ProviderBudget(embedding_warning_fraction=1.01),
         lambda: ProviderBudget(user_embedding_warning_fraction=1.01),

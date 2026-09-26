@@ -22,7 +22,8 @@ def test_readyz_ok_after_migration(app_env, migrated_db_url: str) -> None:
     assert response.status_code == 200
 
 
-def test_m1c_routes_exclude_later_pipelines() -> None:
+def test_m3b_routes_exclude_future_pipelines() -> None:
     paths = set(app.openapi()["paths"])
     assert {"/uploads/notice", "/uploads/intents", "/uploads/original", "/files/{file_id}/original"} <= paths
-    assert not any(p.startswith(("/search", "/rag", "/discovery")) for p in paths)
+    assert "/search" in paths
+    assert not any(p.startswith(("/rag", "/discovery")) for p in paths)
