@@ -17,6 +17,7 @@ from app.authz import Principal
 from app.config import Settings
 from app.ingest.embedding import EmbeddingError, embed
 from app.models import EmbeddingBudgetDay, EmbeddingCall, EmbeddingUserBudgetDay, LibraryItem, SearchRequestDay, SearchUsage
+from app.provider_capacity import LOCK, lease_deadline, reap_expired, reservation_heartbeat
 
 log = logging.getLogger(__name__)
 MONEY = Decimal("0.00000001")
@@ -84,7 +85,8 @@ def _total(db: Session, day, task: str | None = None, user_id: uuid.UUID | None 
 def reserve(db: Session, principal: Principal, settings: Settings, task: str, amount: Decimal) -> uuid.UUID:
     """One advisory lock serializes search and document embedding reservations."""
     day = _day().date()
-    db.execute(text("SELECT pg_advisory_xact_lock(hashtext('ras_embedding_capacity'))"))
+    reap_expired(db.get_bind())
+    db.execute(text(LOCK))
     if task == "embed_query":
         active_document = db.scalar(select(func.count()).select_from(EmbeddingCall).where(
             EmbeddingCall.status == "reserved"))
@@ -124,7 +126,11 @@ def reserve(db: Session, principal: Principal, settings: Settings, task: str, am
             raise ApiError(429, "search_user_budget_exhausted")
         if query_spend + doc_used + amount >= cap * Decimal(str(settings.budget.embedding_warning_fraction)):
             warnings.append("embedding_bucket_near_limit")
+        if (_total(db, day, "embed_query", principal.user_id) + doc_user_used + amount >=
+                user_cap * Decimal(str(settings.budget.user_embedding_warning_fraction))):
+            warnings.append("embedding_user_quota_near_limit")
         model = settings.embedding.model_id
+        lease_seconds = settings.embedding.reservation_lease_seconds
     else:
         rerank_spend = _total(db, day, "rerank")
         rerank_cap = Decimal(str(settings.budget.rerank_daily_usd))
@@ -137,9 +143,10 @@ def reserve(db: Session, principal: Principal, settings: Settings, task: str, am
         if rerank_spend + amount >= rerank_cap * Decimal(str(settings.budget.rerank_warning_fraction)):
             warnings.append("rerank_bucket_near_limit")
         model = settings.rerank.model_id
+        lease_seconds = settings.rerank.reservation_lease_seconds
     usage = SearchUsage(user_id=principal.user_id, day=day, task_type=task, model_id=model,
         provider="openrouter", status="reserved", reserved_usd=amount, cost_status="unknown",
-        warnings=warnings)
+        warnings=warnings, lease_until=lease_deadline(lease_seconds))
     db.add(usage)
     db.flush()
     usage_id = usage.id
@@ -150,6 +157,10 @@ def reserve(db: Session, principal: Principal, settings: Settings, task: str, am
 def settle(db: Session, usage_id: uuid.UUID, *, tokens: int | None = None,
            units: int | None = None, price: float | None = None, rejected: bool = False) -> str:
     usage = db.get(SearchUsage, usage_id, with_for_update=True)
+    if usage.status in ("completed", "rejected"):
+        status = usage.cost_status
+        db.commit()
+        return status
     if rejected:
         usage.status, usage.cost_usd, usage.cost_status = "rejected", Decimal(0), "rejected_no_charge"
     elif tokens is not None and price is not None:
@@ -162,6 +173,7 @@ def settle(db: Session, usage_id: uuid.UUID, *, tokens: int | None = None,
         usage.status = "uncertain"
         usage.cost_status = "unknown_reserved_ceiling"
     usage.finished_at = _day()
+    usage.lease_until = None
     status = usage.cost_status
     db.commit()
     return status
@@ -322,7 +334,9 @@ def search(db: Session, principal: Principal, settings: Settings, query: str,
                 settle(db, embed_usage, rejected=True)
                 raise ApiError(409, "search_scope_changed")
             start = time.perf_counter()
-            result = embed(query, settings, input_type="search_query")
+            with reservation_heartbeat(db.get_bind(), SearchUsage, embed_usage,
+                                       settings.embedding.reservation_lease_seconds):
+                result = embed(query, settings, input_type="search_query")
             timings["provider_ms"] += int((time.perf_counter() - start) * 1000)
         except EmbeddingError as exc:
             settle(db, embed_usage, rejected=exc.definitely_rejected)
@@ -362,7 +376,9 @@ def search(db: Session, principal: Principal, settings: Settings, query: str,
                         settle(db, rerank_usage, rejected=True)
                         raise ApiError(409, "search_scope_changed")
                     start = time.perf_counter()
-                    results, tokens, units = rerank(query, documents, settings)
+                    with reservation_heartbeat(db.get_bind(), SearchUsage, rerank_usage,
+                                               policy.reservation_lease_seconds):
+                        results, tokens, units = rerank(query, documents, settings)
                     timings["rerank_ms"] = int((time.perf_counter() - start) * 1000)
                     timings["provider_ms"] += timings["rerank_ms"]
                     try:

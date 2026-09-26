@@ -69,6 +69,8 @@ def test_defaults_match_documented_mvp_values() -> None:
     assert s.budget.user_rerank_daily_usd <= s.budget.rerank_daily_usd
     assert s.budget.rerank_warning_fraction == 0.8
     assert s.rerank.max_concurrent_requests == 2
+    assert s.embedding.reservation_lease_seconds > s.embedding.request_timeout_seconds + 10
+    assert s.rerank.reservation_lease_seconds > s.rerank.request_timeout_seconds + 10
     assert s.password.min_length == 12
     assert (s.ingest.poll_seconds, s.ingest.lease_seconds, s.ingest.max_attempts,
             s.ingest.markdown_max_chunk_chars) == (5, 120, 4, 1200)
@@ -120,6 +122,8 @@ def test_redis_broker_password_is_url_escaped() -> None:
         lambda: EmbeddingPolicy(endpoint="http://example.org/embeddings"),
         lambda: EmbeddingPolicy(max_concurrent_requests=0),
         lambda: RerankPolicy(max_concurrent_requests=0),
+        lambda: EmbeddingPolicy(reservation_lease_seconds=0),
+        lambda: RerankPolicy(reservation_lease_seconds=0),
     ],
 )
 def test_invalid_values_are_rejected(build) -> None:
@@ -136,6 +140,10 @@ def test_boundary_values_are_accepted() -> None:
     assert EmbeddingPolicy(api_key="").api_key is None
     with pytest.raises(ValidationError):
         Settings(database_url=URL, embedding={"request_timeout_seconds": 110})
+    with pytest.raises(ValidationError):
+        Settings(database_url=URL, embedding={"reservation_lease_seconds": 40})
+    with pytest.raises(ValidationError):
+        Settings(database_url=URL, rerank={"reservation_lease_seconds": 30})
 
 
 # --- M1b: environment, cookies, delivery ---------------------------------------

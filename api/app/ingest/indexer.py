@@ -17,6 +17,7 @@ from app.models import (Chunk, EmbeddingBudgetDay, EmbeddingCall, EmbeddingUserB
                         IngestionJob, IngestStepAttempt, LibraryItem, PaperVersion, PdfPage, ProcessingAcknowledgement,
                         SearchUsage, Section, SourceFile, UploadIntent)
 from app.models.enums import JobState, VerifiedMime
+from app.provider_capacity import LOCK, lease_deadline, reap_expired, reservation_heartbeat
 from app.storage import OriginalStorage
 
 INDEX_VERSION = "private-keyword-vector-v1"
@@ -108,7 +109,8 @@ def _amount(tokens: int, settings: Settings) -> Decimal:
 def _reserve(db: Session, job: IngestionJob, item: LibraryItem, source: SourceFile,
              chunk: Chunk, settings: Settings) -> EmbeddingCall:
     day = utcnow().date()
-    db.execute(text("SELECT pg_advisory_xact_lock(hashtext('ras_embedding_capacity'))"))
+    reap_expired(db.get_bind())
+    db.execute(text(LOCK))
     db.execute(text("INSERT INTO embedding_budget_days(day) VALUES (:day) ON CONFLICT DO NOTHING"), {"day": day})
     budget = db.scalar(select(EmbeddingBudgetDay).where(EmbeddingBudgetDay.day == day).with_for_update())
     db.execute(text("INSERT INTO embedding_user_budget_days(day,user_id) VALUES (:day,:user) ON CONFLICT DO NOTHING"),
@@ -123,8 +125,7 @@ def _reserve(db: Session, job: IngestionJob, item: LibraryItem, source: SourceFi
             return existing
         if existing.status != "rejected":
             if existing.status == "reserved":
-                existing.status = "uncertain"
-                db.commit()
+                raise StepError("embedding_in_progress", retryable=True)
             raise StepError("embedding_outcome_uncertain")
     active = db.scalar(select(func.count()).select_from(EmbeddingCall).where(EmbeddingCall.status == "reserved"))
     active_queries = db.scalar(select(func.count()).select_from(SearchUsage).where(
@@ -157,7 +158,7 @@ def _reserve(db: Session, job: IngestionJob, item: LibraryItem, source: SourceFi
     if (budget.committed_usd + budget.reserved_usd + query_spend >=
             cap * Decimal(str(settings.budget.embedding_warning_fraction))):
         job.warnings = list(dict.fromkeys([*job.warnings, "embedding_bucket_near_limit"]))
-    if (user_budget.committed_usd + user_budget.reserved_usd >=
+    if (user_budget.committed_usd + user_budget.reserved_usd + user_query_spend >=
             user_cap * Decimal(str(settings.budget.user_embedding_warning_fraction))):
         job.warnings = list(dict.fromkeys([*job.warnings, "embedding_user_quota_near_limit"]))
     if existing is None:
@@ -165,7 +166,8 @@ def _reserve(db: Session, job: IngestionJob, item: LibraryItem, source: SourceFi
             model_id=settings.embedding.model_id,
             provider=settings.embedding.provider, pipeline_version=chunk.pipeline_version,
             chunk_hash=chunk.chunk_hash, status="reserved", reserved_usd=amount,
-            cost_status="unknown", reserved_day=day)
+            cost_status="unknown", reserved_day=day,
+            lease_until=lease_deadline(settings.embedding.reservation_lease_seconds))
         db.add(existing)
     else:
         existing.status = "reserved"
@@ -174,6 +176,7 @@ def _reserve(db: Session, job: IngestionJob, item: LibraryItem, source: SourceFi
         existing.cost_usd = None
         existing.cost_status = "unknown"
         existing.finished_at = None
+        existing.lease_until = lease_deadline(settings.embedding.reservation_lease_seconds)
     db.flush()
     return existing
 
@@ -219,7 +222,9 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
             if source.verified_mime == VerifiedMime.PDF.value:
                 _read_pdf(source, storage, settings)
             db.commit()
-            result = embed(pending.text, settings)
+            with reservation_heartbeat(db.get_bind(), EmbeddingCall, call_id,
+                                       settings.embedding.reservation_lease_seconds):
+                result = embed(pending.text, settings)
         except EmbeddingError as exc:
             _provider_failure(db, call_id, exc)
             raise StepError(exc.code, retryable=exc.definitely_rejected) from None
@@ -232,7 +237,9 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
                 _read_pdf(source, storage, settings)
             generation = db.get(IndexGeneration, generation.id)
             call = db.scalar(select(EmbeddingCall).where(EmbeddingCall.id == call_id).with_for_update())
-            if (generation.state != "building" or call.status != "reserved"
+            if (generation.state != "building" or
+                    (call.status != "reserved" and not (call.status == "uncertain" and
+                     call.cost_status == "lease_expired_reserved_ceiling"))
                     or generation.model_id != result.model_id
                     or (generation.dimensions is not None and generation.dimensions != len(result.vector))):
                 raise StepError("embedding_dimensions_mismatch")
@@ -248,6 +255,7 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
             call.cost_usd = settled if result.input_tokens is not None else None
             call.cost_status = "usage_price_estimate" if result.input_tokens is not None else "unknown_reserved_ceiling"
             call.finished_at = utcnow()
+            call.lease_until = None
             budget = db.scalar(select(EmbeddingBudgetDay).where(EmbeddingBudgetDay.day == call.reserved_day).with_for_update())
             budget.reserved_usd -= call.reserved_usd
             budget.committed_usd += settled
@@ -267,11 +275,13 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
 
 def _provider_failure(db: Session, call_id: uuid.UUID, error: EmbeddingError) -> None:
     db.rollback()
-    db.execute(text("SELECT pg_advisory_xact_lock(hashtext('ras_embedding_capacity'))"))
+    db.execute(text(LOCK))
     call = db.scalar(select(EmbeddingCall).where(EmbeddingCall.id == call_id).with_for_update())
-    if call is not None and call.status == "reserved":
+    if (call is not None and (call.status == "reserved" or
+            (call.status == "uncertain" and call.cost_status == "lease_expired_reserved_ceiling"))):
         call.status = "rejected" if error.definitely_rejected else "uncertain"
         call.finished_at = utcnow()
+        call.lease_until = None
         if error.definitely_rejected:
             call.cost_status = "rejected_no_charge"
             call.cost_usd = Decimal("0")
@@ -281,6 +291,8 @@ def _provider_failure(db: Session, call_id: uuid.UUID, error: EmbeddingError) ->
                 EmbeddingUserBudgetDay.day == call.reserved_day,
                 EmbeddingUserBudgetDay.user_id == call.owner_user_id).with_for_update())
             user_budget.reserved_usd -= call.reserved_usd
+        else:
+            call.cost_status = "unknown_reserved_ceiling"
     db.commit()
 
 

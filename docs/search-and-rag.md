@@ -16,6 +16,8 @@ M3b dùng `plainto_tsquery('simple', query)` và `ts_rank_cd` cho keyword, pgvec
 
 Review PR #7: rerank mặc định tắt trên web và API. Khi User bật, **câu tìm kiếm và các candidate chunks được phép** mới gửi provider; response sai định dạng sau khi provider nhận request suy giảm có kiểm soát và giữ reservation nếu chưa biết usage. Query embedding chia giới hạn concurrency với document embedding, rerank có giới hạn riêng. Warning near-limit của bucket embedding/rerank được ghi tại reservation theo tổng đã commit và còn giữ chỗ, trả trong `cost.*.warnings`.
 
+Review lease PR #7: reservation provider có thời hạn và được gia hạn khi lời gọi còn chạy. Reservation quá hạn chuyển `uncertain` trước khi xét slot mới, kể cả ngày khác; USD dự phòng vẫn giữ đến đối soát, không tự retry. Warning quota embedding của User tính cả document và query, cùng phần đã commit và đang dự phòng; query warning được trả qua `cost.embed_query.warnings`.
+
 ```mermaid
 flowchart LR
   A[Identity + allowed item set] --> F[Scope intersection]

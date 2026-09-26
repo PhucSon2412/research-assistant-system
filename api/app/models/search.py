@@ -24,6 +24,8 @@ class SearchUsage(Base):
         CheckConstraint("status IN ('reserved', 'completed', 'uncertain', 'rejected')", name="status_valid"),
         CheckConstraint("reserved_usd >= 0 AND (cost_usd IS NULL OR cost_usd >= 0)", name="cost_non_negative"),
         Index("ix_search_usage_day_user", "day", "user_id"),
+        Index("ix_search_usage_reserved_lease", "lease_until",
+              postgresql_where=text("status = 'reserved'")),
     )
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"))
@@ -38,5 +40,6 @@ class SearchUsage(Base):
     cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(14, 8))
     cost_status: Mapped[str] = mapped_column(Text)
     warnings: Mapped[list[str]] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

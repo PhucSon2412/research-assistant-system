@@ -180,6 +180,47 @@ def test_0012_backfills_existing_search_usage_warnings(empty_db_url: str) -> Non
     eng.dispose()
 
 
+def test_0013_marks_prelease_reservations_uncertain_without_releasing_cost(empty_db_url: str) -> None:
+    from app.identity.passwords import hash_password
+
+    upgrade(empty_db_url, "0012")
+    eng = create_engine(empty_db_url)
+    with eng.begin() as conn:
+        owner = conn.scalar(text("INSERT INTO users(email,password_verifier) VALUES('lease@example.org',:p) RETURNING id"),
+                            {"p": hash_password("synthetic-password-long")})
+        usage = conn.scalar(text("""INSERT INTO search_usage(user_id,day,task_type,model_id,provider,status,
+            reserved_usd,cost_status) VALUES(:u,CURRENT_DATE,'embed_query','model','openrouter','reserved',
+            0.00000100,'unknown') RETURNING id"""), {"u": owner})
+        item = conn.scalar(text("INSERT INTO library_items(visibility,owner_user_id,title)"
+                                " VALUES('private',:u,'Lease fixture') RETURNING id"), {"u": owner})
+        version = conn.scalar(text("INSERT INTO paper_versions(item_id,coverage)"
+                                   " VALUES(:i,'complete') RETURNING id"), {"i": item})
+        job = conn.scalar(text("""INSERT INTO ingestion_jobs(origin,scope_visibility,scope_owner_user_id,
+            item_id,version_id,idempotency_key,rights_epoch_at_start) VALUES
+            ('upload','private',:u,:i,:v,'lease-fixture',0) RETURNING id"""),
+                          {"u": owner, "i": item, "v": version})
+        source = conn.scalar(text("""INSERT INTO source_files(item_id,version_id,job_id,storage_key,
+            verified_mime,byte_size,checksum_sha256) VALUES
+            (:i,:v,:j,'lease/original','text/markdown',1,:h) RETURNING id"""),
+                             {"i": item, "v": version, "j": job, "h": "a" * 64})
+        call = conn.scalar(text("""INSERT INTO embedding_calls(source_file_id,owner_user_id,model_id,
+            provider,pipeline_version,chunk_hash,status,reserved_usd,cost_status,reserved_day)
+            VALUES(:s,:u,'model','openrouter','pipeline',:h,'reserved',0.00000200,'unknown',CURRENT_DATE)
+            RETURNING id"""), {"s": source, "u": owner, "h": "b" * 64})
+    upgrade(empty_db_url)
+    with eng.connect() as conn:
+        row = conn.execute(text("SELECT status,reserved_usd,cost_usd,cost_status,lease_until"
+                                " FROM search_usage WHERE id=:i"), {"i": usage}).one()
+    assert row == ("uncertain", Decimal("0.00000100"), None,
+                   "lease_expired_reserved_ceiling", None)
+    with eng.connect() as conn:
+        row = conn.execute(text("SELECT status,reserved_usd,cost_usd,cost_status,lease_until"
+                                " FROM embedding_calls WHERE id=:i"), {"i": call}).one()
+    assert row == ("uncertain", Decimal("0.00000200"), None,
+                   "lease_expired_reserved_ceiling", None)
+    eng.dispose()
+
+
 def test_migration_sql_seeds_no_accounts() -> None:
     """Ledger backfill is allowed; migrations must never seed accounts."""
     out = io.StringIO()

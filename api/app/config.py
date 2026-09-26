@@ -187,6 +187,7 @@ class EmbeddingPolicy(BaseModel):
     endpoint: str = "https://openrouter.ai/api/v1/embeddings"
     api_key: SecretStr | None = None
     request_timeout_seconds: int = Field(default=30, gt=0)
+    reservation_lease_seconds: int = Field(default=90, gt=0)
     max_concurrent_requests: int = Field(default=2, gt=0)
     max_batch_items: int = Field(default=1, ge=1, le=1)
     max_request_bytes: int = Field(default=16_384, gt=0)
@@ -224,6 +225,7 @@ class RerankPolicy(BaseModel):
     max_candidates: int = Field(default=12, gt=0, le=50)
     max_text_bytes: int = Field(default=2048, gt=0)
     request_timeout_seconds: int = Field(default=20, gt=0)
+    reservation_lease_seconds: int = Field(default=60, gt=0)
     max_usd_per_million_tokens: float = Field(default=0.20, gt=0)
     max_request_usd: float = Field(default=0.01, gt=0)
 
@@ -318,6 +320,10 @@ class Settings(BaseSettings):
     def _check_environment(self) -> "Settings":
         if self.embedding.request_timeout_seconds + 10 >= self.ingest.lease_seconds:
             raise ValueError("embedding timeout must leave at least 10 seconds of lease margin")
+        if self.embedding.reservation_lease_seconds <= self.embedding.request_timeout_seconds + 10:
+            raise ValueError("embedding reservation lease must exceed provider timeout by 10 seconds")
+        if self.rerank.reservation_lease_seconds <= self.rerank.request_timeout_seconds + 10:
+            raise ValueError("rerank reservation lease must exceed provider timeout by 10 seconds")
         if self.environment == "production":
             if not self.http.cookie_secure:
                 raise ValueError("production requires RAS_HTTP__COOKIE_SECURE=true")

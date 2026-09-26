@@ -15,7 +15,9 @@ from app.config import Settings, get_settings
 from app.ingest.embedding import EmbeddingError, EmbeddingResult
 from app.ingest.worker import process_job
 from app.main import app
-from app.search import RerankError, fuse, rerank_order, reserve, rerank
+from app.search import RerankError, fuse, rerank_order, reserve, rerank, settle
+from app.provider_capacity import reap_expired, reservation_heartbeat
+from app.models import SearchUsage
 from app.authz import Principal
 from tests.test_ingest_worker import upload
 from tests.test_pdf_ingest import partial_pdf, upload_pdf
@@ -503,3 +505,139 @@ def test_document_index_warning_counts_query_reservation(upload_api, monkeypatch
         warnings = conn.scalar(text("SELECT warnings FROM ingestion_jobs WHERE id=:j"),
                                {"j": uuid.UUID(ids["job_id"])})
     assert "embedding_bucket_near_limit" in warnings
+
+
+@pytest.mark.parametrize("task", ["embed_query", "rerank"])
+def test_expired_search_lease_frees_slot_but_keeps_cost_and_late_settlement_once(upload_api, task):
+    api, _ = upload_api
+    users = [api.create_user(f"{name}@example.org") for name in ("a", "b", "c")]
+    principals = [Principal(user, "user", uuid.uuid4(), f"{name}@example.org", None)
+                  for user, name in zip(users, ("a", "b", "c"))]
+    settings = settings_with_fake_key()
+    settings.embedding.max_concurrent_requests = 1
+    settings.rerank.max_concurrent_requests = 1
+    amount = Decimal("0.00000060")
+    with Session(api.engine) as db:
+        stale = reserve(db, principals[0], settings, task, amount)
+    with api.engine.begin() as conn:
+        conn.execute(text("UPDATE search_usage SET lease_until=now()-interval '1 second',"
+                          " day=CURRENT_DATE-1 WHERE id=:i"), {"i": stale})
+
+    start = Barrier(2)
+    def compete(principal):
+        with Session(api.engine) as db:
+            start.wait(timeout=10)
+            try:
+                return reserve(db, principal, settings, task, amount)
+            except Exception as exc:
+                return exc
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(compete, principals[1:]))
+    assert sum(isinstance(x, uuid.UUID) for x in outcomes) == 1
+    assert sum(getattr(x, "code", None) == f"search_{'embedding' if task == 'embed_query' else 'rerank'}_concurrency_limit"
+               for x in outcomes) == 1
+    with api.engine.connect() as conn:
+        row = conn.execute(text("SELECT status,cost_status,reserved_usd,cost_usd FROM search_usage WHERE id=:i"),
+                           {"i": stale}).one()
+    assert row == ("uncertain", "lease_expired_reserved_ceiling", amount, None)
+    with Session(api.engine) as db:
+        assert settle(db, stale, tokens=2, price=0.20) == "usage_price_estimate"
+        assert settle(db, stale, tokens=9, price=0.20) == "usage_price_estimate"
+    with api.engine.connect() as conn:
+        row = conn.execute(text("SELECT status,cost_usd,reserved_usd FROM search_usage WHERE id=:i"),
+                           {"i": stale}).one()
+    assert row == ("completed", Decimal("0.00000040"), amount)
+
+
+def test_live_search_reservation_renews_lease(upload_api):
+    api, _ = upload_api
+    user = api.create_user("a@example.org")
+    principal = Principal(user, "user", uuid.uuid4(), "a@example.org", None)
+    settings = settings_with_fake_key()
+    with Session(api.engine) as db:
+        usage_id = reserve(db, principal, settings, "embed_query", Decimal("0.00000010"))
+    with api.engine.begin() as conn:
+        conn.execute(text("UPDATE search_usage SET lease_until=now()+interval '4 seconds' WHERE id=:i"),
+                     {"i": usage_id})
+    with reservation_heartbeat(api.engine, SearchUsage, usage_id, 3):
+        from time import sleep
+        sleep(5.2)
+        reap_expired(api.engine)
+        assert api.scalar("SELECT count(*) FROM search_usage WHERE status='reserved'") == 1
+
+
+@pytest.mark.parametrize("task", ["embed_query", "rerank"])
+def test_expired_lease_keeps_current_day_budget_and_user_quota(upload_api, task):
+    api, _ = upload_api
+    user = api.create_user("a@example.org")
+    principal = Principal(user, "user", uuid.uuid4(), "a@example.org", None)
+    settings = settings_with_fake_key()
+    if task == "embed_query":
+        settings.budget.embedding_daily_usd = 0.00000060
+        settings.budget.user_embedding_daily_usd = 0.00000060
+    else:
+        settings.budget.rerank_daily_usd = 0.00000060
+        settings.budget.user_rerank_daily_usd = 0.00000060
+    with Session(api.engine) as db:
+        stale = reserve(db, principal, settings, task, Decimal("0.00000060"))
+    with api.engine.begin() as conn:
+        conn.execute(text("UPDATE search_usage SET lease_until=now()-interval '1 second' WHERE id=:i"),
+                     {"i": stale})
+    with Session(api.engine) as db:
+        with pytest.raises(Exception) as exc:
+            reserve(db, principal, settings, task, Decimal("0.00000010"))
+    assert getattr(exc.value, "code", None) == ("search_embedding_budget_exhausted" if task == "embed_query"
+                                                 else "search_rerank_budget_exhausted")
+    assert api.scalar("SELECT count(*) FROM search_usage WHERE status='uncertain'") == 1
+
+
+def test_query_user_warning_counts_document_and_concurrent_queries(upload_api, monkeypatch):
+    api, storage = upload_api
+    user = api.create_user("a@example.org")
+    browser = api.user_browser("a@example.org")
+    ids = upload(browser, b"## Methods\nSynthetic body.\n")
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "awaiting_index"
+    principal = Principal(user, "user", uuid.uuid4(), "a@example.org", None)
+    settings = settings_with_fake_key()
+    settings.embedding.max_concurrent_requests = 2
+    settings.embedding.max_request_bytes = 64
+    settings.embedding.max_usd_per_million_tokens = 0.01
+    settings.budget.user_embedding_daily_usd = 0.00000120
+    settings.budget.user_embedding_warning_fraction = 0.75
+    monkeypatch.setattr("app.ingest.indexer.embed", lambda value, selected:
+                        EmbeddingResult([.1, .2, .3], selected.embedding.model_id, 30))
+    assert process_job(uuid.UUID(ids["job_id"]), settings, storage) == "ready"
+    assert api.scalar("SELECT committed_usd FROM embedding_user_budget_days") == Decimal("0.00000030")
+    start = Barrier(2)
+    def one():
+        with Session(api.engine) as db:
+            start.wait(timeout=10)
+            return reserve(db, principal, settings, "embed_query", Decimal("0.00000030"))
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        ids = list(pool.map(lambda _: one(), range(2)))
+    with api.engine.connect() as conn:
+        warnings = conn.scalars(text("SELECT warnings FROM search_usage WHERE id IN (:a,:b)"),
+                                {"a": ids[0], "b": ids[1]}).all()
+    assert sum("embedding_user_quota_near_limit" in row for row in warnings) == 1
+
+
+def test_document_user_warning_counts_query_reservation(upload_api, monkeypatch):
+    api, storage = upload_api
+    user = api.create_user("a@example.org")
+    browser = api.user_browser("a@example.org")
+    ids = upload(browser, b"## Methods\nSynthetic body.\n")
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "awaiting_index"
+    settings = settings_with_fake_key()
+    settings.embedding.max_request_bytes = 64
+    settings.embedding.max_concurrent_requests = 2
+    settings.budget.user_embedding_daily_usd = 0.00001300
+    settings.budget.user_embedding_warning_fraction = 0.75
+    principal = Principal(user, "user", uuid.uuid4(), "a@example.org", None)
+    with Session(api.engine) as db:
+        reserve(db, principal, settings, "embed_query", Decimal("0.00000640"))
+    fake_provider(monkeypatch)
+    assert process_job(uuid.UUID(ids["job_id"]), settings, storage) == "ready"
+    with api.engine.connect() as conn:
+        warnings = conn.scalar(text("SELECT warnings FROM ingestion_jobs WHERE id=:j"),
+                               {"j": uuid.UUID(ids["job_id"])})
+    assert "embedding_user_quota_near_limit" in warnings
