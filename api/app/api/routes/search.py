@@ -4,6 +4,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+from pydantic import model_validator
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_principal
@@ -18,13 +19,20 @@ class SearchRequest(BaseModel):
     query: str = Field(min_length=1)
     mode: Literal["keyword", "hybrid"] = "hybrid"
     item_id: uuid.UUID | None = None
+    collection_id: uuid.UUID | None = None
     rerank: bool = False
+
+    @model_validator(mode="after")
+    def one_scope(self):
+        if self.item_id is not None and self.collection_id is not None:
+            raise ValueError("item_id and collection_id are mutually exclusive")
+        return self
 
 
 @router.post("/search")
 def search_route(body: SearchRequest, principal: Principal = Depends(get_principal),
                  db: Session = Depends(get_db), settings: Settings = Depends(get_settings)) -> dict:
-    return search(db, principal, settings, body.query, body.mode, body.item_id, body.rerank)
+    return search(db, principal, settings, body.query, body.mode, body.item_id, body.rerank, body.collection_id)
 
 
 @router.get("/search/chunks/{chunk_id}")

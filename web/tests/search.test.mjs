@@ -10,9 +10,12 @@ test("rerank starts off and notice names both outbound inputs", () => {
 
 test("search request includes the chosen rerank state", () => {
   assert.deepEqual(makeSearchBody("synthetic", "keyword", DEFAULT_RERANK, " "), {
-    query: "synthetic", mode: "keyword", rerank: false, item_id: null,
+    query: "synthetic", mode: "keyword", rerank: false, item_id: null, collection_id: null,
   });
   assert.deepEqual(makeSearchBody("synthetic", "hybrid", true, " paper-id "), {
-    query: "synthetic", mode: "hybrid", rerank: true, item_id: "paper-id",
+    query: "synthetic", mode: "hybrid", rerank: true, item_id: "paper-id", collection_id: null,
+  });
+  assert.deepEqual(makeSearchBody("synthetic", "keyword", false, "", "collection-id"), {
+    query: "synthetic", mode: "keyword", rerank: false, item_id: null, collection_id: "collection-id",
   });
 });

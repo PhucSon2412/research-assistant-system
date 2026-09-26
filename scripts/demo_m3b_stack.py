@@ -22,7 +22,7 @@ from app.ingest.worker import process_job
 from app.storage import OriginalStorage
 
 
-def main() -> None:
+def main(*, m3c: bool = False) -> None:
     root = Path(__file__).resolve().parents[1]
     env = dotenv_values(root / ".env")
     for key, value in {
@@ -101,6 +101,39 @@ def main() -> None:
         assert client.get(f"/library/items/{ids[other]['item_id']}").status_code == 404
         print({"user": label, "mode": result["mode"], "hits": result["count"],
                "owner_only": True, "rerank": result["rerank_status"]})
+    if m3c:
+        with engine.begin() as conn:
+            common = conn.scalar(text("INSERT INTO library_items(visibility,title) VALUES('common','M3c common metadata') RETURNING id"))
+        collections = []
+        for own, other, label in ((0, 1, "A"), (1, 0, "B")):
+            client = clients[own]
+            headers = {"origin": web, "x-csrf-token": client.cookies["ras_csrf"]}
+            created = client.post("/collections", json={"name": f"{label} reading"}, headers=headers)
+            assert created.status_code == 201, created.text
+            collection = created.json()["collection"]["id"]
+            collections.append(collection)
+            for item in (ids[own]["item_id"], str(common)):
+                added = client.post(f"/collections/{collection}/items", json={"item_id": item}, headers=headers)
+                assert added.status_code == 201, added.text
+            forbidden = client.post(f"/collections/{collection}/items",
+                json={"item_id": ids[other]["item_id"]}, headers=headers)
+            assert forbidden.status_code == 404
+            listing = client.get(f"/collections/{collection}/items")
+            assert listing.status_code == 200 and listing.json()["total"] == 2
+            assert any(row["id"] == str(common) and row["content_status"] == "metadata_only"
+                       for row in listing.json()["items"])
+            scoped = client.post("/search", json={"query": "observation", "mode": "keyword",
+                "collection_id": collection}, headers=headers)
+            assert scoped.status_code == 200, scoped.text
+            assert scoped.json()["count"] == 1 and scoped.json()["hits"][0]["item_id"] == ids[own]["item_id"]
+            print({"user": label, "collection_items": 2, "common_metadata_only": True,
+                   "scoped_hits": 1, "owner_only": True})
+        for own, other in ((0, 1), (1, 0)):
+            denied = clients[own].get(f"/collections/{collections[other]}/items")
+            assert denied.status_code == 404
+        with httpx.Client(timeout=30) as probe:
+            assert probe.get(web + "/collections").status_code == 200
+        print("web_collections_page=200; external_provider_calls=0 (fake index embedding)")
     for client in clients:
         client.close()
     engine.dispose()

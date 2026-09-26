@@ -1,6 +1,6 @@
 # Tài liệu dự án
 
-Repo đã merge M3a private index (PR #6, merge commit `1c4a6f7`). M3b private search đang ở nhánh review; RAG thuộc PR sau. Các tài liệu này mô tả yêu cầu và phương án đề xuất, không khẳng định hiệu năng đã được đo; phần đã có code được ghi riêng ở [môi trường phát triển](dev-setup.md).
+Repo đã merge M3a private index (PR #6, merge commit `1c4a6f7`) và M3b private search (PR #7, merge commit `5911038`). M3c collection cá nhân đang trên nhánh review; RAG thuộc M4. Các tài liệu này mô tả yêu cầu và phương án đề xuất, không khẳng định hiệu năng đã được đo; phần đã có code được ghi riêng ở [môi trường phát triển](dev-setup.md).
 
 ## Cách đọc trạng thái quyết định
 
