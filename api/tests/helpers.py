@@ -125,7 +125,8 @@ class Harness:
             item = conn.scalar(
                 text(
                     "INSERT INTO library_items (visibility, owner_user_id, title, created_at)"
-                    " VALUES (:v, :o, :t, now() + make_interval(secs => :s)) RETURNING id"
+                    " VALUES (:v, :o, :t, TIMESTAMPTZ '2024-01-01 00:00:00+00'"
+                    " + make_interval(secs => :s)) RETURNING id"
                 ),
                 {"v": "private" if owner else "common", "o": owner, "t": title, "s": created_offset_s},
             )

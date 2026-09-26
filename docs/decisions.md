@@ -108,6 +108,8 @@ Những mục từ brief này vẫn giữ hiệu lực cùng quyết định ng�
 
 ## Quyết định kỹ thuật M2a (2026-09-25)
 
+PR #4 đã merge vào `main` ở `66ba1d5`; các dòng bên dưới ghi bối cảnh lúc triển khai M2a. Trạng thái hiện tại của M2b ở [m2b-pdf](m2b-pdf.md).
+
 - M1c PR #3 đã merge vào `main` (`9f4d58d`). M2a triển khai trên nhánh tách từ `origin/main`; M2b chưa bắt đầu.
 - PostgreSQL là nguồn job bền; Celery beat quét `received` và job đến hạn rồi gửi **chỉ job ID** qua Redis. Upload không phụ thuộc enqueue thành công. Redis/worker/beat ngắt thì job vẫn trong DB và được quét lại. `SELECT FOR UPDATE SKIP LOCKED` claim lease; token lease và `rights_epoch` được đọc mới dưới row lock job/item ở mọi commit kết quả; attempt tối đa/backoff ở `Settings.ingest`. Worker chết giữa bước để lại attempt `running`, claim kế tiếp ghi `worker_lost` rồi chạy lại bước. Các bảng dẫn xuất có unique key và kết quả/đổi state trong cùng transaction.
 - M2a chỉ chọn `origin=upload`, `private`, Markdown. Common/discovery/promotion full text chưa có gate `AccessRights` đúng file version, nên không được worker chọn hoặc xử lý. PDF upload M1c vẫn `received` cho M2b.
@@ -120,3 +122,11 @@ Những mục từ brief này vẫn giữ hiệu lực cùng quyết định ng�
 - M2a chỉ cho owner đọc chunk và metadata candidate của item `private`; quyền xem metadata item chung không mở quyền đọc text dẫn xuất, kể cả với Admin. M3 phải kiểm quyền đúng file/version trước khi thêm nhánh đọc common vào điều kiện SQL và trước retrieval.
 - `awaiting_index` là bàn giao cho M3, chưa kết thúc job: ghi `extraction_finished_at`, để `finished_at` trống. Revision `0007` chuyển `finished_at` cũ của job `awaiting_index` sang mốc extraction; `processing_ms` chỉ đo tới kết thúc job, `extraction_processing_ms` đo từ lúc bắt đầu đến bàn giao. Retry không ghi hai mốc khi còn lỗi tạm.
 - `duplicate` ở M2a là cảnh báo cùng hash trong cùng owner/scope, không là liên kết item/version và không dùng lại chunk/candidate. Schema/API hiện chưa có liên kết có kiểm quyền và provenance; M3 nếu cần dùng lại phải thiết kế liên kết đúng scope, version/file và xử lý thu hồi độc lập. Hai owner cùng hash được xử lý độc lập.
+
+## Quyết định kỹ thuật M2b (2026-09-25, nhánh review)
+
+- PDF dùng `pypdf` BSD-3-Clause đã có từ M1c, tiến trình con Linux có timeout/CPU/RAM/output cap từ `Settings.ingest`; timeout 60 giây thấp hơn lease 120 giây ít nhất 30 giây. Giữ cùng claim/step/epoch/duplicate của M2a. Thư viện, lỗi, giới hạn và phép đo ở [hợp đồng M2b](m2b-pdf.md).
+- `pdf_pages` giữ text parser và đánh dấu `body_page` để tính mẫu số gồm cả trang body parse lỗi; section/chunk chỉ trỏ text trích được trong một trang, offset code point chứ không tuyên bố có bounding box. Hai cột sắp lại chỉ khi gutter ổn định và luôn có warning; layout khác được đánh dấu không chắc.
+- `reference_entries` giữ raw citation và locator, field DOI/year mức tin cậy thấp; không match/edge. API original/coverage/references/chunk chỉ mở private owner trong M2b; metadata common vẫn thấy, full text common chờ gate AccessRights đúng file/version. Đây cũng sửa đường download M2a vốn dùng ACL metadata chung và có thể mở file common cài sẵn.
+- Ngưỡng `Settings.pdf_body` là phép thử cần đo, không phải chất lượng đã benchmark. Bộ ba PDF arXiv text quan sát 0/3 bị từ chối tự động; GPT-3 được nhận với `coverage=partial` (63/65 trang thân đạt). Chưa đối chiếu trực quan mọi trang, chưa đại diện PDF scan, toán/hình/bảng hay ngành khác; reference splitting hai cột cần kiểm thêm.
+- Review PR #5: heading `References and Notes` và các biến thể rõ được tách khỏi body; heading giống bibliography nhưng chưa xác nhận bị cách ly, chuyển `needs_review` thay vì bàn giao body. Trang text rỗng giữa các trang thân dù parser thành công vẫn tính vào mẫu số với 0 ký tự; 2/3 trang đạt không qua ngưỡng 70% và đi `needs_review`. Đổi PDF `pipeline_version` sang `layout-v2`; M3 phải trích lại hoặc loại kết quả `layout-v1` trước khi index.

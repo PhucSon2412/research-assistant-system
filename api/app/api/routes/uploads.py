@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_now, get_principal
 from app.api.errors import ApiError
 from app.audit import record_event
-from app.authz import Principal, visible_items_clause
+from app.authz import Principal, m2a_private_derivatives_clause
 from app.config import Settings, get_settings
 from app.identity.tokens import generate_token, hash_token, plausible_token
 from app.models import IngestionJob, LibraryItem, PaperVersion, ProcessingAcknowledgement, SourceFile, UploadIntent
@@ -248,7 +248,7 @@ def download_original(
     row = db.execute(
         select(SourceFile, LibraryItem).join(PaperVersion, SourceFile.version_id == PaperVersion.id)
         .join(LibraryItem, PaperVersion.item_id == LibraryItem.id)
-        .where(SourceFile.id == file_id, visible_items_clause(principal))
+        .where(SourceFile.id == file_id, m2a_private_derivatives_clause(principal))
     ).first()
     if row is None:
         raise ApiError(404, "not_found")
