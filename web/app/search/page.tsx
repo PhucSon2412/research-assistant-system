@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { api, describeError } from "../../lib/api";
+import { DEFAULT_RERANK, SEARCH_NOTICE, makeSearchBody } from "../../lib/search";
 import { ErrorText, Shell, useSession } from "../components/session";
 
 type Hit = {
@@ -18,7 +19,7 @@ export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [itemId, setItemId] = useState("");
   const [mode, setMode] = useState<"keyword" | "hybrid">("keyword");
-  const [rerank, setRerank] = useState(true);
+  const [rerank, setRerank] = useState(DEFAULT_RERANK);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -27,9 +28,8 @@ export default function SearchPage() {
     event.preventDefault();
     setBusy(true); setResult(null); setError(null);
     try {
-      const response = await api<Result>("/search", { method: "POST", body: {
-        query, mode, rerank, item_id: itemId.trim() || null,
-      }});
+      const response = await api<Result>("/search", { method: "POST",
+        body: makeSearchBody(query, mode, rerank, itemId) });
       setResult(response);
     } catch (err) { setError(describeError(err)); }
     finally { setBusy(false); }
@@ -38,7 +38,7 @@ export default function SearchPage() {
   return <Shell user={user}>
     <p><Link href="/">← Thư viện</Link></p>
     <h1>Tìm trong paper đã index</h1>
-    <p>Chỉ tìm nội dung paper riêng của bạn đã index. Chế độ hybrid gửi câu hỏi tới OpenRouter/provider để tạo embedding. Nếu bật rerank, các đoạn kết quả được phép có thể được gửi tới provider.</p>
+    <p>{SEARCH_NOTICE}</p>
     <form onSubmit={submit} style={{ display: "grid", gap: "0.75rem", maxWidth: 700 }}>
       <label>Câu tìm kiếm <input value={query} onChange={(e) => setQuery(e.target.value)} required maxLength={1024} style={{ width: "100%" }} /></label>
       <label>ID paper riêng (để trống để tìm tất cả) <input value={itemId} onChange={(e) => setItemId(e.target.value)} style={{ width: "100%" }} /></label>

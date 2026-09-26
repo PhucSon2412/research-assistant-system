@@ -18,7 +18,7 @@ class SearchRequest(BaseModel):
     query: str = Field(min_length=1)
     mode: Literal["keyword", "hybrid"] = "hybrid"
     item_id: uuid.UUID | None = None
-    rerank: bool = True
+    rerank: bool = False
 
 
 @router.post("/search")

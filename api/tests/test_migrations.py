@@ -161,6 +161,25 @@ def test_0011_upgrades_m3a_data_without_changing_it(empty_db_url: str) -> None:
     eng.dispose()
 
 
+def test_0012_backfills_existing_search_usage_warnings(empty_db_url: str) -> None:
+    from app.identity.passwords import hash_password
+
+    upgrade(empty_db_url, "0011")
+    eng = create_engine(empty_db_url)
+    with eng.begin() as conn:
+        owner = conn.scalar(text("INSERT INTO users(email,password_verifier) VALUES('m3b-review@example.org',:p) RETURNING id"),
+                            {"p": hash_password("synthetic-password-long")})
+        usage = conn.scalar(text("""INSERT INTO search_usage(user_id,day,task_type,model_id,provider,status,
+            reserved_usd,cost_status) VALUES(:u,CURRENT_DATE,'rerank','model','openrouter','uncertain',
+            0.00000100,'unknown_reserved_ceiling') RETURNING id"""), {"u": owner})
+    upgrade(empty_db_url)
+    with eng.connect() as conn:
+        row = conn.execute(text("SELECT status,reserved_usd,warnings FROM search_usage WHERE id=:i"), {"i": usage}).one()
+    assert row.status == "uncertain" and row.reserved_usd == Decimal("0.00000100")
+    assert row.warnings == []
+    eng.dispose()
+
+
 def test_migration_sql_seeds_no_accounts() -> None:
     """Ledger backfill is allowed; migrations must never seed accounts."""
     out = io.StringIO()

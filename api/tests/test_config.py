@@ -16,6 +16,7 @@ from app.config import (
     PasswordPolicy,
     PdfBodyThreshold,
     ProviderBudget,
+    RerankPolicy,
     Retention,
     Settings,
 )
@@ -66,6 +67,8 @@ def test_defaults_match_documented_mvp_values() -> None:
     assert s.rerank.model_id == "qwen/qwen3-reranker-8b"
     assert s.search.max_requests_per_user_day > 0
     assert s.budget.user_rerank_daily_usd <= s.budget.rerank_daily_usd
+    assert s.budget.rerank_warning_fraction == 0.8
+    assert s.rerank.max_concurrent_requests == 2
     assert s.password.min_length == 12
     assert (s.ingest.poll_seconds, s.ingest.lease_seconds, s.ingest.max_attempts,
             s.ingest.markdown_max_chunk_chars) == (5, 120, 4, 1200)
@@ -103,6 +106,8 @@ def test_redis_broker_password_is_url_escaped() -> None:
         lambda: ProviderBudget(app_daily_usd=60.0),  # above the key cap
         lambda: ProviderBudget(user_embedding_daily_usd=4.0),
         lambda: ProviderBudget(user_rerank_daily_usd=3.0),
+        lambda: ProviderBudget(rerank_warning_fraction=0),
+        lambda: ProviderBudget(rerank_warning_fraction=1.01),
         lambda: ProviderBudget(embedding_warning_fraction=0),
         lambda: ProviderBudget(embedding_warning_fraction=1.01),
         lambda: ProviderBudget(user_embedding_warning_fraction=1.01),
@@ -114,6 +119,7 @@ def test_redis_broker_password_is_url_escaped() -> None:
         lambda: EmbeddingPolicy(max_batch_items=2),
         lambda: EmbeddingPolicy(endpoint="http://example.org/embeddings"),
         lambda: EmbeddingPolicy(max_concurrent_requests=0),
+        lambda: RerankPolicy(max_concurrent_requests=0),
     ],
 )
 def test_invalid_values_are_rejected(build) -> None:

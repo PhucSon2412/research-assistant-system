@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, Numeric, Text, func, text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -37,5 +37,6 @@ class SearchUsage(Base):
     reserved_usd: Mapped[Decimal] = mapped_column(Numeric(14, 8))
     cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(14, 8))
     cost_status: Mapped[str] = mapped_column(Text)
+    warnings: Mapped[list[str]] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -16,7 +16,7 @@ from app.api.errors import ApiError
 from app.authz import Principal
 from app.config import Settings
 from app.ingest.embedding import EmbeddingError, embed
-from app.models import EmbeddingBudgetDay, EmbeddingUserBudgetDay, LibraryItem, SearchRequestDay, SearchUsage
+from app.models import EmbeddingBudgetDay, EmbeddingCall, EmbeddingUserBudgetDay, LibraryItem, SearchRequestDay, SearchUsage
 
 log = logging.getLogger(__name__)
 MONEY = Decimal("0.00000001")
@@ -41,9 +41,11 @@ def rerank_order(ids: list[uuid.UUID], results: list[dict]) -> list[uuid.UUID]:
     seen: set[int] = set()
     scored = []
     for row in results:
+        if not isinstance(row, dict):
+            raise ValueError("invalid rerank result")
         index, score = row.get("index"), row.get("relevance_score")
         if (type(index) is not int or index < 0 or index >= len(ids) or index in seen
-                or not isinstance(score, (float, int)) or not math.isfinite(score)):
+                or type(score) not in (float, int) or not math.isfinite(score)):
             raise ValueError("invalid rerank mapping")
         seen.add(index)
         scored.append((ids[index], float(score), index))
@@ -83,6 +85,23 @@ def reserve(db: Session, principal: Principal, settings: Settings, task: str, am
     """One advisory lock serializes search and document embedding reservations."""
     day = _day().date()
     db.execute(text("SELECT pg_advisory_xact_lock(hashtext('ras_embedding_capacity'))"))
+    if task == "embed_query":
+        active_document = db.scalar(select(func.count()).select_from(EmbeddingCall).where(
+            EmbeddingCall.status == "reserved"))
+        active_query = db.scalar(select(func.count()).select_from(SearchUsage).where(
+            SearchUsage.task_type == "embed_query", SearchUsage.status == "reserved"))
+        if active_document + active_query >= settings.embedding.max_concurrent_requests:
+            db.rollback()
+            raise ApiError(429, "search_embedding_concurrency_limit")
+    elif task == "rerank":
+        active_rerank = db.scalar(select(func.count()).select_from(SearchUsage).where(
+            SearchUsage.task_type == "rerank", SearchUsage.status == "reserved"))
+        if active_rerank >= settings.rerank.max_concurrent_requests:
+            db.rollback()
+            raise ApiError(429, "search_rerank_concurrency_limit")
+    else:
+        db.rollback()
+        raise ValueError("invalid search task type")
     used = _total(db, day)
     doc = db.get(EmbeddingBudgetDay, day)
     doc_used = (doc.committed_usd + doc.reserved_usd) if doc else Decimal(0)
@@ -90,28 +109,37 @@ def reserve(db: Session, principal: Principal, settings: Settings, task: str, am
     if used + doc_used + amount > app_cap:
         db.rollback()
         raise ApiError(429, "search_app_budget_exhausted")
+    warnings = []
     if task == "embed_query":
         cap = Decimal(str(settings.budget.embedding_daily_usd))
         user_cap = Decimal(str(settings.budget.user_embedding_daily_usd))
         doc_user = db.get(EmbeddingUserBudgetDay, (day, principal.user_id))
         doc_user_used = (doc_user.committed_usd + doc_user.reserved_usd) if doc_user else Decimal(0)
-        if used - _total(db, day, "rerank") + doc_used + amount > cap:
+        query_spend = _total(db, day, "embed_query")
+        if query_spend + doc_used + amount > cap:
             db.rollback()
             raise ApiError(429, "search_embedding_budget_exhausted")
         if _total(db, day, "embed_query", principal.user_id) + doc_user_used + amount > user_cap:
             db.rollback()
             raise ApiError(429, "search_user_budget_exhausted")
+        if query_spend + doc_used + amount >= cap * Decimal(str(settings.budget.embedding_warning_fraction)):
+            warnings.append("embedding_bucket_near_limit")
         model = settings.embedding.model_id
     else:
-        if _total(db, day, "rerank") + amount > Decimal(str(settings.budget.rerank_daily_usd)):
+        rerank_spend = _total(db, day, "rerank")
+        rerank_cap = Decimal(str(settings.budget.rerank_daily_usd))
+        if rerank_spend + amount > rerank_cap:
             db.rollback()
             raise ApiError(429, "search_rerank_budget_exhausted")
         if _total(db, day, "rerank", principal.user_id) + amount > Decimal(str(settings.budget.user_rerank_daily_usd)):
             db.rollback()
             raise ApiError(429, "search_user_rerank_budget_exhausted")
+        if rerank_spend + amount >= rerank_cap * Decimal(str(settings.budget.rerank_warning_fraction)):
+            warnings.append("rerank_bucket_near_limit")
         model = settings.rerank.model_id
     usage = SearchUsage(user_id=principal.user_id, day=day, task_type=task, model_id=model,
-        provider="openrouter", status="reserved", reserved_usd=amount, cost_status="unknown")
+        provider="openrouter", status="reserved", reserved_usd=amount, cost_status="unknown",
+        warnings=warnings)
     db.add(usage)
     db.flush()
     usage_id = usage.id
@@ -252,9 +280,15 @@ def rerank(query: str, docs: list[str], settings: Settings) -> tuple[list[dict],
         raise RerankError("rerank_rejected", True)
     try:
         data = response.json()
-        if data["model"] != policy.model_id or not isinstance(data["results"], list):
+        if (not isinstance(data, dict) or data.get("model") != policy.model_id
+                or not isinstance(data.get("results"), list)
+                or any(not isinstance(row, dict) for row in data["results"])):
             raise ValueError()
-        usage = data.get("usage") or {}
+        usage = data.get("usage")
+        if usage is None:
+            usage = {}
+        elif not isinstance(usage, dict):
+            raise ValueError()
         tokens, units = usage.get("total_tokens"), usage.get("search_units")
         if tokens is not None and (type(tokens) is not int or tokens < 0):
             raise ValueError()
@@ -347,7 +381,8 @@ def search(db: Session, principal: Principal, settings: Settings, query: str,
                 except ApiError as exc:
                     if exc.code == "search_scope_changed":
                         raise
-                    rerank_status = "degraded_budget"
+                    rerank_status = ("degraded_concurrency" if exc.code == "search_rerank_concurrency_limit"
+                                     else "degraded_budget")
             else:
                 rerank_status = "degraded_ceiling"
     final = hydrate(db, principal, item_id, ids)
@@ -380,12 +415,14 @@ def search(db: Session, principal: Principal, settings: Settings, query: str,
              (("embed_query", embed_usage), ("rerank", rerank_usage))}
     costs = {task: {"status": row.cost_status, "estimated_usd": str(row.cost_usd) if row.cost_usd is not None else None,
                     "reserved_usd": str(row.reserved_usd), "input_tokens": row.input_tokens,
-                    "search_units": row.search_units} if row else None for task, row in usage.items()}
-    log.info("search mode=%s rerank=%s candidates=%d hits=%d keyword_ms=%d vector_ms=%d rerank_ms=%d provider_ms=%d embed_cost=%s rerank_cost=%s",
+                    "search_units": row.search_units, "warnings": row.warnings} if row else None for task, row in usage.items()}
+    log.info("search mode=%s rerank=%s candidates=%d hits=%d keyword_ms=%d vector_ms=%d rerank_ms=%d provider_ms=%d embed_cost=%s rerank_cost=%s embed_warnings=%s rerank_warnings=%s",
              mode, rerank_status, len(keyword) + len(semantic), len(hits),
              timings["keyword_ms"], timings["vector_ms"], timings["rerank_ms"], timings["provider_ms"],
              costs["embed_query"]["estimated_usd"] if costs["embed_query"] else None,
-             costs["rerank"]["estimated_usd"] if costs["rerank"] else None)
+             costs["rerank"]["estimated_usd"] if costs["rerank"] else None,
+             costs["embed_query"]["warnings"] if costs["embed_query"] else [],
+             costs["rerank"]["warnings"] if costs["rerank"] else [])
     return {"mode": mode, "rerank_status": rerank_status, "count": len(hits), "hits": hits,
             "candidate_count": len(keyword) + len(semantic), "timings": timings,
             "cost": costs}

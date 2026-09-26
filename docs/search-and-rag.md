@@ -14,6 +14,8 @@
 
 M3b dùng `plainto_tsquery('simple', query)` và `ts_rank_cd` cho keyword, pgvector cosine `<=>` cho vector exact scan. Mỗi danh sách lấy top-k **sau** gate private owner, `indexed`, active version/file/generation/epoch và vector model/dimensions; hợp nhất bằng reciprocal rank fusion `1/(60+rank)`, tie theo rank keyword, rank vector, UUID. `count` là số hit trả về, không là tổng khớp toàn kho. Hydrate lại trước rerank và response; response gồm item/version/file/chunk/locator/text và coverage. Link `/sources/{chunkId}` mở đúng chunk qua `GET /search/chunks/{chunkId}` có gate lại; file gốc qua API kiểm quyền riêng. Không lấy reference entry làm evidence. Rerank chỉ gửi tối đa candidate/text theo config; lỗi provider/budget/unverified giữ thứ tự fusion, response ghi `rerank_status=degraded_*`. Keyword mode không embed query; nếu bật rerank, query và candidate được phép vẫn có thể gửi provider.
 
+Review PR #7: rerank mặc định tắt trên web và API. Khi User bật, **câu tìm kiếm và các candidate chunks được phép** mới gửi provider; response sai định dạng sau khi provider nhận request suy giảm có kiểm soát và giữ reservation nếu chưa biết usage. Query embedding chia giới hạn concurrency với document embedding, rerank có giới hạn riêng. Warning near-limit của bucket embedding/rerank được ghi tại reservation theo tổng đã commit và còn giữ chỗ, trả trong `cost.*.warnings`.
+
 ```mermaid
 flowchart LR
   A[Identity + allowed item set] --> F[Scope intersection]

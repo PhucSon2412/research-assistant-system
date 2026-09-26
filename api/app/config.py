@@ -162,6 +162,7 @@ class ProviderBudget(BaseModel):
     user_embedding_daily_usd: float = Field(default=1.0, ge=0)
     user_embedding_warning_fraction: float = Field(default=0.8, gt=0, le=1)
     rerank_daily_usd: float = Field(default=2.0, ge=0)
+    rerank_warning_fraction: float = Field(default=0.8, gt=0, le=1)
     user_rerank_daily_usd: float = Field(default=0.5, ge=0)
     generation_daily_usd: float = Field(default=5.0, ge=0)
     key_spending_cap_daily_usd: float = Field(default=50.0, gt=0)
@@ -219,6 +220,7 @@ class RerankPolicy(BaseModel):
     model_id: str = "qwen/qwen3-reranker-8b"
     endpoint: str = "https://openrouter.ai/api/v1/rerank"
     pricing_verified: bool = False
+    max_concurrent_requests: int = Field(default=2, gt=0)
     max_candidates: int = Field(default=12, gt=0, le=50)
     max_text_bytes: int = Field(default=2048, gt=0)
     request_timeout_seconds: int = Field(default=20, gt=0)

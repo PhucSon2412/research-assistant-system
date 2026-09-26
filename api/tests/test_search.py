@@ -2,6 +2,7 @@
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
+from threading import Barrier, Event
 import httpx
 from sqlalchemy.orm import Session
 
@@ -272,6 +273,49 @@ def test_rerank_transport_429_and_timeout(monkeypatch):
     assert error.value.code == "rerank_outcome_uncertain" and not error.value.rejected
 
 
+def test_malformed_rerank_result_reconciles_reservation(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    browser = api.user_browser("a@example.org")
+    settings = settings_with_fake_key()
+    settings.rerank.pricing_verified = True
+    fake_provider(monkeypatch)
+    indexed(api, storage, browser, b"## Methods\nSynthetic keyword body.\n", settings)
+    configured(settings)
+    monkeypatch.setattr("app.search.rerank", lambda query, docs, cfg: ([None], None, None))
+    response = browser.post("/search", {"query": "keyword", "mode": "keyword", "rerank": True})
+    assert response.status_code == 200, response.text
+    assert response.json()["rerank_status"] == "degraded_rerank_response_invalid"
+    ledger = response.json()["cost"]["rerank"]
+    assert ledger["status"] == "unknown_reserved_ceiling"
+    with api.engine.connect() as conn:
+        row = conn.execute(text("SELECT status,cost_status,reserved_usd,cost_usd FROM search_usage WHERE task_type='rerank'")).one()
+    assert row.status == "uncertain" and row.cost_status == "unknown_reserved_ceiling"
+    assert row.reserved_usd > 0 and row.cost_usd is None
+
+
+def test_rerank_payload_is_opt_in(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    browser = api.user_browser("a@example.org")
+    settings = settings_with_fake_key()
+    settings.rerank.pricing_verified = True
+    fake_provider(monkeypatch)
+    indexed(api, storage, browser, b"## Methods\nSynthetic keyword body.\n", settings)
+    configured(settings)
+    sent = []
+    def provider(query, docs, cfg):
+        sent.append((query, docs))
+        return ([{"index": i, "relevance_score": 1.0} for i in range(len(docs))], 3, None)
+    monkeypatch.setattr("app.search.rerank", provider)
+    off = browser.post("/search", {"query": "keyword", "mode": "keyword", "rerank": False})
+    assert off.status_code == 200 and off.json()["rerank_status"] == "not_requested"
+    assert sent == []
+    on = browser.post("/search", {"query": "keyword", "mode": "keyword", "rerank": True})
+    assert on.status_code == 200 and on.json()["rerank_status"] == "applied"
+    assert sent == [("keyword", ["## Methods\nSynthetic keyword body."])]
+
+
 def test_concurrent_search_reservations_share_bucket(upload_api):
     api, _ = upload_api
     user = api.create_user("a@example.org")
@@ -301,3 +345,161 @@ def test_keyword_request_quota_and_concurrent_reservation(upload_api, monkeypatc
     assert browser.post("/search", {"query": "x", "mode": "keyword"}).status_code == 200
     assert browser.post("/search", {"query": "x", "mode": "keyword"}).status_code == 429
     assert api.scalar("SELECT request_count FROM search_request_days") == 1
+
+
+def test_parallel_query_embedding_obeys_shared_concurrency(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    api.create_user("b@example.org")
+    a, b = api.user_browser("a@example.org"), api.user_browser("b@example.org")
+    settings = settings_with_fake_key()
+    settings.embedding.max_concurrent_requests = 1
+    fake_provider(monkeypatch)
+    indexed(api, storage, a, b"## Methods\nSynthetic A keyword body.\n", settings)
+    indexed(api, storage, b, b"## Methods\nSynthetic B keyword body.\n", settings)
+    configured(settings)
+    entered, release = Event(), Event()
+    calls = []
+    def slow_embed(query, selected, input_type):
+        calls.append(query)
+        entered.set()
+        assert release.wait(10)
+        return EmbeddingResult([.1, .2, .3], selected.embedding.model_id, 2)
+    monkeypatch.setattr("app.search.embed", slow_embed)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(a.post, "/search", {"query": "keyword", "mode": "hybrid", "rerank": False})
+        assert entered.wait(10)
+        second = b.post("/search", {"query": "keyword", "mode": "hybrid", "rerank": False})
+        assert second.status_code == 429 and second.json()["error"] == "search_embedding_concurrency_limit"
+        release.set()
+        assert first.result().status_code == 200
+    assert len(calls) == 1
+    assert api.scalar("SELECT count(*) FROM search_usage WHERE task_type='embed_query' AND status='reserved'") == 0
+
+
+def test_worker_index_and_query_embedding_share_concurrency(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    api.create_user("b@example.org")
+    a, b = api.user_browser("a@example.org"), api.user_browser("b@example.org")
+    settings = settings_with_fake_key()
+    settings.embedding.max_concurrent_requests = 1
+    fake_provider(monkeypatch)
+    indexed(api, storage, a, b"## Methods\nSynthetic A keyword body.\n", settings)
+    pending = upload(b, b"## Methods\nSynthetic B pending body.\n")
+    assert process_job(uuid.UUID(pending["job_id"]), storage=storage) == "awaiting_index"
+    configured(settings)
+    entered, release = Event(), Event()
+    def slow_embed(query, selected, input_type):
+        entered.set()
+        assert release.wait(10)
+        return EmbeddingResult([.1, .2, .3], selected.embedding.model_id, 2)
+    monkeypatch.setattr("app.search.embed", slow_embed)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(a.post, "/search", {"query": "keyword", "mode": "hybrid", "rerank": False})
+        assert entered.wait(10)
+        assert process_job(uuid.UUID(pending["job_id"]), settings, storage) == "embedding_concurrency_limit"
+        release.set()
+        assert first.result().status_code == 200
+    assert api.scalar("SELECT count(*) FROM embedding_calls WHERE status='reserved'") == 0
+
+
+def test_parallel_rerank_obeys_concurrency(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    api.create_user("b@example.org")
+    a, b = api.user_browser("a@example.org"), api.user_browser("b@example.org")
+    settings = settings_with_fake_key()
+    settings.rerank.pricing_verified = True
+    settings.rerank.max_concurrent_requests = 1
+    fake_provider(monkeypatch)
+    indexed(api, storage, a, b"## Methods\nSynthetic A keyword body.\n", settings)
+    indexed(api, storage, b, b"## Methods\nSynthetic B keyword body.\n", settings)
+    configured(settings)
+    entered, release = Event(), Event()
+    calls = []
+    def slow_rerank(query, docs, selected):
+        calls.append(docs)
+        entered.set()
+        assert release.wait(10)
+        return ([{"index": i, "relevance_score": 1.0} for i in range(len(docs))], 3, None)
+    monkeypatch.setattr("app.search.rerank", slow_rerank)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(a.post, "/search", {"query": "keyword", "mode": "keyword", "rerank": True})
+        assert entered.wait(10)
+        second = b.post("/search", {"query": "keyword", "mode": "keyword", "rerank": True})
+        assert second.status_code == 200 and second.json()["rerank_status"] == "degraded_concurrency"
+        release.set()
+        assert first.result().json()["rerank_status"] == "applied"
+    assert len(calls) == 1
+    assert api.scalar("SELECT count(*) FROM search_usage WHERE task_type='rerank' AND status='reserved'") == 0
+
+
+def test_concurrent_bucket_warnings_include_all_reservations(upload_api):
+    api, _ = upload_api
+    users = [api.create_user(f"{name}@example.org") for name in ("a", "b")]
+    principals = [Principal(user, "user", uuid.uuid4(), f"{name}@example.org", None)
+                  for user, name in zip(users, ("a", "b"))]
+    settings = settings_with_fake_key()
+    settings.embedding.max_concurrent_requests = 2
+    settings.rerank.max_concurrent_requests = 2
+    settings.budget.embedding_daily_usd = 0.00000120
+    settings.budget.user_embedding_daily_usd = 0.00000120
+    settings.budget.embedding_warning_fraction = 0.75
+    settings.budget.rerank_daily_usd = 0.00000120
+    settings.budget.user_rerank_daily_usd = 0.00000120
+    settings.budget.rerank_warning_fraction = 0.75
+    for task, expected in (("embed_query", "embedding_bucket_near_limit"),
+                           ("rerank", "rerank_bucket_near_limit")):
+        start = Barrier(2)
+        def one(principal):
+            with Session(api.engine) as db:
+                start.wait(timeout=10)
+                return reserve(db, principal, settings, task, Decimal("0.00000060"))
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            ids = list(pool.map(one, principals))
+        assert len(set(ids)) == 2
+        with api.engine.connect() as conn:
+            warnings = conn.scalars(text("SELECT warnings FROM search_usage WHERE task_type=:t"), {"t": task}).all()
+        assert sum(expected in row for row in warnings) == 1
+
+
+def test_query_embedding_warning_counts_document_spend(upload_api):
+    api, _ = upload_api
+    user = api.create_user("a@example.org")
+    principal = Principal(user, "user", uuid.uuid4(), "a@example.org", None)
+    settings = settings_with_fake_key()
+    settings.budget.embedding_daily_usd = 0.00000120
+    settings.budget.user_embedding_daily_usd = 0.00000120
+    settings.budget.embedding_warning_fraction = 0.75
+    with api.engine.begin() as conn:
+        conn.execute(text("INSERT INTO embedding_budget_days(day,committed_usd,reserved_usd) VALUES(CURRENT_DATE,0.00000060,0)"))
+    with Session(api.engine) as db:
+        usage_id = reserve(db, principal, settings, "embed_query", Decimal("0.00000060"))
+    with api.engine.connect() as conn:
+        warnings = conn.scalar(text("SELECT warnings FROM search_usage WHERE id=:i"), {"i": usage_id})
+    assert warnings == ["embedding_bucket_near_limit"]
+
+
+def test_document_index_warning_counts_query_reservation(upload_api, monkeypatch):
+    api, storage = upload_api
+    query_user = api.create_user("a@example.org")
+    api.create_user("b@example.org")
+    browser = api.user_browser("b@example.org")
+    ids = upload(browser, b"## Methods\nSynthetic B body.\n")
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "awaiting_index"
+    settings = settings_with_fake_key()
+    settings.embedding.max_concurrent_requests = 2
+    settings.embedding.max_request_bytes = 64
+    settings.budget.embedding_daily_usd = 0.00001300
+    settings.budget.user_embedding_daily_usd = 0.00001300
+    settings.budget.embedding_warning_fraction = 0.75
+    principal = Principal(query_user, "user", uuid.uuid4(), "a@example.org", None)
+    with Session(api.engine) as db:
+        reserve(db, principal, settings, "embed_query", Decimal("0.00000640"))
+    fake_provider(monkeypatch)
+    assert process_job(uuid.UUID(ids["job_id"]), settings, storage) == "ready"
+    with api.engine.connect() as conn:
+        warnings = conn.scalar(text("SELECT warnings FROM ingestion_jobs WHERE id=:j"),
+                               {"j": uuid.UUID(ids["job_id"])})
+    assert "embedding_bucket_near_limit" in warnings

@@ -127,7 +127,9 @@ def _reserve(db: Session, job: IngestionJob, item: LibraryItem, source: SourceFi
                 db.commit()
             raise StepError("embedding_outcome_uncertain")
     active = db.scalar(select(func.count()).select_from(EmbeddingCall).where(EmbeddingCall.status == "reserved"))
-    if active >= settings.embedding.max_concurrent_requests:
+    active_queries = db.scalar(select(func.count()).select_from(SearchUsage).where(
+        SearchUsage.task_type == "embed_query", SearchUsage.status == "reserved"))
+    if active + active_queries >= settings.embedding.max_concurrent_requests:
         raise StepError("embedding_concurrency_limit", retryable=True)
     if not settings.embedding.pricing_verified:
         raise StepError("embedding_pricing_unverified", retryable=True)
@@ -152,7 +154,7 @@ def _reserve(db: Session, job: IngestionJob, item: LibraryItem, source: SourceFi
         raise StepError("embedding_user_quota_exhausted", retryable=True)
     budget.reserved_usd += amount
     user_budget.reserved_usd += amount
-    if (budget.committed_usd + budget.reserved_usd >=
+    if (budget.committed_usd + budget.reserved_usd + query_spend >=
             cap * Decimal(str(settings.budget.embedding_warning_fraction))):
         job.warnings = list(dict.fromkeys([*job.warnings, "embedding_bucket_near_limit"]))
     if (user_budget.committed_usd + user_budget.reserved_usd >=
