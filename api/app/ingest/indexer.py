@@ -12,8 +12,8 @@ from sqlalchemy.orm import Session
 from app.config import Settings
 from app.ingest import markdown, pdf
 from app.ingest.embedding import EmbeddingError, embed
-from app.ingest.worker import StepError, _locked, _read_markdown, utcnow
-from app.models import (Chunk, EmbeddingBudgetDay, EmbeddingCall, IndexEntry, IndexGeneration,
+from app.ingest.worker import StepError, _locked, _read_markdown, _read_pdf, utcnow
+from app.models import (Chunk, EmbeddingBudgetDay, EmbeddingCall, EmbeddingUserBudgetDay, IndexEntry, IndexGeneration,
                         IngestionJob, IngestStepAttempt, LibraryItem, PaperVersion, PdfPage, ProcessingAcknowledgement,
                         Section, SourceFile, UploadIntent)
 from app.models.enums import JobState, VerifiedMime
@@ -49,14 +49,8 @@ def _eligible_chunks(db: Session, source: SourceFile, version: PaperVersion,
         Chunk.pipeline_version == pipeline).order_by(Chunk.section_id, Chunk.ordinal)).all()
     if not chunks or not any(db.get(Section, c.section_id).kind == "body" for c in chunks):
         raise StepError("index_body_missing")
-    try:
-        if storage.size(source.storage_key) != source.byte_size:
-            raise StepError("index_original_mismatch")
-    except StepError:
-        raise
-    except Exception:
-        raise StepError("storage_unavailable", retryable=True) from None
     if source.verified_mime == VerifiedMime.PDF.value:
+        _read_pdf(source, storage, settings)  # full SHA-256, including same-sized replacements
         pages = db.scalars(select(PdfPage).where(PdfPage.source_file_id == source.id,
             PdfPage.pipeline_version == pipeline)).all()
         if len(pages) != source.page_count or any(p.pipeline_version != pipeline for p in pages):
@@ -106,18 +100,21 @@ def _eligible_chunks(db: Session, source: SourceFile, version: PaperVersion,
     return pipeline, eligible
 
 
-def _amount(chunk: Chunk, settings: Settings) -> Decimal:
-    # UTF-8 byte count is a conservative token ceiling for text inputs.
-    ceiling = len(chunk.text.encode("utf-8"))
+def _amount(tokens: int, settings: Settings) -> Decimal:
     price = Decimal(str(settings.embedding.max_usd_per_million_tokens))
-    return (Decimal(ceiling) * price / Decimal(1_000_000)).quantize(Decimal("0.00000001"), rounding=ROUND_UP)
+    return (Decimal(tokens) * price / Decimal(1_000_000)).quantize(Decimal("0.00000001"), rounding=ROUND_UP)
 
 
-def _reserve(db: Session, source: SourceFile, chunk: Chunk, settings: Settings) -> EmbeddingCall:
+def _reserve(db: Session, job: IngestionJob, item: LibraryItem, source: SourceFile,
+             chunk: Chunk, settings: Settings) -> EmbeddingCall:
     day = utcnow().date()
     db.execute(text("SELECT pg_advisory_xact_lock(hashtext('ras_embedding_capacity'))"))
     db.execute(text("INSERT INTO embedding_budget_days(day) VALUES (:day) ON CONFLICT DO NOTHING"), {"day": day})
     budget = db.scalar(select(EmbeddingBudgetDay).where(EmbeddingBudgetDay.day == day).with_for_update())
+    db.execute(text("INSERT INTO embedding_user_budget_days(day,user_id) VALUES (:day,:user) ON CONFLICT DO NOTHING"),
+               {"day": day, "user": item.owner_user_id})
+    user_budget = db.scalar(select(EmbeddingUserBudgetDay).where(
+        EmbeddingUserBudgetDay.day == day, EmbeddingUserBudgetDay.user_id == item.owner_user_id).with_for_update())
     existing = db.scalar(select(EmbeddingCall).where(EmbeddingCall.source_file_id == source.id,
         EmbeddingCall.model_id == settings.embedding.model_id,
         EmbeddingCall.pipeline_version == chunk.pipeline_version, EmbeddingCall.chunk_hash == chunk.chunk_hash).with_for_update())
@@ -132,13 +129,25 @@ def _reserve(db: Session, source: SourceFile, chunk: Chunk, settings: Settings) 
     active = db.scalar(select(func.count()).select_from(EmbeddingCall).where(EmbeddingCall.status == "reserved"))
     if active >= settings.embedding.max_concurrent_requests:
         raise StepError("embedding_concurrency_limit", retryable=True)
-    amount = _amount(chunk, settings)
+    if not settings.embedding.pricing_verified:
+        raise StepError("embedding_pricing_unverified", retryable=True)
+    # Reserve the full configured request limit. The provider's token count is
+    # reconciled later; concurrent requests cannot spend the same allowance.
+    amount = _amount(settings.embedding.max_request_bytes, settings)
     cap = min(Decimal(str(settings.budget.app_daily_usd)), Decimal(str(settings.budget.embedding_daily_usd)))
     if budget.committed_usd + budget.reserved_usd + amount > cap:
         raise StepError("embedding_budget_exhausted", retryable=True)
+    user_cap = Decimal(str(settings.budget.user_embedding_daily_usd))
+    if user_budget.committed_usd + user_budget.reserved_usd + amount > user_cap:
+        raise StepError("embedding_user_quota_exhausted", retryable=True)
     budget.reserved_usd += amount
+    user_budget.reserved_usd += amount
+    if (user_budget.committed_usd + user_budget.reserved_usd >=
+            user_cap * Decimal(str(settings.budget.user_embedding_warning_fraction))):
+        job.warnings = list(dict.fromkeys([*job.warnings, "embedding_user_quota_near_limit"]))
     if existing is None:
-        existing = EmbeddingCall(source_file_id=source.id, model_id=settings.embedding.model_id,
+        existing = EmbeddingCall(source_file_id=source.id, owner_user_id=item.owner_user_id,
+            model_id=settings.embedding.model_id,
             provider=settings.embedding.provider, pipeline_version=chunk.pipeline_version,
             chunk_hash=chunk.chunk_hash, status="reserved", reserved_usd=amount,
             cost_status="unknown", reserved_day=day)
@@ -147,6 +156,9 @@ def _reserve(db: Session, source: SourceFile, chunk: Chunk, settings: Settings) 
         existing.status = "reserved"
         existing.reserved_usd = amount
         existing.reserved_day = day
+        existing.cost_usd = None
+        existing.cost_status = "unknown"
+        existing.finished_at = None
     db.flush()
     return existing
 
@@ -179,7 +191,7 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
             return JobState.READY.value
         if len(pending.text.encode("utf-8")) > settings.embedding.max_request_bytes:
             raise StepError("embedding_request_too_large")
-        call = _reserve(db, source, pending, settings)
+        call = _reserve(db, job, item, source, pending, settings)
         if call.status == "completed":
             _insert_entry(db, generation, pending, call)
             db.commit()
@@ -188,7 +200,9 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
         db.commit()  # durable reservation before any external request
         try:
             # Fresh rights/lease/ack check immediately before the call.
-            _gate(db, job_id, token)
+            _, _, _, source = _gate(db, job_id, token)
+            if source.verified_mime == VerifiedMime.PDF.value:
+                _read_pdf(source, storage, settings)
             db.commit()
             result = embed(pending.text, settings)
         except EmbeddingError as exc:
@@ -199,6 +213,8 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
             raise
         try:
             job, item, version, source = _gate(db, job_id, token)
+            if source.verified_mime == VerifiedMime.PDF.value:
+                _read_pdf(source, storage, settings)
             generation = db.get(IndexGeneration, generation.id)
             call = db.scalar(select(EmbeddingCall).where(EmbeddingCall.id == call_id).with_for_update())
             if (generation.state != "building" or call.status != "reserved"
@@ -210,11 +226,21 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
             call.dimensions = len(result.vector)
             call.input_tokens = result.input_tokens
             call.status = "completed"
-            call.cost_status = "unknown_reserved_ceiling"
+            if result.input_tokens is not None and result.input_tokens > settings.embedding.max_request_bytes:
+                raise StepError("embedding_usage_exceeds_reservation")
+            settled = (_amount(result.input_tokens, settings) if result.input_tokens is not None
+                       else call.reserved_usd)
+            call.cost_usd = settled if result.input_tokens is not None else None
+            call.cost_status = "usage_price_estimate" if result.input_tokens is not None else "unknown_reserved_ceiling"
             call.finished_at = utcnow()
             budget = db.scalar(select(EmbeddingBudgetDay).where(EmbeddingBudgetDay.day == call.reserved_day).with_for_update())
             budget.reserved_usd -= call.reserved_usd
-            budget.committed_usd += call.reserved_usd  # unknown bill: retain full ceiling
+            budget.committed_usd += settled
+            user_budget = db.scalar(select(EmbeddingUserBudgetDay).where(
+                EmbeddingUserBudgetDay.day == call.reserved_day,
+                EmbeddingUserBudgetDay.user_id == call.owner_user_id).with_for_update())
+            user_budget.reserved_usd -= call.reserved_usd
+            user_budget.committed_usd += settled
             _insert_entry(db, generation, pending, call)
             db.commit()
         except Exception:
@@ -226,6 +252,7 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
 
 def _provider_failure(db: Session, call_id: uuid.UUID, error: EmbeddingError) -> None:
     db.rollback()
+    db.execute(text("SELECT pg_advisory_xact_lock(hashtext('ras_embedding_capacity'))"))
     call = db.scalar(select(EmbeddingCall).where(EmbeddingCall.id == call_id).with_for_update())
     if call is not None and call.status == "reserved":
         call.status = "rejected" if error.definitely_rejected else "uncertain"
@@ -235,6 +262,10 @@ def _provider_failure(db: Session, call_id: uuid.UUID, error: EmbeddingError) ->
             call.cost_usd = Decimal("0")
             budget = db.scalar(select(EmbeddingBudgetDay).where(EmbeddingBudgetDay.day == call.reserved_day).with_for_update())
             budget.reserved_usd -= call.reserved_usd
+            user_budget = db.scalar(select(EmbeddingUserBudgetDay).where(
+                EmbeddingUserBudgetDay.day == call.reserved_day,
+                EmbeddingUserBudgetDay.user_id == call.owner_user_id).with_for_update())
+            user_budget.reserved_usd -= call.reserved_usd
     db.commit()
 
 

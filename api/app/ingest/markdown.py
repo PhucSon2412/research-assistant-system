@@ -11,9 +11,16 @@ import hashlib
 import re
 from dataclasses import dataclass
 
-PIPELINE_VERSION = "markdown-lines-v1"
+PIPELINE_VERSION = "markdown-lines-v2"
 HEADING = re.compile(r"^\s{0,3}(#{1,6})[ \t]+(.+?)[ \t]*#*[ \t]*(?:\r?\n)?$")
-REFERENCES = re.compile(r"^(references|bibliography|works cited|tài liệu tham khảo)$", re.I)
+SECTION_NUMBER = r"(?:\d+(?:\.\d+)*[.)]?\s+)?"
+REFERENCES = re.compile(
+    rf"^{SECTION_NUMBER}(?:references(?:\s+(?:cited|(?:and|&)\s+(?:notes?|footnotes|further reading)))?"
+    r"|(?:notes?|footnotes)\s+(?:and|&)\s+references|cited references"
+    r"|bibliography|works cited|literature cited|tài liệu tham khảo)\s*[.:]?\s*$", re.I)
+BIBLIOGRAPHY_CANDIDATE = re.compile(
+    rf"^{SECTION_NUMBER}(?:references?\b|bibliograph(?:y|ies)\b|works cited\b"
+    r"|literature cited\b|cited references\b|(?:notes?|footnotes)\s+(?:and|&)\s+references\b)", re.I)
 FENCE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
 
 
@@ -60,6 +67,8 @@ def extract(original: str) -> Extracted:
     candidates: list[Candidate] = []
     fence_char: str | None = None
     fence_length = 0
+    in_references = False
+    uncertain_boundary = False
     for line_no, line in enumerate(lines):
         fence = FENCE.match(line)
         if fence:
@@ -75,8 +84,16 @@ def extract(original: str) -> Extracted:
         if not match:
             continue
         heading = match.group(2).strip()
-        kind = "references" if REFERENCES.fullmatch(heading) else "abstract" if heading.casefold() == "abstract" else "body"
         offset = starts[line_no]
+        if REFERENCES.fullmatch(heading):
+            in_references = True
+        elif BIBLIOGRAPHY_CANDIDATE.match(heading):
+            uncertain_boundary = True
+            # A document title such as "Bibliography only" is not itself a
+            # reference entry. Still require review before indexing any body.
+            if not (offset == 0 and match.group(1) == "#"):
+                in_references = True
+        kind = "references" if in_references else "abstract" if heading.casefold() == "abstract" else "body"
         if offset == 0:
             boundaries[0] = (0, kind, heading)
         else:
@@ -90,7 +107,10 @@ def extract(original: str) -> Extracted:
             continue
         sections.append(Span(kind, heading, len(sections), original[start:end], start, end,
                              line_at(starts, start), line_at(starts, end - 1)))
-    return Extracted(sections, candidates, "complete" if sections else "none", [] if sections else ["no_text"])
+    warnings = (["bibliography_boundary_uncertain"] if uncertain_boundary else
+                [] if sections else ["no_text"])
+    return Extracted(sections, candidates, "none" if uncertain_boundary else
+                     "complete" if sections else "none", warnings)
 
 
 def has_body_text(result: Extracted) -> bool:

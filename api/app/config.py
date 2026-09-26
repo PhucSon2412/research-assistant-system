@@ -158,6 +158,8 @@ class ProviderBudget(BaseModel):
 
     app_daily_usd: float = Field(default=10.0, gt=0)
     embedding_daily_usd: float = Field(default=3.0, ge=0)
+    user_embedding_daily_usd: float = Field(default=1.0, ge=0)
+    user_embedding_warning_fraction: float = Field(default=0.8, gt=0, le=1)
     rerank_daily_usd: float = Field(default=2.0, ge=0)
     generation_daily_usd: float = Field(default=5.0, ge=0)
     key_spending_cap_daily_usd: float = Field(default=50.0, gt=0)
@@ -169,6 +171,8 @@ class ProviderBudget(BaseModel):
             raise ValueError("budget buckets must not exceed app_daily_usd")
         if self.app_daily_usd > self.key_spending_cap_daily_usd:
             raise ValueError("app_daily_usd must not exceed the key spending cap")
+        if self.user_embedding_daily_usd > self.embedding_daily_usd:
+            raise ValueError("user_embedding_daily_usd must not exceed embedding_daily_usd")
         return self
 
 
@@ -181,8 +185,10 @@ class EmbeddingPolicy(BaseModel):
     max_concurrent_requests: int = Field(default=2, gt=0)
     max_batch_items: int = Field(default=1, ge=1, le=1)
     max_request_bytes: int = Field(default=16_384, gt=0)
-    # Conservative ceiling for reservations; review against live route pricing.
+    # Configured price ceiling/estimate; verify route price and usage with a tiny
+    # synthetic request before setting pricing_verified for private documents.
     max_usd_per_million_tokens: float = Field(default=0.10, gt=0)
+    pricing_verified: bool = False
 
     @field_validator("api_key", mode="before")
     @classmethod

@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import io
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from decimal import Decimal
 
 import pytest
 from pydantic import SecretStr
 from sqlalchemy import text
 
 from app.config import get_settings
+from app.db import get_sessionmaker
 from app.ingest.embedding import EmbeddingError, EmbeddingResult
-from app.ingest.worker import process_job
+from app.ingest.worker import due_job_ids, process_job
 from tests.test_ingest_worker import upload
 from tests.test_pdf_ingest import full_pdf, image_only_pdf, partial_pdf, upload_pdf
 from tests.test_uploads import upload_api
@@ -18,6 +21,7 @@ from tests.test_uploads import upload_api
 def settings_with_fake_key():
     settings = get_settings().model_copy(deep=True)
     settings.embedding.api_key = SecretStr("synthetic-test-key")
+    settings.embedding.pricing_verified = True
     return settings
 
 
@@ -62,6 +66,65 @@ def test_markdown_indexes_once_and_isolated_by_owner(upload_api, monkeypatch):
     assert a.get(f"/library/items/{first['item_id']}").json()["item"]["content_status"] == "indexed"
     assert api.scalar("SELECT count(*) FROM index_entries WHERE keywords @@ plainto_tsquery('simple', 'finding')") > 0
     assert api.scalar("SELECT count(*) FROM embedding_calls WHERE vector_dims(vector)=3") == len(calls)
+
+
+def test_markdown_references_and_notes_never_becomes_evidence(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    ids = upload(api.user_browser("a@example.org"),
+        b"## Methods\nSynthetic body finding.\n## References and Notes\n[1] Bibliography secret.\n")
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "awaiting_index"
+    assert api.scalar("SELECT count(*) FROM sections WHERE kind='body' AND text LIKE '%Bibliography secret%'") == 0
+    calls = fake_provider(monkeypatch)
+    assert process_job(uuid.UUID(ids["job_id"]), settings_with_fake_key(), storage) == "ready"
+    assert calls and all("Bibliography" not in value and "[1]" not in value for value in calls)
+    assert api.scalar("SELECT count(*) FROM index_entries WHERE text LIKE '%Bibliography secret%'") == 0
+    assert api.scalar("SELECT count(*) FROM reference_entries WHERE raw_citation LIKE '%Bibliography secret%'") == 1
+
+
+def test_uncertain_markdown_bibliography_requires_review(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    ids = upload(api.user_browser("a@example.org"),
+        b"## Methods\nSynthetic body.\n## References to Earlier Work\n[1] Suspect.\n")
+    calls = fake_provider(monkeypatch)
+    assert process_job(uuid.UUID(ids["job_id"]), settings_with_fake_key(), storage) == "needs_review"
+    assert not calls
+    assert api.scalar("SELECT count(*) FROM chunks WHERE source_file_id=:f", f=uuid.UUID(ids["file_id"])) == 0
+    assert api.scalar("SELECT count(*) FROM index_entries") == 0
+
+
+def test_same_size_pdf_replacement_is_rejected_before_embedding(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    ids = upload_pdf(api.user_browser("a@example.org"), full_pdf())
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "awaiting_index"
+    key = api.scalar("SELECT storage_key FROM source_files WHERE id=:f", f=uuid.UUID(ids["file_id"]))
+    original = full_pdf()
+    replacement = original[:-1] + bytes([original[-1] ^ 1])
+    assert len(replacement) == len(original)
+    storage.put(key, io.BytesIO(replacement), "application/pdf")
+    calls = fake_provider(monkeypatch)
+    assert process_job(uuid.UUID(ids["job_id"]), settings_with_fake_key(), storage) == "checksum_mismatch"
+    assert not calls
+    assert api.scalar("SELECT count(*) FROM index_generations WHERE state='active'") == 0
+    assert api.scalar("SELECT content_status FROM library_items WHERE id=:i", i=uuid.UUID(ids["item_id"])) == "metadata_only"
+
+
+def test_pdf_replacement_during_provider_cannot_store_or_publish_result(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    original = full_pdf()
+    ids = upload_pdf(api.user_browser("a@example.org"), original)
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "awaiting_index"
+    key = api.scalar("SELECT storage_key FROM source_files WHERE id=:f", f=uuid.UUID(ids["file_id"]))
+    def replace(value, selected):
+        storage.put(key, io.BytesIO(original[:-1] + bytes([original[-1] ^ 1])), "application/pdf")
+        return EmbeddingResult([0.1, 0.2], selected.embedding.model_id, 5)
+    monkeypatch.setattr("app.ingest.indexer.embed", replace)
+    assert process_job(uuid.UUID(ids["job_id"]), settings_with_fake_key(), storage) == "checksum_mismatch"
+    assert api.scalar("SELECT count(*) FROM index_entries") == 0
+    assert api.scalar("SELECT count(*) FROM index_generations WHERE state='active'") == 0
 
 
 @pytest.mark.parametrize("source, expected", [(full_pdf, "ready"), (partial_pdf, "ready"), (image_only_pdf, "needs_review")])
@@ -172,6 +235,21 @@ def test_budget_blocks_before_provider_and_keeps_metadata_only(upload_api, monke
     assert api.scalar("SELECT count(*) FROM index_generations WHERE state='active'") == 0
 
 
+def test_unverified_price_blocks_private_provider_payload(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    ids = upload(api.user_browser("a@example.org"), b"## Methods\nSynthetic price gate.\n")
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "awaiting_index"
+    calls = fake_provider(monkeypatch)
+    settings = settings_with_fake_key()
+    settings.embedding.pricing_verified = False
+    with get_sessionmaker()() as db:
+        assert uuid.UUID(ids["job_id"]) not in due_job_ids(db, settings)
+    assert process_job(uuid.UUID(ids["job_id"]), settings, storage) == "not_claimed"
+    assert not calls
+    assert api.scalar("SELECT count(*) FROM embedding_calls") == 0
+
+
 def test_second_worker_and_crash_reserved_call_do_not_duplicate_request(upload_api, monkeypatch):
     api, storage = upload_api
     api.create_user("a@example.org")
@@ -263,12 +341,13 @@ def test_concurrent_jobs_share_daily_budget_reservation(upload_api, monkeypatch)
         assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "awaiting_index"
     calls = fake_provider(monkeypatch)
     settings = settings_with_fake_key()
-    settings.budget.embedding_daily_usd = 0.000004
+    settings.embedding.max_request_bytes = 64
+    settings.budget.embedding_daily_usd = 0.0000064
     with ThreadPoolExecutor(max_workers=2) as pool:
         states = list(pool.map(lambda ids: process_job(uuid.UUID(ids["job_id"]), settings, storage), (first, second)))
     assert sorted(states) == ["embedding_budget_exhausted", "ready"]
     assert len(calls) == 1
-    assert api.scalar("SELECT committed_usd+reserved_usd FROM embedding_budget_days") <= 0.000004
+    assert api.scalar("SELECT committed_usd+reserved_usd FROM embedding_budget_days") <= 0.0000064
     assert api.scalar("SELECT count(*) FROM index_generations WHERE state='active'") == 1
 
 
@@ -295,3 +374,70 @@ def test_provider_concurrency_limit_is_durable_across_jobs(upload_api, monkeypat
         conn.execute(text("UPDATE ingestion_jobs SET next_attempt_at=NULL WHERE id=:j"), {"j": uuid.UUID(second["job_id"])})
     assert process_job(uuid.UUID(second["job_id"]), settings, storage) == "ready"
     assert len(seen) == 2
+
+
+def test_same_user_quota_is_atomic_and_warns_near_limit(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    browser = api.user_browser("a@example.org")
+    first = upload(browser, b"## Methods\nSynthetic first finding.\n")
+    second = upload(browser, b"## Results\nSynthetic second finding.\n")
+    for ids in (first, second):
+        assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "awaiting_index"
+    settings = settings_with_fake_key()
+    settings.embedding.max_request_bytes = 64
+    settings.budget.user_embedding_daily_usd = 0.0000064  # one full reservation
+    calls = []
+    def provider(value, selected):
+        calls.append(value)
+        return EmbeddingResult([0.1, 0.2], selected.embedding.model_id, None)
+    monkeypatch.setattr("app.ingest.indexer.embed", provider)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        states = list(pool.map(lambda ids: process_job(uuid.UUID(ids["job_id"]), settings, storage), (first, second)))
+    assert sorted(states) == ["embedding_user_quota_exhausted", "ready"]
+    assert len(calls) == 1
+    assert api.scalar("SELECT committed_usd+reserved_usd FROM embedding_user_budget_days") == Decimal("0.0000064")
+    assert api.scalar("SELECT count(*) FROM ingestion_jobs WHERE warnings ? 'embedding_user_quota_near_limit'") == 1
+    assert api.scalar("SELECT count(*) FROM index_generations WHERE state='active'") == 1
+
+
+def test_user_reservation_released_on_429_then_reconciled_on_retry(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    ids = upload(api.user_browser("a@example.org"), b"## Methods\nSynthetic retry finding.\n")
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "awaiting_index"
+    settings = settings_with_fake_key()
+    settings.embedding.max_request_bytes = 64
+    settings.budget.user_embedding_daily_usd = 0.0000064
+    calls = []
+    def provider(value, selected):
+        calls.append(value)
+        if len(calls) == 1:
+            raise EmbeddingError("provider_rate_limited", definitely_rejected=True)
+        return EmbeddingResult([0.1, 0.2], selected.embedding.model_id, 5)
+    monkeypatch.setattr("app.ingest.indexer.embed", provider)
+    assert process_job(uuid.UUID(ids["job_id"]), settings, storage) == "provider_rate_limited"
+    assert api.scalar("SELECT committed_usd+reserved_usd FROM embedding_user_budget_days") == 0
+    with api.engine.begin() as conn:
+        conn.execute(text("UPDATE ingestion_jobs SET next_attempt_at=NULL WHERE id=:j"), {"j": uuid.UUID(ids["job_id"])})
+    assert process_job(uuid.UUID(ids["job_id"]), settings, storage) == "ready"
+    assert len(calls) == 2
+    assert api.scalar("SELECT committed_usd FROM embedding_user_budget_days") == Decimal("0.0000005")
+    assert api.scalar("SELECT reserved_usd FROM embedding_user_budget_days") == 0
+    assert api.scalar("SELECT committed_usd FROM embedding_budget_days") == Decimal("0.0000005")
+    assert api.scalar("SELECT cost_status FROM embedding_calls") == "usage_price_estimate"
+
+
+def test_user_quota_reconciles_higher_observed_usage(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.create_user("a@example.org")
+    ids = upload(api.user_browser("a@example.org"), b"## Methods\nSynthetic high usage.\n")
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "awaiting_index"
+    settings = settings_with_fake_key()
+    settings.embedding.max_request_bytes = 128
+    settings.budget.user_embedding_daily_usd = 0.0000128
+    monkeypatch.setattr("app.ingest.indexer.embed", lambda value, selected:
+        EmbeddingResult([0.1, 0.2], selected.embedding.model_id, 100))
+    assert process_job(uuid.UUID(ids["job_id"]), settings, storage) == "ready"
+    assert api.scalar("SELECT committed_usd FROM embedding_user_budget_days") == Decimal("0.0000100")
+    assert api.scalar("SELECT reserved_usd FROM embedding_user_budget_days") == 0

@@ -296,8 +296,12 @@ def _extract(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceFil
                         provenance=PIPELINE_VERSION, locator_kind="markdown", page_number=None,
                         start_offset=ref.start, end_offset=ref.end, pipeline_version=PIPELINE_VERSION))
                     ref_ordinal += 1
-        version.coverage = result.coverage if body_present else "none"
+        uncertain = "bibliography_boundary_uncertain" in result.warnings
+        version.coverage = result.coverage if body_present and not uncertain else "none"
         job.warnings = result.warnings if body_present else result.warnings + ["no_body_text"]
+        if uncertain:
+            job.last_error_code = "bibliography_boundary_uncertain"
+            return JobState.NEEDS_REVIEW.value
         if not body_present:
             job.last_error_code = "no_body_text"
         return JobState.CHUNKING.value if body_present else JobState.FULLTEXT_REJECTED.value
@@ -430,8 +434,8 @@ def _chunk_pdf(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceF
 def process_job(job_id: uuid.UUID, settings: Settings | None = None,
                 storage: OriginalStorage | None = None) -> str:
     settings = settings or get_settings()
-    # Leave extracted jobs durable until a provider key is configured.
-    if settings.embedding.api_key is None:
+    # Leave extracted jobs durable until a key and live price check are configured.
+    if settings.embedding.api_key is None or not settings.embedding.pricing_verified:
         with get_sessionmaker()() as check_db:
             current = check_db.get(IngestionJob, job_id)
             if current and (current.state in (JobState.AWAITING_INDEX.value, JobState.INDEXING.value)
@@ -476,11 +480,12 @@ def process_job(job_id: uuid.UUID, settings: Settings | None = None,
 
 def due_job_ids(db: Session, settings: Settings, now: datetime | None = None) -> list[uuid.UUID]:
     now = now or utcnow()
+    provider_ready = settings.embedding.api_key is not None and settings.embedding.pricing_verified
     states = [JobState.RECEIVED.value, JobState.VALIDATING.value, JobState.STORED.value,
               JobState.EXTRACTING.value, JobState.CHUNKING.value, JobState.RETRYABLE_FAILED.value]
-    if settings.embedding.api_key is not None:
+    if provider_ready:
         states += [JobState.AWAITING_INDEX.value, JobState.INDEXING.value]
-    configured = (true() if settings.embedding.api_key is not None else
+    configured = (true() if provider_ready else
                   or_(IngestionJob.state != JobState.RETRYABLE_FAILED.value,
                       IngestionJob.resume_state.is_distinct_from(JobState.INDEXING.value)))
     return list(db.scalars(select(IngestionJob.id).join(SourceFile, SourceFile.job_id == IngestionJob.id)

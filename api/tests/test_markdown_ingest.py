@@ -39,3 +39,15 @@ def test_heading_inside_code_fence_is_body_text() -> None:
 def test_abstract_and_references_alone_do_not_count_as_body() -> None:
     assert not has_body_text(extract("# Paper\n## Abstract\nSummary.\n## References\n[1] Citation.\n"))
     assert has_body_text(extract("# Paper\n\nA result.\n## References\n[1] Citation.\n"))
+
+
+def test_bibliography_variants_and_uncertain_boundary() -> None:
+    for heading in ("References and Notes", "References & Notes", "Notes and References",
+                    "References Cited", "Literature Cited", "2. References and Notes"):
+        result = extract(f"## Methods\nSynthetic finding.\n## {heading}\n[1] Source.\n### Further reading\n[2] Source.\n")
+        assert [section.kind for section in result.sections] == ["body", "references", "references"]
+        assert result.coverage == "complete"
+    uncertain = extract("## Methods\nFinding.\n## References to Earlier Work\n[1] Source.\n")
+    assert uncertain.coverage == "none"
+    assert "bibliography_boundary_uncertain" in uncertain.warnings
+    assert uncertain.sections[-1].kind == "references"

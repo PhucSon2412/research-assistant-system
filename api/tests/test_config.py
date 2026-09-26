@@ -55,9 +55,12 @@ def test_defaults_match_documented_mvp_values() -> None:
     assert s.budget.app_daily_usd == 10.0
     assert s.budget.key_spending_cap_daily_usd == 50.0
     assert s.budget.embedding_daily_usd == 3.0
+    assert s.budget.user_embedding_daily_usd == 1.0
+    assert s.budget.user_embedding_warning_fraction == 0.8
     assert s.embedding.model_id == "openai/text-embedding-3-small"
     assert s.embedding.max_batch_items == 1
     assert s.embedding.api_key is None
+    assert s.embedding.pricing_verified is False
     assert s.password.min_length == 12
     assert (s.ingest.poll_seconds, s.ingest.lease_seconds, s.ingest.max_attempts,
             s.ingest.markdown_max_chunk_chars) == (5, 120, 4, 1200)
@@ -91,6 +94,8 @@ def test_redis_broker_password_is_url_escaped() -> None:
         lambda: Retention(backup_retention=timedelta(0)),
         lambda: ProviderBudget(generation_daily_usd=6.0),  # 3 + 2 + 6 > 10
         lambda: ProviderBudget(app_daily_usd=60.0),  # above the key cap
+        lambda: ProviderBudget(user_embedding_daily_usd=4.0),
+        lambda: ProviderBudget(user_embedding_warning_fraction=1.01),
         lambda: PasswordPolicy(min_length=7),
         lambda: PasswordPolicy(min_length=20, max_length=19),
         lambda: IngestPolicy(max_attempts=0),

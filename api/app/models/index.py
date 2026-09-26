@@ -55,6 +55,7 @@ class EmbeddingCall(Base):
     )
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     source_file_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("source_files.id", ondelete="RESTRICT"))
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"))
     model_id: Mapped[str] = mapped_column(Text)
     provider: Mapped[str] = mapped_column(Text)
     pipeline_version: Mapped[str] = mapped_column(Text)
@@ -91,5 +92,13 @@ class IndexEntry(Base):
 class EmbeddingBudgetDay(Base):
     __tablename__ = "embedding_budget_days"
     day: Mapped[date] = mapped_column(Date, primary_key=True)
+    committed_usd: Mapped[Decimal] = mapped_column(Numeric(14, 8), server_default="0")
+    reserved_usd: Mapped[Decimal] = mapped_column(Numeric(14, 8), server_default="0")
+
+
+class EmbeddingUserBudgetDay(Base):
+    __tablename__ = "embedding_user_budget_days"
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True)
     committed_usd: Mapped[Decimal] = mapped_column(Numeric(14, 8), server_default="0")
     reserved_usd: Mapped[Decimal] = mapped_column(Numeric(14, 8), server_default="0")

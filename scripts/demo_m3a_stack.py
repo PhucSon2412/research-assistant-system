@@ -42,6 +42,7 @@ for name, value in {
 get_settings.cache_clear()
 settings = get_settings().model_copy(deep=True)
 settings.embedding.api_key = SecretStr("synthetic-fake-key")
+settings.embedding.pricing_verified = True  # fake adapter; no live provider charge
 db_url = URL.create("postgresql+psycopg", username=env["POSTGRES_USER"],
     password=env["POSTGRES_PASSWORD"], host="127.0.0.1",
     port=int(env.get("POSTGRES_HOST_PORT") or "5432"), database=env["POSTGRES_DB"])
