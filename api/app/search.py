@@ -184,12 +184,17 @@ def settle(db: Session, usage_id: uuid.UUID, *, tokens: int | None = None,
     return status
 
 
-def _scope(db: Session, principal: Principal, item_id: uuid.UUID | None):
+def _scope(db: Session, principal: Principal, item_id: uuid.UUID | None,
+           collection_id: uuid.UUID | None = None):
     if item_id is not None:
         item = db.scalar(select(LibraryItem).where(LibraryItem.id == item_id,
             LibraryItem.visibility == "private", LibraryItem.owner_user_id == principal.user_id))
         if item is None:
             raise ApiError(404, "not_found")
+    if collection_id is not None and db.execute(text(
+        "SELECT 1 FROM collections WHERE id=:collection AND owner_user_id=:owner"),
+        {"collection": collection_id, "owner": principal.user_id}).first() is None:
+        raise ApiError(404, "not_found")
     rows = db.execute(text("""SELECT g.model_id, g.dimensions FROM library_items i
         JOIN index_generations g ON g.id=i.active_index_generation_id AND g.item_id=i.id
         JOIN paper_versions v ON v.id=g.version_id AND v.item_id=i.id
@@ -197,8 +202,10 @@ def _scope(db: Session, principal: Principal, item_id: uuid.UUID | None):
         WHERE i.visibility='private' AND i.owner_user_id=:owner AND i.content_status='indexed'
           AND i.active_version_id=g.version_id AND i.rights_epoch=g.rights_epoch
           AND g.state='active' AND g.dimensions IS NOT NULL
-          AND (CAST(:item AS uuid) IS NULL OR i.id=CAST(:item AS uuid))"""),
-        {"owner": principal.user_id, "item": item_id}).all()
+          AND (CAST(:item AS uuid) IS NULL OR i.id=CAST(:item AS uuid))
+          AND (CAST(:collection AS uuid) IS NULL OR EXISTS
+            (SELECT 1 FROM collection_items ci WHERE ci.collection_id=CAST(:collection AS uuid) AND ci.item_id=i.id))"""),
+        {"owner": principal.user_id, "item": item_id, "collection": collection_id}).all()
     return {(r.model_id, r.dimensions) for r in rows}
 
 
@@ -216,12 +223,14 @@ BASE = """FROM index_entries e
    AND c.chunk_hash=e.chunk_hash AND c.chunk_hash=ec.chunk_hash AND c.text=e.text
    AND ec.status='completed' AND ec.model_id=g.model_id AND ec.dimensions=g.dimensions
    AND vector_dims(ec.vector)=g.dimensions
-   AND (CAST(:item AS uuid) IS NULL OR i.id=CAST(:item AS uuid))"""
+   AND (CAST(:item AS uuid) IS NULL OR i.id=CAST(:item AS uuid))
+   AND (CAST(:collection AS uuid) IS NULL OR EXISTS
+     (SELECT 1 FROM collection_items ci WHERE ci.collection_id=CAST(:collection AS uuid) AND ci.item_id=i.id))"""
 
 
 def _rank(db: Session, principal: Principal, item_id, settings: Settings, query: str,
-          vector: list[float] | None):
-    params = {"owner": principal.user_id, "item": item_id, "q": query}
+          vector: list[float] | None, collection_id: uuid.UUID | None = None):
+    params = {"owner": principal.user_id, "item": item_id, "collection": collection_id, "q": query}
     start = time.perf_counter()
     keyword = db.execute(text("SELECT e.chunk_id " + BASE + " AND e.keywords @@ plainto_tsquery('simple',:q)"
         " ORDER BY ts_rank_cd(e.keywords,plainto_tsquery('simple',:q)) DESC,e.chunk_id LIMIT :k"),
@@ -239,7 +248,8 @@ def _rank(db: Session, principal: Principal, item_id, settings: Settings, query:
     return keyword, semantic, keyword_ms, vector_ms
 
 
-def hydrate(db: Session, principal: Principal, item_id, ids: list[uuid.UUID]) -> dict[uuid.UUID, dict]:
+def hydrate(db: Session, principal: Principal, item_id, ids: list[uuid.UUID],
+            collection_id: uuid.UUID | None = None) -> dict[uuid.UUID, dict]:
     if not ids:
         return {}
     stmt = text("""SELECT e.chunk_id, i.id item_id, v.id version_id, f.id file_id, i.title,
@@ -247,8 +257,29 @@ def hydrate(db: Session, principal: Principal, item_id, ids: list[uuid.UUID]) ->
         c.start_page, c.end_page, c.start_line, c.end_line, c.start_offset, c.end_offset,
         c.locator_detail, s.kind section_kind
         """ + BASE + " AND e.chunk_id IN :ids").bindparams(bindparam("ids", expanding=True))
-    rows = db.execute(stmt, {"owner": principal.user_id, "item": item_id, "ids": ids}).mappings().all()
+    rows = db.execute(stmt, {"owner": principal.user_id, "item": item_id,
+                             "collection": collection_id, "ids": ids}).mappings().all()
     return {r["chunk_id"]: dict(r) for r in rows}
+
+
+def _hydrate_scope(db: Session, principal: Principal, item_id, ids: list[uuid.UUID],
+                   collection_id: uuid.UUID | None) -> dict[uuid.UUID, dict]:
+    # Preserve the M3b four-argument hydrate call for unscoped requests.
+    if collection_id is None:
+        return hydrate(db, principal, item_id, ids)
+    return hydrate(db, principal, item_id, ids, collection_id)
+
+
+def _lock_hits(db: Session, rows: dict[uuid.UUID, dict], collection_id: uuid.UUID | None) -> None:
+    """Keep revoke and membership removal from committing during response materialization."""
+    if not rows:
+        return
+    item_ids = list({row["item_id"] for row in rows.values()})
+    db.execute(text("SELECT id FROM library_items WHERE id=ANY(:ids) FOR SHARE"), {"ids": item_ids}).all()
+    if collection_id is not None:
+        db.execute(text("SELECT id FROM collections WHERE id=:c FOR SHARE"), {"c": collection_id}).all()
+        db.execute(text("SELECT item_id FROM collection_items WHERE collection_id=:c AND item_id=ANY(:ids) FOR SHARE"),
+                   {"c": collection_id, "ids": item_ids}).all()
 
 
 def open_chunk(db: Session, principal: Principal, chunk_id: uuid.UUID) -> dict:
@@ -341,10 +372,11 @@ def rerank(query: str, docs: list[str], settings: Settings) -> RerankResult:
 
 
 def search(db: Session, principal: Principal, settings: Settings, query: str,
-           mode: str, item_id: uuid.UUID | None, use_rerank: bool) -> dict:
+           mode: str, item_id: uuid.UUID | None, use_rerank: bool,
+           collection_id: uuid.UUID | None = None) -> dict:
     if len(query.encode("utf-8")) > settings.search.max_query_bytes:
         raise ApiError(422, "search_query_too_long")
-    scopes = _scope(db, principal, item_id)  # before any paid call
+    scopes = _scope(db, principal, item_id, collection_id)  # before any paid call
     limit_request(db, principal, settings)
     timings = {"keyword_ms": 0, "vector_ms": 0, "provider_ms": 0, "rerank_ms": 0}
     vector, embed_usage, rerank_usage = None, None, None
@@ -359,7 +391,7 @@ def search(db: Session, principal: Principal, settings: Settings, query: str,
             raise ApiError(503, "search_embedding_ceiling_unverified")
         embed_usage = reserve(db, principal, settings, "embed_query", ceiling)
         try:
-            if _scope(db, principal, item_id) != scopes:
+            if _scope(db, principal, item_id, collection_id) != scopes:
                 settle(db, embed_usage, rejected=True)
                 raise ApiError(409, "search_scope_changed")
             start = time.perf_counter()
@@ -386,9 +418,9 @@ def search(db: Session, principal: Principal, settings: Settings, query: str,
                response_provider=result.response_provider)
         vector = result.vector
     keyword, semantic, timings["keyword_ms"], timings["vector_ms"] = _rank(
-        db, principal, item_id, settings, query, vector)
+        db, principal, item_id, settings, query, vector, collection_id)
     ids = fuse(keyword, semantic)[:settings.search.max_results]
-    hydrated = hydrate(db, principal, item_id, ids)
+    hydrated = _hydrate_scope(db, principal, item_id, ids, collection_id)
     ids = [i for i in ids if i in hydrated]
     rerank_status = "not_requested"
     if use_rerank and ids:
@@ -404,7 +436,7 @@ def search(db: Session, principal: Principal, settings: Settings, query: str,
             if ceiling <= Decimal(str(policy.max_request_usd)):
                 try:
                     rerank_usage = reserve(db, principal, settings, "rerank", ceiling)
-                    fresh = hydrate(db, principal, item_id, sent_ids)
+                    fresh = _hydrate_scope(db, principal, item_id, sent_ids, collection_id)
                     if set(fresh) != set(sent_ids) or any(fresh[i]["rights_epoch"] != hydrated[i]["rights_epoch"]
                                                          or fresh[i]["generation_id"] != hydrated[i]["generation_id"]
                                                          or fresh[i]["text"] != hydrated[i]["text"] for i in sent_ids):
@@ -444,7 +476,7 @@ def search(db: Session, principal: Principal, settings: Settings, query: str,
                                      else "degraded_budget")
             else:
                 rerank_status = "degraded_ceiling"
-    final = hydrate(db, principal, item_id, ids)
+    final = _hydrate_scope(db, principal, item_id, ids, collection_id)
     if set(final) != set(ids) or any(final[i]["rights_epoch"] != hydrated[i]["rights_epoch"]
                                     or final[i]["generation_id"] != hydrated[i]["generation_id"]
                                     or final[i]["text"] != hydrated[i]["text"] for i in ids):
@@ -452,9 +484,8 @@ def search(db: Session, principal: Principal, settings: Settings, query: str,
     # Hold a share lock through response materialization so a concurrent revoke cannot
     # commit between this last check and assembling the outgoing body.
     if ids:
-        db.execute(text("SELECT id FROM library_items WHERE id = ANY(:ids) FOR SHARE"),
-                   {"ids": list({final[i]["item_id"] for i in ids})}).all()
-        locked = hydrate(db, principal, item_id, ids)
+        _lock_hits(db, final, collection_id)
+        locked = _hydrate_scope(db, principal, item_id, ids, collection_id)
         if set(locked) != set(ids) or any(locked[i]["rights_epoch"] != final[i]["rights_epoch"]
                                          or locked[i]["generation_id"] != final[i]["generation_id"]
                                          or locked[i]["text"] != final[i]["text"] for i in ids):

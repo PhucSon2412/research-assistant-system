@@ -38,6 +38,7 @@ EXPECTED_TABLES = {
     "index_generations", "embedding_calls", "index_entries", "embedding_budget_days",
     "embedding_user_budget_days",
     "search_request_days", "search_usage",
+    "collections", "collection_items",
 }
 
 
@@ -90,6 +91,35 @@ def test_orm_models_match_migrated_schema(migrated_db_url: str) -> None:
         diff = compare_metadata(ctx, Base.metadata)
     eng.dispose()
     assert diff == []
+
+
+def test_collection_membership_foreign_keys_restrict(migrated_db_url: str) -> None:
+    eng = create_engine(migrated_db_url)
+    with eng.connect() as conn:
+        delete_actions = conn.scalars(text("""SELECT confdeltype FROM pg_constraint
+            WHERE conrelid='collection_items'::regclass AND contype='f'""")).all()
+    eng.dispose()
+    assert delete_actions == ["r", "r"]
+
+
+def test_0015_upgrades_m3b_database_with_existing_data(empty_db_url: str) -> None:
+    from app.identity.passwords import hash_password
+
+    upgrade(empty_db_url, "0014")
+    eng = create_engine(empty_db_url)
+    with eng.begin() as conn:
+        owner = conn.scalar(text("INSERT INTO users(email,password_verifier) VALUES('m3c@example.org',:p) RETURNING id"),
+                            {"p": hash_password("synthetic-password-long")})
+        item = conn.scalar(text("INSERT INTO library_items(visibility,owner_user_id,title) VALUES('private',:o,'M3b existing') RETURNING id"), {"o": owner})
+        conn.execute(text("INSERT INTO search_request_days(day,user_id,request_count) VALUES(CURRENT_DATE,:o,7)"), {"o": owner})
+    upgrade(empty_db_url)
+    with eng.begin() as conn:
+        assert conn.scalar(text("SELECT request_count FROM search_request_days WHERE user_id=:o"), {"o": owner}) == 7
+        assert conn.scalar(text("SELECT title FROM library_items WHERE id=:i"), {"i": item}) == "M3b existing"
+        collection = conn.scalar(text("INSERT INTO collections(owner_user_id,name) VALUES(:o,'Reading') RETURNING id"), {"o": owner})
+        conn.execute(text("INSERT INTO collection_items(collection_id,item_id) VALUES(:c,:i)"), {"c": collection, "i": item})
+        assert conn.scalar(text("SELECT count(*) FROM collection_items WHERE collection_id=:c"), {"c": collection}) == 1
+    eng.dispose()
 
 
 def test_0009_upgrades_database_with_m2b_pdf_data(empty_db_url: str) -> None:

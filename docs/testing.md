@@ -38,6 +38,10 @@ Tạo item `A-private`, `B-private`, `common`, cùng DOI/hash và chuỗi nhận
 
 M3b thêm `test_search.py`: PostgreSQL/pgvector thật với A/B/Admin/common metadata, top-k keyword/vector đã lọc quyền, payload rerank không có B/bibliography, scope ID 404, epoch/generation/dimensions, provider 429/timeout/response sai, mapping RRF/rerank và reservation đồng thời. Test không xác minh route, giá hay độ trễ OpenRouter live khi chưa có key. UI build chỉ xác minh biên dịch; demo Compose ghi riêng ở [dev-setup](dev-setup.md).
 
+M3c thêm `test_collections.py`: ma trận Admin/A/B cho CRUD và membership, common metadata, ID trái quyền so với ID vắng mặt, keyword/vector top-k có đối chứng ngoài collection, rerank payload chỉ có candidate còn quyền/thuộc collection, và membership tồn tại sau đổi epoch/generation mà không trả nội dung. Migration `0015` được thử trên PostgreSQL `0014` có item và search ledger; không sửa migration cũ.
+
+Review PR #8 bổ sung test PostgreSQL cho hai FK membership `ON DELETE RESTRICT`: xóa collection trực tiếp khi còn membership bị từ chối; endpoint xóa membership tường minh rồi collection, giữ nguyên item; lỗi giữa hai bước rollback toàn bộ. Test schema so ORM và migration từ DB sạch đến `0015 (head)` vẫn phải xanh.
+
 Review PR #7 bổ sung test một phần tử rerank sai kiểu và ledger `uncertain`, search embedding song song, worker index tranh slot với query embedding, rerank song song, warning hai bucket qua ngưỡng bởi nhiều User, backfill `0012` và trạng thái mặc định/payload rerank on/off của UI/API. `npm run test:search --prefix web` dùng Node test runner cho trạng thái và request body của form.
 
 Review lease/quota tiếp theo kiểm reservation quá hạn ở ngày cũ, hai request tranh slot sau thu hồi, heartbeat giữ slot của lời gọi còn chạy, response muộn đối soát một lần, migration `0013`, và warning quota User khi document/query đưa cùng User qua ngưỡng theo hai chiều.

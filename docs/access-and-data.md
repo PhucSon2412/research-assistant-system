@@ -10,7 +10,7 @@
 
 **Đề xuất:** Quyền áp dụng ở cấp **library item** (một bản paper trong một kho), gồm `common` hoặc `private(owner_user_id)`. Metadata, file, chunk, embedding, reference trích từ item và kết quả search/RAG đi theo cùng phạm vi. Một paper học thuật có thể có item riêng và item chung độc lập; trùng nội dung không tự thay đổi visibility. Admin có quyền vận hành kho chung, không mặc nhiên đọc kho riêng của User trong giao diện hay API thông thường. Chính sách hỗ trợ/kiểm tra sự cố trên dữ liệu riêng cần quyết định riêng.
 
-**Đề xuất:** Collection MVP thuộc một User và chỉ chứa item mà chủ collection có quyền; khi quyền thay đổi, membership không mở rộng quyền. Collection không phải ACL. Paper kho chung có thể được User thêm vào collection riêng.
+**M3c (PR đang review):** Collection thuộc một User; chủ có thể thêm item riêng của mình hoặc metadata item chung mà họ thấy được. Membership vẫn có thể tồn tại sau thay đổi quyền/index, nhưng list luôn lọc ACL metadata hiện tại, search còn yêu cầu private owner và active index hợp lệ. Membership không cấp quyền file/chunk/index. User khác và Admin không xem/sửa collection của chủ qua API; ID trái quyền và ID vắng mặt đều `404`. Paper chung `metadata_only` hiện trong danh sách collection, không vào full-text search/RAG; chưa có nhánh common full text trước khi `AccessRights` đúng version/file được triển khai.
 
 ## Ma trận quyền MVP đề xuất
 

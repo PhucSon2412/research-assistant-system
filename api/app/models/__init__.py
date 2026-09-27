@@ -2,6 +2,7 @@
 
 from app.models.audit import AuditEvent
 from app.models.base import Base
+from app.models.collection import Collection, CollectionItem
 from app.models.identity import BootstrapState, Invitation, PasswordResetToken, User, UserSession
 from app.models.index import EmbeddingBudgetDay, EmbeddingCall, EmbeddingUserBudgetDay, IndexEntry, IndexGeneration
 from app.models.ingest import Chunk, IngestionJob, IngestStepAttempt, MetadataCandidate, PdfPage, ReferenceEntry, Section
@@ -13,6 +14,7 @@ __all__ = [
     "AuditEvent",
     "Base",
     "BootstrapState",
+    "Collection", "CollectionItem",
     "EmbeddingBudgetDay", "EmbeddingCall", "EmbeddingUserBudgetDay", "IndexEntry", "IndexGeneration",
     "IngestionJob",
     "IngestStepAttempt",
