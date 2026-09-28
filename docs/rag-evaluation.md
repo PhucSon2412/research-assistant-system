@@ -210,9 +210,41 @@ Trước đây keyword mode “tránh” gửi evidence cho câu không có đá
 
 **Đề xuất tiếp theo (chưa làm):** đo lại trên corpus lớn hơn/paper thật trước khi hạ ngưỡng; cân nhắc trọng số theo độ hiếm của term trong scope (IDF) hoặc cụm từ (`<->`) thay vì đếm term ngang nhau; tie-break theo khóa ổn định theo nội dung để lần chạy lặp lại được; đo latency truy vấn với workload 1.000 paper; rerank thật sau khi đối soát charge.
 
+## M4d-2 — nhận diện câu so sánh (đo trước/sau)
+
+Task 2 trong [roadmap](roadmap.md#task-sau-m4c). Hành vi mới ở [search-and-rag](search-and-rag.md#m4d-2--nhận-diện-câu-so-sánh); quyết định ở [decisions](decisions.md#quyết-định-triển-khai-m4d-2-2026-09-28). Vẫn là corpus tổng hợp 87 chunk, nhãn `pending_human_review`, embedder cục bộ `local/hash-bow-512-v1`, generation capture không trả claim, 0 lời gọi OpenRouter: **không** chứng minh grounded answer, citation accuracy, abstention hay chất lượng production.
+
+**Quy trình.** Luật được thiết kế từ CMP-03 (split `dev`) và các cách diễn đạt tiếng Anh tương đương, rồi kiểm ca âm trên 65 câu ngoài nhóm `comparison` (chỉ kiểm luật có coi câu là so sánh hay không; không chỉnh theo kết quả retrieval của câu nào). Để tránh nhiễu tie-break UUID giữa hai lần seed (±1 side, xem M4d-1), trước/sau được đo bằng một script tạm: seed corpus **một lần** qua API/worker thật, chạy `runner.evaluate` hai lần trên cùng DB, lần “trước” vá `app.rag.is_comparison` về luật cũ (`COMPARISON.search`) và câu truy vấn keyword về cách bỏ từ cũ. Chạy trên `dev` trong lúc làm; holdout chạy **một lần** trên commit `12f614c` (tree sạch) sau khi chốt code. Báo cáo chính thức chạy `run` trên cùng commit: [`rag-eval-2026-09-28-m4d2-comparison.md`](../evaluation/rag/reports/rag-eval-2026-09-28-m4d2-comparison.md) (JSON cùng tên; file sinh ra được đổi tên để không ghi đè báo cáo cùng ngày).
+
+**Nhận diện.** Nhóm `comparison`: **14/15 → 15/15** (dev 11/12 → 12/12, holdout 3/3 → 3/3). Câu ngoài nhóm bị coi là so sánh: 0/65 trước và sau (gồm PP-08 “differential privacy”, PP-05 “compared with”, PP-03 “change between … and …”). Báo cáo JSON có thêm `comparison.detected_outside_group` để thấy dương tính giả.
+
+**Recall@5 và phủ pack (luật phủ trọn span, side trúng).** Cùng seed, trước và sau **giống hệt** ở mọi stage, nhóm, scope và split; CMP-03 cũng giữ nguyên thứ hạng:
+
+| Stage | Dev (39 câu, 51 side) | Holdout (10 câu, 12 side) | Tổng, báo cáo `run` (49 câu, 63 side) |
+| --- | --- | --- | --- |
+| Recall@5 `search:keyword` | 28 → 28 | 7 → 7 | 35 (0,612) |
+| Recall@5 `search:hybrid` | 45 → 45 | 11 → 11 | 56 (0,929) |
+| Recall@5 `vector` | 45 → 45 | 10 → 10 | 55 (0,918) |
+| Phủ pack `rag_pack:keyword` | 29 → 29 | 8 → 8 | 37 (0,633) |
+| Phủ pack `rag_pack:hybrid` | 46 → 46 | 12 → 12 | 58 (0,949) |
+
+Tổng của lần `run` trùng báo cáo M4d-1 ở mọi dòng. Nhóm `comparison`: Recall@5 hybrid 17/24 side (đủ hai phía 6/12 câu), phủ pack hybrid 19/24 (đủ hai phía 8/12), `evidence_pack` 4 side — phần mất ở pack thuộc task M4d-3, không xử lý ở đây. Search không dùng luật so sánh nên Recall@5 không thể đổi; phủ pack không đổi vì với CMP-03 cả hai paper đã đứng đầu thứ hạng, nên việc dành chỗ cho mỗi paper chọn đúng những chunk như trước.
+
+**CMP-03.** Search keyword hạng side (2, 1), hybrid (2, 1), vector (1, 2). Pack keyword 2 chunk (P01, P02), side ở vị trí (1, 2); pack hybrid 6 chunk (P01, P02, P12), cả hai side trong pack. Câu truy vấn keyword không còn “differ”; payload generation vẫn là câu hỏi gốc. Điều thay đổi là **gate**: script gửi thêm ba response generation giả cho CMP-03 trên corpus này, ở scope collection và all, mode keyword và hybrid (12 lượt mỗi phía):
+
+| Response giả | Trước | Sau |
+| --- | --- | --- |
+| Một claim `comparison=true` dẫn P01 và P02 | `answered` 4/4 | `answered` 4/4 |
+| Hai claim riêng, mỗi claim một paper | `answered` 4/4 | `insufficient_evidence` / `comparison_requires_multiple_papers` 4/4 |
+| Một claim chỉ dẫn một paper | `answered` 4/4 | `insufficient_evidence` / `comparison_requires_multiple_papers` 4/4 |
+
+Đây chỉ là kiểm cấu trúc với claim do script soạn, không phải chất lượng answer.
+
+**Pipeline trước generation, câu không có đáp án và ACL.** Không đổi: RAG gửi evidence cho câu kỳ vọng `insufficient_evidence` keyword 17/28, hybrid 27/28 (dev 14/22 và 21/22, holdout 3/6 và 6/6, trước = sau); RAG keyword tự từ chối 4 câu so sánh có đáp án vì pack chỉ có một paper (CMP-05, 07, 08, 11 — cùng bốn câu như M4d-1). Báo cáo `run`: 400 bản ghi search/vector/RAG và 87 chunk × 3 identity = 261 lần mở viewer, **0 vi phạm ACL**; 0 payload chứa văn bản chỉ có trong nhãn; khóa payload chỉ `question`/`evidence`; 0 outbound HTTP bị chặn; 239 lời gọi embedder cục bộ. Script trước/sau: 0 vi phạm ở cả hai phía, viewer dev 255 và holdout 246 lần mở, 0 vi phạm.
+
 ## Cần người đọc duyệt và việc tiếp theo
 
 - Duyệt 80 nhãn: quote/side có đủ và đúng không, kỳ vọng `insufficient_evidence` của câu mâu thuẫn (RCI-06), bibliographic (RCI-01) và so sánh một phía có hợp ý sản phẩm không. Sau khi duyệt, đổi trạng thái cần một quyết định schema mới (hiện schema cố ý chỉ nhận `pending_human_review`).
 - Chạy lại `run` với embedding/rerank/generation thật chỉ sau khi đối soát charge trên key và bật `pricing_verified` có chủ đích; khi đó mới có answer để chấm bằng phiếu người đọc và mới báo grounded/citation/abstention.
 - Thêm corpus thật có giấy phép phân phối rõ cho đúng version, tiến dần tới workload 1.000 paper; giữ holdout tách khỏi mọi lần chỉnh.
-- Ba phát hiện search/RAG được tách thành task riêng sau khi merge PR M4c (xem [roadmap](roadmap.md#task-sau-m4c)): keyword query yếu với câu hỏi tự nhiên (đã xử lý ở [M4d-1](#m4d-1--keyword-query-cho-câu-hỏi-tự-nhiên-đo-trướcsau)), regex so sánh bỏ sót “differ”, giới hạn pack so sánh làm rơi chứng cứ. Mỗi task đo lại bằng bộ này, không chỉnh theo holdout.
+- Ba phát hiện search/RAG được tách thành task riêng sau khi merge PR M4c (xem [roadmap](roadmap.md#task-sau-m4c)): keyword query yếu với câu hỏi tự nhiên (đã xử lý ở [M4d-1](#m4d-1--keyword-query-cho-câu-hỏi-tự-nhiên-đo-trướcsau)), regex so sánh bỏ sót “differ” (đã xử lý ở [M4d-2](#m4d-2--nhận-diện-câu-so-sánh-đo-trướcsau)), giới hạn pack so sánh làm rơi chứng cứ (M4d-3). Mỗi task đo lại bằng bộ này, không chỉnh theo holdout.
