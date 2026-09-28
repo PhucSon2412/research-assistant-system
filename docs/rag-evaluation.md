@@ -79,6 +79,7 @@ Cách ly provider trong `run`:
 - **Phủ evidence pack** (`rag_pack:*`) là tỷ lệ side nằm ở bất kỳ đâu trong **toàn evidence pack tối đa 6 chunk** (3 paper, 12.000 byte) mà RAG gửi generation. Đây **không** phải Recall@5 và không so trực tiếp với cột Recall@5.
 - Phân lỗi: `acl` → `extraction` (không chunk active nào chứa trọn span) → `retrieval` (không có trong danh sách trả về) → `rank` (có nhưng hạng > 5) → `evidence_pack` (search nội bộ của RAG trả về nhưng pack giới hạn chunk/paper/byte không chọn). `generation` là **not measured** trong PR này.
 - Với câu không có đáp án, báo cáo chỉ ghi pipeline tự trả `insufficient_evidence` trước generation hay đã gửi evidence đi; đó **không** là abstention appropriateness.
+- **Candidate cho câu không có đáp án** (thêm ở M4d-1): theo mode × split × nhóm (`no_answer`, kỳ vọng `insufficient_evidence`, `answered` để so), số câu search trả ≥ 1 chunk, số hit TB, số câu từ khóa `no_terms` và số câu RAG gửi evidence. Đây không phải abstention appropriateness.
 - ACL: mọi response search/vector/RAG và payload capture được kiểm item id thuộc tập được phép của identity/scope, marker của item người khác không xuất hiện, và scope trái quyền trả đúng `404 {"error":"not_found"}`. Mọi chunk xuất hiện được mở qua `/search/chunks/{id}` bằng cả ba identity: owner `200`, người khác `404`. Payload gửi model chỉ có khóa `question` và `evidence`; báo cáo đếm payload chứa văn bản chỉ có trong nhãn (`rationale`, `label_status`, ID câu hỏi). `supported_claim` có thể trùng nguyên văn paper nên không dùng làm tín hiệu rò rỉ.
 
 ## Chấm bằng người đọc
@@ -132,11 +133,86 @@ Lần chạy 2026-09-28 trên commit `04070f1` (tree sạch), Windows 11, Conda 
 - 0 lời gọi provider ngoài, 0 lần outbound HTTP bị chặn, 239 lời gọi embedder cục bộ. Chưa có response generation nào để người đọc chấm: grounded/citation/abstention có mẫu số 0.
 - `not measured`: rerank, chất lượng vector ngữ nghĩa thật, grounded answer rate, citation accuracy, abstention appropriateness, latency p95, chi phí/charge.
 
-Recall hybrid cao ở đây chủ yếu vì corpus nhỏ, câu hỏi và paper do cùng một người viết với từ vựng trùng nhau, và embedder băm là phép so khớp từ; không suy ra được chất lượng production. Số keyword thấp là phát hiện về cách dựng query hiện hành, không phải lỗi dữ liệu.
+Recall hybrid cao ở đây chủ yếu vì corpus nhỏ, câu hỏi và paper do cùng một người viết với từ vựng trùng nhau, và embedder băm là phép so khớp từ; không suy ra được chất lượng production. Số keyword thấp là phát hiện về cách dựng query lúc đó (`plainto_tsquery`), không phải lỗi dữ liệu; M4d-1 đổi cách dựng query, xem mục dưới.
+
+## M4d-1 — keyword query cho câu hỏi tự nhiên (đo trước/sau)
+
+Task 1 trong [roadmap](roadmap.md#task-sau-m4c). Hành vi mới ở [search-and-rag](search-and-rag.md#m4d-1--keyword-query-giới-hạn); quyết định ở [decisions](decisions.md#quyết-định-triển-khai-m4d-1-2026-09-28). Mọi số dưới đây vẫn trên corpus tổng hợp 87 chunk, nhãn `pending_human_review`, embedder hybrid là vector băm cục bộ `local/hash-bow-512-v1`: **không** tuyên bố đạt mục tiêu chất lượng production nào.
+
+**Quy trình.** Baseline chạy `run` trên `origin/main` `99e439d` (tree sạch) trước khi sửa; tổng khớp đúng báo cáo M4c (`1/63`, `55/63`, pack hybrid `57/63`). Các phương án chỉ được so trên **39 câu có đáp án / 51 side của split `dev`** bằng một script tạm: seed corpus một lần qua API/worker thật rồi chạy lại `runner.evaluate` cho câu dev, không gọi câu holdout. Holdout chỉ được xem **một lần** trong lần chạy cuối trên commit `3e7d3b5` (tree sạch), sau khi đã chốt triển khai.
+
+**Phương án đã thử (dev).** Cột Recall@5 và phủ pack đếm side trúng. “No-answer có cand.” là số câu nhóm `no_answer` mà keyword search trả ≥ 1 chunk (kèm số hit trung bình); “RAG kw gửi” là số câu kỳ vọng `insufficient_evidence` mà RAG keyword gửi evidence tới generation; “top-5 đúng item” là tỷ lệ hit trong 5 hạng đầu của câu có đáp án thuộc item chứa chứng cứ.
+
+| Phương án | kw R@5 | hybrid R@5 | pack kw | pack hybrid | No-answer có cand. (TB hit) | RAG kw gửi / 22 | Top-5 đúng item |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Baseline `plainto_tsquery` (AND mọi token) | 1/51 | 45/51 | 1/51 | 46/51 | 0/12 (0) | 0 | — |
+| OR mọi token, cap 32, khớp ≥ 1 (tham chiếu, không chọn) | 47/51 | 46/51 | 49/51 | 47/51 | 12/12 (10,3) | 21 | 84% |
+| Bỏ stopword, cap 8, khớp ≥ 1 | 44/51 | 46/51 | 45/51 | 45/51 | 12/12 (7,5) | 21 | 86% |
+| Bỏ stopword, cap 8, ngưỡng 34% term câu hỏi | 40/51 | 45/51 | 41/51 | 45/51 | 10/12 (2,0) | 16 | 89% |
+| Bỏ stopword, cap 8, ngưỡng 50% term câu hỏi | 29/51 | 45/51 | 29/51 | 46/51 | 9/12 (1,1) | 14 | 94% |
+| Bỏ stopword, cap 8, ngưỡng 67% | 14/51 | 45/51 | 13/51 | 46/51 | 1/12 (0,25) | 3 | 88% |
+| Bỏ stopword, cap 8, AND mọi term hữu ích | 2/51 | 45/51 | 2/51 | 46/51 | 0/12 | 0 | — |
+| Cap 6 / cap 12, ngưỡng 50% | 34 / 31 | 44 / 45 | 33 / 30 | 44 / 46 | 9/12 (1,4 / 1,1) | 15 / 13 | 90% / 95% |
+| Ngưỡng 50% **term có trong scope đã lọc quyền** | 37/51 | 45/51 | 37/51 | 45/51 | 12/12 (4,9) | 19 | 91% |
+| Ngưỡng 67% term có trong scope | 23/51 | 45/51 | 22/51 | 46/51 | 9/12 (1,25) | 14 | 93% |
+
+Sau khi sửa lỗi nhóm từ ghép (dấu gạch nối giữa các phần làm đóng nhóm sớm) và thêm sàn 2 term, chạy lại trên hai lần seed:
+
+| Ngưỡng (stopword, cap 8, sàn 2) | kw R@5 | hybrid R@5 (seed 1 / seed 2) | pack kw | pack hybrid | No-answer có cand. (TB hit) | RAG kw gửi / 22 | Top-5 đúng item |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 25% | 44/51 | 46 / 47 | 46/51 | 46/51 | 11/12 (3,1) | 18 | 88% |
+| 34% | 41/51 | 44 / 45 | 40/51 | 45/51 | 10/12 (1,8) | 16 | 90% |
+| 40% | 33/51 | 45 / 45 | 34/51 | 46/51 | 9/12 (1,7) | 15 | 95% |
+| **50% (chọn)** | 28/51 | 45 / 45 | 29/51 | 46/51 | 9/12 (1,1) | 14 | 94% |
+
+Nhận xét dùng để chọn:
+
+- Câu hỏi hầu như luôn có từ không xuất hiện trong chunk chứng cứ: từ khung câu hỏi (“reach”, “score”, “happened”) và tên paper (“Dense Adapter Stacks”, “GSR”) mà thân bài không lặp lại. Vì vậy AND mọi term hữu ích (2/51) gần như không hơn baseline.
+- Tính ngưỡng trên term có mặt trong scope bỏ luôn các từ vắng mặt như “Yoruba”, “French”, “carbon” — đúng là tín hiệu câu không có đáp án — nên no-answer nhận candidate 12/12 mà Recall vẫn thấp hơn ngưỡng 34% theo câu hỏi. Đã bỏ phương án này cùng truy vấn đếm term theo scope.
+- Hạ ngưỡng tăng Recall keyword nhưng số hit của câu không có đáp án tăng 2–3 lần và hybrid dao động (34% làm pack hybrid mất 1 side so sánh ở cả hai seed). Trên corpus 1.000 paper, “2 trong 8 từ” sẽ khớp rất nhiều chunk; ngưỡng một nửa được kỳ vọng ổn định hơn khi quy mô tăng, nhưng điều này **chưa đo**.
+- Chọn 50% + sàn 2 + cap 8: Recall keyword tăng lớn, hybrid và pack hybrid không thoái lui ở cả hai seed, nhiễu thấp nhất trong các phương án có recall đáng kể. 25–34% là phương án thay thế nếu chấp nhận nhiều candidate hơn; không đổi khi chưa có corpus lớn hơn.
+- **Nhiễu giữa các lần seed:** tie-break cuối cùng là `chunk_id` UUID sinh mới mỗi lần ingest, nên cùng code có thể lệch ±1 side hybrid giữa hai lần chạy (quan sát được ở 25% và 34%). Trong một trạng thái DB, thứ hạng xác định.
+
+**Trước/sau (baseline `99e439d` → `3e7d3b5`), luật phủ trọn span.** Báo cáo: [`rag-eval-2026-09-28-m4d1-keyword.md`](../evaluation/rag/reports/rag-eval-2026-09-28-m4d1-keyword.md) (JSON cùng tên); báo cáo M4c [`rag-eval-2026-09-28.md`](../evaluation/rag/reports/rag-eval-2026-09-28.md) giữ làm baseline. Recall@5 chỉ cho danh sách có thứ hạng; **phủ evidence pack** (toàn pack ≤ 6 chunk) là metric riêng, không phải Recall@5. Config lúc chạy là mặc định `SearchPolicy`: `keyword_max_terms=8`, `keyword_min_match_fraction=0.5`, `keyword_min_match_terms=2`, term 2–64 ký tự, `keyword_top_k=30`.
+
+| Stage | Dev (39 câu, 51 side) | Holdout (10 câu, 12 side) | Tổng (49 câu, 63 side) |
+| --- | --- | --- | --- |
+| Recall@5 `search:keyword` | 1 → **28** (TB câu 0,026 → 0,603) | 0 → **7** (0 → 0,650) | 1 → **35** (0,020 → 0,612) |
+| Recall@5 `search:hybrid` | 45 → 45 (0,923) | 10 → 11 (0,900 → 0,950) | 55 → 56 (0,918 → 0,929) |
+| Recall@5 `vector` (không đổi, đối chứng) | 45 → 45 | 10 → 10 | 55 → 55 |
+| Phủ pack `rag_pack:keyword` | 1 → **29** (0,026 → 0,615) | 0 → **8** (0 → 0,700) | 1 → **37** (0,020 → 0,633) |
+| Phủ pack `rag_pack:hybrid` | 46 → 46 (0,936) | 11 → 12 (0,950 → 1,000) | 57 → 58 (0,939 → 0,949) |
+
+Theo nhóm (side trúng, trước → sau):
+
+| Nhóm | kw R@5 dev | kw R@5 holdout | hybrid R@5 dev | hybrid R@5 holdout | pack kw dev | pack hybrid dev |
+| --- | --- | --- | --- | --- | --- | --- |
+| `single_paper` | 0 → 10/17 | 0 → 2/4 | 17 → 17/17 | 4 → 4/4 | 0 → 10/17 | 17 → 17/17 |
+| `comparison` | 0 → 9/20 | 0 → 1/4 | 14 → 14/20 | 2 → 3/4 | 0 → 10/20 | 15 → 15/20 |
+| `partial_pdf` | 1 → 6/6 | 0 → 1/1 | 6 → 6/6 | 1 → 1/1 | 1 → 6/6 | 6 → 6/6 |
+| `permission` | 0 → 2/3 | 0 → 2/2 | 3 → 3/3 | 2 → 2/2 | 0 → 2/3 | 3 → 3/3 |
+| `references_conflict_injection` | 0 → 1/5 | 0 → 1/1 | 5 → 5/5 | 1 → 1/1 | 0 → 1/5 | 5 → 5/5 |
+
+Theo scope, keyword Recall@5 dev: `item` 0 → 11/18, `collection` 1 → 9/20, `all` 0 → 8/13; holdout `item` 0 → 4/6, `all` 0 → 3/6 (holdout không có câu `collection` có đáp án). Hybrid theo scope dev không đổi (18/18, 15/20, 12/13); holdout `all` 4 → 5/6. Mức tăng hybrid/pack hybrid ở holdout (+1 side) nằm trong biên nhiễu ±1 do tie-break UUID nêu trên, nên không coi là cải thiện hybrid đã chứng minh; điều đo được là **không thoái lui**.
+
+**Câu không có đáp án.** Có candidate không phải có bằng chứng; pipeline vẫn để generation và kiểm citation quyết định.
+
+| Mode | Nhóm (dev / holdout) | Dev: có candidate (TB hit) | Dev: RAG gửi evidence | Holdout: có candidate (TB hit) | Holdout: RAG gửi evidence |
+| --- | --- | --- | --- | --- | --- |
+| keyword | `no_answer` (12 / 3) | 0 → 9 (0 → 1,08) | 0 → 9 | 0 → 1 (0 → 0,33) | 0 → 1 |
+| keyword | kỳ vọng `insufficient_evidence` (22 / 6) | 0 → 14 (0 → 1,23) | 0 → 14 | 0 → 3 (0 → 1,17) | 0 → 3 |
+| hybrid | `no_answer` | 12 → 12 (11,0) | 12 → 12 | 3 → 3 (8,0) | 3 → 3 |
+| hybrid | kỳ vọng `insufficient_evidence` | 21 → 21 (11,86) | 21 → 21 | 6 → 6 (9,17) | 6 → 6 |
+
+Trước đây keyword mode “tránh” gửi evidence cho câu không có đáp án chỉ vì gần như không khớp gì, kể cả với 48/49 câu có đáp án. Sau thay đổi, RAG keyword gửi evidence cho 17/28 câu kỳ vọng thiếu bằng chứng (hybrid vẫn 27/28); abstention đúng phụ thuộc generation và vẫn **not measured**. RAG keyword còn tự trả `insufficient_evidence` cho 6 câu có đáp án không có hit và 4 câu so sánh chỉ có hit của một paper (`comparison_requires_multiple_papers`). Không câu nào trong bộ chỉ gồm từ phổ biến (`no_terms` = 0); trường hợp đó có test riêng.
+
+**ACL và provider:** 400 bản ghi search/vector/RAG (response + payload) và 87 chunk × 3 identity = 261 lần mở viewer, **0 vi phạm** trong phạm vi chạy, ở cả baseline và sau; 0 payload chứa văn bản chỉ có trong nhãn; 0 lời gọi provider ngoài, 0 outbound HTTP bị chặn; embedder cục bộ 239 lời gọi ở cả hai lần (keyword không thêm embedding). Regex so sánh vẫn bỏ sót CMP-03 (“differ”) và pack so sánh vẫn làm rơi chứng cứ (`evidence_pack` 5 → 4 side) — hai task riêng sau.
+
+**Đề xuất tiếp theo (chưa làm):** đo lại trên corpus lớn hơn/paper thật trước khi hạ ngưỡng; cân nhắc trọng số theo độ hiếm của term trong scope (IDF) hoặc cụm từ (`<->`) thay vì đếm term ngang nhau; tie-break theo khóa ổn định theo nội dung để lần chạy lặp lại được; đo latency truy vấn với workload 1.000 paper; rerank thật sau khi đối soát charge.
 
 ## Cần người đọc duyệt và việc tiếp theo
 
 - Duyệt 80 nhãn: quote/side có đủ và đúng không, kỳ vọng `insufficient_evidence` của câu mâu thuẫn (RCI-06), bibliographic (RCI-01) và so sánh một phía có hợp ý sản phẩm không. Sau khi duyệt, đổi trạng thái cần một quyết định schema mới (hiện schema cố ý chỉ nhận `pending_human_review`).
 - Chạy lại `run` với embedding/rerank/generation thật chỉ sau khi đối soát charge trên key và bật `pricing_verified` có chủ đích; khi đó mới có answer để chấm bằng phiếu người đọc và mới báo grounded/citation/abstention.
 - Thêm corpus thật có giấy phép phân phối rõ cho đúng version, tiến dần tới workload 1.000 paper; giữ holdout tách khỏi mọi lần chỉnh.
-- Ba phát hiện search/RAG được tách thành task riêng **sau khi merge PR này**, không xử lý ở đây (xem [roadmap](roadmap.md#task-sau-m4c)): keyword query yếu với câu hỏi tự nhiên, regex so sánh bỏ sót “differ”, giới hạn pack so sánh làm rơi chứng cứ. Mỗi task đo lại bằng bộ này, không chỉnh theo holdout.
+- Ba phát hiện search/RAG được tách thành task riêng sau khi merge PR M4c (xem [roadmap](roadmap.md#task-sau-m4c)): keyword query yếu với câu hỏi tự nhiên (đã xử lý ở [M4d-1](#m4d-1--keyword-query-cho-câu-hỏi-tự-nhiên-đo-trướcsau)), regex so sánh bỏ sót “differ”, giới hạn pack so sánh làm rơi chứng cứ. Mỗi task đo lại bằng bộ này, không chỉnh theo holdout.
