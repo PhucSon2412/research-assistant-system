@@ -98,7 +98,27 @@ Cách ly provider trong `run`:
 
 Báo cáo: [`evaluation/rag/reports/rag-eval-2026-09-28.md`](../evaluation/rag/reports/rag-eval-2026-09-28.md) (JSON cùng tên có từng bản ghi). Lệnh tái lập nằm đầu báo cáo. Số liệu dưới đây chỉ đúng cho corpus tổng hợp, embedder cục bộ và config mặc định, không là baseline chất lượng production.
 
-<!-- M4C-RESULTS -->
+Lần chạy 2026-09-28 trên commit `5be6ce7` (tree sạch), Windows 11, Conda `ras` Python 3.12.14, pypdf 6.19.0, PostgreSQL/MinIO của Compose, khoảng 2 phút; chạy hai lần cho cùng số liệu.
+
+- Ingest: 16/16 item `ready`/`indexed`, coverage khớp kỳ vọng (P08, P09 `partial`), 87 chunk; **63/63** side chứng cứ được chunk active phủ, nên không có lỗi `extraction` trên corpus này.
+- Recall@5 trên 49 câu `answered` (63 side):
+
+| Stage | Recall@5 TB theo câu | Side trúng / tổng | Câu nhiều side đủ mọi side | Phân lỗi |
+| --- | --- | --- | --- | --- |
+| `search:keyword` | 0,020 | 1/63 | 0/14 | ok 1, retrieval 48 |
+| `search:hybrid` (vector cục bộ, không rerank) | 0,918 | 55/63 | 7/14 | ok 42, rank 7 |
+| `vector` | 0,918 | 55/63 | 7/14 | ok 42, rank 7 |
+| `rag_pack:hybrid` (toàn pack ≤ 6 chunk) | 0,939 | 57/63 | 9/14 | ok 44, evidence_pack 5 |
+| `rag_pack:keyword` | 0,020 | 1/63 | 0/14 | ok 1, retrieval 48 |
+
+- Nhóm `comparison` (12 câu có đáp án, 24 side): `search:hybrid` 16/24 side, đủ hai phía ở 5/12 câu; pack hybrid 18/24, đủ hai phía 7/12. Các lỗi còn lại ở pack (CMP-04, 06, 07, 10, 13) là chunk đúng đứng sau giới hạn 6 chunk hoặc paper đúng đứng sau 3 paper đầu. Regex so sánh nhận ra 14/15 câu (bỏ sót CMP-03 dùng “differ”).
+- Dev/holdout, `search:hybrid`: dev 0,923 (45/51 side, 39 câu), holdout 0,900 (10/12 side, 10 câu). Holdout không được dùng để chỉnh gì.
+- Pipeline RAG trước generation: mode hybrid gửi evidence cho 49/49 câu có đáp án và 27/28 câu kỳ vọng `insufficient_evidence` (chỉ Admin tự từ chối vì không có item); mode keyword tự từ chối 48/49 câu có đáp án vì không có hit. Ba câu scope trái quyền trả `404` ở cả hai mode.
+- ACL: 400 bản ghi search/vector/RAG (response + payload) có 0 vi phạm; 87 chunk × 3 identity = 261 lần mở viewer, 0 vi phạm; payload chỉ có khóa `question`/`evidence` và 0 payload chứa văn bản chỉ có trong nhãn. **0 lỗi ACL trong phạm vi các request đã chạy**, không phải bằng chứng cho mọi đường truy cập.
+- 0 lời gọi provider ngoài, 0 lần outbound HTTP bị chặn, 239 lời gọi embedder cục bộ.
+- `not measured`: rerank, chất lượng vector ngữ nghĩa thật, grounded answer rate, citation accuracy, abstention appropriateness, latency p95, chi phí/charge.
+
+Recall hybrid cao ở đây chủ yếu vì corpus nhỏ, câu hỏi và paper do cùng một người viết với từ vựng trùng nhau, và embedder băm là phép so khớp từ; không suy ra được chất lượng production. Số keyword thấp là phát hiện về cách dựng query hiện hành (xem [decisions](decisions.md#quyết-định-triển-khai-m4c-2026-09-28)), không phải lỗi dữ liệu.
 
 ## Cần người đọc duyệt và việc tiếp theo
 
