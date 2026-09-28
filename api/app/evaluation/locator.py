@@ -18,7 +18,8 @@ from app.config import IngestPolicy, PdfBodyThreshold
 from app.evaluation.schema import NonEvidence, Paper, Span
 from app.ingest import markdown, pdf
 
-MIN_OVERLAP = 0.5
+FULL_SPAN = 1.0
+DIAGNOSTIC_OVERLAP = 0.5  # labelled diagnostic only, never a headline metric
 
 
 class LocatorError(ValueError):
@@ -146,12 +147,25 @@ def check_non_evidence(entry: NonEvidence, source: Source) -> list[str]:
     return []
 
 
-def covers(span: Span, hit: Hit, minimum: float = MIN_OVERLAP) -> bool:
-    """A chunk covers a gold span when it holds at least ``minimum`` of the span's characters."""
+def valid_locator(start: int | None, end: int | None) -> bool:
+    return isinstance(start, int) and isinstance(end, int) and 0 <= start < end
+
+
+def covers(span: Span, hit: Hit, minimum: float = FULL_SPAN) -> bool:
+    """Whether a chunk holds the gold span, on the same item/kind (and page for PDF).
+
+    The default and headline rule is the whole span inside the chunk's
+    half-open range. A smaller ``minimum`` (the share of span characters that
+    must lie inside the chunk) exists only for the labelled diagnostic.
+    """
     if hit.item != span.item or hit.locator_kind != span.locator_kind:
         return False
-    if span.locator_kind == "pdf" and hit.page != span.page:
+    if span.locator_kind == "pdf" and (span.page is None or hit.page != span.page):
         return False
+    if not (valid_locator(span.start_offset, span.end_offset) and valid_locator(hit.start_offset, hit.end_offset)):
+        return False
+    if minimum >= FULL_SPAN:
+        return hit.start_offset <= span.start_offset and span.end_offset <= hit.end_offset
     length = span.end_offset - span.start_offset
     shared = min(span.end_offset, hit.end_offset) - max(span.start_offset, hit.start_offset)
-    return length > 0 and shared >= minimum * length
+    return shared > 0 and shared >= minimum * length

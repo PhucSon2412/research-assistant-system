@@ -10,7 +10,7 @@ from pydantic import ValidationError
 from app.config import EmbeddingPolicy, GenerationPolicy, get_settings
 from app.evaluation import local_embedding
 from app.evaluation.corpus import DEFAULT_ROOT, build_pdfs
-from app.evaluation.locator import Hit, annotate, check_non_evidence, check_span, covers, load_source
+from app.evaluation.locator import DIAGNOSTIC_OVERLAP, Hit, annotate, check_non_evidence, check_span, covers, load_source
 from app.evaluation.metrics import Row, aggregate, failure, recall, side_ranks
 from app.evaluation.review import answer_rows, machine_check, score as score_review
 from app.evaluation.runner import (ORIGIN, Capture, Environment, check_viewer, eval_settings, evaluate,
@@ -141,12 +141,24 @@ def test_pdf_sources_render_to_the_committed_bytes(dataset):
 def test_cover_rule_and_recall_formulas():
     span = Span(item="A/P01", locator_kind="markdown", quote="x" * 10, start_offset=100, end_offset=110,
                 start_line=3, end_line=3, parser="p")
-    assert covers(span, Hit("A/P01", "markdown", None, 0, 200))
-    assert covers(span, Hit("A/P01", "markdown", None, 105, 300))       # exactly half
-    assert not covers(span, Hit("A/P01", "markdown", None, 106, 300))
-    assert not covers(span, Hit("B/P01", "markdown", None, 0, 200))
+    md = lambda start, end, item="A/P01": Hit(item, "markdown", None, start, end)  # noqa: E731
+    # Headline rule: the chunk's half-open range holds the whole span.
+    assert covers(span, md(0, 200)) and covers(span, md(100, 110))            # wider / exact bounds
+    assert not covers(span, md(101, 110)) and not covers(span, md(100, 109))  # one code point short
+    assert not covers(span, md(105, 300))                                     # exactly half
+    assert not covers(span, md(110, 200)) and not covers(span, md(0, 100))    # adjacent, no overlap
+    assert not covers(span, md(0, 200, "B/P01"))
+    assert not covers(span, Hit("A/P01", "pdf", None, 0, 200))                # wrong locator kind
+    assert not covers(span, md(-1, -1)) and not covers(span, md(120, 110))    # invalid chunk locator
+    assert not covers(span.model_copy(update={"end_offset": 100}), md(0, 200))  # empty gold span
+    assert not covers(span.model_copy(update={"start_offset": None}), md(0, 200))
+    # The 50% rule is a labelled diagnostic only.
+    assert covers(span, md(105, 300), DIAGNOSTIC_OVERLAP) and not covers(span, md(106, 300), DIAGNOSTIC_OVERLAP)
+    assert not covers(span, md(110, 200), DIAGNOSTIC_OVERLAP)
     pdf_span = span.model_copy(update={"locator_kind": "pdf", "page": 2})
     assert covers(pdf_span, Hit("A/P01", "pdf", 2, 90, 120)) and not covers(pdf_span, Hit("A/P01", "pdf", 3, 90, 120))
+    assert not covers(pdf_span, Hit("A/P01", "pdf", 2, 105, 120))
+    assert not covers(pdf_span.model_copy(update={"page": None}), Hit("A/P01", "pdf", None, 90, 120))
 
     question = Question.model_validate({
         "id": "CMP-99", "split": "dev", "group": "comparison", "question": "q", "identity": "user_a",
@@ -158,6 +170,9 @@ def test_cover_rule_and_recall_formulas():
     hits.insert(1, Hit("A/P01", "markdown", None, 100, 110))
     ranks = side_ranks(question, hits)
     assert ranks == [2, 8]
+    half = [Hit("A/P01", "markdown", None, 105, 400), *hits]  # holds exactly half of side one
+    assert side_ranks(question, half) == [3, 9]
+    assert side_ranks(question, half, DIAGNOSTIC_OVERLAP) == [1, 9]
     assert recall(ranks) == 0.5 and recall(ranks, k=8) == 1.0
     assert failure(ranks, [True, True], acl_violation=False) == "rank"
     assert failure([2, None], [True, True], acl_violation=False) == "retrieval"
@@ -167,7 +182,7 @@ def test_cover_rule_and_recall_formulas():
     rows = [Row("CMP-99", "comparison", "dev", "all", "vector", (2, 8), "rank"),
             Row("SP-99", "single_paper", "dev", "all", "vector", (1,), "ok")]
     [entry] = aggregate(rows, ["stage"])
-    assert entry["questions"] == 2 and entry["recall_at_k"] == 0.75
+    assert entry["questions"] == 2 and entry["mean_per_question"] == 0.75
     assert (entry["sides_hit"], entry["sides_total"]) == (2, 3)
     assert (entry["all_sides_hit"], entry["multi_side_questions"]) == (0, 1)
     with pytest.raises(ValueError):
@@ -220,37 +235,99 @@ def test_instrumented_run_blocks_real_outbound_http():
     assert httpx.HTTPTransport.handle_request is original
 
 
-def test_review_scoring_uses_only_human_columns(dataset):
-    manifest, qset = dataset
+def _review_rows(qset, citations_per_claim=(2,)):
     question = _question(qset, "SP-20")
     span = question.evidence[0].spans[0]
     chunk = {"text": "## Abstract\n\n" + span.quote}
     citation = {"chunk_id": "c1", "item_id": "i1", "quote": span.quote, "locator_kind": "markdown",
                 "start_line": span.start_line, "end_line": span.end_line, "start_offset": span.start_offset - 13,
                 "end_offset": span.end_offset, "start_page": None, "locator_detail": {}}
+    claims = [{"text": f"claim {n}", "citations": [citation] * count} for n, count in enumerate(citations_per_claim, 1)]
+    response = {"status": "answered", "claims": claims}
+    return question, citation, chunk, answer_rows(question, "hybrid", response, {"c1": chunk}, lambda _: "A/P06")
+
+
+def _grade(row, supported="yes", correct="yes", reviewer="r1"):
+    return row | {"human_claim_supported": supported, "human_citation_correct": correct, "reviewer": reviewer}
+
+
+def test_review_machine_checks_are_structural_only(dataset):
+    _, qset = dataset
+    question, citation, chunk, rows = _review_rows(qset)
     assert machine_check(citation, {"c1": chunk}, question, "A/P06") == {
-        "machine_id_in_evidence": "yes", "machine_quote_verbatim": "yes", "machine_locator_overlaps_gold": "yes"}
+        "machine_id_in_evidence": "yes", "machine_quote_verbatim": "yes", "machine_locator_covers_gold": "yes"}
     assert machine_check(citation | {"chunk_id": "c2"}, {"c1": chunk}, question, "A/P06")["machine_id_in_evidence"] == "no"
     assert machine_check(citation | {"quote": "invented"}, {"c1": chunk}, question, "A/P06")["machine_quote_verbatim"] == "no"
-    response = {"status": "answered", "claims": [{"text": "41 papers", "citations": [citation, citation]}]}
-    rows = answer_rows(question, "hybrid", response, {"c1": chunk}, lambda _: "A/P06")
-    assert len(rows) == 2 and rows[0]["machine_locator_overlaps_gold"] == "yes"
-    # Machine checks alone never count as a reviewed judgement.
-    assert score_review(rows)["grounded_answer_rate"]["denominator"] == 0
-    rows[0] |= {"human_claim_supported": "yes", "human_citation_correct": "yes", "reviewer": "r1"}
-    rows[1] |= {"human_claim_supported": "partial", "human_citation_correct": "no", "reviewer": "r1"}
-    abstain = answer_rows(_question(qset, "NA-01"), "hybrid", {"status": "insufficient_evidence", "claims": []}, {}, str)
-    abstain[0] |= {"human_abstention_appropriate": "yes", "reviewer": "r1"}
-    wrong = answer_rows(_question(qset, "NA-02"), "hybrid", {"status": "insufficient_evidence", "claims": []}, {}, str)
-    wrong[0] |= {"human_abstention_appropriate": "no", "reviewer": "r2"}
-    metrics = score_review(rows + abstain + wrong)
+    half = citation | {"start_offset": citation["start_offset"] + 13 + 1}
+    assert machine_check(half, {"c1": chunk}, question, "A/P06")["machine_locator_covers_gold"] == "no"
+    assert len(rows) == 2 and {r["response_claims"] for r in rows} == {"1"} and {r["claim_citations"] for r in rows} == {"2"}
+    # Machine columns alone never count as a reviewed judgement.
+    metrics = score_review(rows)
+    assert metrics["grounded_answer_rate"]["denominator"] == 0
+    assert metrics["answered_responses"]["unreviewed"] == 1
+
+
+def test_grounded_excludes_partly_graded_response(dataset):
+    _, qset = dataset
+    _, _, _, rows = _review_rows(qset)
+    partial = [_grade(rows[0]), rows[1]]  # two citation rows, only one graded
+    metrics = score_review(partial)
+    assert metrics["grounded_answer_rate"] == {"numerator": 0, "denominator": 0, "value": None}
+    assert metrics["answered_responses"]["incomplete"] == 1
+    assert metrics["answered_responses"]["incomplete_ids"] == ["SP-20/hybrid"]
+    # A judgement with no named reviewer is not graded either.
+    assert score_review([_grade(rows[0]), _grade(rows[1], reviewer="")])["answered_responses"]["incomplete"] == 1
+    # A deleted citation row leaves the response incomplete, even if the rest is graded.
+    assert score_review([_grade(rows[0])])["answered_responses"]["incomplete"] == 1
+    _, _, _, two_claims = _review_rows(qset, (1, 1))
+    assert score_review([_grade(two_claims[0])])["answered_responses"]["incomplete"] == 1
+
+
+def test_grounded_counts_complete_responses(dataset):
+    _, qset = dataset
+    _, _, _, rows = _review_rows(qset, (2, 1))
+    complete = [_grade(row) for row in rows]
+    metrics = score_review(complete)
+    assert metrics["grounded_answer_rate"] == {"numerator": 1, "denominator": 1, "value": 1.0}
+    assert metrics["answered_responses"]["complete"] == 1
+    assert metrics["citation_accuracy"] == {"numerator": 3, "denominator": 3, "value": 1.0}
+    one_unsupported = [_grade(rows[0]), _grade(rows[1]), _grade(rows[2], supported="partial", correct="no")]
+    metrics = score_review(one_unsupported)
     assert metrics["grounded_answer_rate"] == {"numerator": 0, "denominator": 1, "value": 0.0}
-    assert metrics["citation_accuracy"] == {"numerator": 1, "denominator": 2, "value": 0.5}
-    assert metrics["abstention_appropriateness"] == {"numerator": 1, "denominator": 2, "value": 0.5}
+    assert metrics["citation_accuracy"] == {"numerator": 2, "denominator": 3, "value": 0.6667}
+
+
+def test_grounded_rejects_conflicting_labels_for_one_claim(dataset):
+    _, qset = dataset
+    _, _, _, rows = _review_rows(qset)
+    conflicting = [_grade(rows[0], supported="yes"), _grade(rows[1], supported="no")]
+    metrics = score_review(conflicting)
+    assert metrics["grounded_answer_rate"]["denominator"] == 0
+    assert metrics["answered_responses"]["conflicting_ids"] == ["SP-20/hybrid"]
+    edited = [_grade(rows[0]), _grade(rows[1]) | {"claim_text": "edited claim"}]
+    assert score_review(edited)["answered_responses"]["conflicting"] == 1
+    duplicated = [_grade(rows[0]), _grade(rows[0])]
+    assert score_review(duplicated)["answered_responses"]["conflicting"] == 1
     with pytest.raises(ValueError):
         score_review([rows[0] | {"human_claim_supported": "probably"}])
-    with pytest.raises(ValueError):
-        score_review([rows[0] | {"reviewer": ""}])
+
+
+def test_abstention_scoring_needs_one_consistent_reviewed_verdict(dataset):
+    _, qset = dataset
+    sheets = []
+    for qid, verdict, reviewer in (("NA-01", "yes", "r1"), ("NA-02", "no", "r2"), ("NA-03", "yes", "")):
+        rows = answer_rows(_question(qset, qid), "hybrid", {"status": "insufficient_evidence", "claims": []}, {}, str)
+        sheets += [rows[0] | {"human_abstention_appropriate": verdict, "reviewer": reviewer}]
+    metrics = score_review(sheets)
+    assert metrics["abstention_appropriateness"] == {"numerator": 1, "denominator": 2, "value": 0.5}
+    assert metrics["abstention_responses"]["unreviewed"] == 1
+    answered_badly = answer_rows(_question(qset, "NA-04"), "hybrid", {"status": "answered", "claims": [
+        {"text": "made up", "citations": [{"chunk_id": "x", "item_id": "i", "quote": "q", "locator_kind": "markdown",
+                                          "start_line": 1, "end_line": 1, "start_offset": 0, "end_offset": 1,
+                                          "start_page": None, "locator_detail": {}}]}]}, {}, str)
+    mixed = [_grade(answered_badly[0], supported="no", correct="no") | {"human_abstention_appropriate": "no"}]
+    mixed.append(dict(mixed[0]) | {"human_abstention_appropriate": "yes", "citation_no": "2", "claim_citations": "2"})
+    assert score_review(mixed)["abstention_responses"]["conflicting"] == 1
 
 
 ACL_ITEMS = {"A/P01", "A/P10", "A/P11", "B/P11", "B/P20", "B/P21", "C/C01"}

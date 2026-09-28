@@ -34,6 +34,14 @@ Các milestone nhỏ, có thể review riêng. Thứ tự và phạm vi dưới 
 
 **M4c (PR đánh giá):** bộ 80 câu nhãn agent `pending_human_review`, manifest corpus tổng hợp có checksum/giấy phép, công cụ validate/annotate/run/review và báo cáo mẫu ở [rag-evaluation](rag-evaluation.md). Không đổi hành vi RAG, không streaming, không gọi OpenRouter; chất lượng generation và p95 chưa đo. Tiếp theo: người đọc duyệt nhãn, streaming, rồi chạy generation thật sau khi đối soát charge để chấm grounded/citation/abstention.
 
+### Task sau M4c
+
+Ba task search/RAG riêng, mở sau khi PR M4c merge; mỗi task là một PR, đo trước/sau bằng bộ M4c (Recall@5 search và phủ pack theo luật trọn span), không chỉnh theo holdout, không gộp vào PR đánh giá:
+
+1. **Keyword query:** `plainto_tsquery('simple', câu hỏi)` AND mọi token nên keyword search/RAG gần như không khớp câu hỏi tự nhiên (Recall@5 keyword 1/63 side). Đề xuất và đo cách dựng query khác trước khi đổi hành vi.
+2. **Nhận diện câu so sánh:** `app.rag.COMPARISON` bỏ sót câu dùng “differ” (CMP-03), nên câu đó không qua nhánh pack/gate so sánh.
+3. **Giới hạn pack so sánh:** pack ≤ 3 paper/6 chunk theo thứ hạng làm rơi chứng cứ đúng ở 5 câu so sánh (CMP-04, 06, 07, 10, 13); cần phương án chọn chunk/paper và đo lại byte/token.
+
 ## Ưu tiên sau MVP — đã xác nhận về thứ tự
 
 1. DOI/arXiv URL import: metadata + link trước; full text chỉ nếu có file và quyền.

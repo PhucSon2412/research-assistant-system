@@ -1,28 +1,31 @@
 """Recall@k and failure attribution with explicit denominators.
 
 Each gold *side* is one required piece of evidence (a comparison has one side
-per paper). A side is found at rank r when the r-th retrieved chunk covers any
-of its acceptable spans. Per question, Recall@k = sides found within k / sides.
-Group figures report the mean of per-question values and the pooled
-``sides_hit / sides_total`` so the denominator is always visible.
+per paper). A side is found at rank r when the r-th retrieved chunk contains
+the whole of one of its acceptable spans (``locator.covers``; a partial-overlap
+rule exists only as a labelled diagnostic). Per question, the value is sides
+found within k / sides: Recall@5 for a ranked search list, or coverage of the
+whole evidence pack when k is the pack size. Group figures report the mean of
+per-question values and the pooled ``sides_hit / sides_total`` so the
+denominator is always visible.
 """
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
-from app.evaluation.locator import Hit, covers
+from app.evaluation.locator import FULL_SPAN, Hit, covers
 from app.evaluation.schema import Question
 
 K = 5
 
 
-def side_ranks(question: Question, hits: Sequence[Hit]) -> list[int | None]:
+def side_ranks(question: Question, hits: Sequence[Hit], minimum: float = FULL_SPAN) -> list[int | None]:
     """1-based rank of the first hit covering each side, or None."""
     ranks: list[int | None] = []
     for side in question.evidence:
         ranks.append(next((rank for rank, hit in enumerate(hits, 1)
-                           if any(covers(span, hit) for span in side.spans)), None))
+                           if any(covers(span, hit, minimum) for span in side.spans)), None))
     return ranks
 
 
@@ -79,7 +82,7 @@ def aggregate(rows: Iterable[Row], keys: Sequence[str], k: int = K) -> list[dict
         entry = dict(zip(keys, key))
         entry |= {
             "questions": len(members),
-            "recall_at_k": round(sum(per_question) / len(per_question), 4),
+            "mean_per_question": round(sum(per_question) / len(per_question), 4),
             "sides_hit": sum(sides_within(row.ranks, k) for row in members),
             "sides_total": sum(len(row.ranks) for row in members),
             "all_sides_hit": sum(sides_within(row.ranks, k) == len(row.ranks) for row in multi),

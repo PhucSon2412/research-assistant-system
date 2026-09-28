@@ -73,55 +73,70 @@ Cách ly provider trong `run`:
 
 ### Metric
 
-- Recall@5 chỉ tính trên câu `answered`. Một side trúng ở hạng r khi chunk hạng r chứa ít nhất 50% ký tự của một span chuẩn của side đó. Recall@5 của câu = số side trúng trong top 5 / số side. Bảng báo trung bình theo câu, tổng `side trúng/tổng side` và số câu nhiều side tìm đủ **mọi** side, theo stage × nhóm/scope/split.
-- Stage: `search:keyword`, `search:hybrid` (keyword + vector cục bộ, RRF, không rerank), `vector`, và `rag_pack:*` (evidence pack thực sự dựng cho generation; tính trên toàn pack ≤ 6 chunk).
-- Phân lỗi: `acl` → `extraction` (không chunk active nào phủ span) → `retrieval` (không có trong danh sách trả về) → `rank` (có nhưng hạng > 5) → `evidence_pack` (search nội bộ của RAG trả về nhưng pack giới hạn chunk/paper/byte không chọn). `generation` là **not measured** trong PR này.
+- **Luật khớp chính:** một side trúng khi chunk chứa **trọn 100%** một span chuẩn của side đó: cùng item, cùng loại locator, cùng trang với PDF, offset nửa mở hợp lệ (`0 ≤ start < end`) ở cả span và chunk, và `chunk.start ≤ span.start`, `span.end ≤ chunk.end`. Chunk chỉ chứa một phần span không được tính. Luật “chunk chứa ≥ 50% ký tự span” chỉ còn là **số chẩn đoán** có nhãn riêng trong báo cáo, không phải kết quả chính và không so với mục tiêu.
+- Mẫu số là câu `answered`. Giá trị của câu = số side trúng / số side; bảng báo trung bình theo câu, tổng `side trúng/tổng side` và số câu nhiều side tìm đủ **mọi** side, theo stage × nhóm/scope/split.
+- **Recall@5** chỉ dành cho danh sách có thứ hạng: `search:keyword`, `search:hybrid` (keyword + vector cục bộ, RRF, không rerank) và `vector`; side phải nằm trong 5 chunk đầu.
+- **Phủ evidence pack** (`rag_pack:*`) là tỷ lệ side nằm ở bất kỳ đâu trong **toàn evidence pack tối đa 6 chunk** (3 paper, 12.000 byte) mà RAG gửi generation. Đây **không** phải Recall@5 và không so trực tiếp với cột Recall@5.
+- Phân lỗi: `acl` → `extraction` (không chunk active nào chứa trọn span) → `retrieval` (không có trong danh sách trả về) → `rank` (có nhưng hạng > 5) → `evidence_pack` (search nội bộ của RAG trả về nhưng pack giới hạn chunk/paper/byte không chọn). `generation` là **not measured** trong PR này.
 - Với câu không có đáp án, báo cáo chỉ ghi pipeline tự trả `insufficient_evidence` trước generation hay đã gửi evidence đi; đó **không** là abstention appropriateness.
 - ACL: mọi response search/vector/RAG và payload capture được kiểm item id thuộc tập được phép của identity/scope, marker của item người khác không xuất hiện, và scope trái quyền trả đúng `404 {"error":"not_found"}`. Mọi chunk xuất hiện được mở qua `/search/chunks/{id}` bằng cả ba identity: owner `200`, người khác `404`. Payload gửi model chỉ có khóa `question` và `evidence`; báo cáo đếm payload chứa văn bản chỉ có trong nhãn (`rationale`, `label_status`, ID câu hỏi). `supported_claim` có thể trùng nguyên văn paper nên không dùng làm tín hiệu rò rỉ.
 
 ## Chấm bằng người đọc
 
-`review-template` tạo phiếu CSV mỗi dòng một câu × mode; khi có câu trả lời thật, `app.evaluation.review.answer_rows` tách một dòng cho mỗi citation và điền ba cột kiểm máy: chunk ID có trong evidence, quote nguyên văn, locator chồng span chuẩn. Ba cột này chỉ là kiểm cấu trúc. Người đọc điền:
+`review-template` tạo phiếu CSV mỗi dòng một câu × mode; khi có câu trả lời thật, `app.evaluation.review.answer_rows` tách một dòng cho mỗi citation và điền ba cột kiểm máy: chunk ID có trong evidence, quote nguyên văn, locator chứa trọn span chuẩn (`machine_locator_covers_gold`). Ba cột này chỉ là kiểm cấu trúc. Hai cột `response_claims` và `claim_citations` ghi số claim của response và số citation của từng claim lúc sinh phiếu, để phát hiện dòng bị thiếu. Người đọc điền:
 
 - `human_claim_supported` (`yes`/`partial`/`no`): đọc span được dẫn trong file gốc, claim có được đoạn đó hỗ trợ đầy đủ không; câu so sánh phải có chứng cứ của đủ các phía và phân biệt ý kiến tác giả với kết luận hệ thống.
 - `human_citation_correct` (`yes`/`no`): citation trỏ đúng span chứng cứ (item/version/file/vị trí), không phải reference entry hay injection.
 - `human_abstention_appropriate` (`yes`/`no`/`n/a`) cho câu kỳ vọng không trả lời: hệ thống từ chối hoặc nêu rõ thiếu/mâu thuẫn, không bịa phần thiếu, không lộ item trái quyền.
 - `reviewer`, `review_date`, `notes`.
 
-`score-review` tính grounded answer rate (response `answered` có mọi claim `yes` / response `answered` đã chấm), citation accuracy (citation `yes` / citation đã chấm) và abstention appropriateness (câu kỳ vọng không trả lời được chấm `yes` / số đã chấm), luôn kèm tử số, mẫu số và số dòng chưa chấm. Không dùng LLM tự chấm nghĩa claim. Gold label không được đưa vào prompt RAG.
+`score-review` tính với tử số, mẫu số và số dòng chưa chấm:
+
+- **Grounded answer rate** = response `answered` hoàn tất có mọi claim `yes` / số response `answered` **hoàn tất**. Một response chỉ hoàn tất khi đủ mọi claim (1..`response_claims`) và mọi dòng citation (1..`claim_citations`) của từng claim, mỗi dòng có `reviewer`, `human_claim_supported` và `human_citation_correct`. Các dòng lặp của cùng claim phải cùng `claim_text`, cùng `claim_citations` và cùng giá trị `human_claim_supported`; số citation không được trùng. Response chấm dở (`incomplete`, gồm thiếu dòng hoặc có phán đoán mà không có reviewer), mâu thuẫn (`conflicting`) hoặc chưa chấm (`unreviewed`) được đếm và liệt kê riêng, **không** vào mẫu số, không mặc nhiên thành grounded hay ungrounded.
+- **Citation accuracy** = dòng citation có reviewer và `human_citation_correct=yes` / dòng citation có reviewer và giá trị.
+- **Abstention appropriateness** = response cho câu kỳ vọng không trả lời có đúng một phán đoán `human_abstention_appropriate` nhất quán (từ dòng có reviewer) là `yes` / số response như vậy; phán đoán mâu thuẫn được đếm riêng.
+
+Giá trị ngoài tập cho phép (ví dụ `probably`) làm lệnh báo lỗi. Không dùng LLM tự chấm nghĩa claim. Gold label không được đưa vào prompt RAG.
 
 ## Test
 
-`api/tests/test_evaluation.py` (14 test): dataset commit hợp lệ và mọi nhãn `pending_human_review`; schema từ chối nhãn "đã duyệt", evidence ngoài scope, so sánh một phía, `scope_not_found` sai, marker của chính caller, câu lặp ngoài nhóm permission, thiếu holdout/số câu; checksum và cờ phân phối; lệch offset/dòng/parser và reference entry bị gắn làm evidence (Markdown); span PDF theo trang và trang không trích xuất; PDF render lại đúng SHA-256; luật phủ 50% và Recall/phân lỗi/aggregate có mẫu số; phân biệt `evidence_pack`/`retrieval`/`rank`/`extraction`; embedder xác định, đơn vị, 0 token; `eval_settings` không đổi mặc định `pricing_verified`; chặn outbound HTTP và khôi phục; công thức chấm chỉ dựa cột người đọc. Test ACL chạy chính runner trên PostgreSQL/MinIO thật với A/B/Admin, cùng DOI, file cùng hash và canary riêng; kiểm search/vector/RAG payload/response/viewer, IDOR item/collection, Admin không có evidence, và một generation giả cố dẫn chunk của B bị từ chối. Kiểm đối chứng thủ công: tạm bỏ điều kiện owner trong SQL search làm test ACL này fail; đã khôi phục.
+`api/tests/test_evaluation.py` (18 test): dataset commit hợp lệ và mọi nhãn `pending_human_review`; schema từ chối nhãn "đã duyệt", evidence ngoài scope, so sánh một phía, `scope_not_found` sai, marker của chính caller, câu lặp ngoài nhóm permission, thiếu holdout/số câu; checksum và cờ phân phối; lệch offset/dòng/parser và reference entry bị gắn làm evidence (Markdown); span PDF theo trang và trang không trích xuất; PDF render lại đúng SHA-256; luật phủ trọn span với các biên (vừa khít, thiếu một code point, đúng một nửa, kề nhau, locator không hợp lệ, sai trang/loại) và luật chẩn đoán 50%, Recall/phân lỗi/aggregate có mẫu số; phân biệt `evidence_pack`/`retrieval`/`rank`/`extraction`; embedder xác định, đơn vị, 0 token; `eval_settings` không đổi mặc định `pricing_verified`; chặn outbound HTTP và khôi phục; công thức chấm chỉ dựa cột người đọc, gồm response hai dòng citation mới chấm một dòng (không vào mẫu số), response hoàn tất, nhãn mâu thuẫn trên cùng claim, dòng bị xóa, phán đoán thiếu reviewer và abstention mâu thuẫn. Test ACL chạy chính runner trên PostgreSQL/MinIO thật với A/B/Admin, cùng DOI, file cùng hash và canary riêng; kiểm search/vector/RAG payload/response/viewer, IDOR item/collection, Admin không có evidence, và một generation giả cố dẫn chunk của B bị từ chối. Kiểm đối chứng thủ công: tạm bỏ điều kiện owner trong SQL search làm test ACL này fail; đã khôi phục.
 
 ## Kết quả lần chạy mẫu
 
 Báo cáo: [`evaluation/rag/reports/rag-eval-2026-09-28.md`](../evaluation/rag/reports/rag-eval-2026-09-28.md) (JSON cùng tên có từng bản ghi). Lệnh tái lập nằm đầu báo cáo. Số liệu dưới đây chỉ đúng cho corpus tổng hợp, embedder cục bộ và config mặc định, không là baseline chất lượng production.
 
-Lần chạy 2026-09-28 trên commit `5be6ce7` (tree sạch), Windows 11, Conda `ras` Python 3.12.14, pypdf 6.19.0, PostgreSQL/MinIO của Compose, khoảng 2 phút; chạy hai lần cho cùng số liệu.
+Lần chạy 2026-09-28 trên commit `M4C_COMMIT` (tree sạch), Windows 11, Conda `ras` Python 3.12.14, pypdf 6.19.0, PostgreSQL/MinIO của Compose, khoảng 2 phút. Cả 80 nhãn vẫn `pending_human_review`, nên các số dưới đây **chưa chứng minh** đã đạt mục tiêu chất lượng nào.
 
-- Ingest: 16/16 item `ready`/`indexed`, coverage khớp kỳ vọng (P08, P09 `partial`), 87 chunk; **63/63** side chứng cứ được chunk active phủ, nên không có lỗi `extraction` trên corpus này.
-- Recall@5 trên 49 câu `answered` (63 side):
+- Ingest: 16/16 item `ready`/`indexed`, coverage khớp kỳ vọng (P08, P09 `partial`), 87 chunk; **63/63** side chứng cứ có chunk active chứa trọn span, nên không có lỗi `extraction` trên corpus này.
+- Recall@5 (luật phủ trọn span) trên 49 câu `answered`, 63 side:
 
 | Stage | Recall@5 TB theo câu | Side trúng / tổng | Câu nhiều side đủ mọi side | Phân lỗi |
 | --- | --- | --- | --- | --- |
 | `search:keyword` | 0,020 | 1/63 | 0/14 | ok 1, retrieval 48 |
 | `search:hybrid` (vector cục bộ, không rerank) | 0,918 | 55/63 | 7/14 | ok 42, rank 7 |
 | `vector` | 0,918 | 55/63 | 7/14 | ok 42, rank 7 |
-| `rag_pack:hybrid` (toàn pack ≤ 6 chunk) | 0,939 | 57/63 | 9/14 | ok 44, evidence_pack 5 |
+
+- Phủ evidence pack (toàn pack tối đa 6 chunk, **không phải Recall@5**), cùng mẫu số:
+
+| Stage | Phủ pack TB theo câu | Side trong pack / tổng | Câu nhiều side đủ mọi side | Phân lỗi |
+| --- | --- | --- | --- | --- |
+| `rag_pack:hybrid` | 0,939 | 57/63 | 9/14 | ok 44, evidence_pack 5 |
 | `rag_pack:keyword` | 0,020 | 1/63 | 0/14 | ok 1, retrieval 48 |
 
-- Nhóm `comparison` (12 câu có đáp án, 24 side): `search:hybrid` 16/24 side, đủ hai phía ở 5/12 câu; pack hybrid 18/24, đủ hai phía 7/12. Các lỗi còn lại ở pack (CMP-04, 06, 07, 10, 13) là chunk đúng đứng sau giới hạn 6 chunk hoặc paper đúng đứng sau 3 paper đầu. Regex so sánh nhận ra 14/15 câu (bỏ sót CMP-03 dùng “differ”).
-- Dev/holdout, `search:hybrid`: dev 0,923 (45/51 side, 39 câu), holdout 0,900 (10/12 side, 10 câu). Holdout không được dùng để chỉnh gì.
+- **Đối chiếu với phép tính review trước (hybrid 55/63, pack 57/63, luật ≥ 50%):** số mới giống hệt. Kiểm từng mẫu trên bản ghi của lần chạy: cả 315 lượt đánh giá side (63 side × 5 stage) cho cùng hạng dưới hai luật, và không có chunk trả về nào chỉ chồng một phần gold span. Lý do: mọi span chuẩn là một câu nằm gọn trong một section Markdown hoặc một trang PDF, còn chunk hiện hành là cả section (≤ 1.200 ký tự) hoặc đoạn trong một trang, nên không có span bị cắt ngang chunk. Trên corpus có section dài hơn, hai luật có thể khác nhau; khi đó chỉ số theo luật trọn span là kết quả.
+- Nhóm `comparison` (12 câu có đáp án, 24 side): Recall@5 `search:hybrid` 16/24 side, đủ hai phía trong top 5 ở 5/12 câu; phủ pack hybrid 18/24 side, đủ hai phía trong pack ở 7/12 câu. Mất ở pack (CMP-04, 06, 07, 10, 13) là do chunk đúng nằm sau giới hạn 6 chunk hoặc paper đúng nằm sau 3 paper đầu. Regex so sánh nhận ra 14/15 câu (bỏ sót CMP-03 dùng “differ”).
+- Recall@5 `search:hybrid` dev/holdout: dev 0,923 (45/51 side, 39 câu), holdout 0,900 (10/12 side, 10 câu). Holdout không được dùng để chỉnh gì.
 - Pipeline RAG trước generation: mode hybrid gửi evidence cho 49/49 câu có đáp án và 27/28 câu kỳ vọng `insufficient_evidence` (chỉ Admin tự từ chối vì không có item); mode keyword tự từ chối 48/49 câu có đáp án vì không có hit. Ba câu scope trái quyền trả `404` ở cả hai mode.
 - ACL: 400 bản ghi search/vector/RAG (response + payload) có 0 vi phạm; 87 chunk × 3 identity = 261 lần mở viewer, 0 vi phạm; payload chỉ có khóa `question`/`evidence` và 0 payload chứa văn bản chỉ có trong nhãn. **0 lỗi ACL trong phạm vi các request đã chạy**, không phải bằng chứng cho mọi đường truy cập.
-- 0 lời gọi provider ngoài, 0 lần outbound HTTP bị chặn, 239 lời gọi embedder cục bộ.
+- 0 lời gọi provider ngoài, 0 lần outbound HTTP bị chặn, 239 lời gọi embedder cục bộ. Chưa có response generation nào để người đọc chấm: grounded/citation/abstention có mẫu số 0.
 - `not measured`: rerank, chất lượng vector ngữ nghĩa thật, grounded answer rate, citation accuracy, abstention appropriateness, latency p95, chi phí/charge.
 
-Recall hybrid cao ở đây chủ yếu vì corpus nhỏ, câu hỏi và paper do cùng một người viết với từ vựng trùng nhau, và embedder băm là phép so khớp từ; không suy ra được chất lượng production. Số keyword thấp là phát hiện về cách dựng query hiện hành (xem [decisions](decisions.md#quyết-định-triển-khai-m4c-2026-09-28)), không phải lỗi dữ liệu.
+Recall hybrid cao ở đây chủ yếu vì corpus nhỏ, câu hỏi và paper do cùng một người viết với từ vựng trùng nhau, và embedder băm là phép so khớp từ; không suy ra được chất lượng production. Số keyword thấp là phát hiện về cách dựng query hiện hành, không phải lỗi dữ liệu.
 
 ## Cần người đọc duyệt và việc tiếp theo
 
 - Duyệt 80 nhãn: quote/side có đủ và đúng không, kỳ vọng `insufficient_evidence` của câu mâu thuẫn (RCI-06), bibliographic (RCI-01) và so sánh một phía có hợp ý sản phẩm không. Sau khi duyệt, đổi trạng thái cần một quyết định schema mới (hiện schema cố ý chỉ nhận `pending_human_review`).
 - Chạy lại `run` với embedding/rerank/generation thật chỉ sau khi đối soát charge trên key và bật `pricing_verified` có chủ đích; khi đó mới có answer để chấm bằng phiếu người đọc và mới báo grounded/citation/abstention.
 - Thêm corpus thật có giấy phép phân phối rõ cho đúng version, tiến dần tới workload 1.000 paper; giữ holdout tách khỏi mọi lần chỉnh.
+- Ba phát hiện search/RAG được tách thành task riêng **sau khi merge PR này**, không xử lý ở đây (xem [roadmap](roadmap.md#task-sau-m4c)): keyword query yếu với câu hỏi tự nhiên, regex so sánh bỏ sót “differ”, giới hạn pack so sánh làm rơi chứng cứ. Mỗi task đo lại bằng bộ này, không chỉnh theo holdout.

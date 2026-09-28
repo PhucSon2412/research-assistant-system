@@ -8,7 +8,7 @@ from datetime import datetime
 from importlib.metadata import version
 
 from app.evaluation import local_embedding
-from app.evaluation.locator import covers
+from app.evaluation.locator import DIAGNOSTIC_OVERLAP, FULL_SPAN, covers
 from app.evaluation.metrics import K, Row, aggregate
 from app.ingest import markdown, pdf
 
@@ -24,16 +24,18 @@ NOT_MEASURED = {
 }
 
 
-def _stage_tables(rows: list[Row], keys: list[str]) -> list[dict]:
-    search_rows = [row for row in rows if not row.stage.startswith("rag_pack")]
-    pack_rows = [row for row in rows if row.stage.startswith("rag_pack")]
-    table = aggregate(search_rows, ["stage", *keys], K)
-    for entry in aggregate(pack_rows, ["stage", *keys], PACK_K):
-        entry["k"] = "pack"
-        table.append(entry)
-    for entry in table:
-        entry.setdefault("k", K)
-    return table
+def _block(rows: list[Row], k: int, keys=("group", "scope", "split")) -> dict:
+    block = {"overall": aggregate(rows, ["stage"], k)}
+    for key in keys:
+        block[f"by_{key}"] = aggregate(rows, ["stage", key], k)
+    return block
+
+
+def _metrics(rows: list[Row], keys=("group", "scope", "split")) -> dict:
+    """Recall@5 for ranked search/vector lists; whole-pack coverage for RAG packs (not Recall@5)."""
+    ranked = [row for row in rows if not row.stage.startswith("rag_pack")]
+    packs = [row for row in rows if row.stage.startswith("rag_pack")]
+    return {"recall_at_5": _block(ranked, K, keys), "evidence_pack_coverage": _block(packs, PACK_K, keys)}
 
 
 def _rag_outcomes(qset, records: list[dict]) -> list[dict]:
@@ -54,7 +56,7 @@ def _rag_outcomes(qset, records: list[dict]) -> list[dict]:
     return [{"mode": m, "expected": e, "outcome": o, "count": n} for (m, e, o), n in sorted(counts.items())]
 
 
-def build(*, manifest, qset, records, rows, index, seeded, viewer, capture, settings, configured_pricing,
+def build(*, manifest, qset, records, rows, diagnostic_rows, index, seeded, viewer, capture, settings, configured_pricing,
           defaults, comparison_detected, started: datetime, git: dict, modes) -> dict:
     answered = [q for q in qset.questions if q.expected.status == "answered"]
     sides = sum(len(q.evidence) for q in answered)
@@ -107,9 +109,14 @@ def build(*, manifest, qset, records, rows, index, seeded, viewer, capture, sett
                       "pricing_verified_code_defaults": defaults,
                       "pricing_verified_configured": configured_pricing,
                       "note": "The run overrides pricing_verified only on an in-process Settings copy bound to local fakes; the default and .env values above are unchanged."},
-        "index_check": _index_check(answered, index),
-        "retrieval": {"k": K, "overall": _stage_tables(rows, []), "by_group": _stage_tables(rows, ["group"]),
-                      "by_scope": _stage_tables(rows, ["scope"]), "by_split": _stage_tables(rows, ["split"])},
+        "index_check": _index_check(answered, index) | {
+            "diagnostic_overlap_50": _index_check(answered, index, DIAGNOSTIC_OVERLAP)},
+        "retrieval": {"coverage_rule": "chunk contains 100% of a gold span (same item, kind, page; valid half-open offsets)",
+                      "recall_at_5_k": K, "evidence_pack_max_chunks": settings.generation.max_evidence_chunks,
+                      **_metrics(rows),
+                      "diagnostic_overlap_50": {
+                          "rule": "chunk holds >= 50% of a gold span's characters; diagnostic only, not a headline result",
+                          **_metrics(diagnostic_rows, ())}},
         "comparison": {"questions": sum(q.group == "comparison" for q in qset.questions),
                        "detected_by_rag_keyword_rule": sum(comparison_detected.values()),
                        "not_detected": sorted(k for k, v in comparison_detected.items() if not v)},
@@ -123,14 +130,14 @@ def build(*, manifest, qset, records, rows, index, seeded, viewer, capture, sett
     }
 
 
-def _index_check(answered, index) -> dict:
+def _index_check(answered, index, minimum: float = FULL_SPAN) -> dict:
     """Gold sides that no chunk of the item's active index covers (extraction/chunking losses)."""
     missing = []
     total = 0
     for q in answered:
         for side in q.evidence:
             total += 1
-            if not any(covers(span, hit) for span in side.spans for hit in index.get(span.item, [])):
+            if not any(covers(span, hit, minimum) for span in side.spans for hit in index.get(span.item, [])):
                 missing.append(f"{q.id}:{side.label}")
     return {"gold_sides": total, "indexed_sides": total - len(missing), "not_indexed": missing}
 
@@ -139,8 +146,8 @@ STAGES = {
     "search:keyword": "`POST /search` mode `keyword` (PostgreSQL FTS `plainto_tsquery('simple')`)",
     "search:hybrid": "`POST /search` mode `hybrid`: keyword + vector băm cục bộ, fusion RRF, không rerank",
     "vector": "vector-only qua `app.search._rank` (cùng gate SQL), vector băm cục bộ",
-    "rag_pack:keyword": "evidence pack mà `POST /rag/ask` mode `keyword` thực sự dựng để gửi generation",
-    "rag_pack:hybrid": "evidence pack mà `POST /rag/ask` mode `hybrid` thực sự dựng để gửi generation",
+    "rag_pack:keyword": "toàn evidence pack (tối đa 6 chunk) mà `POST /rag/ask` mode `keyword` dựng để gửi generation",
+    "rag_pack:hybrid": "toàn evidence pack (tối đa 6 chunk) mà `POST /rag/ask` mode `hybrid` dựng để gửi generation",
 }
 REPRODUCE = [
     "# PowerShell từ gốc repo; .env theo docs/dev-setup.md",
@@ -151,17 +158,25 @@ REPRODUCE = [
 ]
 
 
-def _table(entries: list[dict], key: str | None) -> list[str]:
-    columns = ["Stage", *([key] if key else []), "k", "Câu", "Recall@k (TB theo câu)", "Side trúng / tổng",
+def _table(entries: list[dict], key: str | None, metric: str) -> list[str]:
+    columns = ["Stage", *([key] if key else []), "Câu", f"{metric} (TB theo câu)", "Side trúng / tổng",
                "Đủ mọi side / câu nhiều side", "Kết quả"]
     lines = ["| " + " | ".join(columns) + " |", "| " + " | ".join("---" for _ in columns) + " |"]
     for e in entries:
         outcomes = ", ".join(f"{name}={count}" for name, count in e["outcomes"].items())
-        cells = [f"`{e['stage']}`", *([str(e[key])] if key else []), str(e["k"]), str(e["questions"]),
-                 f"{e['recall_at_k']:.3f}", f"{e['sides_hit']}/{e['sides_total']}",
+        cells = [f"`{e['stage']}`", *([str(e[key])] if key else []), str(e["questions"]),
+                 f"{e['mean_per_question']:.3f}", f"{e['sides_hit']}/{e['sides_total']}",
                  f"{e['all_sides_hit']}/{e['multi_side_questions']}", outcomes]
         lines.append("| " + " | ".join(cells) + " |")
     return lines
+
+
+def _tables(block: dict, metric: str) -> list[str]:
+    out = ["", "Tổng:", "", *_table(block["overall"], None, metric)]
+    for key, title in (("group", "Theo nhóm"), ("scope", "Theo scope"), ("split", "Dev / holdout")):
+        if f"by_{key}" in block:
+            out += ["", f"{title}:", "", *_table(block[f"by_{key}"], key, metric)]
+    return out
 
 
 def _cell(stage: dict | None) -> str:
@@ -191,7 +206,8 @@ def render_markdown(data: dict) -> str:
         "> Nhãn do coding agent soạn, trạng thái `pending_human_review`; **chưa** được người dùng hay chuyên gia duyệt. "
         f"Corpus tổng hợp {rep['papers']} paper, nhỏ hơn nhiều so với workload đề xuất {rep['target_papers']:,} paper: "
         "kết quả chỉ kiểm pipeline, gate ACL và khớp locator, không đại diện chất lượng trên paper thật. "
-        "Các ngưỡng trong docs là **mục tiêu đề xuất, cần đo**, không phải CI gate.",
+        "Các ngưỡng trong docs là **mục tiêu đề xuất, cần đo**, không phải CI gate; vì cả 80 nhãn còn "
+        "`pending_human_review`, báo cáo này **chưa chứng minh** đã đạt mục tiêu chất lượng nào.",
         "", "## Tái lập", "", "```powershell", *REPRODUCE, "```", "",
         f"- Commit `{data['git']['commit']}`" + (" (working tree có thay đổi chưa commit)" if data["git"]["dirty"] else ""),
         f"- Python {env['python']}, pypdf {env['pypdf']}, parser `{env['pdf_parser']}` / `{env['markdown_parser']}`; {env['platform']}",
@@ -215,23 +231,39 @@ def render_markdown(data: dict) -> str:
         out.append(f"| {key} | {v['job_state']} | {v['content_status']} | {v['coverage']} ({v['expected_coverage']}) | {v['indexed_chunks']} |")
     check = data["index_check"]
     missing = f"; chưa phủ: {', '.join(check['not_indexed'])}" if check["not_indexed"] else ""
-    out += ["", f"Tổng {data['corpus']['indexed_chunks']} chunk đã index. Side chứng cứ được chunk active phủ: "
-            f"**{check['indexed_sides']}/{check['gold_sides']}**{missing}.",
-            "", "## Recall@5", "",
-            "Mẫu số là các câu `answered`. Một side trúng khi chunk ở hạng ≤ k chứa ít nhất 50% ký tự của một span chuẩn "
-            "của side đó. Recall@k của câu = side trúng / số side; bảng báo trung bình theo câu và tổng side. "
-            "`rag_pack` tính trên toàn bộ pack (k = pack). Kết quả: `ok`; `extraction` (span không có trong index); "
-            "`retrieval` (không có trong danh sách trả về); `rank` (có nhưng hạng > k); `evidence_pack` (search nội bộ "
-            "của RAG trả về nhưng pack giới hạn chunk/paper/byte không chọn); `acl`.", ""]
+    retrieval = data["retrieval"]
+    pack_max = retrieval["evidence_pack_max_chunks"]
+    out += ["", f"Tổng {data['corpus']['indexed_chunks']} chunk đã index. Side chứng cứ có ít nhất một chunk active chứa "
+            f"trọn span chuẩn: **{check['indexed_sides']}/{check['gold_sides']}**{missing}.",
+            "", "## Cách tính", "",
+            "Mẫu số là các câu `answered`. Một side trúng khi chunk chứa **trọn 100%** một span chuẩn của side đó: cùng item, "
+            "cùng loại locator, cùng trang với PDF, offset nửa mở hợp lệ và `chunk.start ≤ span.start`, `span.end ≤ chunk.end`. "
+            "Giá trị của câu = side trúng / số side; bảng báo trung bình theo câu, tổng side và số câu nhiều side tìm đủ mọi side. "
+            "Kết quả: `ok`; `extraction` (không chunk active nào chứa trọn span); `retrieval` (không có trong danh sách trả về); "
+            "`rank` (có nhưng hạng > 5); `evidence_pack` (search nội bộ của RAG trả về nhưng pack giới hạn chunk/paper/byte "
+            "không chọn); `acl`.", ""]
     out += [f"- `{stage}`: {text}" for stage, text in STAGES.items()]
-    out += ["", "### Tổng", "", *_table(data["retrieval"]["overall"], None),
-            "", "### Theo nhóm", "", *_table(data["retrieval"]["by_group"], "group"),
-            "", "### Theo scope", "", *_table(data["retrieval"]["by_scope"], "scope"),
-            "", "### Dev / holdout", "", *_table(data["retrieval"]["by_split"], "split")]
+    out += ["", "## Recall@5 — search và vector", "",
+            "Chỉ các danh sách có thứ hạng (`search:*`, `vector`) được báo là Recall@5: side phải nằm trong 5 chunk đầu.",
+            *_tables(retrieval["recall_at_5"], "Recall@5"),
+            "", f"## Phủ evidence pack — toàn pack tối đa {pack_max} chunk (không phải Recall@5)", "",
+            f"`rag_pack:*` đo side có nằm **ở bất kỳ vị trí nào** trong evidence pack mà RAG gửi generation "
+            f"(tối đa {pack_max} chunk / {cfg['max_evidence_papers']} paper / {cfg['max_evidence_bytes']} byte), "
+            "không giới hạn top 5. Không so trực tiếp với Recall@5 ở trên.",
+            *_tables(retrieval["evidence_pack_coverage"], "Phủ pack"),
+            "", "## Chẩn đoán: chồng ≥ 50% span (không phải kết quả chính)", "",
+            "Cùng dữ liệu, nhưng side được tính khi chunk chứa ít nhất 50% ký tự span. Chỉ để thấy span bị cắt ngang "
+            "chunk; không dùng làm kết quả hay so với mục tiêu. Side được index theo luật này: "
+            f"{check['diagnostic_overlap_50']['indexed_sides']}/{check['diagnostic_overlap_50']['gold_sides']}.",
+            "", "Recall@5 (chẩn đoán ≥ 50%):", "", *_table(retrieval["diagnostic_overlap_50"]["recall_at_5"]["overall"],
+                                                          None, "Recall@5 ≥50%"),
+            "", f"Phủ pack ≤ {pack_max} chunk (chẩn đoán ≥ 50%):", "",
+            *_table(retrieval["diagnostic_overlap_50"]["evidence_pack_coverage"]["overall"], None, "Phủ pack ≥50%")]
     comparison = data["comparison"]
     undetected = f"; không nhận ra: {', '.join(comparison['not_detected'])}" if comparison["not_detected"] else ""
     out += ["", "## So sánh nhiều paper", "",
-            "Ở nhóm `comparison`, cột “Đủ mọi side” là số câu tìm được chứng cứ của **tất cả** các phía trong top-k. "
+            "Ở nhóm `comparison`, cột “Đủ mọi side” là số câu có chứng cứ của **tất cả** các phía: trong top 5 với "
+            "Recall@5, hoặc ở bất kỳ đâu trong pack với phủ pack. "
             f"Luật từ khóa so sánh của RAG (`app.rag.COMPARISON`) nhận ra {comparison['detected_by_rag_keyword_rule']}/"
             f"{comparison['questions']} câu so sánh{undetected}.",
             "", "## Pipeline RAG trước generation", "",
@@ -250,13 +282,14 @@ def render_markdown(data: dict) -> str:
             "", "## Chưa đo", ""]
     out += [f"- `{name}`: not measured — {why}" for name, why in data["not_measured"].items()]
     out += ["", "## Theo câu hỏi", "",
-            "Ô retrieval: hạng từng side (`×` = không có) và kết quả. Ô RAG: HTTP, trạng thái/lý do, `→ gen` nếu evidence "
-            "được gửi tới generation, và số chunk trong pack.", "",
-            "| ID | Nhóm | Split | Danh tính | Scope | Kỳ vọng | search:keyword | search:hybrid | vector | rag:keyword | rag:hybrid |",
-            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+            "Ô search/vector: hạng từng side (`×` = không có) và kết quả Recall@5. Ô pack: vị trí side trong pack và kết quả "
+            "phủ pack. Ô RAG: HTTP, trạng thái/lý do, `→ gen` nếu evidence được gửi tới generation, và số chunk trong pack.", "",
+            "| ID | Nhóm | Split | Danh tính | Scope | Kỳ vọng | search:keyword | search:hybrid | vector | pack:keyword | pack:hybrid | rag:keyword | rag:hybrid |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for q in data["questions"]:
         s = q["stages"]
         out.append(f"| {q['id']} | {q['group']} | {q['split']} | {q['identity']} | {q['scope']} | {q['expected']} | "
                    f"{_cell(s.get('search:keyword'))} | {_cell(s.get('search:hybrid'))} | {_cell(s.get('vector'))} | "
+                   f"{_cell(s.get('rag_pack:keyword'))} | {_cell(s.get('rag_pack:hybrid'))} | "
                    f"{_rag_cell(q.get('rag:keyword'))} | {_rag_cell(q.get('rag:hybrid'))} |")
     return "\n".join(out) + "\n"

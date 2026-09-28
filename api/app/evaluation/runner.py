@@ -38,7 +38,7 @@ from app.authz import Principal
 from app.config import EmbeddingPolicy, GenerationPolicy, PasswordPolicy, RerankPolicy, Settings, get_settings
 from app.evaluation import local_embedding
 from app.evaluation.corpus import sha256_bytes
-from app.evaluation.locator import Hit, covers
+from app.evaluation.locator import DIAGNOSTIC_OVERLAP, FULL_SPAN, Hit, covers
 from app.evaluation.metrics import K, Row, failure, side_ranks
 from app.evaluation.report import build
 from app.evaluation.schema import Manifest, Question, QuestionSet, allowed_items, load
@@ -437,8 +437,12 @@ def check_viewer(seeded: Seeded, records: list[dict]) -> dict:
 
 # --- scoring ---------------------------------------------------------------------------------------
 
-def score(manifest: Manifest, qset: QuestionSet, records: list[dict], index: dict[str, list[Hit]]) -> list[Row]:
-    """One Row per answered question and stage; ranks are 1-based positions in the returned list."""
+def score(manifest: Manifest, qset: QuestionSet, records: list[dict], index: dict[str, list[Hit]],
+          minimum: float = FULL_SPAN) -> list[Row]:
+    """One Row per answered question and stage; ranks are 1-based positions in the returned list.
+
+    ``minimum`` selects the span-coverage rule; the headline uses the whole span.
+    """
     rows = []
     by_id = {q.id: q for q in qset.questions}
     for record in records:
@@ -446,13 +450,13 @@ def score(manifest: Manifest, qset: QuestionSet, records: list[dict], index: dic
         if question.expected.status != "answered":
             continue
         hits = [Hit(*h) for h in record["hits"]]
-        ranks = side_ranks(question, hits)
-        indexed = [any(covers(span, hit) for span in side.spans for hit in index.get(span.item, []))
+        ranks = side_ranks(question, hits, minimum)
+        indexed = [any(covers(span, hit, minimum) for span in side.spans for hit in index.get(span.item, []))
                    for side in question.evidence]
         acl = bool(record["acl_violations"])
         if record["stage"] == "rag_pack":
             pool = [Hit(*h) for h in record["search_pool"]]
-            pool_ranks = side_ranks(question, pool)
+            pool_ranks = side_ranks(question, pool, minimum)
             outcome = failure(ranks, indexed, acl_violation=acl, k=len(hits) or 1, pool="retrieval")
             if outcome == "retrieval" and all(rank is not None for rank in pool_ranks):
                 outcome = "evidence_pack"
@@ -487,7 +491,9 @@ def run(root: Path, *, modes: tuple[str, ...] = MODES, keep: bool = False) -> di
         settings = env.settings
         configured = env.configured_pricing
     rows = score(manifest, qset, records, index)
-    return build(manifest=manifest, qset=qset, records=records, rows=rows, index=index, seeded=seeded,
+    diagnostic = score(manifest, qset, records, index, DIAGNOSTIC_OVERLAP)
+    return build(manifest=manifest, qset=qset, records=records, rows=rows, diagnostic_rows=diagnostic,
+                 index=index, seeded=seeded,
                  viewer=viewer, capture=capture, settings=settings, configured_pricing=configured,
                  defaults={"embedding": EmbeddingPolicy().pricing_verified,
                            "rerank": RerankPolicy().pricing_verified,
