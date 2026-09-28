@@ -33,13 +33,20 @@ COMPARISON = re.compile(r"\b(compare|comparison|versus|vs\.?|contrast)\b|so sán
 # "differ" asks for a comparison only when both sides are named in one clause:
 # "A and B differ", "A differs from B", "differ/difference(s) between A and B".
 # "differential", "different", "what difference did X make", "did X differ across
-# seeds" and "..., and does it differ" are ordinary questions. The rule cannot tell
-# papers from conditions of one paper ("differ between 2 lux and 0.5 lux").
+# seeds" and "..., and does it differ" are ordinary questions. A pronoun or a
+# phrase from an earlier clause is never taken as side A ("What is the method, and
+# does it differ from baseline?"). The rule cannot tell papers from conditions of
+# one paper ("differ between 2 lux and 0.5 lux").
 DIFFER_WORDS = r"differ(?:s|ed|ing)?|differences?"
+_PRONOUN = r"(?:it|its|this|that|these|those|they|them|their|he|she|one|ones|what|which|who|whom)"
+# One word of a named side: not a pronoun and not across a clause boundary.
+_SIDE_WORD = rf"(?!{_PRONOUN}\b)[^\s,;:.?!]+"
 DIFFERENCE = re.compile(
     r"\band\s+(?!(?:do|does|did|is|are|was|were|has|have|had|it|they|how|why|what|which)\b)"
     r"[^.?!;,]*\bdiffer(?:s|ed|ing)?\b"
-    r"|\bdiffer(?:s|ed|ing)?\s+(?:\w+\s+){0,3}?from\b"
+    # Side A runs from the clause start (or do/does/did/how) up to "differ".
+    rf"|(?:^|[,;:]\s*|\b(?:do|does|did|how)\s+)(?:{_SIDE_WORD}\s+){{1,6}}?"
+    rf"differ(?:s|ed|ing)?\s+(?:\w+\s+){{0,3}}?from\s+{_SIDE_WORD}"
     r"|\b(?:differ(?:s|ed|ing)?|differences?)\s+between\b[^.?!;]*\band\b", re.I)
 # Words removed from the keyword retrieval query of a comparison; they name the
 # task, not the content, so the original question still goes to generation.

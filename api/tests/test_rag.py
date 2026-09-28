@@ -484,8 +484,11 @@ DIFFER_QUESTIONS = (
     "How do GSR and DAS differ in their behaviour on code-switched input?",  # CMP-03
     "Do GSR and DAS differ on code-switched input?",
     "In what ways do the original GSR study and the replication study differ?",
+    "How does GSR differ from DAS?",
     "How does GSR differ from DAS on code-switched input?",
     "How did GSR differ in behaviour from DAS?",
+    "Does the replication study differ from the original GSR study in tokenizer settings?",
+    "Explain how curriculum sampling differs from Dense Adapter Stacks.",
     "Explain how GSR and DAS differed on code-switched input.",
     "How does code-switched behaviour differ between GSR and DAS?",
     "What is the difference between GSR and DAS on code-switched input?",
@@ -504,14 +507,25 @@ ORDINARY_QUESTIONS = (
     "How much power did the event camera draw compared with the infrared reference camera?",
     "How did mean recall of the wildlife detector change between 2 lux and 0.5 lux?",
 )
+# "differ ... from" with side A missing: a pronoun or a phrase from an earlier clause.
+PRONOUN_DIFFER_QUESTIONS = (
+    "Does it differ from baseline?",
+    "What is the method, and does it differ from baseline?",
+    "What is the method and does it differ from baseline?",
+    "How does it differ from the baseline?",
+    "What is GSR, and how does it differ from DAS?",
+    "What is GSR, and how does DAS differ from it?",
+    "Which differs from baseline?",
+    "Tell me whether it differs from baseline.",
+)
 
 
 def test_differ_questions_are_comparisons_and_ordinary_ones_are_not():
     for question in DIFFER_QUESTIONS:
         assert is_comparison(question), question
         stripped = COMPARISON_CUE.sub(" ", question)
-        assert "differ" not in stripped.lower() and "GSR" in stripped, stripped
-    for question in ORDINARY_QUESTIONS:
+        assert "differ" not in stripped.lower() and ("GSR" in stripped or "curriculum" in stripped), stripped
+    for question in ORDINARY_QUESTIONS + PRONOUN_DIFFER_QUESTIONS:
         assert not is_comparison(question), question
     assert is_comparison("Compare the training compute of GSR and DAS in GPU-hours.")
     # Every word form the question rule accepts also marks a comparative claim.
@@ -657,3 +671,34 @@ def test_differ_question_with_one_valid_paper_never_generates(upload_api, monkey
             assert second["item_id"] not in str(data) and not any(item in str(data) for item in b_items)
     assert calls == []
     assert api.scalar("SELECT count(*) FROM search_usage WHERE task_type='generation'") == 0
+
+
+def test_pronoun_differ_question_is_not_forced_through_comparison_gate(upload_api, monkeypatch):
+    api, storage = upload_api
+    _, a, _, _, first, _, settings = setup(api, storage, monkeypatch,
+        b"## Results\nThe method is sparse routing. It does differ from baseline by seven units.\n")
+    second = indexed(api, storage, a, b"## Results\nUnrelated result nine units.\n", settings)
+    collection = a.post("/collections", {"name": "Pair"}).json()["collection"]["id"]
+    for item in (first, second):
+        assert a.post(f"/collections/{collection}/items", {"item_id": item["item_id"]}).status_code == 201
+    monkeypatch.setattr("app.search.embed", lambda value, cfg, input_type: EmbeddingResult(
+        [.1, .2, .3], cfg.embedding.model_id, 2))
+    sent = []
+    def one_paper(messages, cfg):
+        payload = json.loads(messages[1]["content"])
+        sent.append(payload)
+        row = next(row for row in payload["evidence"] if "seven units" in row["text"])
+        return GenerationResult(json.dumps({"claims": [{"text": "The method differs from baseline by seven units.",
+            "citations": [{"chunk_id": row["chunk_id"], "quote": "seven units"}]}]}),
+            200, 50, cfg.generation.model_id, "SyntheticProvider")
+    monkeypatch.setattr("app.rag.generate", one_paper)
+    # Keyword finds only the first paper and hybrid also sends the second: a comparison
+    # would abstain before generation (keyword) or reject the one-paper claim (hybrid).
+    for question in ("Does it differ from baseline?", "What is the method, and does it differ from baseline?"):
+        for scope in ({"collection_id": collection}, {"scope": "all"}):
+            for mode in ("keyword", "hybrid"):
+                sent.clear()
+                data = a.post("/rag/ask", {**scope, "question": question, "mode": mode}).json()
+                assert data["status"] == "answered" and "reason" not in data, (question, scope, mode, data)
+                assert len(sent) == 1 and sent[0]["question"] == question
+                assert {cite["item_id"] for cite in data["claims"][0]["citations"]} == {first["item_id"]}
