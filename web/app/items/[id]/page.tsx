@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { api, describeError } from "../../../lib/api";
+import { makeRagBody } from "../../../lib/rag";
 import { ErrorText, Shell, useSession } from "../../components/session";
 import type { Item } from "../../page";
 
@@ -21,9 +22,13 @@ type JobInfo = { id: string; state: string; origin: string; attempt_count: numbe
   last_error_code: string | null; warnings: string[];
   extraction_finished_at: string | null; finished_at: string | null };
 type RagCitation = { chunk_id: string; quote: string; url: string;
+  item_id: string; title: string | null; version_id: string; source_file_id: string;
   locator_kind: string; start_page: number | null; start_line: number | null };
 type RagAnswer = { status: "answered" | "insufficient_evidence"; coverage: string | null;
+  reason?: "comparison_requires_multiple_papers";
+  scope: { kind: "item" | "collection" | "all"; item_id?: string; collection_id?: string };
   claims: { text: string; citations: RagCitation[] }[] };
+type Collection = { id: string; name: string };
 
 const stateText: Record<string, string> = {
   received: "Đã nhận file, chờ xử lý",
@@ -58,6 +63,8 @@ export default function ItemPage() {
   const [saved, setSaved] = useState(false);
   const [question, setQuestion] = useState("");
   const [mode, setMode] = useState<"keyword" | "hybrid">("keyword");
+  const [ragScope, setRagScope] = useState("item");
+  const [collections, setCollections] = useState<Collection[]>([]);
   const [rag, setRag] = useState<RagAnswer | null>(null);
   const [ragError, setRagError] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
@@ -72,6 +79,13 @@ export default function ItemPage() {
     const timer = setInterval(() => { void refresh(); }, 5000);
     return () => { active = false; clearInterval(timer); };
   }, [user, id]);
+
+  useEffect(() => {
+    if (!user) return;
+    api<{ collections: Collection[] }>("/collections")
+      .then((data) => setCollections(data.collections))
+      .catch((err) => setRagError(describeError(err)));
+  }, [user]);
 
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -96,7 +110,8 @@ export default function ItemPage() {
     setRag(null);
     setRagError(null);
     try {
-      setRag(await api<RagAnswer>("/rag/ask", { method: "POST", body: { item_id: id, question, mode } }));
+      setRag(await api<RagAnswer>("/rag/ask", { method: "POST",
+        body: makeRagBody(ragScope, id, question, mode) }));
     } catch (err) {
       setRagError(describeError(err));
     } finally {
@@ -149,9 +164,15 @@ export default function ItemPage() {
             {` · ${f.byte_size} byte`}{f.page_count ? ` · ${f.page_count} trang` : ""}
           </li>)}</ul>
           {item.visibility === "private" && item.content_status === "indexed" && <section>
-            <h2>Hỏi paper này</h2>
+            <h2>Hỏi đáp có dẫn nguồn</h2>
             <p>Câu hỏi và các đoạn được chọn sẽ gửi qua OpenRouter/provider để tạo câu trả lời.</p>
             <form onSubmit={ask}>
+              <label>Phạm vi <select value={ragScope} onChange={(e) => { setRagScope(e.target.value); setRag(null); }}>
+                <option value="item">Paper này</option>
+                <option value="all">Tất cả paper đã index tôi có quyền</option>
+                {collections.map((collection) => <option key={collection.id} value={collection.id}>
+                  Collection: {collection.name}</option>)}
+              </select></label>{" "}
               <label htmlFor="rag-question">Câu hỏi</label>{" "}
               <input id="rag-question" value={question} onChange={(e) => setQuestion(e.target.value)}
                 required maxLength={1024} style={{ width: "min(100%, 36rem)" }} />{" "}
@@ -163,13 +184,18 @@ export default function ItemPage() {
             </form>
             <ErrorText message={ragError} />
             {rag && <div aria-live="polite">
+              <p>Phạm vi đã hỏi: {rag.scope.kind === "item" ? "paper này" : rag.scope.kind === "all"
+                ? "tất cả paper đã index có quyền" : `collection ${collections.find((c) => c.id === rag.scope.collection_id)?.name ?? rag.scope.collection_id}`}.</p>
               <p>Trạng thái: {rag.status === "answered" ? "Có câu trả lời" : "Chưa đủ bằng chứng"}.
                 {rag.coverage === "partial" && " File chỉ được trích xuất một phần."}</p>
+              {rag.reason === "comparison_requires_multiple_papers" &&
+                <p>Chưa có nguồn từ ít nhất hai paper để so sánh.</p>}
               {rag.claims.map((claim, index) => <p key={index}>
                 {claim.text}{" "}
                 {claim.citations.map((citation) => <span key={citation.chunk_id}>
-                  <Link href={citation.url}>[Nguồn {citation.locator_kind === "pdf" ? `trang ${citation.start_page}` : `dòng ${citation.start_line}`}]</Link>{" "}
+                  <Link href={citation.url}>[{citation.title || citation.item_id} · {citation.locator_kind === "pdf" ? `trang ${citation.start_page}` : `dòng ${citation.start_line}`}]</Link>{" "}
                   <q>{citation.quote}</q>{" "}
+                  <small>Version {citation.version_id} · File {citation.source_file_id}</small>{" "}
                 </span>)}
               </p>)}
             </div>}

@@ -74,7 +74,8 @@ def test_defaults_match_documented_mvp_values() -> None:
     assert s.generation.pricing_verified is False
     assert s.budget.generation_daily_usd == 5.0
     assert s.budget.user_generation_daily_usd <= s.budget.generation_daily_usd
-    assert s.generation.max_evidence_chunks > 0 and s.generation.max_evidence_bytes > 0
+    assert s.generation.max_evidence_chunks >= s.generation.max_evidence_papers > 0
+    assert s.generation.max_evidence_bytes > 0
     assert s.generation.max_input_tokens_estimate > s.generation.max_question_bytes
     assert s.generation.max_output_tokens > 0
     assert s.embedding.reservation_lease_seconds > s.embedding.request_timeout_seconds + 10
@@ -119,6 +120,7 @@ def test_redis_broker_password_is_url_escaped() -> None:
         lambda: ProviderBudget(user_generation_daily_usd=6.0),
         lambda: ProviderBudget(generation_warning_fraction=0),
         lambda: GenerationPolicy(max_evidence_chunks=0),
+        lambda: GenerationPolicy(max_evidence_papers=7),
         lambda: GenerationPolicy(max_output_tokens=0),
         lambda: GenerationPolicy(endpoint="http://example.org/chat"),
         lambda: ProviderBudget(rerank_warning_fraction=0),

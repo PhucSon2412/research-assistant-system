@@ -14,6 +14,8 @@
 
 **M4a:** RAG chỉ nhận paper `private` của chính caller, dùng active indexed version/file/generation/rights epoch. Trước provider và trước response kiểm lại đúng tập chunk evidence; viewer mở citation tiếp tục kiểm ACL hiện tại. Không ghi question/evidence/answer vào ledger; ledger chỉ giữ model, provider, usage, chi phí ước tính và trạng thái reservation. Output không streaming, nên đổi quyền khi request đang chạy chặn answer ở lần kiểm cuối; bytes đã gửi provider trước thu hồi không lấy lại được.
 
+**M4b scope:** RAG nhận thêm collection của caller hoặc toàn bộ private item hiện có active index. Membership được giao với ACL và active generation trước keyword/vector top-k và kiểm lại cho từng evidence trước/sau provider; xóa membership trong lúc xử lý chặn answer. Common `metadata_only` trong collection vẫn không vào RAG; chưa có đường common full text hoặc rights gate đúng file version. Viewer kiểm ACL hiện tại mỗi lần mở và không dựa vào membership cũ.
+
 ## Ma trận quyền MVP đề xuất
 
 | Hành động | User: item chung | User: item riêng của mình | User: item riêng người khác | Admin: item chung | Admin: item riêng User |

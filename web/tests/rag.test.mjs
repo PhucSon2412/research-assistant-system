@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ApiError, api, describeError } from "../lib/api.ts";
+import { makeRagBody } from "../lib/rag.ts";
+
+test("RAG UI submits exactly one chosen scope", () => {
+  assert.deepEqual(makeRagBody("item", "paper-1", "Q", "keyword"),
+    { item_id: "paper-1", question: "Q", mode: "keyword" });
+  assert.deepEqual(makeRagBody("collection-1", "paper-1", "Q", "hybrid"),
+    { collection_id: "collection-1", question: "Q", mode: "hybrid" });
+  assert.deepEqual(makeRagBody("all", "paper-1", "Q", "keyword"),
+    { scope: "all", question: "Q", mode: "keyword" });
+});
 
 test("RAG form request shows a clear message for pricing/provider 503", async () => {
   const previousDocument = globalThis.document;
