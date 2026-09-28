@@ -1,0 +1,212 @@
+{
+  "note": "Synthetic PDF sources written for this repository. app.evaluation.corpus renders them with ReportLab invariant mode; shapes are drawn without any text layer.",
+  "papers": {
+    "P07": {
+      "file": "pdf/p07-thermal-scheduling.pdf",
+      "pages": [
+        {"lines": [
+          "Thermal-Aware Scheduling for Edge Inference",
+          "Authors: Ines Duarte and Kofi Asante (fictional authors; synthetic evaluation paper).",
+          "Identifier: doi:10.5555/ras-eval.p07 (fictional, not registered).",
+          "Abstract",
+          "We schedule neural network inference on edge devices using on-chip temperature forecasts.",
+          "The scheduler cuts p95 latency by 23% and thermal throttling events from 41 to 9 per hour."
+        ]},
+        {"lines": [
+          "Introduction",
+          "Edge devices lower their clock speed when the chip gets too hot, so latency becomes erratic.",
+          "Reactive governors respond only after throttling has started and cannot plan ahead.",
+          "Inference workloads are often bursty, which makes short-term temperature spikes common.",
+          "A scheduler that predicts temperature can delay low-priority jobs before throttling begins.",
+          "Such planning must stay cheap, because the forecaster runs on the same constrained device.",
+          "We therefore restrict the forecaster to a linear model that needs no accelerator support.",
+          "The goal is predictable latency for interactive requests rather than maximum throughput.",
+          "We compare against first-come-first-served scheduling with the default thermal governor.",
+          "Our contribution is a scheduler that uses forecasts, together with measurements on devices."
+        ]},
+        {"lines": [
+          "Methods",
+          "The forecaster is a linear model over the last 20 temperature readings sampled at 10 Hz.",
+          "Jobs are deferred when the forecast exceeds 78 degrees Celsius within the next two seconds.",
+          "Deferred jobs wait in a priority queue and are resumed once the forecast falls again.",
+          "Interactive requests are never deferred for longer than 300 milliseconds in this design.",
+          "We evaluated three device types: a phone SoC, a single-board computer and a drone controller.",
+          "Each device ran the same image classification model with a batch size of one request.",
+          "Every experiment lasted two hours at an ambient temperature of 24 degrees Celsius.",
+          "Latency was logged per request, and throttling events were read from the kernel log."
+        ]},
+        {"lines": [
+          "Results",
+          "Across the three devices, p95 latency fell by 23% relative to first-come-first-served.",
+          "Throttling events dropped from 41 to 9 per hour on average across the three devices.",
+          "Energy per inference rose by 4% because deferred jobs later ran at higher clock speeds.",
+          "The phone SoC showed the largest latency gain, a 31% reduction of p95 latency.",
+          "The single-board computer improved by 27%, with most gains during long bursts.",
+          "Median latency changed by less than 2% on every device, so the gain lies in the tail.",
+          "Forecast error stayed below 1.5 degrees Celsius for 95% of the prediction windows.",
+          "The scheduler itself used less than 1% of processor time on each of the devices."
+        ]},
+        {"lines": [
+          "Discussion",
+          "The drone controller benefited least, with a 9% latency reduction.",
+          "Its cooling was already adequate, so the chip rarely approached the threshold.",
+          "Longer forecast horizons made the scheduler defer too many jobs in our trials.",
+          "A threshold below 78 degrees Celsius reduced throttling further but hurt throughput.",
+          "Results may differ for workloads with large batches or for devices with active fans.",
+          "We did not study multi-tenant settings where several models share one device.",
+          "Integrating the forecaster into the kernel governor is left for future work.",
+          "The measurements cover a single ambient temperature, which limits generality."
+        ]},
+        {"lines": [
+          "Conclusion",
+          "Forecast-driven deferral keeps tail latency predictable on thermally limited devices.",
+          "The approach needs only a small linear model and a priority queue per device.",
+          "References",
+          "[1] P. Laine. Dynamic Thermal Management for Mobile Processors. 2023.",
+          "[2] G. Ortiz. Tail Latency on Embedded Inference Hardware. 2024."
+        ]}
+      ]
+    },
+    "P08": {
+      "file": "pdf/p08-event-camera-wildlife.pdf",
+      "pages": [
+        {"lines": [
+          "Low-Light Wildlife Detection with Event Cameras",
+          "Authors: Joon Park and Emma Laurent (fictional authors; synthetic evaluation paper).",
+          "Identifier: doi:10.5555/ras-eval.p08 (fictional, not registered).",
+          "Abstract",
+          "We detect nocturnal animals with an event camera and a spiking neural detector.",
+          "At 2 lux the detector reaches a mean recall of 0.71 across nine species."
+        ]},
+        {"lines": [
+          "Introduction",
+          "Camera traps at night rely on infrared illumination, which can disturb some animals.",
+          "Event cameras report brightness changes per pixel and work at very low light levels.",
+          "Their sparse output suits spiking detectors that run on low-power hardware in the field.",
+          "Few studies measure how detection quality changes as the scene gets darker.",
+          "We collect clips in forests and report recall at several controlled light levels.",
+          "Our aim is to find the light level below which detection becomes unreliable.",
+          "We also compare the power draw of the event camera with an infrared reference camera.",
+          "The dataset and labels are described in the methods section of this paper."
+        ]},
+        {"lines": [
+          "Methods",
+          "Events are accumulated into 4 temporal bins of 25 milliseconds each.",
+          "The detector was trained on 14,200 labelled clips from 3 forest sites.",
+          "Clips were labelled by two ecologists who marked the species and a bounding box.",
+          "Light levels were measured with a calibrated lux meter placed next to the camera.",
+          "We report recall because false negatives matter most for population surveys.",
+          "Each site contributed clips from both summer and winter recording periods.",
+          "Training used a fixed learning schedule without any per-site tuning at all.",
+          "Test clips come from recording nights that were not used during training."
+        ]},
+        {"lines": ["Results", "Figure 3. Recall per species at 2 lux."],
+         "shapes": [
+          [60, 200, 40, 380], [120, 200, 40, 250], [180, 200, 40, 330],
+          [240, 200, 40, 190], [300, 200, 40, 420], [360, 200, 40, 270],
+          [420, 200, 40, 150], [480, 200, 40, 310], [540, 200, 40, 230]
+        ]},
+        {"lines": [
+          "Figure 3 shows per-species recall; the exact values appear only in the figure.",
+          "Mean recall fell from 0.71 at 2 lux to 0.52 at 0.5 lux across all nine species.",
+          "False positives were most often caused by moving branches in windy conditions.",
+          "Recall was stable across the two recording seasons for most of the species.",
+          "Small animals such as mice were detected less often than larger mammals.",
+          "Detection latency on the field hardware stayed below 40 milliseconds per clip.",
+          "Adding a fifth temporal bin did not change mean recall in our ablation runs.",
+          "Clips with rain produced more events but did not reduce recall noticeably."
+        ]},
+        {"lines": [
+          "Discussion",
+          "The event camera consumed 0.9 W compared with 2.6 W for the infrared reference camera.",
+          "Lower power allows longer deployments on the same battery in remote locations.",
+          "Detection below 0.5 lux may need longer bins or a more sensitive sensor model.",
+          "Branch motion remains the main source of errors and needs better filtering.",
+          "Our sites were temperate forests, so other habitats may behave differently.",
+          "Species with little motion at night are hard to detect with events alone.",
+          "A combined event and infrared system could cover both situations in future.",
+          "Ethics approval covered passive recording only, without any animal handling."
+        ]},
+        {"lines": [
+          "Conclusion",
+          "Event cameras detect nocturnal wildlife reliably down to about 2 lux at low power.",
+          "Per-species values should be read from Figure 3 in the original file.",
+          "References",
+          "[1] M. Haddad. Spiking Detectors for Neuromorphic Vision. 2024.",
+          "[2] B. Keller. Camera Traps and Animal Disturbance. 2022."
+        ]}
+      ]
+    },
+    "P09": {
+      "file": "pdf/p09-federated-readmission.pdf",
+      "pages": [
+        {"lines": [
+          "Federated Learning for Hospital Readmission Prediction",
+          "Authors: Sara Haile and Luca Bianchi (fictional authors; synthetic evaluation paper).",
+          "Identifier: doi:10.5555/ras-eval.p09 (fictional, not registered).",
+          "Abstract",
+          "Seven hospitals trained a readmission model without sharing patient records.",
+          "The federated model reached an AUROC of 0.78, close to 0.79 for pooled training."
+        ]},
+        {"lines": [
+          "Introduction",
+          "Readmission within 30 days is costly for hospitals and harmful for patients.",
+          "Prediction models need data from many hospitals to generalise across populations.",
+          "Legal rules often prevent hospitals from pooling patient records in one place.",
+          "Federated learning trains a shared model while each hospital keeps its own data.",
+          "We test whether federated training can match a model trained on pooled records.",
+          "We also measure the cost of adding differential privacy to the shared updates.",
+          "Our cohort comes from seven hospitals of very different sizes in one region.",
+          "All analyses were approved by the ethics boards of the participating hospitals."
+        ]},
+        {"lines": [
+          "Methods",
+          "Each hospital ran 5 local epochs per round for 60 rounds of federated training.",
+          "Updates were clipped to norm 1.0 and aggregated with secure summation.",
+          "The model is a gradient-boosted ensemble distilled into a small neural network.",
+          "Features include diagnoses, length of stay, age group and prior admissions.",
+          "The outcome is an unplanned readmission within 30 days of hospital discharge.",
+          "Pooled training on the same features serves as an upper reference model.",
+          "Each hospital held out 20% of its admissions for the final evaluation step.",
+          "We repeated federated training with three random seeds for every setting."
+        ]},
+        {"lines": [],
+         "shapes": [
+          [60, 150, 490, 30], [60, 190, 490, 30], [60, 230, 490, 30],
+          [60, 270, 490, 30], [60, 310, 490, 30], [60, 350, 490, 30],
+          [60, 390, 490, 30], [60, 430, 490, 30]
+        ]},
+        {"lines": [
+          "Results",
+          "Per-hospital AUROC values are listed in Table 4, which is provided as a scanned image.",
+          "The smallest hospital, with 1,900 admissions, gained the most from federation.",
+          "Differential privacy with epsilon 8 reduced the federated AUROC to 0.75.",
+          "Calibration of the federated model was similar to that of the pooled model.",
+          "Training finished in 11 hours of wall-clock time across all seven hospitals.",
+          "Communication per round stayed below 4 megabytes for every participating site.",
+          "Hospitals with fewer than 5,000 admissions benefited more than large hospitals.",
+          "No hospital performed worse with the federated model than with a local model."
+        ]},
+        {"lines": [
+          "Discussion",
+          "Federated training nearly matched pooled training without moving patient records.",
+          "The privacy cost of epsilon 8 may be acceptable for decision support but not for all uses.",
+          "Small hospitals gain the most, which supports regional collaboration on such models.",
+          "Our cohort covers one region, so external validation in other regions is needed.",
+          "Scanned appendix tables should be converted to text before any automated reuse.",
+          "Future work will test personalisation layers for hospitals with unusual case mixes.",
+          "Secure summation added little overhead compared with the local training time.",
+          "Clinicians reviewed the top features and found them clinically plausible."
+        ]},
+        {"lines": [
+          "Conclusion",
+          "Federated learning offers near-pooled readmission prediction across seven hospitals.",
+          "Per-hospital values remain available only in the scanned Table 4 of the original.",
+          "References",
+          "[1] E. Novak. Secure Aggregation for Federated Health Models. 2024.",
+          "[2] D. Ferreira. Readmission Risk Scores Revisited. 2023."
+        ]}
+      ]
+    }
+  }
+}

@@ -1,0 +1,242 @@
+%PDF-1.3
+%“Œ‹ž ReportLab Generated PDF document (opensource)
+1 0 obj
+<<
+/F1 2 0 R
+>>
+endobj
+2 0 obj
+<<
+/BaseFont /Helvetica /Encoding /WinAnsiEncoding /Name /F1 /Subtype /Type1 /Type /Font
+>>
+endobj
+3 0 obj
+<<
+/Contents 12 0 R /MediaBox [ 0 0 612 792 ] /Parent 11 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+4 0 obj
+<<
+/Contents 13 0 R /MediaBox [ 0 0 612 792 ] /Parent 11 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+5 0 obj
+<<
+/Contents 14 0 R /MediaBox [ 0 0 612 792 ] /Parent 11 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+6 0 obj
+<<
+/Contents 15 0 R /MediaBox [ 0 0 612 792 ] /Parent 11 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+7 0 obj
+<<
+/Contents 16 0 R /MediaBox [ 0 0 612 792 ] /Parent 11 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+8 0 obj
+<<
+/Contents 17 0 R /MediaBox [ 0 0 612 792 ] /Parent 11 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+9 0 obj
+<<
+/PageMode /UseNone /Pages 11 0 R /Type /Catalog
+>>
+endobj
+10 0 obj
+<<
+/Author (anonymous) /CreationDate (D:20000101000000+00'00') /Creator (anonymous) /Keywords () /ModDate (D:20000101000000+00'00') /Producer (ReportLab PDF Library - \(opensource\)) 
+  /Subject (unspecified) /Title (untitled) /Trapped /False
+>>
+endobj
+11 0 obj
+<<
+/Count 6 /Kids [ 3 0 R 4 0 R 5 0 R 6 0 R 7 0 R 8 0 R ] /Type /Pages
+>>
+endobj
+12 0 obj
+<<
+/Length 657
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT /F1 11 Tf 13.2 TL ET
+BT 1 0 0 1 35 750 Tm (Thermal-Aware Scheduling for Edge Inference) Tj T* ET
+BT 1 0 0 1 35 735 Tm (Authors: Ines Duarte and Kofi Asante \(fictional authors; synthetic evaluation paper\).) Tj T* ET
+BT 1 0 0 1 35 720 Tm (Identifier: doi:10.5555/ras-eval.p07 \(fictional, not registered\).) Tj T* ET
+BT 1 0 0 1 35 705 Tm (Abstract) Tj T* ET
+BT 1 0 0 1 35 690 Tm (We schedule neural network inference on edge devices using on-chip temperature forecasts.) Tj T* ET
+BT 1 0 0 1 35 675 Tm (The scheduler cuts p95 latency by 23% and thermal throttling events from 41 to 9 per hour.) Tj T* ET
+.6 g
+0 g
+ 
+endstream
+endobj
+13 0 obj
+<<
+/Length 1216
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT /F1 11 Tf 13.2 TL ET
+BT 1 0 0 1 35 750 Tm (Introduction) Tj T* ET
+BT 1 0 0 1 35 735 Tm (Edge devices lower their clock speed when the chip gets too hot, so latency becomes erratic.) Tj T* ET
+BT 1 0 0 1 35 720 Tm (Reactive governors respond only after throttling has started and cannot plan ahead.) Tj T* ET
+BT 1 0 0 1 35 705 Tm (Inference workloads are often bursty, which makes short-term temperature spikes common.) Tj T* ET
+BT 1 0 0 1 35 690 Tm (A scheduler that predicts temperature can delay low-priority jobs before throttling begins.) Tj T* ET
+BT 1 0 0 1 35 675 Tm (Such planning must stay cheap, because the forecaster runs on the same constrained device.) Tj T* ET
+BT 1 0 0 1 35 660 Tm (We therefore restrict the forecaster to a linear model that needs no accelerator support.) Tj T* ET
+BT 1 0 0 1 35 645 Tm (The goal is predictable latency for interactive requests rather than maximum throughput.) Tj T* ET
+BT 1 0 0 1 35 630 Tm (We compare against first-come-first-served scheduling with the default thermal governor.) Tj T* ET
+BT 1 0 0 1 35 615 Tm (Our contribution is a scheduler that uses forecasts, together with measurements on devices.) Tj T* ET
+.6 g
+0 g
+ 
+endstream
+endobj
+14 0 obj
+<<
+/Length 1075
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT /F1 11 Tf 13.2 TL ET
+BT 1 0 0 1 35 750 Tm (Methods) Tj T* ET
+BT 1 0 0 1 35 735 Tm (The forecaster is a linear model over the last 20 temperature readings sampled at 10 Hz.) Tj T* ET
+BT 1 0 0 1 35 720 Tm (Jobs are deferred when the forecast exceeds 78 degrees Celsius within the next two seconds.) Tj T* ET
+BT 1 0 0 1 35 705 Tm (Deferred jobs wait in a priority queue and are resumed once the forecast falls again.) Tj T* ET
+BT 1 0 0 1 35 690 Tm (Interactive requests are never deferred for longer than 300 milliseconds in this design.) Tj T* ET
+BT 1 0 0 1 35 675 Tm (We evaluated three device types: a phone SoC, a single-board computer and a drone controller.) Tj T* ET
+BT 1 0 0 1 35 660 Tm (Each device ran the same image classification model with a batch size of one request.) Tj T* ET
+BT 1 0 0 1 35 645 Tm (Every experiment lasted two hours at an ambient temperature of 24 degrees Celsius.) Tj T* ET
+BT 1 0 0 1 35 630 Tm (Latency was logged per request, and throttling events were read from the kernel log.) Tj T* ET
+.6 g
+0 g
+ 
+endstream
+endobj
+15 0 obj
+<<
+/Length 1039
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT /F1 11 Tf 13.2 TL ET
+BT 1 0 0 1 35 750 Tm (Results) Tj T* ET
+BT 1 0 0 1 35 735 Tm (Across the three devices, p95 latency fell by 23% relative to first-come-first-served.) Tj T* ET
+BT 1 0 0 1 35 720 Tm (Throttling events dropped from 41 to 9 per hour on average across the three devices.) Tj T* ET
+BT 1 0 0 1 35 705 Tm (Energy per inference rose by 4% because deferred jobs later ran at higher clock speeds.) Tj T* ET
+BT 1 0 0 1 35 690 Tm (The phone SoC showed the largest latency gain, a 31% reduction of p95 latency.) Tj T* ET
+BT 1 0 0 1 35 675 Tm (The single-board computer improved by 27%, with most gains during long bursts.) Tj T* ET
+BT 1 0 0 1 35 660 Tm (Median latency changed by less than 2% on every device, so the gain lies in the tail.) Tj T* ET
+BT 1 0 0 1 35 645 Tm (Forecast error stayed below 1.5 degrees Celsius for 95% of the prediction windows.) Tj T* ET
+BT 1 0 0 1 35 630 Tm (The scheduler itself used less than 1% of processor time on each of the devices.) Tj T* ET
+.6 g
+0 g
+ 
+endstream
+endobj
+16 0 obj
+<<
+/Length 1002
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT /F1 11 Tf 13.2 TL ET
+BT 1 0 0 1 35 750 Tm (Discussion) Tj T* ET
+BT 1 0 0 1 35 735 Tm (The drone controller benefited least, with a 9% latency reduction.) Tj T* ET
+BT 1 0 0 1 35 720 Tm (Its cooling was already adequate, so the chip rarely approached the threshold.) Tj T* ET
+BT 1 0 0 1 35 705 Tm (Longer forecast horizons made the scheduler defer too many jobs in our trials.) Tj T* ET
+BT 1 0 0 1 35 690 Tm (A threshold below 78 degrees Celsius reduced throttling further but hurt throughput.) Tj T* ET
+BT 1 0 0 1 35 675 Tm (Results may differ for workloads with large batches or for devices with active fans.) Tj T* ET
+BT 1 0 0 1 35 660 Tm (We did not study multi-tenant settings where several models share one device.) Tj T* ET
+BT 1 0 0 1 35 645 Tm (Integrating the forecaster into the kernel governor is left for future work.) Tj T* ET
+BT 1 0 0 1 35 630 Tm (The measurements cover a single ambient temperature, which limits generality.) Tj T* ET
+.6 g
+0 g
+ 
+endstream
+endobj
+17 0 obj
+<<
+/Length 588
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT /F1 11 Tf 13.2 TL ET
+BT 1 0 0 1 35 750 Tm (Conclusion) Tj T* ET
+BT 1 0 0 1 35 735 Tm (Forecast-driven deferral keeps tail latency predictable on thermally limited devices.) Tj T* ET
+BT 1 0 0 1 35 720 Tm (The approach needs only a small linear model and a priority queue per device.) Tj T* ET
+BT 1 0 0 1 35 705 Tm (References) Tj T* ET
+BT 1 0 0 1 35 690 Tm ([1] P. Laine. Dynamic Thermal Management for Mobile Processors. 2023.) Tj T* ET
+BT 1 0 0 1 35 675 Tm ([2] G. Ortiz. Tail Latency on Embedded Inference Hardware. 2024.) Tj T* ET
+.6 g
+0 g
+ 
+endstream
+endobj
+xref
+0 18
+0000000000 65535 f 
+0000000061 00000 n 
+0000000092 00000 n 
+0000000199 00000 n 
+0000000394 00000 n 
+0000000589 00000 n 
+0000000784 00000 n 
+0000000979 00000 n 
+0000001174 00000 n 
+0000001369 00000 n 
+0000001438 00000 n 
+0000001700 00000 n 
+0000001790 00000 n 
+0000002498 00000 n 
+0000003766 00000 n 
+0000004893 00000 n 
+0000005984 00000 n 
+0000007038 00000 n 
+trailer
+<<
+/ID 
+[<1c178198fbdfa51b25995d89d4102043><1c178198fbdfa51b25995d89d4102043>]
+% ReportLab generated PDF document -- digest (opensource)
+
+/Info 10 0 R
+/Root 9 0 R
+/Size 18
+>>
+startxref
+7677
+%%EOF

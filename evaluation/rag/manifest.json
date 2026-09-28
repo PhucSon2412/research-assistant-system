@@ -1,0 +1,445 @@
+{
+  "schema_version": 1,
+  "corpus_id": "ras-synthetic-rag-v1",
+  "checked_on": "2026-09-28",
+  "usage_scope": "Self-authored synthetic papers for retrieval/RAG evaluation and ACL tests in this repository. Private/ACL fixtures (A/B copies, canary identifiers) are synthetic; no real user data or third-party paper text is included. Real papers are not committed: the three arXiv PDFs used in M2b are under arXiv's default licence and were only used transiently.",
+  "representativeness": {
+    "papers": 15,
+    "files": 15,
+    "private_items": 16,
+    "metadata_only_items": 2,
+    "target_papers": 1000,
+    "statement": "15 synthetic papers (12 Markdown, 3 generated PDFs) uploaded as 16 private items plus 2 metadata-only common items, 87 indexed body/abstract chunks, versus the proposed 1,000-paper x 20-page workload. Results only exercise the pipeline, ACL gates and locator matching on short, cleanly written English text; they do not represent real extraction quality, real-paper vocabulary, scale effects on ranking, or other languages and domains."
+  },
+  "papers": [
+    {
+      "id": "P01",
+      "title": "Gated Sparse Routing for Low-Resource Machine Translation",
+      "file": "markdown/p01-gated-sparse-routing.md",
+      "format": "markdown",
+      "version_label": "v1",
+      "sha256": "53cff9361b521ae37f6bc1d34d4137314cbf196f112e9fc25abce25f99ec003c",
+      "byte_size": 2249,
+      "source": "Hand-written Markdown in this repository.",
+      "doi": "10.5555/ras-eval.p01",
+      "license": {
+        "kind": "self_authored_synthetic",
+        "redistribution_in_repo": true,
+        "statement": "Written for this repository on 2026-09-28 by the coding agent under the project owner's task; fictional authors, results and identifiers; no third-party text. Distributed with the repository under the repository's terms."
+      },
+      "checked_on": "2026-09-28",
+      "contains_third_party_text": false,
+      "expected_coverage": "complete"
+    },
+    {
+      "id": "P02",
+      "title": "Dense Adapter Stacks for Low-Resource Translation",
+      "file": "markdown/p02-dense-adapter-stacks.md",
+      "format": "markdown",
+      "version_label": "v1",
+      "sha256": "5f7d5afaa63c35a5c28cb5af11826a7a3eb6ba6f27334806bc074d6a109d9d55",
+      "byte_size": 1746,
+      "source": "Hand-written Markdown in this repository.",
+      "doi": "10.5555/ras-eval.p02",
+      "license": {
+        "kind": "self_authored_synthetic",
+        "redistribution_in_repo": true,
+        "statement": "Written for this repository on 2026-09-28 by the coding agent under the project owner's task; fictional authors, results and identifiers; no third-party text. Distributed with the repository under the repository's terms."
+      },
+      "checked_on": "2026-09-28",
+      "contains_third_party_text": false,
+      "expected_coverage": "complete"
+    },
+    {
+      "id": "P03",
+      "title": "CNDI-5k: A Benchmark for Clinical Note De-identification",
+      "file": "markdown/p03-clinical-deidentification-benchmark.md",
+      "format": "markdown",
+      "version_label": "v1",
+      "sha256": "f3355baf114a5b7a2496b1deb0901dca75743927680012c6dc7511bf70101989",
+      "byte_size": 1277,
+      "source": "Hand-written Markdown in this repository.",
+      "doi": "10.5555/ras-eval.p03",
+      "license": {
+        "kind": "self_authored_synthetic",
+        "redistribution_in_repo": true,
+        "statement": "Written for this repository on 2026-09-28 by the coding agent under the project owner's task; fictional authors, results and identifiers; no third-party text. Distributed with the repository under the repository's terms."
+      },
+      "checked_on": "2026-09-28",
+      "contains_third_party_text": false,
+      "expected_coverage": "complete"
+    },
+    {
+      "id": "P04",
+      "title": "Revisiting Gated Sparse Routing: A Replication Study",
+      "file": "markdown/p04-gsr-replication.md",
+      "format": "markdown",
+      "version_label": "v1",
+      "sha256": "b33f090063b6f7c9dcdae81e145420de4942daeee14fb8e44dc60fe19bb90e85",
+      "byte_size": 1338,
+      "source": "Hand-written Markdown in this repository.",
+      "doi": "10.5555/ras-eval.p04",
+      "license": {
+        "kind": "self_authored_synthetic",
+        "redistribution_in_repo": true,
+        "statement": "Written for this repository on 2026-09-28 by the coding agent under the project owner's task; fictional authors, results and identifiers; no third-party text. Distributed with the repository under the repository's terms."
+      },
+      "checked_on": "2026-09-28",
+      "contains_third_party_text": false,
+      "expected_coverage": "complete"
+    },
+    {
+      "id": "P05",
+      "title": "Graph Neural Networks for Soil Moisture Forecasting",
+      "file": "markdown/p05-soil-moisture-gnn.md",
+      "format": "markdown",
+      "version_label": "v1",
+      "sha256": "edabde78f44b73a9bc51834e3548e0abb5c68ef9c96fa002837fac62348e6a5d",
+      "byte_size": 1253,
+      "source": "Hand-written Markdown in this repository.",
+      "doi": "10.5555/ras-eval.p05",
+      "license": {
+        "kind": "self_authored_synthetic",
+        "redistribution_in_repo": true,
+        "statement": "Written for this repository on 2026-09-28 by the coding agent under the project owner's task; fictional authors, results and identifiers; no third-party text. Distributed with the repository under the repository's terms."
+      },
+      "checked_on": "2026-09-28",
+      "contains_third_party_text": false,
+      "expected_coverage": "complete"
+    },
+    {
+      "id": "P06",
+      "title": "A Survey of Efficient Routing in Multilingual Translation",
+      "file": "markdown/p06-routing-survey.md",
+      "format": "markdown",
+      "version_label": "v1",
+      "sha256": "c9f9be0fa89ec99e4d1016f991aaa41eb05a25a64393c76b39f24255e6e9cab3",
+      "byte_size": 1327,
+      "source": "Hand-written Markdown in this repository.",
+      "doi": "10.5555/ras-eval.p06",
+      "license": {
+        "kind": "self_authored_synthetic",
+        "redistribution_in_repo": true,
+        "statement": "Written for this repository on 2026-09-28 by the coding agent under the project owner's task; fictional authors, results and identifiers; no third-party text. Distributed with the repository under the repository's terms."
+      },
+      "checked_on": "2026-09-28",
+      "contains_third_party_text": false,
+      "expected_coverage": "complete"
+    },
+    {
+      "id": "P07",
+      "title": "Thermal-Aware Scheduling for Edge Inference",
+      "file": "pdf/p07-thermal-scheduling.pdf",
+      "format": "pdf",
+      "version_label": "v1",
+      "sha256": "b8c6900344e558cb7dfe3c1ca38c26ad6cd864384cde0ba3f19d8f8328a62bfb",
+      "byte_size": 8251,
+      "pages": 6,
+      "source": "Rendered from corpus/pdf_sources.json by `python -m app.evaluation build-pdfs` (ReportLab invariant mode).",
+      "doi": "10.5555/ras-eval.p07",
+      "license": {
+        "kind": "self_authored_synthetic",
+        "redistribution_in_repo": true,
+        "statement": "Written for this repository on 2026-09-28 by the coding agent under the project owner's task; fictional authors, results and identifiers; no third-party text. Distributed with the repository under the repository's terms."
+      },
+      "checked_on": "2026-09-28",
+      "contains_third_party_text": false,
+      "expected_coverage": "complete"
+    },
+    {
+      "id": "P08",
+      "title": "Low-Light Wildlife Detection with Event Cameras",
+      "file": "pdf/p08-event-camera-wildlife.pdf",
+      "format": "pdf",
+      "version_label": "v1",
+      "sha256": "a47cdb1a55dd067eacf9b1b194b671abbf007f381bc14a517a6b8a0c1b95e80e",
+      "byte_size": 8507,
+      "pages": 7,
+      "source": "Rendered from corpus/pdf_sources.json by `python -m app.evaluation build-pdfs` (ReportLab invariant mode).",
+      "doi": "10.5555/ras-eval.p08",
+      "license": {
+        "kind": "self_authored_synthetic",
+        "redistribution_in_repo": true,
+        "statement": "Written for this repository on 2026-09-28 by the coding agent under the project owner's task; fictional authors, results and identifiers; no third-party text. Distributed with the repository under the repository's terms."
+      },
+      "checked_on": "2026-09-28",
+      "contains_third_party_text": false,
+      "expected_coverage": "partial"
+    },
+    {
+      "id": "P09",
+      "title": "Federated Learning for Hospital Readmission Prediction",
+      "file": "pdf/p09-federated-readmission.pdf",
+      "format": "pdf",
+      "version_label": "v1",
+      "sha256": "06cc031e87f6b6be22370a7a6f59f1a53c82ebb3debb68bdf6e8d03bab4f6620",
+      "byte_size": 8464,
+      "pages": 7,
+      "source": "Rendered from corpus/pdf_sources.json by `python -m app.evaluation build-pdfs` (ReportLab invariant mode).",
+      "doi": "10.5555/ras-eval.p09",
+      "license": {
+        "kind": "self_authored_synthetic",
+        "redistribution_in_repo": true,
+        "statement": "Written for this repository on 2026-09-28 by the coding agent under the project owner's task; fictional authors, results and identifiers; no third-party text. Distributed with the repository under the repository's terms."
+      },
+      "checked_on": "2026-09-28",
+      "contains_third_party_text": false,
+      "expected_coverage": "partial"
+    },
+    {
+      "id": "P10",
+      "title": "Tokenizer Drift in Continual Pretraining (copy A)",
+      "file": "markdown/p10-tokenizer-drift-a.md",
+      "format": "markdown",
+      "version_label": "v1",
+      "sha256": "923a9d1b6a74dc7a475858fe1818bf347b7e16ad1ef4d5f243232e89e00d30cd",
+      "byte_size": 631,
+      "source": "Hand-written Markdown in this repository.",
+      "doi": "10.5555/ras-eval.shared-01",
+      "license": {
+        "kind": "self_authored_synthetic",
+        "redistribution_in_repo": true,
+        "statement": "Written for this repository on 2026-09-28 by the coding agent under the project owner's task; fictional authors, results and identifiers; no third-party text. Distributed with the repository under the repository's terms."
+      },
+      "checked_on": "2026-09-28",
+      "contains_third_party_text": false,
+      "expected_coverage": "complete"
+    },
+    {
+      "id": "P11",
+      "title": "Seasonal Demand Forecasting for Rural Microgrids",
+      "file": "markdown/p11-microgrid-demand.md",
+      "format": "markdown",
+      "version_label": "v1",
+      "sha256": "56254d68d67a667e4301581c384469716ca6cae98095816dd66a56ebaff7ccf6",
+      "byte_size": 776,
+      "source": "Hand-written Markdown in this repository.",
+      "doi": "10.5555/ras-eval.p11",
+      "license": {
+        "kind": "self_authored_synthetic",
+        "redistribution_in_repo": true,
+        "statement": "Written for this repository on 2026-09-28 by the coding agent under the project owner's task; fictional authors, results and identifiers; no third-party text. Distributed with the repository under the repository's terms."
+      },
+      "checked_on": "2026-09-28",
+      "contains_third_party_text": false,
+      "expected_coverage": "complete"
+    },
+    {
+      "id": "P12",
+      "title": "Curriculum Sampling for Low-Resource Translation",
+      "file": "markdown/p12-curriculum-sampling.md",
+      "format": "markdown",
+      "version_label": "v1",
+      "sha256": "0d65840b3164de7ff6d7a5521d896d82a5b4e357fafd8a3c003f119d9cdb0892",
+      "byte_size": 1242,
+      "source": "Hand-written Markdown in this repository.",
+      "doi": "10.5555/ras-eval.p12",
+      "license": {
+        "kind": "self_authored_synthetic",
+        "redistribution_in_repo": true,
+        "statement": "Written for this repository on 2026-09-28 by the coding agent under the project owner's task; fictional authors, results and identifiers; no third-party text. Distributed with the repository under the repository's terms."
+      },
+      "checked_on": "2026-09-28",
+      "contains_third_party_text": false,
+      "expected_coverage": "complete"
+    },
+    {
+      "id": "P13",
+      "title": "Energy Cost of Mixture-of-Experts Inference on Edge Devices",
+      "file": "markdown/p13-moe-energy.md",
+      "format": "markdown",
+      "version_label": "v1",
+      "sha256": "803de116918ff089c04577da4e6496c3029bdc7674a3459c3837ea339f72845e",
+      "byte_size": 928,
+      "source": "Hand-written Markdown in this repository.",
+      "doi": "10.5555/ras-eval.p13",
+      "license": {
+        "kind": "self_authored_synthetic",
+        "redistribution_in_repo": true,
+        "statement": "Written for this repository on 2026-09-28 by the coding agent under the project owner's task; fictional authors, results and identifiers; no third-party text. Distributed with the repository under the repository's terms."
+      },
+      "checked_on": "2026-09-28",
+      "contains_third_party_text": false,
+      "expected_coverage": "complete"
+    },
+    {
+      "id": "P20",
+      "title": "Tokenizer Drift in Continual Pretraining (copy B)",
+      "file": "markdown/p20-tokenizer-drift-b.md",
+      "format": "markdown",
+      "version_label": "v1",
+      "sha256": "35cf269ca6ebb67eddd16238dc92cebf66fa900e04478192a930009a28d5e7fb",
+      "byte_size": 641,
+      "source": "Hand-written Markdown in this repository.",
+      "doi": "10.5555/ras-eval.shared-01",
+      "license": {
+        "kind": "self_authored_synthetic",
+        "redistribution_in_repo": true,
+        "statement": "Written for this repository on 2026-09-28 by the coding agent under the project owner's task; fictional authors, results and identifiers; no third-party text. Distributed with the repository under the repository's terms."
+      },
+      "checked_on": "2026-09-28",
+      "contains_third_party_text": false,
+      "expected_coverage": "complete"
+    },
+    {
+      "id": "P21",
+      "title": "Gated Sparse Routing for Speech Recognition",
+      "file": "markdown/p21-gsr-speech-b.md",
+      "format": "markdown",
+      "version_label": "v1",
+      "sha256": "761fd2b9500dd5d82b1cf590b3ddfe64dd6e98c06ba19701c377045063016979",
+      "byte_size": 587,
+      "source": "Hand-written Markdown in this repository.",
+      "doi": "10.5555/ras-eval.p21",
+      "license": {
+        "kind": "self_authored_synthetic",
+        "redistribution_in_repo": true,
+        "statement": "Written for this repository on 2026-09-28 by the coding agent under the project owner's task; fictional authors, results and identifiers; no third-party text. Distributed with the repository under the repository's terms."
+      },
+      "checked_on": "2026-09-28",
+      "contains_third_party_text": false,
+      "expected_coverage": "complete"
+    }
+  ],
+  "items": [
+    {
+      "key": "A/P01",
+      "owner": "user_a",
+      "paper": "P01"
+    },
+    {
+      "key": "A/P02",
+      "owner": "user_a",
+      "paper": "P02"
+    },
+    {
+      "key": "A/P03",
+      "owner": "user_a",
+      "paper": "P03"
+    },
+    {
+      "key": "A/P04",
+      "owner": "user_a",
+      "paper": "P04"
+    },
+    {
+      "key": "A/P05",
+      "owner": "user_a",
+      "paper": "P05"
+    },
+    {
+      "key": "A/P06",
+      "owner": "user_a",
+      "paper": "P06"
+    },
+    {
+      "key": "A/P07",
+      "owner": "user_a",
+      "paper": "P07"
+    },
+    {
+      "key": "A/P08",
+      "owner": "user_a",
+      "paper": "P08"
+    },
+    {
+      "key": "A/P09",
+      "owner": "user_a",
+      "paper": "P09"
+    },
+    {
+      "key": "A/P10",
+      "owner": "user_a",
+      "paper": "P10",
+      "acl_markers": [
+        "ZQXA7731"
+      ]
+    },
+    {
+      "key": "A/P11",
+      "owner": "user_a",
+      "paper": "P11"
+    },
+    {
+      "key": "A/P12",
+      "owner": "user_a",
+      "paper": "P12"
+    },
+    {
+      "key": "A/P13",
+      "owner": "user_a",
+      "paper": "P13"
+    },
+    {
+      "key": "B/P11",
+      "owner": "user_b",
+      "paper": "P11"
+    },
+    {
+      "key": "B/P20",
+      "owner": "user_b",
+      "paper": "P20",
+      "acl_markers": [
+        "ZQXB4410"
+      ]
+    },
+    {
+      "key": "B/P21",
+      "owner": "user_b",
+      "paper": "P21",
+      "acl_markers": [
+        "ZQXB5582"
+      ]
+    },
+    {
+      "key": "C/C01",
+      "owner": "common",
+      "title": "Tokenizer Drift in Continual Pretraining",
+      "doi": "10.5555/ras-eval.shared-01"
+    },
+    {
+      "key": "C/C02",
+      "owner": "common",
+      "title": "Gated Sparse Routing for Low-Resource Machine Translation",
+      "doi": "10.5555/ras-eval.p01"
+    }
+  ],
+  "collections": [
+    {
+      "key": "A-translation",
+      "owner": "user_a",
+      "items": [
+        "A/P01",
+        "A/P02",
+        "A/P04",
+        "A/P12",
+        "C/C02"
+      ]
+    },
+    {
+      "key": "A-systems",
+      "owner": "user_a",
+      "items": [
+        "A/P07",
+        "A/P13"
+      ]
+    },
+    {
+      "key": "A-health",
+      "owner": "user_a",
+      "items": [
+        "A/P03",
+        "A/P09"
+      ]
+    },
+    {
+      "key": "B-speech",
+      "owner": "user_b",
+      "items": [
+        "B/P21",
+        "B/P20",
+        "C/C01"
+      ]
+    }
+  ]
+}
