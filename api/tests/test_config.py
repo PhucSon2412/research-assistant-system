@@ -17,6 +17,7 @@ from app.config import (
     PdfBodyThreshold,
     ProviderBudget,
     RerankPolicy,
+    GenerationPolicy,
     Retention,
     Settings,
 )
@@ -69,6 +70,13 @@ def test_defaults_match_documented_mvp_values() -> None:
     assert s.budget.user_rerank_daily_usd <= s.budget.rerank_daily_usd
     assert s.budget.rerank_warning_fraction == 0.8
     assert s.rerank.max_concurrent_requests == 2
+    assert s.generation.model_id == "openai/gpt-6-sol"
+    assert s.generation.pricing_verified is False
+    assert s.budget.generation_daily_usd == 5.0
+    assert s.budget.user_generation_daily_usd <= s.budget.generation_daily_usd
+    assert s.generation.max_evidence_chunks > 0 and s.generation.max_evidence_bytes > 0
+    assert s.generation.max_input_tokens_estimate > s.generation.max_question_bytes
+    assert s.generation.max_output_tokens > 0
     assert s.embedding.reservation_lease_seconds > s.embedding.request_timeout_seconds + 10
     assert s.rerank.reservation_lease_seconds > s.rerank.request_timeout_seconds + 10
     assert s.password.min_length == 12
@@ -108,6 +116,11 @@ def test_redis_broker_password_is_url_escaped() -> None:
         lambda: ProviderBudget(app_daily_usd=60.0),  # above the key cap
         lambda: ProviderBudget(user_embedding_daily_usd=4.0),
         lambda: ProviderBudget(user_rerank_daily_usd=3.0),
+        lambda: ProviderBudget(user_generation_daily_usd=6.0),
+        lambda: ProviderBudget(generation_warning_fraction=0),
+        lambda: GenerationPolicy(max_evidence_chunks=0),
+        lambda: GenerationPolicy(max_output_tokens=0),
+        lambda: GenerationPolicy(endpoint="http://example.org/chat"),
         lambda: ProviderBudget(rerank_warning_fraction=0),
         lambda: ProviderBudget(rerank_warning_fraction=1.01),
         lambda: ProviderBudget(embedding_warning_fraction=0),
@@ -144,6 +157,8 @@ def test_boundary_values_are_accepted() -> None:
         Settings(database_url=URL, embedding={"reservation_lease_seconds": 40})
     with pytest.raises(ValidationError):
         Settings(database_url=URL, rerank={"reservation_lease_seconds": 30})
+    with pytest.raises(ValidationError):
+        Settings(database_url=URL, generation={"reservation_lease_seconds": 60})
 
 
 # --- M1b: environment, cookies, delivery ---------------------------------------

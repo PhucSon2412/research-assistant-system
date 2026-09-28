@@ -20,7 +20,7 @@ class SearchRequestDay(Base):
 class SearchUsage(Base):
     __tablename__ = "search_usage"
     __table_args__ = (
-        CheckConstraint("task_type IN ('embed_query', 'rerank')", name="task_type_valid"),
+        CheckConstraint("task_type IN ('embed_query', 'rerank', 'generation')", name="task_type_valid"),
         CheckConstraint("status IN ('reserved', 'completed', 'uncertain', 'rejected')", name="status_valid"),
         CheckConstraint("reserved_usd >= 0 AND (cost_usd IS NULL OR cost_usd >= 0)", name="cost_non_negative"),
         Index("ix_search_usage_day_user", "day", "user_id"),
@@ -37,6 +37,7 @@ class SearchUsage(Base):
     response_provider: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text)
     input_tokens: Mapped[int | None] = mapped_column(Integer)
+    output_tokens: Mapped[int | None] = mapped_column(Integer)
     search_units: Mapped[int | None] = mapped_column(Integer)
     reserved_usd: Mapped[Decimal] = mapped_column(Numeric(14, 8))
     cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(14, 8))
@@ -45,3 +46,10 @@ class SearchUsage(Base):
     lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class RagRequestDay(Base):
+    __tablename__ = "rag_request_days"
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True)
+    request_count: Mapped[int] = mapped_column(Integer, server_default="0")

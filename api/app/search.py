@@ -103,6 +103,12 @@ def reserve(db: Session, principal: Principal, settings: Settings, task: str, am
         if active_rerank >= settings.rerank.max_concurrent_requests:
             db.rollback()
             raise ApiError(429, "search_rerank_concurrency_limit")
+    elif task == "generation":
+        active_generation = db.scalar(select(func.count()).select_from(SearchUsage).where(
+            SearchUsage.task_type == "generation", SearchUsage.status == "reserved"))
+        if active_generation >= settings.generation.max_concurrent_requests:
+            db.rollback()
+            raise ApiError(429, "rag_generation_concurrency_limit")
     else:
         db.rollback()
         raise ValueError("invalid search task type")
@@ -133,7 +139,7 @@ def reserve(db: Session, principal: Principal, settings: Settings, task: str, am
             warnings.append("embedding_user_quota_near_limit")
         model = settings.embedding.model_id
         lease_seconds = settings.embedding.reservation_lease_seconds
-    else:
+    elif task == "rerank":
         rerank_spend = _total(db, day, "rerank")
         rerank_cap = Decimal(str(settings.budget.rerank_daily_usd))
         if rerank_spend + amount > rerank_cap:
@@ -146,6 +152,19 @@ def reserve(db: Session, principal: Principal, settings: Settings, task: str, am
             warnings.append("rerank_bucket_near_limit")
         model = settings.rerank.model_id
         lease_seconds = settings.rerank.reservation_lease_seconds
+    else:
+        generation_spend = _total(db, day, "generation")
+        cap = Decimal(str(settings.budget.generation_daily_usd))
+        if generation_spend + amount > cap:
+            db.rollback()
+            raise ApiError(429, "rag_generation_budget_exhausted")
+        if _total(db, day, "generation", principal.user_id) + amount > Decimal(str(settings.budget.user_generation_daily_usd)):
+            db.rollback()
+            raise ApiError(429, "rag_user_budget_exhausted")
+        if generation_spend + amount >= cap * Decimal(str(settings.budget.generation_warning_fraction)):
+            warnings.append("generation_bucket_near_limit")
+        model = settings.generation.model_id
+        lease_seconds = settings.generation.reservation_lease_seconds
     usage = SearchUsage(user_id=principal.user_id, day=day, task_type=task, model_id=model,
         provider="openrouter", status="reserved", reserved_usd=amount, cost_status="unknown",
         warnings=warnings, lease_until=lease_deadline(lease_seconds))

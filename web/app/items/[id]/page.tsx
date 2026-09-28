@@ -20,6 +20,10 @@ type FileInfo = { id: string; filename: string | null; byte_size: number; verifi
 type JobInfo = { id: string; state: string; origin: string; attempt_count: number;
   last_error_code: string | null; warnings: string[];
   extraction_finished_at: string | null; finished_at: string | null };
+type RagCitation = { chunk_id: string; quote: string; url: string;
+  locator_kind: string; start_page: number | null; start_line: number | null };
+type RagAnswer = { status: "answered" | "insufficient_evidence"; coverage: string | null;
+  claims: { text: string; citations: RagCitation[] }[] };
 
 const stateText: Record<string, string> = {
   received: "Đã nhận file, chờ xử lý",
@@ -52,6 +56,11 @@ export default function ItemPage() {
   const [item, setItem] = useState<(Detail & { files: FileInfo[]; jobs: JobInfo[] }) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [question, setQuestion] = useState("");
+  const [mode, setMode] = useState<"keyword" | "hybrid">("keyword");
+  const [rag, setRag] = useState<RagAnswer | null>(null);
+  const [ragError, setRagError] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -78,6 +87,20 @@ export default function ItemPage() {
       setError(null);
     } catch (err) {
       setError(describeError(err));
+    }
+  }
+
+  async function ask(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setAsking(true);
+    setRag(null);
+    setRagError(null);
+    try {
+      setRag(await api<RagAnswer>("/rag/ask", { method: "POST", body: { item_id: id, question, mode } }));
+    } catch (err) {
+      setRagError(describeError(err));
+    } finally {
+      setAsking(false);
     }
   }
 
@@ -125,6 +148,32 @@ export default function ItemPage() {
             <a href={`/api/files/${encodeURIComponent(f.id)}/original`}>{f.filename ?? "Original"}</a>
             {` · ${f.byte_size} byte`}{f.page_count ? ` · ${f.page_count} trang` : ""}
           </li>)}</ul>
+          {item.visibility === "private" && item.content_status === "indexed" && <section>
+            <h2>Hỏi paper này</h2>
+            <p>Câu hỏi và các đoạn được chọn sẽ gửi qua OpenRouter/provider để tạo câu trả lời.</p>
+            <form onSubmit={ask}>
+              <label htmlFor="rag-question">Câu hỏi</label>{" "}
+              <input id="rag-question" value={question} onChange={(e) => setQuestion(e.target.value)}
+                required maxLength={1024} style={{ width: "min(100%, 36rem)" }} />{" "}
+              <select aria-label="Cách tìm bằng chứng" value={mode}
+                onChange={(e) => setMode(e.target.value as "keyword" | "hybrid")}>
+                <option value="keyword">Từ khóa</option><option value="hybrid">Kết hợp</option>
+              </select>{" "}
+              <button type="submit" disabled={asking}>{asking ? "Đang hỏi…" : "Hỏi"}</button>
+            </form>
+            <ErrorText message={ragError} />
+            {rag && <div aria-live="polite">
+              <p>Trạng thái: {rag.status === "answered" ? "Có câu trả lời" : "Chưa đủ bằng chứng"}.
+                {rag.coverage === "partial" && " File chỉ được trích xuất một phần."}</p>
+              {rag.claims.map((claim, index) => <p key={index}>
+                {claim.text}{" "}
+                {claim.citations.map((citation) => <span key={citation.chunk_id}>
+                  <Link href={citation.url}>[Nguồn {citation.locator_kind === "pdf" ? `trang ${citation.start_page}` : `dòng ${citation.start_line}`}]</Link>{" "}
+                  <q>{citation.quote}</q>{" "}
+                </span>)}
+              </p>)}
+            </div>}
+          </section>}
         </>
       )}
     </Shell>
