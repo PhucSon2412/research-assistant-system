@@ -365,12 +365,14 @@ def evaluate(env: Environment, manifest: Manifest, qset: QuestionSet, seeded: Se
         for mode in modes:
             response = who.post("/search", {"query": question.question, "mode": mode, "rerank": False,
                                             **_scope_body(question, seeded, rag=False)})
-            rows = response.json().get("hits", []) if response.status_code == 200 else []
+            found = response.json() if response.status_code == 200 else {}
+            rows = found.get("hits", [])
             hits = [_hit(row, seeded) for row in rows]
             records.append(_record(question, "search", mode, response.status_code, hits,
                                    _acl(question, manifest, seeded, response.status_code, response.text,
                                         [row["item_id"] for row in rows]),
-                                   chunk_ids=[row["chunk_id"] for row in rows]))
+                                   chunk_ids=[row["chunk_id"] for row in rows],
+                                   keyword_query=found.get("keyword_query")))
             capture.reset()
             response = who.post("/rag/ask", {"question": question.question, "mode": mode,
                                              **_scope_body(question, seeded, rag=True)})
@@ -406,8 +408,8 @@ def _vector_record(env: Environment, manifest: Manifest, question: Question, see
     collection_id = seeded.collections[scope.collection] if scope.kind == "collection" else None
     with Session(env.engine) as db:
         principal = who.principal()
-        _, ids, _, _ = _rank(db, principal, item_id, env.settings, question.question,
-                             local_embedding.vector(question.question), collection_id)
+        ids = _rank(db, principal, item_id, env.settings, question.question,
+                    local_embedding.vector(question.question), collection_id).semantic
         rows = hydrate(db, principal, item_id, ids, collection_id)
         db.rollback()
     ordered = [dict(rows[i]) | {"chunk_id": str(i)} for i in ids if i in rows]

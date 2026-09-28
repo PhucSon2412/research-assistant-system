@@ -12,7 +12,8 @@ type Hit = {
   locator_kind: "pdf" | "markdown"; start_page: number | null;
   start_line: number | null; end_line: number | null; section_kind: string;
 };
-type Result = { mode: "keyword" | "hybrid"; rerank_status: string; count: number; hits: Hit[] };
+type Result = { mode: "keyword" | "hybrid"; rerank_status: string; count: number; hits: Hit[];
+  keyword_query?: { status: "ok" | "no_terms"; terms: number; min_match: number; dropped_terms: number } };
 type Collection = { id: string; name: string };
 type CollectionItem = { id: string; title: string | null; content_status: string; visibility: string };
 
@@ -75,6 +76,11 @@ export default function SearchPage() {
     <ErrorText message={error} />
     {result && <section aria-live="polite">
       <p>Chế độ: {result.mode === "hybrid" ? "hybrid" : "chỉ từ khóa"} · Rerank: {result.rerank_status} · {result.count} đoạn</p>
+      {result.keyword_query?.status === "no_terms" &&
+        <p>Truy vấn chỉ gồm từ phổ biến nên phần từ khóa không có thuật ngữ để tìm; hãy thêm thuật ngữ cụ thể.</p>}
+      {result.keyword_query?.status === "ok" &&
+        <p style={{ fontSize: "0.8rem", color: "#555" }}>Từ khóa: đoạn khớp ít nhất {result.keyword_query.min_match}/{result.keyword_query.terms} thuật ngữ
+          {result.keyword_query.dropped_terms > 0 && ` (bỏ ${result.keyword_query.dropped_terms} thuật ngữ vượt giới hạn)`}.</p>}
       {result.hits.map((hit) => <article key={hit.chunk_id} style={{ borderTop: "1px solid #ccc", marginTop: "1rem" }}>
         <h2><Link href={`/items/${hit.item_id}`}>{hit.title || "Paper riêng"}</Link></h2>
         <p>{hit.coverage === "partial" ? "Chỉ trích xuất được một phần paper. " : ""}

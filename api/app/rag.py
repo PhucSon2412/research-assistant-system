@@ -276,6 +276,8 @@ def answer(db: Session, principal: Principal, settings: Settings, item_id: uuid.
     policy = settings.generation
     if len(question.encode("utf-8")) > policy.max_question_bytes:
         raise ApiError(422, "rag_question_too_long")
+    if "\x00" in question:
+        raise ApiError(422, "rag_question_invalid")
     if sum((item_id is not None, collection_id is not None, all_items)) != 1:
         raise ApiError(422, "rag_invalid_scope")
     _scope(db, principal, item_id, collection_id)
@@ -296,6 +298,9 @@ def answer(db: Session, principal: Principal, settings: Settings, item_id: uuid.
     base = {"status": "insufficient_evidence", "scope": scope, "coverage": coverage,
             "claims": [], "cost": None}
     if not pack:
+        # Only function words or out-of-range tokens: say so instead of implying a search miss.
+        if mode == "keyword" and found["keyword_query"]["status"] == "no_terms":
+            return {**base, "reason": "keyword_query_without_terms"}
         return base
     # A comparison needs evidence from both sides before any paper text reaches generation.
     if comparing and len({row["item_id"] for row in pack.values()}) < 2:

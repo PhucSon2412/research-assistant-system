@@ -219,6 +219,20 @@ class SearchPolicy(BaseModel):
     max_results: int = Field(default=20, gt=0, le=100)
     max_requests_per_user_day: int = Field(default=200, gt=0)
     max_query_request_usd: float = Field(default=0.0002, gt=0)
+    # Keyword query built from a question (app.keyword_query): distinct useful terms kept in
+    # input order, their length bounds, and how many kept terms a chunk must match (the share,
+    # at least keyword_min_match_terms, at most all kept terms).
+    keyword_max_terms: int = Field(default=8, gt=0, le=32)
+    keyword_min_term_chars: int = Field(default=2, gt=0)
+    keyword_max_term_chars: int = Field(default=64, gt=0, le=256)
+    keyword_min_match_fraction: float = Field(default=0.5, gt=0, le=1)
+    keyword_min_match_terms: int = Field(default=2, gt=0)
+
+    @model_validator(mode="after")
+    def _check_keyword_terms(self) -> "SearchPolicy":
+        if self.keyword_min_term_chars > self.keyword_max_term_chars:
+            raise ValueError("keyword_min_term_chars must not exceed keyword_max_term_chars")
+        return self
 
 
 class RerankPolicy(BaseModel):

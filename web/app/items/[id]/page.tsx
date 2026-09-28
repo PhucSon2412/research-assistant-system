@@ -25,7 +25,7 @@ type RagCitation = { chunk_id: string; quote: string; url: string;
   item_id: string; title: string | null; version_id: string; source_file_id: string;
   locator_kind: string; start_page: number | null; start_line: number | null };
 type RagAnswer = { status: "answered" | "insufficient_evidence"; coverage: string | null;
-  reason?: "comparison_requires_multiple_papers";
+  reason?: "comparison_requires_multiple_papers" | "keyword_query_without_terms";
   scope: { kind: "item" | "collection" | "all"; item_id?: string; collection_id?: string };
   claims: { text: string; citations: RagCitation[] }[] };
 type Collection = { id: string; name: string };
@@ -190,6 +190,8 @@ export default function ItemPage() {
                 {rag.coverage === "partial" && " File chỉ được trích xuất một phần."}</p>
               {rag.reason === "comparison_requires_multiple_papers" &&
                 <p>Chưa có nguồn từ ít nhất hai paper để so sánh.</p>}
+              {rag.reason === "keyword_query_without_terms" &&
+                <p>Câu hỏi chỉ gồm từ phổ biến nên chế độ từ khóa không có thuật ngữ để tìm; hãy thêm thuật ngữ cụ thể.</p>}
               {rag.claims.map((claim, index) => <p key={index}>
                 {claim.text}{" "}
                 {claim.citations.map((citation) => <span key={citation.chunk_id}>
