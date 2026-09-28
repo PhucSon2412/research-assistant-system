@@ -12,7 +12,7 @@ $py = "$env:USERPROFILE\.conda\envs\ras\python.exe"
 & $py -m app.evaluation run --output evaluation\rag\reports
 ```
 
-- Commit `12f614c5ab03b0657921e66d331c126f2c34538c`
+- Commit `0660c8043188621c03fc3f610e3b44b8224f53bc`
 - Python 3.12.14, pypdf 6.19.0, parser `pypdf-6.19.0-layout-v2` / `markdown-lines-v2`; Windows-11-10.0.26200-SP0
 - Dataset `ras-rag-eval-v1`: 80 câu, 16 holdout, 49 câu có đáp án với 63 side chứng cứ; nhóm single_paper 20, comparison 15, no_answer 15, partial_pdf 10, permission 10, references_conflict_injection 10.
 - Config: keyword_top_k=30, vector_top_k=30, max_results=20, evidence ≤ 6 chunk / 3 paper / 12000 byte, chunk ≤ 1200 ký tự.
@@ -250,36 +250,36 @@ Số câu mà search trả ít nhất một chunk, số hit trung bình, số c�
 | ID | Nhóm | Split | Danh tính | Scope | Kỳ vọng | search:keyword | search:hybrid | vector | pack:keyword | pack:hybrid | rag:keyword | rag:hybrid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | SP-01 | single_paper | dev | user_a | item | answered | ×,× (retrieval) | 3,3 (ok) | 3,3 (ok) | ×,× (retrieval) | 4,4 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (6) |
-| SP-02 | single_paper | dev | user_a | all | answered | × (retrieval) | 4 (ok) | 2 (ok) | × (retrieval) | 3 (ok) | 200 insufficient_evidence → gen (3) | 200 insufficient_evidence → gen (6) |
+| SP-02 | single_paper | dev | user_a | all | answered | × (retrieval) | 4 (ok) | 2 (ok) | × (retrieval) | 4 (ok) | 200 insufficient_evidence → gen (3) | 200 insufficient_evidence → gen (6) |
 | SP-03 | single_paper | dev | user_a | item | answered | × (retrieval) | 2 (ok) | 2 (ok) | × (retrieval) | 5 (ok) | 200 insufficient_evidence → gen (1) | 200 insufficient_evidence → gen (6) |
-| SP-04 | single_paper | holdout | user_a | item | answered | 1 (ok) | 1 (ok) | 1 (ok) | 1 (ok) | 5 (ok) | 200 insufficient_evidence → gen (1) | 200 insufficient_evidence → gen (6) |
+| SP-04 | single_paper | holdout | user_a | item | answered | 1 (ok) | 1 (ok) | 1 (ok) | 1 (ok) | 6 (ok) | 200 insufficient_evidence → gen (1) | 200 insufficient_evidence → gen (6) |
 | SP-05 | single_paper | dev | user_a | item | answered | × (retrieval) | 3 (ok) | 3 (ok) | × (retrieval) | 4 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (6) |
-| SP-06 | single_paper | dev | user_a | item | answered | × (retrieval) | 1 (ok) | 1 (ok) | × (retrieval) | 2 (ok) | 200 insufficient_evidence (0) | 200 insufficient_evidence → gen (6) |
+| SP-06 | single_paper | dev | user_a | item | answered | × (retrieval) | 1 (ok) | 1 (ok) | × (retrieval) | 1 (ok) | 200 insufficient_evidence (0) | 200 insufficient_evidence → gen (6) |
 | SP-07 | single_paper | dev | user_a | item | answered | 1 (ok) | 1 (ok) | 1 (ok) | 1 (ok) | 5 (ok) | 200 insufficient_evidence → gen (1) | 200 insufficient_evidence → gen (6) |
-| SP-08 | single_paper | dev | user_a | all | answered | × (retrieval) | 1 (ok) | 1 (ok) | × (retrieval) | 4 (ok) | 200 insufficient_evidence (0) | 200 insufficient_evidence → gen (6) |
+| SP-08 | single_paper | dev | user_a | all | answered | × (retrieval) | 1 (ok) | 1 (ok) | × (retrieval) | 3 (ok) | 200 insufficient_evidence (0) | 200 insufficient_evidence → gen (6) |
 | SP-09 | single_paper | holdout | user_a | item | answered | × (retrieval) | 3 (ok) | 3 (ok) | × (retrieval) | 4 (ok) | 200 insufficient_evidence → gen (1) | 200 insufficient_evidence → gen (6) |
 | SP-10 | single_paper | dev | user_a | item | answered | 1 (ok) | 1 (ok) | 1 (ok) | 1 (ok) | 5 (ok) | 200 insufficient_evidence → gen (1) | 200 insufficient_evidence → gen (6) |
 | SP-11 | single_paper | dev | user_a | item | answered | 2 (ok) | 2 (ok) | 4 (ok) | 2 (ok) | 3 (ok) | 200 insufficient_evidence → gen (4) | 200 insufficient_evidence → gen (6) |
-| SP-12 | single_paper | dev | user_a | all | answered | 1 (ok) | 1 (ok) | 1 (ok) | 2 (ok) | 3 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (6) |
+| SP-12 | single_paper | dev | user_a | all | answered | 1 (ok) | 1 (ok) | 1 (ok) | 2 (ok) | 5 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (6) |
 | SP-13 | single_paper | holdout | user_a | item | answered | 1 (ok) | 1 (ok) | 3 (ok) | 1 (ok) | 4 (ok) | 200 insufficient_evidence → gen (1) | 200 insufficient_evidence → gen (6) |
-| SP-14 | single_paper | dev | user_a | item | answered | 2 (ok) | 3 (ok) | 4 (ok) | 2 (ok) | 3 (ok) | 200 insufficient_evidence → gen (3) | 200 insufficient_evidence → gen (5) |
-| SP-15 | single_paper | dev | user_a | collection | answered | 1 (ok) | 1 (ok) | 1 (ok) | 1 (ok) | 6 (ok) | 200 insufficient_evidence → gen (1) | 200 insufficient_evidence → gen (6) |
-| SP-16 | single_paper | dev | user_a | all | answered | 1 (ok) | 1 (ok) | 1 (ok) | 1 (ok) | 6 (ok) | 200 insufficient_evidence → gen (1) | 200 insufficient_evidence → gen (6) |
+| SP-14 | single_paper | dev | user_a | item | answered | 3 (ok) | 3 (ok) | 4 (ok) | 2 (ok) | 3 (ok) | 200 insufficient_evidence → gen (3) | 200 insufficient_evidence → gen (5) |
+| SP-15 | single_paper | dev | user_a | collection | answered | 1 (ok) | 1 (ok) | 1 (ok) | 1 (ok) | 4 (ok) | 200 insufficient_evidence → gen (1) | 200 insufficient_evidence → gen (6) |
+| SP-16 | single_paper | dev | user_a | all | answered | 1 (ok) | 1 (ok) | 1 (ok) | 1 (ok) | 4 (ok) | 200 insufficient_evidence → gen (1) | 200 insufficient_evidence → gen (6) |
 | SP-17 | single_paper | dev | user_a | item | answered | 1 (ok) | 1 (ok) | 1 (ok) | 2 (ok) | 4 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (5) |
 | SP-18 | single_paper | holdout | user_a | item | answered | × (retrieval) | 1 (ok) | 1 (ok) | × (retrieval) | 4 (ok) | 200 insufficient_evidence (0) | 200 insufficient_evidence → gen (5) |
-| SP-19 | single_paper | dev | user_a | all | answered | 2 (ok) | 2 (ok) | 1 (ok) | 1 (ok) | 2 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (6) |
+| SP-19 | single_paper | dev | user_a | all | answered | 2 (ok) | 2 (ok) | 1 (ok) | 1 (ok) | 3 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (6) |
 | SP-20 | single_paper | dev | user_a | item | answered | 1 (ok) | 1 (ok) | 1 (ok) | 2 (ok) | 2 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (4) |
-| CMP-01 | comparison | dev | user_a | collection | answered | 1,× (retrieval) | 2,4 (ok) | 1,3 (ok) | 1,3 (ok) | 1,4 (ok) | 200 insufficient_evidence → gen (4) | 200 insufficient_evidence → gen (6) |
-| CMP-02 | comparison | dev | user_a | collection | answered | 1,2 (ok) | 1,2 (ok) | 1,2 (ok) | 1,2 (ok) | 2,4 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (6) |
-| CMP-03 | comparison | dev | user_a | collection | answered | 2,1 (ok) | 2,1 (ok) | 1,2 (ok) | 1,2 (ok) | 1,4 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (6) |
-| CMP-04 | comparison | dev | user_a | collection | answered | 1,× (retrieval) | 1,12 (rank) | 1,12 (rank) | 5,× (retrieval) | 6,× (evidence_pack) | 200 insufficient_evidence → gen (5) | 200 insufficient_evidence → gen (6) |
-| CMP-05 | comparison | holdout | user_a | all | answered | ×,× (retrieval) | 1,7 (rank) | 1,7 (rank) | ×,× (retrieval) | 5,1 (ok) | 200 insufficient_evidence/comparison_requires_multiple_papers (0) | 200 insufficient_evidence → gen (6) |
-| CMP-06 | comparison | dev | user_a | all | answered | ×,× (retrieval) | 2,20 (rank) | 2,20 (rank) | ×,× (retrieval) | 6,× (evidence_pack) | 200 insufficient_evidence (0) | 200 insufficient_evidence → gen (6) |
+| CMP-01 | comparison | dev | user_a | collection | answered | 2,× (retrieval) | 2,4 (ok) | 1,3 (ok) | 1,3 (ok) | 2,4 (ok) | 200 insufficient_evidence → gen (4) | 200 insufficient_evidence → gen (6) |
+| CMP-02 | comparison | dev | user_a | collection | answered | 1,2 (ok) | 1,2 (ok) | 1,2 (ok) | 1,2 (ok) | 3,5 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (6) |
+| CMP-03 | comparison | dev | user_a | collection | answered | 2,1 (ok) | 2,1 (ok) | 1,2 (ok) | 1,2 (ok) | 1,5 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (6) |
+| CMP-04 | comparison | dev | user_a | collection | answered | 1,× (retrieval) | 1,12 (rank) | 1,12 (rank) | 4,× (retrieval) | 5,× (evidence_pack) | 200 insufficient_evidence → gen (5) | 200 insufficient_evidence → gen (6) |
+| CMP-05 | comparison | holdout | user_a | all | answered | ×,× (retrieval) | 1,7 (rank) | 1,7 (rank) | ×,× (retrieval) | 6,3 (ok) | 200 insufficient_evidence/comparison_requires_multiple_papers (0) | 200 insufficient_evidence → gen (6) |
+| CMP-06 | comparison | dev | user_a | all | answered | ×,× (retrieval) | 2,20 (rank) | 2,20 (rank) | ×,× (retrieval) | 4,× (evidence_pack) | 200 insufficient_evidence (0) | 200 insufficient_evidence → gen (6) |
 | CMP-07 | comparison | dev | user_a | collection | answered | ×,× (retrieval) | 9,8 (rank) | 9,8 (rank) | ×,× (retrieval) | ×,× (evidence_pack) | 200 insufficient_evidence/comparison_requires_multiple_papers (0) | 200 insufficient_evidence → gen (6) |
-| CMP-08 | comparison | dev | user_a | collection | answered | ×,× (retrieval) | 6,2 (rank) | 6,2 (rank) | ×,× (retrieval) | 3,4 (ok) | 200 insufficient_evidence/comparison_requires_multiple_papers (0) | 200 insufficient_evidence → gen (6) |
-| CMP-09 | comparison | dev | user_a | all | answered | 2,1 (ok) | 2,1 (ok) | 2,1 (ok) | 2,4 (ok) | 2,5 (ok) | 200 insufficient_evidence → gen (4) | 200 insufficient_evidence → gen (6) |
-| CMP-10 | comparison | holdout | user_a | all | answered | 2,× (retrieval) | 2,4 (ok) | 9,2 (rank) | 2,3 (ok) | 3,4 (ok) | 200 insufficient_evidence → gen (4) | 200 insufficient_evidence → gen (6) |
-| CMP-11 | comparison | dev | user_a | collection | answered | ×,1 (retrieval) | 3,1 (ok) | 3,1 (ok) | ×,× (retrieval) | 1,4 (ok) | 200 insufficient_evidence/comparison_requires_multiple_papers (0) | 200 insufficient_evidence → gen (6) |
+| CMP-08 | comparison | dev | user_a | collection | answered | ×,× (retrieval) | 6,2 (rank) | 6,2 (rank) | ×,× (retrieval) | 2,4 (ok) | 200 insufficient_evidence/comparison_requires_multiple_papers (0) | 200 insufficient_evidence → gen (6) |
+| CMP-09 | comparison | dev | user_a | all | answered | 2,1 (ok) | 2,1 (ok) | 2,1 (ok) | 2,3 (ok) | 2,4 (ok) | 200 insufficient_evidence → gen (4) | 200 insufficient_evidence → gen (6) |
+| CMP-10 | comparison | holdout | user_a | all | answered | 2,× (retrieval) | 2,4 (ok) | 9,2 (rank) | 2,4 (ok) | 3,6 (ok) | 200 insufficient_evidence → gen (4) | 200 insufficient_evidence → gen (6) |
+| CMP-11 | comparison | dev | user_a | collection | answered | ×,1 (retrieval) | 3,1 (ok) | 3,1 (ok) | ×,× (retrieval) | 1,6 (ok) | 200 insufficient_evidence/comparison_requires_multiple_papers (0) | 200 insufficient_evidence → gen (6) |
 | CMP-12 | comparison | dev | user_a | all | insufficient_evidence | — | — | — | — | — | 200 insufficient_evidence → gen (4) | 200 insufficient_evidence → gen (6) |
 | CMP-13 | comparison | dev | user_a | collection | answered | ×,× (retrieval) | 2,6 (rank) | 1,6 (rank) | 1,× (retrieval) | 1,× (evidence_pack) | 200 insufficient_evidence → gen (3) | 200 insufficient_evidence → gen (6) |
 | CMP-14 | comparison | holdout | user_a | all | insufficient_evidence | — | — | — | — | — | 200 insufficient_evidence (0) | 200 insufficient_evidence → gen (6) |
@@ -303,27 +303,27 @@ Số câu mà search trả ít nhất một chunk, số hit trung bình, số c�
 | PP-02 | partial_pdf | dev | user_a | item | insufficient_evidence | — | — | — | — | — | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (6) |
 | PP-03 | partial_pdf | dev | user_a | item | answered | 1 (ok) | 2 (ok) | 4 (ok) | 1 (ok) | 1 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (6) |
 | PP-04 | partial_pdf | holdout | user_a | item | insufficient_evidence | — | — | — | — | — | 200 insufficient_evidence → gen (5) | 200 insufficient_evidence → gen (6) |
-| PP-05 | partial_pdf | dev | user_a | all | answered | 2 (ok) | 2 (ok) | 2 (ok) | 1 (ok) | 1 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (6) |
+| PP-05 | partial_pdf | dev | user_a | all | answered | 2 (ok) | 2 (ok) | 2 (ok) | 2 (ok) | 6 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (6) |
 | PP-06 | partial_pdf | dev | user_a | item | answered | 1 (ok) | 1 (ok) | 1 (ok) | 1 (ok) | 3 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (6) |
 | PP-07 | partial_pdf | dev | user_a | item | insufficient_evidence | — | — | — | — | — | 200 insufficient_evidence (0) | 200 insufficient_evidence → gen (6) |
 | PP-08 | partial_pdf | dev | user_a | item | answered | 1 (ok) | 1 (ok) | 1 (ok) | 2 (ok) | 4 (ok) | 200 insufficient_evidence → gen (3) | 200 insufficient_evidence → gen (6) |
-| PP-09 | partial_pdf | holdout | user_a | item | answered | 2 (ok) | 2 (ok) | 3 (ok) | 2 (ok) | 3 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (6) |
-| PP-10 | partial_pdf | dev | user_a | collection | answered | 1 (ok) | 1 (ok) | 1 (ok) | 1 (ok) | 1 (ok) | 200 insufficient_evidence → gen (6) | 200 insufficient_evidence → gen (6) |
+| PP-09 | partial_pdf | holdout | user_a | item | answered | 1 (ok) | 1 (ok) | 3 (ok) | 2 (ok) | 3 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (6) |
+| PP-10 | partial_pdf | dev | user_a | collection | answered | 1 (ok) | 1 (ok) | 1 (ok) | 2 (ok) | 2 (ok) | 200 insufficient_evidence → gen (6) | 200 insufficient_evidence → gen (6) |
 | ACL-01 | permission | dev | user_a | all | insufficient_evidence | — | — | — | — | — | 200 insufficient_evidence → gen (3) | 200 insufficient_evidence → gen (6) |
-| ACL-02 | permission | dev | user_b | all | answered | 1 (ok) | 1 (ok) | 1 (ok) | 1 (ok) | 1 (ok) | 200 insufficient_evidence → gen (1) | 200 insufficient_evidence → gen (6) |
-| ACL-03 | permission | dev | user_a | all | answered | 1 (ok) | 1 (ok) | 1 (ok) | 2 (ok) | 5 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (5) |
-| ACL-04 | permission | holdout | user_b | all | answered | 1 (ok) | 1 (ok) | 1 (ok) | 2 (ok) | 4 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (6) |
+| ACL-02 | permission | dev | user_b | all | answered | 1 (ok) | 1 (ok) | 1 (ok) | 1 (ok) | 2 (ok) | 200 insufficient_evidence → gen (1) | 200 insufficient_evidence → gen (6) |
+| ACL-03 | permission | dev | user_a | all | answered | 1 (ok) | 1 (ok) | 1 (ok) | 1 (ok) | 3 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (5) |
+| ACL-04 | permission | holdout | user_b | all | answered | 1 (ok) | 1 (ok) | 1 (ok) | 1 (ok) | 2 (ok) | 200 insufficient_evidence → gen (2) | 200 insufficient_evidence → gen (6) |
 | ACL-05 | permission | dev | admin | all | insufficient_evidence | — | — | — | — | — | 200 insufficient_evidence (0) | 200 insufficient_evidence (0) |
 | ACL-06 | permission | dev | user_a | item | scope_not_found | — | — | — | — | — | 404 error (0) | 404 error (0) |
 | ACL-07 | permission | dev | admin | item | scope_not_found | — | — | — | — | — | 404 error (0) | 404 error (0) |
 | ACL-08 | permission | dev | user_a | collection | scope_not_found | — | — | — | — | — | 404 error (0) | 404 error (0) |
-| ACL-09 | permission | holdout | user_b | all | answered | 1 (ok) | 1 (ok) | 1 (ok) | 1 (ok) | 2 (ok) | 200 insufficient_evidence → gen (1) | 200 insufficient_evidence → gen (6) |
+| ACL-09 | permission | holdout | user_b | all | answered | 1 (ok) | 1 (ok) | 1 (ok) | 1 (ok) | 6 (ok) | 200 insufficient_evidence → gen (1) | 200 insufficient_evidence → gen (6) |
 | ACL-10 | permission | dev | user_a | all | answered | × (retrieval) | 1 (ok) | 1 (ok) | × (retrieval) | 3 (ok) | 200 insufficient_evidence (0) | 200 insufficient_evidence → gen (6) |
 | RCI-01 | references_conflict_injection | dev | user_a | item | insufficient_evidence | — | — | — | — | — | 200 insufficient_evidence (0) | 200 insufficient_evidence → gen (4) |
 | RCI-02 | references_conflict_injection | dev | user_a | all | insufficient_evidence | — | — | — | — | — | 200 insufficient_evidence (0) | 200 insufficient_evidence → gen (6) |
 | RCI-03 | references_conflict_injection | dev | user_a | item | answered | 1 (ok) | 1 (ok) | 1 (ok) | 1 (ok) | 3 (ok) | 200 insufficient_evidence → gen (1) | 200 insufficient_evidence → gen (4) |
 | RCI-04 | references_conflict_injection | holdout | user_a | item | insufficient_evidence | — | — | — | — | — | 200 insufficient_evidence → gen (1) | 200 insufficient_evidence → gen (4) |
-| RCI-05 | references_conflict_injection | dev | user_a | collection | answered | ×,× (retrieval) | 5,3 (ok) | 5,2 (ok) | ×,× (retrieval) | 1,4 (ok) | 200 insufficient_evidence → gen (1) | 200 insufficient_evidence → gen (6) |
+| RCI-05 | references_conflict_injection | dev | user_a | collection | answered | ×,× (retrieval) | 5,3 (ok) | 5,2 (ok) | ×,× (retrieval) | 1,6 (ok) | 200 insufficient_evidence → gen (1) | 200 insufficient_evidence → gen (6) |
 | RCI-06 | references_conflict_injection | dev | user_a | all | insufficient_evidence | — | — | — | — | — | 200 insufficient_evidence → gen (4) | 200 insufficient_evidence → gen (6) |
 | RCI-07 | references_conflict_injection | dev | user_a | item | answered | × (retrieval) | 3 (ok) | 3 (ok) | × (retrieval) | 5 (ok) | 200 insufficient_evidence (0) | 200 insufficient_evidence → gen (5) |
 | RCI-08 | references_conflict_injection | dev | user_a | item | answered | × (retrieval) | 5 (ok) | 5 (ok) | × (retrieval) | 4 (ok) | 200 insufficient_evidence → gen (3) | 200 insufficient_evidence → gen (6) |
