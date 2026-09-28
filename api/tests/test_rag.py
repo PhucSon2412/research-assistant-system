@@ -16,7 +16,8 @@ from app.authz import Principal
 from app.config import get_settings
 from app.main import app
 from app.models import SearchUsage
-from app.rag import GenerationError, GenerationResult, _pack, generate
+from app.rag import (COMPARATIVE_ASSERTION, COMPARISON_CUE, GenerationError, GenerationResult, _pack,
+                     generate, is_comparison)
 from app.search import reserve
 from tests.test_search import indexed
 from tests.test_private_index import fake_provider, settings_with_fake_key
@@ -477,3 +478,227 @@ def test_comparison_without_valid_second_paper_abstains(upload_api, monkeypatch)
     assert result.json()["status"] == "insufficient_evidence"
     assert result.json()["reason"] == "comparison_requires_multiple_papers"
     assert calls == []
+
+
+DIFFER_QUESTIONS = (
+    "How do GSR and DAS differ in their behaviour on code-switched input?",  # CMP-03
+    "Do GSR and DAS differ on code-switched input?",
+    "In what ways do the original GSR study and the replication study differ?",
+    "How does GSR differ from DAS?",
+    "How does GSR differ from DAS on code-switched input?",
+    "How did GSR differ in behaviour from DAS?",
+    "Does the replication study differ from the original GSR study in tokenizer settings?",
+    "Explain how curriculum sampling differs from Dense Adapter Stacks.",
+    "Explain how GSR and DAS differed on code-switched input.",
+    "How does code-switched behaviour differ between GSR and DAS?",
+    "What is the difference between GSR and DAS on code-switched input?",
+    "What are the differences between GSR and DAS?",
+)
+ORDINARY_QUESTIONS = (
+    "What effect did differential privacy with epsilon 8 have on the federated model?",
+    "Which different routing strategies does the survey cover?",
+    "What difference did caching the most used experts make?",
+    "Is the difference significant?",
+    "Did BLEU differ across random seeds?",
+    "How much did the scores differ?",
+    "What rank do the adapters have, and does it differ across layers?",
+    "What rank do the adapters have and does it differ across layers?",
+    "How did GSR perform on code-switched input?",
+    "How much power did the event camera draw compared with the infrared reference camera?",
+    "How did mean recall of the wildlife detector change between 2 lux and 0.5 lux?",
+)
+# "differ ... from" with side A missing: a pronoun or a phrase from an earlier clause.
+PRONOUN_DIFFER_QUESTIONS = (
+    "Does it differ from baseline?",
+    "What is the method, and does it differ from baseline?",
+    "What is the method and does it differ from baseline?",
+    "How does it differ from the baseline?",
+    "What is GSR, and how does it differ from DAS?",
+    "What is GSR, and how does DAS differ from it?",
+    "Which differs from baseline?",
+    "Tell me whether it differs from baseline.",
+)
+
+
+def test_differ_questions_are_comparisons_and_ordinary_ones_are_not():
+    for question in DIFFER_QUESTIONS:
+        assert is_comparison(question), question
+        stripped = COMPARISON_CUE.sub(" ", question)
+        assert "differ" not in stripped.lower() and ("GSR" in stripped or "curriculum" in stripped), stripped
+    for question in ORDINARY_QUESTIONS + PRONOUN_DIFFER_QUESTIONS:
+        assert not is_comparison(question), question
+    assert is_comparison("Compare the training compute of GSR and DAS in GPU-hours.")
+    # Every word form the question rule accepts also marks a comparative claim.
+    for claim in ("GSR differs from DAS.", "GSR and DAS differed.", "They differ.",
+                  "The difference is two points.", "Differences remain.", "Differing results."):
+        assert COMPARATIVE_ASSERTION.search(claim), claim
+    assert not COMPARATIVE_ASSERTION.search("GSR uses a differential design.")
+
+
+def _two_paper_collection(api, storage, monkeypatch):
+    # Five keyword terms need three matches, so every body repeats three of them.
+    _, a, b, admin, first, b_setup, settings = setup(api, storage, monkeypatch,
+        b"## Results\nSharedword codeswitch behaviour: first result seven units.\n")
+    second = indexed(api, storage, a, b"## Results\nSharedword codeswitch behaviour: second result nine units.\n",
+                     settings)
+    foreign = indexed(api, storage, b, b"## Results\nSharedword codeswitch behaviour BSECRET result.\n", settings)
+    b_items = {b_setup["item_id"], foreign["item_id"]}
+    common = api.add_item(owner=None, title="Sharedword codeswitch common metadata_only")
+    collection = a.post("/collections", {"name": "Pair"}).json()["collection"]["id"]
+    for item in (first["item_id"], second["item_id"], str(common)):
+        assert a.post(f"/collections/{collection}/items", {"item_id": item}).status_code == 201
+    monkeypatch.setattr("app.search.embed", lambda value, cfg, input_type: EmbeddingResult(
+        [.1, .2, .3], cfg.embedding.model_id, 2))
+    queries = []
+    from app import rag
+    original = rag.search
+    def recorded(db, principal, cfg, query, mode, *args):
+        queries.append((query, mode))
+        return original(db, principal, cfg, query, mode, *args)
+    monkeypatch.setattr("app.rag.search", recorded)
+    return a, b, admin, first, second, b_items, common, collection, queries
+
+
+def test_differ_question_takes_comparison_gate_in_keyword_and_hybrid(upload_api, monkeypatch):
+    api, storage = upload_api
+    a, b, admin, first, second, b_items, common, collection, queries = _two_paper_collection(
+        api, storage, monkeypatch)
+    question = "How do Sharedword and codeswitch differ in their behaviour on code-switched input?"
+    both = (first["item_id"], second["item_id"])
+    sent = []
+    def claim_citing(text, cited):
+        def fake(messages, cfg):
+            payload = json.loads(messages[1]["content"])
+            sent.append(payload)
+            assert set(payload) == {"question", "evidence"} and payload["question"] == question
+            by_item = {row["item_id"]: row for row in payload["evidence"]}
+            assert set(by_item) == set(both)
+            quotes = {first["item_id"]: "seven units", second["item_id"]: "nine units"}
+            return GenerationResult(json.dumps({"claims": [{"text": text, "comparison": True, "citations": [
+                {"chunk_id": by_item[item]["chunk_id"], "quote": quotes[item]} for item in cited]}]}),
+                200, 50, cfg.generation.model_id, "SyntheticProvider")
+        return fake
+    monkeypatch.setattr("app.rag.generate", claim_citing(
+        "The first paper differs from the second: seven units versus nine units.", both))
+    for scope in ({"collection_id": collection}, {"scope": "all"}):
+        for mode in ("keyword", "hybrid"):
+            queries.clear()
+            response = a.post("/rag/ask", {**scope, "question": question, "mode": mode})
+            assert response.status_code == 200, response.text
+            data = response.json()
+            assert data["status"] == "answered", (scope, mode, data)
+            cites = data["claims"][0]["citations"]
+            assert {cite["item_id"] for cite in cites} == set(both)
+            for cite in cites:
+                path = cite["url"].replace("/sources/", "/search/chunks/")
+                assert a.get(path).status_code == 200
+                assert b.get(path).status_code == 404 and admin.get(path).status_code == 404
+            # Keyword retrieval drops the comparison word; generation still gets the question.
+            stripped = "How do Sharedword and codeswitch   in their behaviour on code-switched input?"
+            assert queries == [(stripped if mode == "keyword" else question, mode)]
+    assert len(sent) == 4
+    assert all(not any(item in str(payload) for item in b_items) and str(common) not in str(payload)
+               and "BSECRET" not in str(payload) for payload in sent)
+
+    def separate(messages, cfg):
+        by_item = {row["item_id"]: row for row in json.loads(messages[1]["content"])["evidence"]}
+        return GenerationResult(json.dumps({"claims": [
+            {"text": "The first paper differs: seven units.", "comparison": False, "citations": [
+                {"chunk_id": by_item[first["item_id"]]["chunk_id"], "quote": "seven units"}]},
+            {"text": "The second paper differs: nine units.", "comparison": False, "citations": [
+                {"chunk_id": by_item[second["item_id"]]["chunk_id"], "quote": "nine units"}]}]}),
+            200, 50, cfg.generation.model_id, "SyntheticProvider")
+    rejected = {"two separate claims": separate,
+                "one side cited": claim_citing("The first paper differs from the second.", both[:1]),
+                "no comparative wording": claim_citing("These papers have results.", both)}
+    for name, fake in rejected.items():
+        monkeypatch.setattr("app.rag.generate", fake)
+        for mode in ("keyword", "hybrid"):
+            data = a.post("/rag/ask", {"collection_id": collection, "question": question, "mode": mode}).json()
+            assert data["status"] == "insufficient_evidence" and data["claims"] == [], (name, mode, data)
+            assert data["reason"] == "comparison_requires_multiple_papers", (name, mode)
+
+    # One item keeps the single-paper contract: no comparison gate, unstripped query.
+    def one_paper(messages, cfg):
+        row = json.loads(messages[1]["content"])["evidence"][0]
+        return GenerationResult(json.dumps({"claims": [{"text": "The first paper reports seven units.",
+            "citations": [{"chunk_id": row["chunk_id"], "quote": "seven units"}]}]}),
+            200, 50, cfg.generation.model_id, "SyntheticProvider")
+    monkeypatch.setattr("app.rag.generate", one_paper)
+    queries.clear()
+    single = a.post("/rag/ask", {"item_id": first["item_id"], "question": question, "mode": "keyword"}).json()
+    assert single["status"] == "answered" and single["scope"]["kind"] == "item"
+    assert queries == [(question, "keyword")]
+
+    # Admin has no paper and B's keyword hits only one of its own: neither reaches
+    # generation. B's hybrid pack may hold B's two papers, never A's.
+    payloads = []
+    def record(messages, cfg):
+        payloads.append(json.loads(messages[1]["content"]))
+        return GenerationResult('{"claims":[]}', 200, 5, cfg.generation.model_id, "SyntheticProvider")
+    monkeypatch.setattr("app.rag.generate", record)
+    for mode in ("keyword", "hybrid"):
+        data = admin.post("/rag/ask", {"scope": "all", "question": question, "mode": mode}).json()
+        assert data["status"] == "insufficient_evidence" and data["claims"] == []
+    data = b.post("/rag/ask", {"scope": "all", "question": question, "mode": "keyword"}).json()
+    assert data["status"] == "insufficient_evidence"
+    assert data["reason"] == "comparison_requires_multiple_papers"
+    assert payloads == []
+    data = b.post("/rag/ask", {"scope": "all", "question": question, "mode": "hybrid"}).json()
+    assert data["status"] == "insufficient_evidence" and data["claims"] == []
+    assert len(payloads) == 1 and {row["item_id"] for row in payloads[0]["evidence"]} == b_items
+    for browser in (b, admin):
+        assert browser.post("/rag/ask", {"collection_id": collection, "question": question}).status_code == 404
+    assert all(item not in str(payloads) for item in both)
+
+
+def test_differ_question_with_one_valid_paper_never_generates(upload_api, monkeypatch):
+    api, storage = upload_api
+    a, _, _, _, second, b_items, _, collection, _ = _two_paper_collection(api, storage, monkeypatch)
+    # The second paper stays in the collection but is no longer indexed full text.
+    with api.engine.begin() as conn:
+        conn.execute(text("UPDATE library_items SET content_status='metadata_only' WHERE id=:i"),
+                     {"i": uuid.UUID(second["item_id"])})
+    calls = []
+    monkeypatch.setattr("app.rag.generate", lambda *args: calls.append(args))
+    question = "How does Sharedword codeswitch behaviour differ between the first and the second paper?"
+    assert is_comparison(question)
+    for scope in ({"collection_id": collection}, {"scope": "all"}):
+        for mode in ("keyword", "hybrid"):
+            data = a.post("/rag/ask", {**scope, "question": question, "mode": mode}).json()
+            assert data["status"] == "insufficient_evidence" and data["claims"] == [], (scope, mode, data)
+            assert data["reason"] == "comparison_requires_multiple_papers" and data["cost"] is None
+            assert second["item_id"] not in str(data) and not any(item in str(data) for item in b_items)
+    assert calls == []
+    assert api.scalar("SELECT count(*) FROM search_usage WHERE task_type='generation'") == 0
+
+
+def test_pronoun_differ_question_is_not_forced_through_comparison_gate(upload_api, monkeypatch):
+    api, storage = upload_api
+    _, a, _, _, first, _, settings = setup(api, storage, monkeypatch,
+        b"## Results\nThe method is sparse routing. It does differ from baseline by seven units.\n")
+    second = indexed(api, storage, a, b"## Results\nUnrelated result nine units.\n", settings)
+    collection = a.post("/collections", {"name": "Pair"}).json()["collection"]["id"]
+    for item in (first, second):
+        assert a.post(f"/collections/{collection}/items", {"item_id": item["item_id"]}).status_code == 201
+    monkeypatch.setattr("app.search.embed", lambda value, cfg, input_type: EmbeddingResult(
+        [.1, .2, .3], cfg.embedding.model_id, 2))
+    sent = []
+    def one_paper(messages, cfg):
+        payload = json.loads(messages[1]["content"])
+        sent.append(payload)
+        row = next(row for row in payload["evidence"] if "seven units" in row["text"])
+        return GenerationResult(json.dumps({"claims": [{"text": "The method differs from baseline by seven units.",
+            "citations": [{"chunk_id": row["chunk_id"], "quote": "seven units"}]}]}),
+            200, 50, cfg.generation.model_id, "SyntheticProvider")
+    monkeypatch.setattr("app.rag.generate", one_paper)
+    # Keyword finds only the first paper and hybrid also sends the second: a comparison
+    # would abstain before generation (keyword) or reject the one-paper claim (hybrid).
+    for question in ("Does it differ from baseline?", "What is the method, and does it differ from baseline?"):
+        for scope in ({"collection_id": collection}, {"scope": "all"}):
+            for mode in ("keyword", "hybrid"):
+                sent.clear()
+                data = a.post("/rag/ask", {**scope, "question": question, "mode": mode}).json()
+                assert data["status"] == "answered" and "reason" not in data, (question, scope, mode, data)
+                assert len(sent) == 1 and sent[0]["question"] == question
+                assert {cite["item_id"] for cite in data["claims"][0]["citations"]} == {first["item_id"]}

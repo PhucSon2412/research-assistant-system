@@ -47,7 +47,7 @@ from app.identity.bootstrap import bootstrap_admin
 from app.identity.passwords import hash_password
 from app.ingest.worker import process_job
 from app.main import app
-from app.rag import COMPARISON, GenerationResult
+from app.rag import GenerationResult, is_comparison
 from app.search import _rank, hydrate
 from app.storage import OriginalStorage
 
@@ -500,6 +500,5 @@ def run(root: Path, *, modes: tuple[str, ...] = MODES, keep: bool = False) -> di
                  defaults={"embedding": EmbeddingPolicy().pricing_verified,
                            "rerank": RerankPolicy().pricing_verified,
                            "generation": GenerationPolicy().pricing_verified},
-                 comparison_detected={q.id: bool(COMPARISON.search(q.question)) for q in qset.questions
-                                      if q.group == "comparison"},
+                 comparison_detected={q.id: is_comparison(q.question) for q in qset.questions},
                  started=started, git=git_state(), modes=modes)

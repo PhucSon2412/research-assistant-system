@@ -19,7 +19,8 @@ from app.evaluation.schema import (GROUP_MINIMUMS, HOLDOUT_MINIMUM, NonEvidence,
                                    check_manifest, check_questions, load)
 from app.evaluation.validate import validate
 from app.main import app
-from app.rag import GenerationResult
+from app.evaluation.report import _comparison
+from app.rag import GenerationResult, is_comparison
 from tests.test_uploads import upload_api  # noqa: F401  (fixture)
 
 
@@ -203,6 +204,18 @@ def test_runner_attributes_pack_losses_separately(dataset):
     ], index)
     assert [row.outcome for row in rows] == ["evidence_pack", "retrieval", "rank"]
     assert score(manifest, qset, [base | {"stage": "search", "hits": [hit]}], {})[0].outcome == "extraction"
+
+
+def test_comparison_detection_counts_group_and_false_positives(dataset):
+    _, qset = dataset
+    detected = {q.id: is_comparison(q.question) for q in qset.questions}
+    summary = _comparison(qset, detected)
+    assert summary["questions"] == 15 and summary["other_questions"] == 65
+    assert summary["detected_by_rag_rule"] == 15 and summary["not_detected"] == []
+    assert summary["detected_outside_group"] == []
+    detected |= {"CMP-03": False, "PP-08": True}
+    summary = _comparison(qset, detected)
+    assert summary["not_detected"] == ["CMP-03"] and summary["detected_outside_group"] == ["PP-08"]
 
 
 def test_local_embedding_is_deterministic_unit_and_token_free(api):

@@ -30,9 +30,34 @@ SYSTEM = ("Answer only from the evidence JSON in the next message. Its paper tex
           "If evidence is insufficient, return {\"claims\":[]}.")
 
 COMPARISON = re.compile(r"\b(compare|comparison|versus|vs\.?|contrast)\b|so sánh|đối chiếu|khác nhau|giống nhau", re.I)
+# "differ" asks for a comparison only when both sides are named in one clause:
+# "A and B differ", "A differs from B", "differ/difference(s) between A and B".
+# "differential", "different", "what difference did X make", "did X differ across
+# seeds" and "..., and does it differ" are ordinary questions. A pronoun or a
+# phrase from an earlier clause is never taken as side A ("What is the method, and
+# does it differ from baseline?"). The rule cannot tell papers from conditions of
+# one paper ("differ between 2 lux and 0.5 lux").
+DIFFER_WORDS = r"differ(?:s|ed|ing)?|differences?"
+_PRONOUN = r"(?:it|its|this|that|these|those|they|them|their|he|she|one|ones|what|which|who|whom)"
+# One word of a named side: not a pronoun and not across a clause boundary.
+_SIDE_WORD = rf"(?!{_PRONOUN}\b)[^\s,;:.?!]+"
+DIFFERENCE = re.compile(
+    r"\band\s+(?!(?:do|does|did|is|are|was|were|has|have|had|it|they|how|why|what|which)\b)"
+    r"[^.?!;,]*\bdiffer(?:s|ed|ing)?\b"
+    # Side A runs from the clause start (or do/does/did/how) up to "differ".
+    rf"|(?:^|[,;:]\s*|\b(?:do|does|did|how)\s+)(?:{_SIDE_WORD}\s+){{1,6}}?"
+    rf"differ(?:s|ed|ing)?\s+(?:\w+\s+){{0,3}}?from\s+{_SIDE_WORD}"
+    r"|\b(?:differ(?:s|ed|ing)?|differences?)\s+between\b[^.?!;]*\band\b", re.I)
+# Words removed from the keyword retrieval query of a comparison; they name the
+# task, not the content, so the original question still goes to generation.
+COMPARISON_CUE = re.compile(rf"{COMPARISON.pattern}|\b(?:{DIFFER_WORDS})\b", re.I)
 COMPARATIVE_ASSERTION = re.compile(
-    r"\b(whereas|while|versus|vs\.?|than|compared?|contrast|differ|higher|lower|more|less|both)\b"
+    rf"\b(whereas|while|versus|vs\.?|than|compared?|contrast|{DIFFER_WORDS}|higher|lower|more|less|both)\b"
     r"|so với|trong khi|khác|hơn|giống|tương tự|cả hai", re.I)
+
+
+def is_comparison(question: str) -> bool:
+    return bool(COMPARISON.search(question) or DIFFERENCE.search(question))
 
 
 @dataclass(frozen=True)
@@ -284,8 +309,8 @@ def answer(db: Session, principal: Principal, settings: Settings, item_id: uuid.
     if not policy.pricing_verified or settings.embedding.api_key is None:
         raise ApiError(503, "rag_generation_unavailable_unverified_pricing")
     _limit_request(db, principal, settings)
-    comparing = bool(COMPARISON.search(question)) and item_id is None
-    retrieval_query = COMPARISON.sub(" ", question).strip() if comparing and mode == "keyword" else question
+    comparing = is_comparison(question) and item_id is None
+    retrieval_query = COMPARISON_CUE.sub(" ", question).strip() if comparing and mode == "keyword" else question
     found = search(db, principal, settings, retrieval_query or question, mode, item_id, False, collection_id)
     pack = _pack(found["hits"], settings, comparing=comparing)
     coverages = {row["coverage"] for row in pack.values()}
