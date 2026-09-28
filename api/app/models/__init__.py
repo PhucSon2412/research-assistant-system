@@ -7,7 +7,7 @@ from app.models.identity import BootstrapState, Invitation, PasswordResetToken, 
 from app.models.index import EmbeddingBudgetDay, EmbeddingCall, EmbeddingUserBudgetDay, IndexEntry, IndexGeneration
 from app.models.ingest import Chunk, IngestionJob, IngestStepAttempt, MetadataCandidate, PdfPage, ReferenceEntry, Section
 from app.models.library import LibraryItem, PaperVersion, SourceFile
-from app.models.search import SearchRequestDay, SearchUsage
+from app.models.search import RagRequestDay, SearchRequestDay, SearchUsage
 from app.models.upload import ProcessingAcknowledgement, UploadIntent
 
 __all__ = [
@@ -28,7 +28,7 @@ __all__ = [
     "PaperVersion",
     "PasswordResetToken",
     "SourceFile",
-    "SearchRequestDay", "SearchUsage",
+    "RagRequestDay", "SearchRequestDay", "SearchUsage",
     "User",
     "UserSession",
     "ProcessingAcknowledgement",

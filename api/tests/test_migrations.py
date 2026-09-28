@@ -37,7 +37,7 @@ EXPECTED_TABLES = {
     "reference_entries",
     "index_generations", "embedding_calls", "index_entries", "embedding_budget_days",
     "embedding_user_budget_days",
-    "search_request_days", "search_usage",
+    "search_request_days", "search_usage", "rag_request_days",
     "collections", "collection_items",
 }
 
@@ -100,6 +100,36 @@ def test_collection_membership_foreign_keys_restrict(migrated_db_url: str) -> No
             WHERE conrelid='collection_items'::regclass AND contype='f'""")).all()
     eng.dispose()
     assert delete_actions == ["r", "r"]
+
+
+def test_0016_upgrades_m3c_database_with_data(empty_db_url: str) -> None:
+    from app.identity.passwords import hash_password
+
+    upgrade(empty_db_url, "0015")
+    eng = create_engine(empty_db_url)
+    with eng.begin() as conn:
+        user = conn.scalar(text("INSERT INTO users (email, password_verifier) VALUES ('m4a@example.org', :v) RETURNING id"),
+                           {"v": hash_password("synthetic-password-long")})
+        item = conn.scalar(text("INSERT INTO library_items (visibility, owner_user_id, title)"
+                                " VALUES ('private', :u, 'Synthetic M3c item') RETURNING id"), {"u": user})
+        collection = conn.scalar(text("INSERT INTO collections (owner_user_id, name)"
+                                      " VALUES (:u, 'Existing') RETURNING id"), {"u": user})
+        conn.execute(text("INSERT INTO collection_items (collection_id, item_id) VALUES (:c,:i)"),
+                     {"c": collection, "i": item})
+        usage = conn.scalar(text("INSERT INTO search_usage (user_id, day, task_type, model_id, provider,"
+                                 " status, reserved_usd, cost_status) VALUES (:u, CURRENT_DATE, 'rerank',"
+                                 " 'fixture', 'openrouter', 'uncertain', 0.01, 'unknown_reserved_ceiling') RETURNING id"),
+                            {"u": user})
+    upgrade(empty_db_url)
+    with eng.connect() as conn:
+        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == "0016"
+        assert conn.scalar(text("SELECT title FROM library_items WHERE id=:i"), {"i": item}) == "Synthetic M3c item"
+        assert conn.scalar(text("SELECT count(*) FROM collection_items WHERE collection_id=:c"), {"c": collection}) == 1
+        assert conn.scalar(text("SELECT status FROM search_usage WHERE id=:u"), {"u": usage}) == "uncertain"
+        conn.execute(text("INSERT INTO search_usage (user_id, day, task_type, model_id, provider,"
+                          " status, reserved_usd, cost_status) VALUES (:u, CURRENT_DATE, 'generation',"
+                          " 'openai/gpt-6-sol', 'openrouter', 'reserved', 0.01, 'unknown')"), {"u": user})
+    eng.dispose()
 
 
 def test_0015_upgrades_m3b_database_with_existing_data(empty_db_url: str) -> None:

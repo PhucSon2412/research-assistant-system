@@ -3,12 +3,19 @@
 // The UI only reflects what the API allows; it never decides permissions.
 
 export class ApiError extends Error {
+  status: number;
+  code: string;
+  detail?: string;
+
   constructor(
-    public status: number,
-    public code: string,
-    public detail?: string,
+    status: number,
+    code: string,
+    detail?: string,
   ) {
     super(code);
+    this.status = status;
+    this.code = code;
+    this.detail = detail;
   }
 }
 
@@ -71,6 +78,7 @@ const MESSAGES: Record<string, string> = {
   invalid_pdf: "PDF không hợp lệ hoặc vượt giới hạn trang.",
   invalid_markdown: "Markdown không hợp lệ.",
   upload_unavailable: "Chưa thể lưu file. Hãy thử lại.",
+  rag_generation_unavailable_unverified_pricing: "Hỏi đáp hiện chưa khả dụng vì chi phí và provider chưa được xác minh.",
 };
 
 export function describeError(err: unknown): string {

@@ -165,6 +165,8 @@ class ProviderBudget(BaseModel):
     rerank_warning_fraction: float = Field(default=0.8, gt=0, le=1)
     user_rerank_daily_usd: float = Field(default=0.5, ge=0)
     generation_daily_usd: float = Field(default=5.0, ge=0)
+    user_generation_daily_usd: float = Field(default=1.0, ge=0)
+    generation_warning_fraction: float = Field(default=0.8, gt=0, le=1)
     key_spending_cap_daily_usd: float = Field(default=50.0, gt=0)
 
     @model_validator(mode="after")
@@ -178,6 +180,8 @@ class ProviderBudget(BaseModel):
             raise ValueError("user_embedding_daily_usd must not exceed embedding_daily_usd")
         if self.user_rerank_daily_usd > self.rerank_daily_usd:
             raise ValueError("user_rerank_daily_usd must not exceed rerank_daily_usd")
+        if self.user_generation_daily_usd > self.generation_daily_usd:
+            raise ValueError("user_generation_daily_usd must not exceed generation_daily_usd")
         return self
 
 
@@ -233,6 +237,32 @@ class RerankPolicy(BaseModel):
     def _check_endpoint(self) -> "RerankPolicy":
         if not self.endpoint.startswith("https://"):
             raise ValueError("rerank endpoint must use HTTPS")
+        return self
+
+
+class GenerationPolicy(BaseModel):
+    model_id: str = "openai/gpt-6-sol"
+    endpoint: str = "https://openrouter.ai/api/v1/chat/completions"
+    pricing_verified: bool = False
+    max_question_bytes: int = Field(default=1024, gt=0)
+    max_evidence_chunks: int = Field(default=6, gt=0, le=30)
+    max_evidence_bytes: int = Field(default=12_000, gt=0)
+    max_input_tokens_estimate: int = Field(default=16000, gt=0)
+    max_output_tokens: int = Field(default=512, gt=0)
+    max_response_bytes: int = Field(default=16_384, gt=0)
+    max_claims: int = Field(default=8, gt=0)
+    max_requests_per_user_day: int = Field(default=50, gt=0)
+    max_concurrent_requests: int = Field(default=2, gt=0)
+    request_timeout_seconds: int = Field(default=60, gt=0)
+    reservation_lease_seconds: int = Field(default=100, gt=0)
+    max_input_usd_per_million_tokens: float = Field(default=2.0, gt=0)
+    max_output_usd_per_million_tokens: float = Field(default=10.0, gt=0)
+    max_request_usd: float = Field(default=0.05, gt=0)
+
+    @model_validator(mode="after")
+    def _check_endpoint(self) -> "GenerationPolicy":
+        if not self.endpoint.startswith("https://"):
+            raise ValueError("generation endpoint must use HTTPS")
         return self
 
 
@@ -303,6 +333,7 @@ class Settings(BaseSettings):
     embedding: EmbeddingPolicy = EmbeddingPolicy()
     search: SearchPolicy = SearchPolicy()
     rerank: RerankPolicy = RerankPolicy()
+    generation: GenerationPolicy = GenerationPolicy()
     http: HttpSecurity = HttpSecurity()
     delivery: Delivery = Delivery()
     storage: ObjectStorage | None = None
@@ -324,6 +355,8 @@ class Settings(BaseSettings):
             raise ValueError("embedding reservation lease must exceed provider timeout by 10 seconds")
         if self.rerank.reservation_lease_seconds <= self.rerank.request_timeout_seconds + 10:
             raise ValueError("rerank reservation lease must exceed provider timeout by 10 seconds")
+        if self.generation.reservation_lease_seconds <= self.generation.request_timeout_seconds + 10:
+            raise ValueError("generation reservation lease must exceed provider timeout by 10 seconds")
         if self.environment == "production":
             if not self.http.cookie_secure:
                 raise ValueError("production requires RAS_HTTP__COOKIE_SECURE=true")
