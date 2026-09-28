@@ -2,7 +2,7 @@
 
 [Mục lục](README.md) · [Quyết định còn mở](decisions.md) · [Kiểm thử](testing.md)
 
-Các milestone nhỏ, có thể review riêng. Thứ tự và phạm vi dưới đây là **đề xuất**. **Trạng thái:** M1a–M1c đã merge (PR #1–#3); M2a đã merge (PR #4, `66ba1d5`), M2b đã merge (PR #5, `f5483c8`), M3a/private index đã merge (PR #6, `1c4a6f7`), M3b/private search đã merge (PR #7, `5911038`), M3c collection cá nhân đã merge (PR #8, `6b0a96a`), M4a một paper riêng đã merge (PR #9, `6eaaf12`). Mỗi bước giữ khả năng kiểm quyền và khả năng truy nguyên từ file/version đến chunk.
+Các milestone nhỏ, có thể review riêng. Thứ tự và phạm vi dưới đây là **đề xuất**. **Trạng thái:** M1a–M1c đã merge (PR #1–#3); M2a đã merge (PR #4, `66ba1d5`), M2b đã merge (PR #5, `f5483c8`), M3a/private index đã merge (PR #6, `1c4a6f7`), M3b/private search đã merge (PR #7, `5911038`), M3c collection cá nhân đã merge (PR #8, `6b0a96a`), M4a một paper riêng đã merge (PR #9, `6eaaf12`), M4b RAG theo scope đã merge (PR #10, `2977142`); M4c bộ đánh giá ban đầu ở PR riêng. Mỗi bước giữ khả năng kiểm quyền và khả năng truy nguyên từ file/version đến chunk.
 
 | Mốc | Phụ thuộc | Đầu ra kiểm chứng được | Rủi ro / phép thử then chốt |
 | --- | --- | --- | --- |
@@ -31,6 +31,8 @@ Các milestone nhỏ, có thể review riêng. Thứ tự và phạm vi dưới 
 **M3c (PR #8 đã merge):** collection cá nhân, membership item riêng hoặc metadata chung, CRUD/list UI và `collection_id` cho search. Membership không cấp quyền; common full text chờ `AccessRights` đúng version/file. **Bàn giao M4:** dùng scope collection cho evidence pack/RAG, vẫn kiểm lại ACL và locator tại citation/viewer; không suy quyền từ membership hoặc reference edge.
 
 **M4a (PR #9 đã merge):** hỏi một paper private qua API/UI, evidence pack giới hạn, OpenRouter generation với giá chưa xác minh mặc định khóa, claim/citation/coverage/insufficient evidence và viewer kiểm quyền. **M4b (PR scope):** RAG scope collection/toàn kho, giữ lời gọi một paper và giới hạn thêm số paper trong evidence. Không streaming trong PR này. Streaming, bộ đánh giá ≥80 câu có người đọc đối chiếu claim/nguồn/abstention và baseline token đầu/hoàn tất, charge/latency là việc tiếp theo; mục tiêu p95 vẫn chưa đo.
+
+**M4c (PR đánh giá):** bộ 80 câu nhãn agent `pending_human_review`, manifest corpus tổng hợp có checksum/giấy phép, công cụ validate/annotate/run/review và báo cáo mẫu ở [rag-evaluation](rag-evaluation.md). Không đổi hành vi RAG, không streaming, không gọi OpenRouter; chất lượng generation và p95 chưa đo. Tiếp theo: người đọc duyệt nhãn, streaming, rồi chạy generation thật sau khi đối soát charge để chấm grounded/citation/abstention.
 
 ## Ưu tiên sau MVP — đã xác nhận về thứ tự
 

@@ -1,6 +1,6 @@
 # Tài liệu dự án
 
-Repo đã merge M3a private index (PR #6, merge commit `1c4a6f7`), M3b private search (PR #7, merge commit `5911038`), M3c collection cá nhân (PR #8, merge commit `6b0a96a`) và M4a RAG một paper riêng (PR #9, merge commit `6eaaf12`). M4b mở scope RAG trong PR riêng; streaming và đánh giá có người đọc ≥80 câu là việc tiếp theo. Các tài liệu này mô tả yêu cầu và phương án đề xuất, không khẳng định hiệu năng đã được đo; phần đã có code được ghi riêng ở [môi trường phát triển](dev-setup.md).
+Repo đã merge M3a private index (PR #6, merge commit `1c4a6f7`), M3b private search (PR #7, merge commit `5911038`), M3c collection cá nhân (PR #8, merge commit `6b0a96a`) M4a RAG một paper riêng (PR #9, merge commit `6eaaf12`) và M4b RAG theo scope (PR #10, merge commit `2977142`). M4c thêm [bộ đánh giá retrieval/RAG ban đầu](rag-evaluation.md) trong PR riêng: 80 câu nhãn agent chờ người duyệt, corpus tổng hợp, công cụ và báo cáo mẫu; streaming và đánh giá answer bằng người đọc là việc tiếp theo. Các tài liệu này mô tả yêu cầu và phương án đề xuất, không khẳng định hiệu năng đã được đo; phần đã có code được ghi riêng ở [môi trường phát triển](dev-setup.md).
 
 ## Cách đọc trạng thái quyết định
 
@@ -21,6 +21,7 @@ Khi có thay đổi quyết định, cập nhật tài liệu liên quan cùng t
 | [Search và RAG](search-and-rag.md) | Retrieval, kiểm quyền, dẫn nguồn, xử lý thiếu bằng chứng |
 | [Yêu cầu phi chức năng](nonfunctional.md) | Cách đo hiệu suất, độ tin cậy, an toàn, vận hành |
 | [Chiến lược kiểm thử](testing.md) | Các tầng test, bộ đánh giá retrieval/RAG, chống rò rỉ |
+| [Bộ đánh giá retrieval/RAG (M4c)](rag-evaluation.md) | Dữ liệu 80 câu, manifest corpus, locator, metric, runner, phiếu người đọc, kết quả mẫu và giới hạn |
 | [Roadmap](roadmap.md) | Milestone, phụ thuộc, đầu ra, rủi ro |
 | [Môi trường phát triển](dev-setup.md) | Lệnh dựng/hạ Compose, migrate, bootstrap, test đã kiểm; schema M1a–M3b, auth/ACL, upload original, worker ingest và private search |
 | [M2b PDF/coverage/references](m2b-pdf.md) | Parser, ngưỡng body, locator, quyền, kiểm chứng và hợp đồng bàn giao M3 |

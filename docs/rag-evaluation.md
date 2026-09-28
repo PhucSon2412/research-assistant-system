@@ -1,0 +1,107 @@
+# Bộ đánh giá retrieval/RAG ban đầu (M4c)
+
+[Mục lục](README.md) · [Kiểm thử](testing.md) · [Search và RAG](search-and-rag.md) · [Phi chức năng](nonfunctional.md)
+
+M4c thêm dữ liệu đánh giá, công cụ kiểm/chạy và báo cáo mẫu. PR này **không** đổi hành vi search/RAG production, không thêm streaming và không gọi OpenRouter. Mọi ngưỡng Recall@5, grounded answer, citation accuracy và abstention vẫn là **mục tiêu đề xuất, cần đo**, không phải CI gate.
+
+## Trạng thái nhãn
+
+Toàn bộ 80 câu, span chuẩn và lý do do coding agent soạn từ corpus tổng hợp, trạng thái `pending_human_review`, `label_author=coding_agent`. Schema chỉ nhận đúng giá trị này, nên không file nào có thể ghi là đã được người dùng hay chuyên gia duyệt. Offset/dòng do máy điền từ quote (`annotate`), còn việc chọn quote, side và kỳ vọng là phán đoán của agent cần người đọc kiểm.
+
+## Dữ liệu
+
+| Đường dẫn | Nội dung |
+| --- | --- |
+| `evaluation/rag/manifest.json` | Corpus: paper, file, version, SHA-256, kích thước, số trang, DOI hư cấu, giấy phép/phạm vi dùng, ngày kiểm, coverage kỳ vọng; item theo owner, marker ACL, collection |
+| `evaluation/rag/corpus/markdown/*.md` | 12 paper Markdown tự viết |
+| `evaluation/rag/corpus/pdf_sources.json`, `corpus/pdf/*.pdf` | Nguồn và bản render của 3 PDF (ReportLab `invariant`, tái lập byte-for-byte) |
+| `evaluation/rag/questions.json` | 80 câu hỏi có ID ổn định |
+| `evaluation/rag/review/human-review-template.csv` | Phiếu chấm cho người đọc |
+| `evaluation/rag/reports/` | Báo cáo mẫu JSON + Markdown |
+| `api/app/evaluation/` | Schema, locator, metric, embedder cục bộ, runner, report, review, CLI |
+
+`.gitattributes` giữ LF/binary cho corpus để checksum không đổi khi checkout trên Windows.
+
+### Corpus và giới hạn đại diện
+
+15 paper tổng hợp (12 Markdown, 3 PDF sinh bằng code), tác giả, kết quả và DOI đều hư cấu, không có văn bản bên thứ ba; phạm vi dùng là đánh giá và test ACL trong repo này. Upload thành 16 item private (A 13, B 3; A và B cùng upload P11 byte-identical) và 2 item common `metadata_only` trùng DOI/tiêu đề. Sau ingest thật có **87 chunk body/abstract** được index. So với workload đề xuất 1.000 paper × 20 trang, kết quả **không đại diện** chất lượng extraction trên paper thật, từ vựng/độ dài thật, hiệu ứng quy mô lên ranking, hay ngôn ngữ/ngành khác. Không commit paper thật: ba PDF arXiv ở M2b dùng giấy phép mặc định của arXiv, không cho phép phân phối lại trong repo. Muốn thêm paper thật cần ghi giấy phép đúng version (ví dụ CC BY cho đúng file) vào manifest trước khi commit.
+
+Ca đặc biệt: P05 chứa đoạn prompt injection; P06 là survey có reference list trỏ tới paper khác; P01/P04 mâu thuẫn về BLEU gain; P08 có trang Results chỉ có hình (trang thiếu ký tự), P09 có trang body không có text layer (bảng scan giả lập). P10 (A) và P20 (B) cùng DOI/tiêu đề với C01 common nhưng khác nội dung và có canary riêng `ZQXA7731`/`ZQXB4410`; P21 của B mang `ZQXB5582`. Admin không upload được (API trả 403), nên Admin chỉ có metadata chung.
+
+### Câu hỏi
+
+| Nhóm | Số câu | Holdout |
+| --- | --- | --- |
+| `single_paper` | 20 | 4 |
+| `comparison` | 15 | 3 |
+| `no_answer` | 15 | 3 |
+| `partial_pdf` | 10 | 2 |
+| `permission` | 10 | 2 |
+| `references_conflict_injection` | 10 | 2 |
+
+Mỗi câu tính một lần. Nhãn phụ nằm ở `tags` (ví dụ `conflict`, `bibliographic`, `prompt_injection_in_document`, `acl_pair:ACL-02`, `duplicate_hash`). 16 câu `holdout` không được dùng để chỉnh retrieval, prompt hay config; báo cáo tách dev/holdout. Cùng một câu chữ chỉ được lặp trong nhóm `permission` như cặp A/B/Admin khác quyền.
+
+Mỗi câu có: `question`, `identity` (`user_a`, `user_b`, `admin`), `scope` (`item`/`collection`/`all` trỏ item/collection trong manifest), `expected.status` (`answered`, `insufficient_evidence`, `scope_not_found`) kèm `reason`/`coverage`, `evidence` (danh sách side; mỗi side cần ít nhất một span chấp nhận được), `non_evidence` (reference entry, injection, citing statement, claim mâu thuẫn, vùng không trích xuất được, metadata-only, item trái quyền) có lý do, `forbidden_markers`, `supported_claim` và `rationale`. Câu so sánh có một side cho mỗi paper. Reference list chỉ xuất hiện ở `non_evidence` loại `bibliography_entry`; validator từ chối span evidence nằm trong vùng references.
+
+Span Markdown dùng dòng bắt đầu từ 1 và offset code point trong original đã decode UTF-8, như `app.ingest.markdown`. Span PDF dùng trang 1-based và offset code point trong `pdf_pages.text` do `app.ingest.pdf` trích ra (`pypdf-<version>-layout-v2`), không phải byte offset hay bounding box. Mỗi span ghi parser version; đổi parser làm validator báo lệch.
+
+## Công cụ
+
+```powershell
+# PowerShell từ gốc repo; Conda ras; .env như dev-setup
+$py = "$env:USERPROFILE\.conda\envs\ras\python.exe"
+& $py -m app.evaluation validate          # schema, số câu/nhóm/holdout, checksum, quyền, gold span
+& $py -m app.evaluation annotate          # điền offset/dòng từ quote rồi validate (sau khi sửa câu hỏi)
+& $py -m app.evaluation build-pdfs --check  # render lại PDF và so SHA-256 với manifest
+docker compose up -d --wait db minio
+& $py -m app.evaluation run --output evaluation\rag\reports
+& $py -m app.evaluation review-template --output review.csv --modes hybrid
+& $py -m app.evaluation score-review review.csv
+```
+
+`validate` chạy parser production (Markdown và PDF qua tiến trình con) trên chính file trong repo, kiểm quote đúng tại offset, dòng khớp offset, parser version khớp, span nằm trong body/abstract, vùng `not_extracted_region` đúng là trang thiếu/không trích xuất được, evidence thuộc item của chính identity và nằm trong scope, câu `scope_not_found` đúng là scope người khác, marker cấm không nằm trong evidence và thuộc item của người khác.
+
+`run` tạo database `ras_eval_*` và bucket MinIO tạm trên Compose, migrate tới head, rồi dùng API thật: bootstrap Admin, tạo A/B, đăng nhập, xác nhận từng upload bằng intent rồi gửi file, chạy worker thật (extraction/chunk/index), tạo collection qua API và item common bằng SQL fixture. Sau đó mỗi câu được hỏi đúng identity/scope qua `POST /search` (keyword, hybrid) và `POST /rag/ask` (keyword, hybrid), cộng một lượt vector-only qua `app.search._rank` với cùng gate SQL. Database/bucket bị xóa khi xong (`--keep` để debug).
+
+Cách ly provider trong `run`:
+
+- Outbound HTTP bị chặn ở `httpx.HTTPTransport` suốt lần chạy; báo cáo ghi số lần bị chặn.
+- Embedding document/query dùng `local/hash-bow-512-v1`: bag-of-words băm, xác định, 0 token. Nó cho phép đi đúng đường pgvector/gate model–dimensions/fusion, nhưng **không** đo chất lượng `openai/text-embedding-3-small`.
+- Generation được thay bằng capture ghi đúng payload sẽ gửi và trả `{"claims": []}`; không có câu trả lời nên chất lượng generation **not measured**.
+- Rerank không yêu cầu (**not measured**).
+- `pricing_verified` mặc định và trong `.env` giữ `false`; chỉ bản `Settings` trong tiến trình, gắn với fake cục bộ, bật cờ để pipeline chạy. Không đối soát charge nào vì không có lời gọi trả phí.
+
+### Metric
+
+- Recall@5 chỉ tính trên câu `answered`. Một side trúng ở hạng r khi chunk hạng r chứa ít nhất 50% ký tự của một span chuẩn của side đó. Recall@5 của câu = số side trúng trong top 5 / số side. Bảng báo trung bình theo câu, tổng `side trúng/tổng side` và số câu nhiều side tìm đủ **mọi** side, theo stage × nhóm/scope/split.
+- Stage: `search:keyword`, `search:hybrid` (keyword + vector cục bộ, RRF, không rerank), `vector`, và `rag_pack:*` (evidence pack thực sự dựng cho generation; tính trên toàn pack ≤ 6 chunk).
+- Phân lỗi: `acl` → `extraction` (không chunk active nào phủ span) → `retrieval` (không có trong danh sách trả về) → `rank` (có nhưng hạng > 5) → `evidence_pack` (search nội bộ của RAG trả về nhưng pack giới hạn chunk/paper/byte không chọn). `generation` là **not measured** trong PR này.
+- Với câu không có đáp án, báo cáo chỉ ghi pipeline tự trả `insufficient_evidence` trước generation hay đã gửi evidence đi; đó **không** là abstention appropriateness.
+- ACL: mọi response search/vector/RAG và payload capture được kiểm item id thuộc tập được phép của identity/scope, marker của item người khác không xuất hiện, và scope trái quyền trả đúng `404 {"error":"not_found"}`. Mọi chunk xuất hiện được mở qua `/search/chunks/{id}` bằng cả ba identity: owner `200`, người khác `404`. Payload gửi model chỉ có khóa `question` và `evidence`; báo cáo đếm payload chứa văn bản chỉ có trong nhãn (`rationale`, `label_status`, ID câu hỏi). `supported_claim` có thể trùng nguyên văn paper nên không dùng làm tín hiệu rò rỉ.
+
+## Chấm bằng người đọc
+
+`review-template` tạo phiếu CSV mỗi dòng một câu × mode; khi có câu trả lời thật, `app.evaluation.review.answer_rows` tách một dòng cho mỗi citation và điền ba cột kiểm máy: chunk ID có trong evidence, quote nguyên văn, locator chồng span chuẩn. Ba cột này chỉ là kiểm cấu trúc. Người đọc điền:
+
+- `human_claim_supported` (`yes`/`partial`/`no`): đọc span được dẫn trong file gốc, claim có được đoạn đó hỗ trợ đầy đủ không; câu so sánh phải có chứng cứ của đủ các phía và phân biệt ý kiến tác giả với kết luận hệ thống.
+- `human_citation_correct` (`yes`/`no`): citation trỏ đúng span chứng cứ (item/version/file/vị trí), không phải reference entry hay injection.
+- `human_abstention_appropriate` (`yes`/`no`/`n/a`) cho câu kỳ vọng không trả lời: hệ thống từ chối hoặc nêu rõ thiếu/mâu thuẫn, không bịa phần thiếu, không lộ item trái quyền.
+- `reviewer`, `review_date`, `notes`.
+
+`score-review` tính grounded answer rate (response `answered` có mọi claim `yes` / response `answered` đã chấm), citation accuracy (citation `yes` / citation đã chấm) và abstention appropriateness (câu kỳ vọng không trả lời được chấm `yes` / số đã chấm), luôn kèm tử số, mẫu số và số dòng chưa chấm. Không dùng LLM tự chấm nghĩa claim. Gold label không được đưa vào prompt RAG.
+
+## Test
+
+`api/tests/test_evaluation.py` (14 test): dataset commit hợp lệ và mọi nhãn `pending_human_review`; schema từ chối nhãn "đã duyệt", evidence ngoài scope, so sánh một phía, `scope_not_found` sai, marker của chính caller, câu lặp ngoài nhóm permission, thiếu holdout/số câu; checksum và cờ phân phối; lệch offset/dòng/parser và reference entry bị gắn làm evidence (Markdown); span PDF theo trang và trang không trích xuất; PDF render lại đúng SHA-256; luật phủ 50% và Recall/phân lỗi/aggregate có mẫu số; phân biệt `evidence_pack`/`retrieval`/`rank`/`extraction`; embedder xác định, đơn vị, 0 token; `eval_settings` không đổi mặc định `pricing_verified`; chặn outbound HTTP và khôi phục; công thức chấm chỉ dựa cột người đọc. Test ACL chạy chính runner trên PostgreSQL/MinIO thật với A/B/Admin, cùng DOI, file cùng hash và canary riêng; kiểm search/vector/RAG payload/response/viewer, IDOR item/collection, Admin không có evidence, và một generation giả cố dẫn chunk của B bị từ chối. Kiểm đối chứng thủ công: tạm bỏ điều kiện owner trong SQL search làm test ACL này fail; đã khôi phục.
+
+## Kết quả lần chạy mẫu
+
+Báo cáo: [`evaluation/rag/reports/rag-eval-2026-09-28.md`](../evaluation/rag/reports/rag-eval-2026-09-28.md) (JSON cùng tên có từng bản ghi). Lệnh tái lập nằm đầu báo cáo. Số liệu dưới đây chỉ đúng cho corpus tổng hợp, embedder cục bộ và config mặc định, không là baseline chất lượng production.
+
+<!-- M4C-RESULTS -->
+
+## Cần người đọc duyệt và việc tiếp theo
+
+- Duyệt 80 nhãn: quote/side có đủ và đúng không, kỳ vọng `insufficient_evidence` của câu mâu thuẫn (RCI-06), bibliographic (RCI-01) và so sánh một phía có hợp ý sản phẩm không. Sau khi duyệt, đổi trạng thái cần một quyết định schema mới (hiện schema cố ý chỉ nhận `pending_human_review`).
+- Chạy lại `run` với embedding/rerank/generation thật chỉ sau khi đối soát charge trên key và bật `pricing_verified` có chủ đích; khi đó mới có answer để chấm bằng phiếu người đọc và mới báo grounded/citation/abstention.
+- Thêm corpus thật có giấy phép phân phối rõ cho đúng version, tiến dần tới workload 1.000 paper; giữ holdout tách khỏi mọi lần chỉnh.

@@ -1,2 +1,8 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Evaluation corpus checksums are recorded in evaluation/rag/manifest.json:
+# keep bytes identical on every checkout.
+evaluation/rag/corpus/**/*.md text eol=lf
+evaluation/rag/corpus/**/*.json text eol=lf
+evaluation/rag/corpus/**/*.pdf binary
