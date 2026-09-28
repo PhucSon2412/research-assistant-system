@@ -322,9 +322,11 @@ def test_collection_and_all_scope_multi_paper_citations_and_acl(upload_api, monk
         sent.append(evidence)
         assert {row["item_id"] for row in evidence} == {first["item_id"], second["item_id"]}
         assert all("BibliographyOnly" not in row["text"] for row in evidence)
-        claims = [{"text": f"Paper {i + 1} has a result.", "citations": [{
-            "chunk_id": row["chunk_id"], "quote": "seven units" if row["item_id"] == first["item_id"] else "nine units"}]}
-            for i, row in enumerate(evidence)]
+        by_item = {row["item_id"]: row for row in evidence}
+        claims = [{"text": "Paper A reports seven units whereas paper B reports nine units.",
+            "comparison": True, "citations": [
+                {"chunk_id": by_item[first["item_id"]]["chunk_id"], "quote": "seven units"},
+                {"chunk_id": by_item[second["item_id"]]["chunk_id"], "quote": "nine units"}]}]
         return GenerationResult(json.dumps({"claims": claims}), 200, 50,
                                 cfg.generation.model_id, "SyntheticProvider")
     monkeypatch.setattr("app.rag.generate", compare)
@@ -335,6 +337,7 @@ def test_collection_and_all_scope_multi_paper_citations_and_acl(upload_api, monk
         assert data["status"] == "answered" and data["scope"]["kind"] in ("collection", "all"), (data, sent)
         citations = [cite for claim in data["claims"] for cite in claim["citations"]]
         assert {cite["item_id"] for cite in citations} == {first["item_id"], second["item_id"]}
+        assert data["claims"][0]["comparison"] is True and len(citations) == 2
         for cite in citations:
             source = a.get(cite["url"].replace("/sources/", "/search/chunks/"))
             assert source.status_code == 200
@@ -348,6 +351,29 @@ def test_collection_and_all_scope_multi_paper_citations_and_acl(upload_api, monk
     hybrid = a.post("/rag/ask", {"collection_id": collection, "question": "Compare Sharedword",
                                   "mode": "hybrid"})
     assert hybrid.status_code == 200 and hybrid.json()["status"] == "answered"
+    def separate_claims(messages, cfg):
+        by_item = {row["item_id"]: row for row in json.loads(messages[1]["content"])["evidence"]}
+        return GenerationResult(json.dumps({"claims": [
+            {"text": "Paper A reports seven units.", "comparison": False, "citations": [
+                {"chunk_id": by_item[first["item_id"]]["chunk_id"], "quote": "seven units"}]},
+            {"text": "Paper B reports nine units.", "comparison": False, "citations": [
+                {"chunk_id": by_item[second["item_id"]]["chunk_id"], "quote": "nine units"}]}]}),
+            200, 50, cfg.generation.model_id, "SyntheticProvider")
+    monkeypatch.setattr("app.rag.generate", separate_claims)
+    incomplete = a.post("/rag/ask", {"collection_id": collection, "question": "Compare Sharedword"})
+    assert incomplete.status_code == 200
+    assert incomplete.json()["status"] == "insufficient_evidence" and incomplete.json()["claims"] == []
+    assert incomplete.json()["reason"] == "comparison_requires_multiple_papers"
+    def mislabeled_claim(messages, cfg):
+        by_item = {row["item_id"]: row for row in json.loads(messages[1]["content"])["evidence"]}
+        return GenerationResult(json.dumps({"claims": [{"text": "These papers have results.",
+            "comparison": True, "citations": [
+                {"chunk_id": by_item[first["item_id"]]["chunk_id"], "quote": "seven units"},
+                {"chunk_id": by_item[second["item_id"]]["chunk_id"], "quote": "nine units"}]}]}),
+            200, 50, cfg.generation.model_id, "SyntheticProvider")
+    monkeypatch.setattr("app.rag.generate", mislabeled_claim)
+    assert a.post("/rag/ask", {"collection_id": collection, "question": "Compare Sharedword"}).json()[
+        "status"] == "insufficient_evidence"
     for browser in (b, admin):
         assert browser.post("/rag/ask", {"collection_id": collection, "question": "Sharedword"}).status_code == 404
     assert a.post("/rag/ask", {"collection_id": str(uuid.uuid4()), "question": "Sharedword"}).status_code == 404
@@ -414,3 +440,40 @@ def test_evidence_pack_limits_papers_chunks_and_bytes(api):
     settings.generation.max_evidence_papers = 2
     settings.generation.max_evidence_bytes = 5
     assert len(_pack(hits, settings)) == 1
+
+
+def test_comparison_pack_reserves_a_chunk_for_later_paper(api):
+    settings = settings_with_fake_key()
+    paper_a, paper_b = str(uuid.uuid4()), str(uuid.uuid4())
+    settings.generation.max_evidence_chunks = 6
+    settings.generation.max_evidence_papers = 2
+    hits = [{"chunk_id": str(uuid.uuid4()), "item_id": paper_a, "text": f"A rank {rank}",
+             "section_kind": "body"} for rank in range(1, 7)]
+    hits.append({"chunk_id": str(uuid.uuid4()), "item_id": paper_b,
+                 "text": "B evidence", "section_kind": "body"})
+    assert {row["item_id"] for row in _pack(hits, settings).values()} == {paper_a}
+    pack = list(_pack(hits, settings, comparing=True).values())
+    assert [row["item_id"] for row in pack] == [paper_a, paper_b, *([paper_a] * 4)]
+    assert [row["text"] for row in pack if row["item_id"] == paper_a] == [
+        f"A rank {rank}" for rank in range(1, 6)]
+    hits[-1]["section_kind"] = "references"
+    assert {row["item_id"] for row in _pack(hits, settings, comparing=True).values()} == {paper_a}
+
+
+def test_comparison_without_valid_second_paper_abstains(upload_api, monkeypatch):
+    api, storage = upload_api
+    _, a, _, _, first, _, settings = setup(api, storage, monkeypatch,
+        b"## Methods\nSharedword first result seven units.\n")
+    second = indexed(api, storage, a,
+        b"## Results\nUnrelated result nine units.\n## References\nSharedword is only in bibliography.\n",
+        settings)
+    collection = a.post("/collections", {"name": "Pair"}).json()["collection"]["id"]
+    for item in (first, second):
+        assert a.post(f"/collections/{collection}/items", {"item_id": item["item_id"]}).status_code == 201
+    calls = []
+    monkeypatch.setattr("app.rag.generate", lambda *args: calls.append(args))
+    result = a.post("/rag/ask", {"collection_id": collection, "question": "Compare Sharedword"})
+    assert result.status_code == 200
+    assert result.json()["status"] == "insufficient_evidence"
+    assert result.json()["reason"] == "comparison_requires_multiple_papers"
+    assert calls == []
