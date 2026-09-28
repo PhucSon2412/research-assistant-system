@@ -1,6 +1,6 @@
 # Tài liệu dự án
 
-Repo đã merge M3a private index (PR #6, merge commit `1c4a6f7`), M3b private search (PR #7, merge commit `5911038`), M3c collection cá nhân (PR #8, merge commit `6b0a96a`) M4a RAG một paper riêng (PR #9, merge commit `6eaaf12`) và M4b RAG theo scope (PR #10, merge commit `2977142`). M4c thêm [bộ đánh giá retrieval/RAG ban đầu](rag-evaluation.md) trong PR riêng: 80 câu nhãn agent chờ người duyệt, corpus tổng hợp, công cụ và báo cáo mẫu; streaming và đánh giá answer bằng người đọc là việc tiếp theo. Các tài liệu này mô tả yêu cầu và phương án đề xuất, không khẳng định hiệu năng đã được đo; phần đã có code được ghi riêng ở [môi trường phát triển](dev-setup.md).
+Repo đã merge M3a private index (PR #6, merge commit `1c4a6f7`), M3b private search (PR #7, merge commit `5911038`), M3c collection cá nhân (PR #8, merge commit `6b0a96a`) M4a RAG một paper riêng (PR #9, merge commit `6eaaf12`) và M4b RAG theo scope (PR #10, merge commit `2977142`). M4c thêm [bộ đánh giá retrieval/RAG ban đầu](rag-evaluation.md) trong PR riêng: 80 câu nhãn agent chờ người duyệt, corpus tổng hợp, công cụ và báo cáo mẫu; streaming và đánh giá answer bằng người đọc là việc tiếp theo. PR #11 đã merge ở `99e439d`; M4d-1 đổi cách dựng keyword query cho câu hỏi tự nhiên trong PR riêng ([search-and-rag](search-and-rag.md#m4d-1--keyword-query-giới-hạn)). Các tài liệu này mô tả yêu cầu và phương án đề xuất, không khẳng định hiệu năng đã được đo; phần đã có code được ghi riêng ở [môi trường phát triển](dev-setup.md).
 
 ## Cách đọc trạng thái quyết định
 

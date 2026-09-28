@@ -2,7 +2,7 @@
 
 [Mục lục](README.md) · [Quyết định còn mở](decisions.md) · [Kiểm thử](testing.md)
 
-Các milestone nhỏ, có thể review riêng. Thứ tự và phạm vi dưới đây là **đề xuất**. **Trạng thái:** M1a–M1c đã merge (PR #1–#3); M2a đã merge (PR #4, `66ba1d5`), M2b đã merge (PR #5, `f5483c8`), M3a/private index đã merge (PR #6, `1c4a6f7`), M3b/private search đã merge (PR #7, `5911038`), M3c collection cá nhân đã merge (PR #8, `6b0a96a`), M4a một paper riêng đã merge (PR #9, `6eaaf12`), M4b RAG theo scope đã merge (PR #10, `2977142`); M4c bộ đánh giá ban đầu ở PR riêng. Mỗi bước giữ khả năng kiểm quyền và khả năng truy nguyên từ file/version đến chunk.
+Các milestone nhỏ, có thể review riêng. Thứ tự và phạm vi dưới đây là **đề xuất**. **Trạng thái:** M1a–M1c đã merge (PR #1–#3); M2a đã merge (PR #4, `66ba1d5`), M2b đã merge (PR #5, `f5483c8`), M3a/private index đã merge (PR #6, `1c4a6f7`), M3b/private search đã merge (PR #7, `5911038`), M3c collection cá nhân đã merge (PR #8, `6b0a96a`), M4a một paper riêng đã merge (PR #9, `6eaaf12`), M4b RAG theo scope đã merge (PR #10, `2977142`), M4c bộ đánh giá ban đầu đã merge (PR #11, `99e439d`); M4d-1 keyword query ở PR riêng. Mỗi bước giữ khả năng kiểm quyền và khả năng truy nguyên từ file/version đến chunk.
 
 | Mốc | Phụ thuộc | Đầu ra kiểm chứng được | Rủi ro / phép thử then chốt |
 | --- | --- | --- | --- |
@@ -38,7 +38,7 @@ Các milestone nhỏ, có thể review riêng. Thứ tự và phạm vi dưới 
 
 Ba task search/RAG riêng, mở sau khi PR M4c merge; mỗi task là một PR, đo trước/sau bằng bộ M4c (Recall@5 search và phủ pack theo luật trọn span), không chỉnh theo holdout, không gộp vào PR đánh giá:
 
-1. **Keyword query:** `plainto_tsquery('simple', câu hỏi)` AND mọi token nên keyword search/RAG gần như không khớp câu hỏi tự nhiên (Recall@5 keyword 1/63 side). Đề xuất và đo cách dựng query khác trước khi đổi hành vi.
+1. **Keyword query (M4d-1, PR riêng):** `plainto_tsquery('simple', câu hỏi)` AND mọi token nên keyword search/RAG gần như không khớp câu hỏi tự nhiên (Recall@5 keyword 1/63 side). M4d-1 dựng query giới hạn từ `ts_debug` cùng cấu hình `simple` (bỏ stop word, ≤ 8 term, khớp ≥ một nửa): Recall@5 keyword 35/63, hybrid không thoái lui; xem [rag-evaluation](rag-evaluation.md#m4d-1--keyword-query-cho-câu-hỏi-tự-nhiên-đo-trướcsau).
 2. **Nhận diện câu so sánh:** `app.rag.COMPARISON` bỏ sót câu dùng “differ” (CMP-03), nên câu đó không qua nhánh pack/gate so sánh.
 3. **Giới hạn pack so sánh:** pack ≤ 3 paper/6 chunk theo thứ hạng làm rơi chứng cứ đúng ở 5 câu so sánh (CMP-04, 06, 07, 10, 13); cần phương án chọn chunk/paper và đo lại byte/token.
 

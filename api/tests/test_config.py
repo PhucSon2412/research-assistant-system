@@ -200,3 +200,20 @@ def test_development_settings_from_environment(monkeypatch: pytest.MonkeyPatch) 
     assert s.http.public_base_url == "http://127.0.0.1:3000"
     assert s.http.allowed_origins == ["http://127.0.0.1:3000", "http://localhost:3000"]
     assert (s.delivery.mode, s.http.cookie_secure) == ("dev_outbox", False)
+
+
+def test_keyword_query_limits_defaults_environment_and_bounds(monkeypatch: pytest.MonkeyPatch) -> None:
+    s = Settings(database_url=URL)
+    assert (s.search.keyword_max_terms, s.search.keyword_min_term_chars, s.search.keyword_max_term_chars,
+            s.search.keyword_min_match_fraction, s.search.keyword_min_match_terms) == (8, 2, 64, 0.5, 2)
+    monkeypatch.setenv("RAS_DATABASE_URL", URL)
+    monkeypatch.setenv("RAS_SEARCH__KEYWORD_MAX_TERMS", "5")
+    monkeypatch.setenv("RAS_SEARCH__KEYWORD_MIN_MATCH_FRACTION", "0.75")
+    s = Settings()  # type: ignore[call-arg]
+    assert (s.search.keyword_max_terms, s.search.keyword_min_match_fraction) == (5, 0.75)
+    for bad in ({"keyword_max_terms": 0}, {"keyword_max_terms": 33}, {"keyword_min_match_fraction": 0},
+                {"keyword_min_match_fraction": 1.5}, {"keyword_min_match_terms": 0},
+                {"keyword_max_term_chars": 257},
+                {"keyword_min_term_chars": 10, "keyword_max_term_chars": 5}):
+        with pytest.raises(ValidationError):
+            Settings(database_url=URL, search=bad)

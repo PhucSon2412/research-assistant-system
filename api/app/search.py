@@ -8,11 +8,13 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_UP
+from typing import NamedTuple
 
 import httpx
 from sqlalchemy import bindparam, func, select, text
 from sqlalchemy.orm import Session
 
+from app import keyword_query
 from app.api.errors import ApiError
 from app.authz import Principal
 from app.config import Settings
@@ -247,13 +249,37 @@ BASE = """FROM index_entries e
      (SELECT 1 FROM collection_items ci WHERE ci.collection_id=CAST(:collection AS uuid) AND ci.item_id=i.id))"""
 
 
+# Chunks matching at least :min of the bounded terms; the full gate in BASE applies inside the
+# subquery, before ordering and LIMIT. Ties: more terms matched, cover density, chunk ID.
+KEYWORD = ("SELECT chunk_id FROM (SELECT e.chunk_id, e.keywords,"
+    " (SELECT count(*) FROM unnest(CAST(:terms AS text[])) t WHERE e.keywords @@ CAST(t AS tsquery)) matched "
+    + BASE + " AND e.keywords @@ CAST(:any AS tsquery)) hit WHERE matched >= :min"
+    " ORDER BY matched DESC, ts_rank_cd(keywords, CAST(:any AS tsquery)) DESC, chunk_id LIMIT :k")
+
+
+class Ranked(NamedTuple):
+    keyword: list[uuid.UUID]
+    semantic: list[uuid.UUID]
+    keyword_ms: int
+    vector_ms: int
+    keyword_query: dict
+
+
+def _keyword(db: Session, params: dict, keywords: keyword_query.KeywordQuery,
+             settings: Settings) -> list[uuid.UUID]:
+    if not keywords.terms:
+        return []
+    return db.execute(text(KEYWORD), {**params, "terms": keywords.term_queries(),
+        "any": keywords.any_query(), "min": keywords.min_match,
+        "k": settings.search.keyword_top_k}).scalars().all()
+
+
 def _rank(db: Session, principal: Principal, item_id, settings: Settings, query: str,
-          vector: list[float] | None, collection_id: uuid.UUID | None = None):
-    params = {"owner": principal.user_id, "item": item_id, "collection": collection_id, "q": query}
+          vector: list[float] | None, collection_id: uuid.UUID | None = None) -> Ranked:
+    params = {"owner": principal.user_id, "item": item_id, "collection": collection_id}
     start = time.perf_counter()
-    keyword = db.execute(text("SELECT e.chunk_id " + BASE + " AND e.keywords @@ plainto_tsquery('simple',:q)"
-        " ORDER BY ts_rank_cd(e.keywords,plainto_tsquery('simple',:q)) DESC,e.chunk_id LIMIT :k"),
-        {**params, "k": settings.search.keyword_top_k}).scalars().all()
+    keywords = keyword_query.build(db, query, settings.search)
+    keyword = _keyword(db, params, keywords, settings)
     keyword_ms = int((time.perf_counter() - start) * 1000)
     semantic, vector_ms = [], 0
     if vector is not None:
@@ -264,7 +290,7 @@ def _rank(db: Session, principal: Principal, item_id, settings: Settings, query:
             {**params, "model": settings.embedding.model_id, "dim": len(vector),
              "vector": "[" + ",".join(str(x) for x in vector) + "]", "k": settings.search.vector_top_k}).scalars().all()
         vector_ms = int((time.perf_counter() - start) * 1000)
-    return keyword, semantic, keyword_ms, vector_ms
+    return Ranked(keyword, semantic, keyword_ms, vector_ms, keywords.summary())
 
 
 def hydrate(db: Session, principal: Principal, item_id, ids: list[uuid.UUID],
@@ -395,6 +421,8 @@ def search(db: Session, principal: Principal, settings: Settings, query: str,
            collection_id: uuid.UUID | None = None) -> dict:
     if len(query.encode("utf-8")) > settings.search.max_query_bytes:
         raise ApiError(422, "search_query_too_long")
+    if "\x00" in query:  # PostgreSQL text cannot hold NUL; refuse before any query or provider
+        raise ApiError(422, "search_query_invalid")
     scopes = _scope(db, principal, item_id, collection_id)  # before any paid call
     limit_request(db, principal, settings)
     timings = {"keyword_ms": 0, "vector_ms": 0, "provider_ms": 0, "rerank_ms": 0}
@@ -436,7 +464,7 @@ def search(db: Session, principal: Principal, settings: Settings, query: str,
                response_model_id=result.response_model_id,
                response_provider=result.response_provider)
         vector = result.vector
-    keyword, semantic, timings["keyword_ms"], timings["vector_ms"] = _rank(
+    keyword, semantic, timings["keyword_ms"], timings["vector_ms"], keyword_info = _rank(
         db, principal, item_id, settings, query, vector, collection_id)
     ids = fuse(keyword, semantic)[:settings.search.max_results]
     hydrated = _hydrate_scope(db, principal, item_id, ids, collection_id)
@@ -533,5 +561,6 @@ def search(db: Session, principal: Principal, settings: Settings, query: str,
              costs["embed_query"]["warnings"] if costs["embed_query"] else [],
              costs["rerank"]["warnings"] if costs["rerank"] else [])
     return {"mode": mode, "rerank_status": rerank_status, "count": len(hits), "hits": hits,
-            "candidate_count": len(keyword) + len(semantic), "timings": timings,
+            "candidate_count": len(keyword) + len(semantic), "keyword_query": keyword_info,
+            "timings": timings,
             "cost": costs}

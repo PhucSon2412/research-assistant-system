@@ -56,6 +56,31 @@ def _rag_outcomes(qset, records: list[dict]) -> list[dict]:
     return [{"mode": m, "expected": e, "outcome": o, "count": n} for (m, e, o), n in sorted(counts.items())]
 
 
+def _candidates(qset, records: list[dict]) -> list[dict]:
+    """How often questions without an answer still receive candidates (not abstention quality)."""
+    groups = {"no_answer_group": lambda q: q.group == "no_answer",
+              "expected_insufficient_evidence": lambda q: q.expected.status == "insufficient_evidence",
+              "answered": lambda q: q.expected.status == "answered"}
+    table = []
+    for mode in sorted({r["mode"] for r in records if r["stage"] == "search"}):
+        for split in ("dev", "holdout", "all"):
+            for name, keep in groups.items():
+                chosen = {q.id for q in qset.questions if keep(q) and split in (q.split, "all")}
+                search = [r for r in records if r["stage"] == "search" and r["mode"] == mode
+                          and r["question_id"] in chosen]
+                rag = [r for r in records if r["stage"] == "rag_pack" and r["mode"] == mode
+                       and r["question_id"] in chosen]
+                if not search:
+                    continue
+                table.append({"mode": mode, "split": split, "questions": name, "count": len(search),
+                              "search_with_candidates": sum(bool(r["hits"]) for r in search),
+                              "mean_search_hits": round(sum(len(r["hits"]) for r in search) / len(search), 2),
+                              "keyword_no_terms": sum((r.get("keyword_query") or {}).get("status") == "no_terms"
+                                                      for r in search),
+                              "rag_evidence_sent": sum(bool(r["generation_called"]) for r in rag)})
+    return table
+
+
 def build(*, manifest, qset, records, rows, diagnostic_rows, index, seeded, viewer, capture, settings, configured_pricing,
           defaults, comparison_detected, started: datetime, git: dict, modes) -> dict:
     answered = [q for q in qset.questions if q.expected.status == "answered"]
@@ -121,6 +146,7 @@ def build(*, manifest, qset, records, rows, diagnostic_rows, index, seeded, view
                        "detected_by_rag_keyword_rule": sum(comparison_detected.values()),
                        "not_detected": sorted(k for k, v in comparison_detected.items() if not v)},
         "rag_pipeline": _rag_outcomes(qset, records),
+        "candidates": _candidates(qset, records),
         "acl": {"records_audited": len(records), "violations": acl, "viewer": viewer,
                 "gold_label_in_payload": sum(bool(r.get("gold_label_in_payload")) for r in records),
                 "payload_keys": sorted({k for r in records for k in r.get("payload_request_keys", [])})},
@@ -143,7 +169,7 @@ def _index_check(answered, index, minimum: float = FULL_SPAN) -> dict:
 
 
 STAGES = {
-    "search:keyword": "`POST /search` mode `keyword` (PostgreSQL FTS `plainto_tsquery('simple')`)",
+    "search:keyword": "`POST /search` mode `keyword` (PostgreSQL FTS `simple`, truy vấn từ khóa giới hạn của `app.keyword_query`)",
     "search:hybrid": "`POST /search` mode `hybrid`: keyword + vector băm cục bộ, fusion RRF, không rerank",
     "vector": "vector-only qua `app.search._rank` (cùng gate SQL), vector băm cục bộ",
     "rag_pack:keyword": "toàn evidence pack (tối đa 6 chunk) mà `POST /rag/ask` mode `keyword` dựng để gửi generation",
@@ -271,6 +297,15 @@ def render_markdown(data: dict) -> str:
             "trước khi gọi model; đây **không** là tỷ lệ abstention đúng.", "",
             "| Mode | Kỳ vọng | Kết quả pipeline | Số lượt |", "| --- | --- | --- | --- |"]
     out += [f"| {r['mode']} | {r['expected']} | {r['outcome']} | {r['count']} |" for r in data["rag_pipeline"]]
+    out += ["", "## Candidate cho câu không có đáp án", "",
+            "Số câu mà search trả ít nhất một chunk, số hit trung bình, số câu không còn thuật ngữ từ khóa hữu ích "
+            "(`no_terms`) và số câu RAG gửi evidence tới generation. Có candidate **không** có nghĩa có bằng chứng "
+            "trả lời; dòng `answered` chỉ để so sánh.", "",
+            "| Mode | Split | Nhóm câu | Câu | Có candidate | TB hit | Từ khóa `no_terms` | RAG gửi evidence |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+    out += [f"| {c['mode']} | {c['split']} | {c['questions']} | {c['count']} | {c['search_with_candidates']} | "
+            f"{c['mean_search_hits']} | {c['keyword_no_terms']} | {c['rag_evidence_sent']} |"
+            for c in data.get("candidates", [])]
     out += ["", "## ACL", "",
             f"- Bản ghi đã kiểm (search, vector, RAG response + payload): {acl['records_audited']}; vi phạm: **{len(acl['violations'])}**.",
             f"- Viewer `/search/chunks/{{id}}`: {acl['viewer']['chunks']} chunk × 3 danh tính = {acl['viewer']['requests']} request; "
