@@ -142,9 +142,7 @@ def build(*, manifest, qset, records, rows, diagnostic_rows, index, seeded, view
                       "diagnostic_overlap_50": {
                           "rule": "chunk holds >= 50% of a gold span's characters; diagnostic only, not a headline result",
                           **_metrics(diagnostic_rows, ())}},
-        "comparison": {"questions": sum(q.group == "comparison" for q in qset.questions),
-                       "detected_by_rag_keyword_rule": sum(comparison_detected.values()),
-                       "not_detected": sorted(k for k, v in comparison_detected.items() if not v)},
+        "comparison": _comparison(qset, comparison_detected),
         "rag_pipeline": _rag_outcomes(qset, records),
         "candidates": _candidates(qset, records),
         "acl": {"records_audited": len(records), "violations": acl, "viewer": viewer,
@@ -154,6 +152,16 @@ def build(*, manifest, qset, records, rows, diagnostic_rows, index, seeded, view
         "questions": per_question,
         "records": records,
     }
+
+
+def _comparison(qset, detected: dict[str, bool]) -> dict:
+    """``app.rag.is_comparison`` per question; outside the group a hit is a false positive."""
+    group = {q.id for q in qset.questions if q.group == "comparison"}
+    return {"questions": len(group),
+            "detected_by_rag_rule": sum(detected.get(k, False) for k in group),
+            "not_detected": sorted(k for k in group if not detected.get(k, False)),
+            "other_questions": len(qset.questions) - len(group),
+            "detected_outside_group": sorted(k for k, v in detected.items() if v and k not in group)}
 
 
 def _index_check(answered, index, minimum: float = FULL_SPAN) -> dict:
@@ -287,11 +295,13 @@ def render_markdown(data: dict) -> str:
             *_table(retrieval["diagnostic_overlap_50"]["evidence_pack_coverage"]["overall"], None, "Phủ pack ≥50%")]
     comparison = data["comparison"]
     undetected = f"; không nhận ra: {', '.join(comparison['not_detected'])}" if comparison["not_detected"] else ""
+    outside = ", ".join(comparison["detected_outside_group"]) or "không câu nào"
     out += ["", "## So sánh nhiều paper", "",
             "Ở nhóm `comparison`, cột “Đủ mọi side” là số câu có chứng cứ của **tất cả** các phía: trong top 5 với "
             "Recall@5, hoặc ở bất kỳ đâu trong pack với phủ pack. "
-            f"Luật từ khóa so sánh của RAG (`app.rag.COMPARISON`) nhận ra {comparison['detected_by_rag_keyword_rule']}/"
-            f"{comparison['questions']} câu so sánh{undetected}.",
+            f"Luật nhận diện câu so sánh của RAG (`app.rag.is_comparison`) nhận ra {comparison['detected_by_rag_rule']}/"
+            f"{comparison['questions']} câu so sánh{undetected}; trong {comparison['other_questions']} câu thuộc nhóm khác, "
+            f"luật coi là so sánh: {outside}.",
             "", "## Pipeline RAG trước generation", "",
             "Generation không chạy, nên bảng chỉ cho biết pipeline gửi evidence đi hay tự trả `insufficient_evidence` "
             "trước khi gọi model; đây **không** là tỷ lệ abstention đúng.", "",
