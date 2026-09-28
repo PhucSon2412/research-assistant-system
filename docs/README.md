@@ -1,6 +1,6 @@
 # Tài liệu dự án
 
-Repo đã merge M3a private index (PR #6, merge commit `1c4a6f7`), M3b private search (PR #7, merge commit `5911038`) và M3c collection cá nhân (PR #8, merge commit `6b0a96a`). M4a RAG một paper riêng đang triển khai; M4b còn streaming, scope rộng và đánh giá ≥80 câu. Các tài liệu này mô tả yêu cầu và phương án đề xuất, không khẳng định hiệu năng đã được đo; phần đã có code được ghi riêng ở [môi trường phát triển](dev-setup.md).
+Repo đã merge M3a private index (PR #6, merge commit `1c4a6f7`), M3b private search (PR #7, merge commit `5911038`), M3c collection cá nhân (PR #8, merge commit `6b0a96a`) và M4a RAG một paper riêng (PR #9, merge commit `6eaaf12`). M4b mở scope RAG trong PR riêng; streaming và đánh giá có người đọc ≥80 câu là việc tiếp theo. Các tài liệu này mô tả yêu cầu và phương án đề xuất, không khẳng định hiệu năng đã được đo; phần đã có code được ghi riêng ở [môi trường phát triển](dev-setup.md).
 
 ## Cách đọc trạng thái quyết định
 

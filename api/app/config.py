@@ -246,6 +246,7 @@ class GenerationPolicy(BaseModel):
     pricing_verified: bool = False
     max_question_bytes: int = Field(default=1024, gt=0)
     max_evidence_chunks: int = Field(default=6, gt=0, le=30)
+    max_evidence_papers: int = Field(default=3, gt=0, le=30)
     max_evidence_bytes: int = Field(default=12_000, gt=0)
     max_input_tokens_estimate: int = Field(default=16000, gt=0)
     max_output_tokens: int = Field(default=512, gt=0)
@@ -263,6 +264,8 @@ class GenerationPolicy(BaseModel):
     def _check_endpoint(self) -> "GenerationPolicy":
         if not self.endpoint.startswith("https://"):
             raise ValueError("generation endpoint must use HTTPS")
+        if self.max_evidence_papers > self.max_evidence_chunks:
+            raise ValueError("max_evidence_papers must not exceed max_evidence_chunks")
         return self
 
 

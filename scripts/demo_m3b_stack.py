@@ -13,6 +13,7 @@ from dotenv import dotenv_values
 from pydantic import SecretStr
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL
+from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.identity.passwords import hash_password
@@ -22,7 +23,7 @@ from app.ingest.worker import process_job
 from app.storage import OriginalStorage
 
 
-def main(*, m3c: bool = False) -> None:
+def main(*, m3c: bool = False, m4b: bool = False) -> None:
     root = Path(__file__).resolve().parents[1]
     env = dotenv_values(root / ".env")
     for key, value in {
@@ -131,13 +132,50 @@ def main(*, m3c: bool = False) -> None:
         for own, other in ((0, 1), (1, 0)):
             denied = clients[own].get(f"/collections/{collections[other]}/items")
             assert denied.status_code == 404
+        if m4b:
+            from app import rag
+            from app.authz import Principal
+
+            settings.generation.pricing_verified = True  # host fake only
+            def fake_generate(messages, selected):
+                import json
+                evidence = json.loads(messages[1]["content"])["evidence"]
+                assert len(evidence) == 1 and "Bibliography" not in str(evidence)
+                row = evidence[0]
+                return rag.GenerationResult(json.dumps({"claims": [{"text": "Synthetic observation.",
+                    "citations": [{"chunk_id": row["chunk_id"], "quote": "observation"}]}]}),
+                    100, 30, selected.generation.model_id, "SyntheticProvider")
+            rag.generate = fake_generate
+            for own, other, label in ((0, 1, "A"), (1, 0, "B")):
+                client = clients[own]
+                headers = {"origin": web, "x-csrf-token": client.cookies["ras_csrf"]}
+                locked = client.post("/rag/ask", json={"collection_id": collections[own],
+                    "question": "observation", "mode": "keyword"}, headers=headers)
+                assert locked.status_code == 503 and locked.json()["error"] == "rag_generation_unavailable_unverified_pricing"
+                with Session(engine) as db:
+                    user_id = db.scalar(text("SELECT owner_user_id FROM library_items WHERE id=:i"),
+                                        {"i": uuid.UUID(ids[own]["item_id"])})
+                    principal = Principal(user_id=user_id, role="user", session_id=uuid.uuid4(),
+                                          email=f"synthetic-{label}@example.org", display_name=None)
+                    for scope in ("collection", "all"):
+                        response = rag.answer(db, principal, settings, None, "observation", "keyword",
+                            collection_id=uuid.UUID(collections[own]) if scope == "collection" else None,
+                            all_items=scope == "all")
+                        assert response["status"] == "answered"
+                        cite = response["claims"][0]["citations"][0]
+                        assert cite["item_id"] == ids[own]["item_id"]
+                        assert clients[other].get(f"/search/chunks/{cite['chunk_id']}").status_code == 404
+                        print({"user": label, "rag_scope": scope, "status": response["status"],
+                               "owner_only": True, "provider": "host fake"})
         with httpx.Client(timeout=30) as probe:
             assert probe.get(web + "/collections").status_code == 200
-        print("web_collections_page=200; external_provider_calls=0 (fake index embedding)")
+        print("web_collections_page=200; external_provider_calls=0 (fake embedding/generation)" if m4b
+              else "web_collections_page=200; external_provider_calls=0 (fake index embedding)")
     for client in clients:
         client.close()
     engine.dispose()
-    print("web_search_page=200; external_provider_calls=0 (fake index embedding)")
+    print("web_search_page=200; external_provider_calls=0 (fake embedding/generation)" if m4b
+          else "web_search_page=200; external_provider_calls=0 (fake index embedding)")
 
 
 if __name__ == "__main__":

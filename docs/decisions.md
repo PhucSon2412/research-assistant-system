@@ -101,6 +101,8 @@ Các lựa chọn dưới đây là **quyết định kỹ thuật của PR M1b 
 - Kho chung do Admin quản lý; user upload mặc định riêng tư; User hỏi đáp trên kho chung và kho riêng của mình; MVP có Admin/User.
 - PDF/Markdown là định dạng MVP; giữ file gốc, báo phần không trích xuất được, không coi metadata-only là toàn văn.
 - Search hybrid; RAG có nguồn đến vị trí cụ thể và có thể từ chối khi thiếu bằng chứng; index toàn văn không đồng nghĩa đưa cả paper vào một prompt.
+
+**Ghi nhận M4b scope (2026-09-28):** PR #9 đã merge ở `6eaaf12`; tài liệu cũ còn ghi M4a đang triển khai và gộp streaming/bộ đánh giá ≥80 câu vào M4b. Theo phạm vi task này, M4b chỉ mở `item_id`/`collection_id`/`scope="all"` loại trừ nhau, không streaming. Quyết định triển khai dùng gate private owner/active generation của M3b/M3c, thêm giới hạn số paper và kiểm lại từng evidence cùng membership trước provider/sau provider. Common full text chưa có rights gate đúng file version, nên common `metadata_only` vẫn ngoài evidence. Câu so sánh scope rộng phải có ít nhất hai paper trong pack và citation; kiểm quote/ID chỉ là kiểm cấu trúc, chưa chứng minh nghĩa claim. Streaming, đánh giá người đọc ≥80 câu và baseline p95/charge để bước sau. Nội dung đã gửi provider trước khi thu hồi không thể lấy lại.
 - References và quan hệ citation phục vụ khám phá; citation không hàm ý đồng ý.
 - Không thêm tính năng AI tự động tóm tắt paper nếu không có yêu cầu mới.
 
@@ -176,7 +178,7 @@ PR #7 đã merge ở `5911038`. M3c giữ gate private full text của PR #7; co
 
 ## Quyết định triển khai M4a (2026-09-27)
 
-PR #8 đã merge ở `6b0a96a`. M4a chỉ hỏi một `item_id` private của caller, không suy quyền từ collection membership. Dùng retrieval M3b/M3c với gate trước top-k; evidence body/abstract active index có locator và coverage. Response không streaming. M4b nhận streaming, scope collection/toàn kho và đánh giá ≥80 câu; chưa có baseline token đầu.
+PR #8 đã merge ở `6b0a96a`. M4a chỉ hỏi một `item_id` private của caller, không suy quyền từ collection membership. Dùng retrieval M3b/M3c với gate trước top-k; evidence body/abstract active index có locator và coverage. Response không streaming. Phạm vi M4b được chốt sau đó chỉ gồm scope collection/toàn kho; streaming và đánh giá ≥80 câu để bước sau, chưa có baseline token đầu.
 
 Generation dùng [OpenRouter chat completions API](https://openrouter.ai/docs/api/api-reference/chat/create-a-chat-completion) `POST /api/v1/chat/completions`, `stream=false`, `max_completion_tokens` và `response_format=json_object`; yêu cầu routing metadata, kiểm response model đúng ID được cấu hình và provider được chọn hiện diện trong metadata. [Trang model GPT-6 Sol](https://openrouter.ai/openai/gpt-6-sol) liệt kê nhiều upstream, nên không khóa cứng một provider. Contract tổng hợp xác minh parser; price input/output và token cap trong config, `pricing_verified=false` mặc định. Quan sát token/HTTP thành công không đủ xác nhận charge thực; chưa bật gửi paper riêng khi giá chưa đối soát. Bucket generation $5/ngày trong app $10/ngày có quota User, concurrency và reservation cùng advisory lock với embedding/rerank. `uncertain` giữ reservation khi outcome chưa chắc; không tự retry. Ledger không chứa question, evidence hoặc answer.
 
