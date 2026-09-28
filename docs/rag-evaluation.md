@@ -106,7 +106,7 @@ Giá trị ngoài tập cho phép (ví dụ `probably`) làm lệnh báo lỗi. 
 
 Báo cáo: [`evaluation/rag/reports/rag-eval-2026-09-28.md`](../evaluation/rag/reports/rag-eval-2026-09-28.md) (JSON cùng tên có từng bản ghi). Lệnh tái lập nằm đầu báo cáo. Số liệu dưới đây chỉ đúng cho corpus tổng hợp, embedder cục bộ và config mặc định, không là baseline chất lượng production.
 
-Lần chạy 2026-09-28 trên commit `M4C_COMMIT` (tree sạch), Windows 11, Conda `ras` Python 3.12.14, pypdf 6.19.0, PostgreSQL/MinIO của Compose, khoảng 2 phút. Cả 80 nhãn vẫn `pending_human_review`, nên các số dưới đây **chưa chứng minh** đã đạt mục tiêu chất lượng nào.
+Lần chạy 2026-09-28 trên commit `04070f1` (tree sạch), Windows 11, Conda `ras` Python 3.12.14, pypdf 6.19.0, PostgreSQL/MinIO của Compose, khoảng 2 phút. Cả 80 nhãn vẫn `pending_human_review`, nên các số dưới đây **chưa chứng minh** đã đạt mục tiêu chất lượng nào.
 
 - Ingest: 16/16 item `ready`/`indexed`, coverage khớp kỳ vọng (P08, P09 `partial`), 87 chunk; **63/63** side chứng cứ có chunk active chứa trọn span, nên không có lỗi `extraction` trên corpus này.
 - Recall@5 (luật phủ trọn span) trên 49 câu `answered`, 63 side:
