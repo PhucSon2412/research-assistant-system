@@ -136,6 +136,31 @@ class IngestPolicy(BaseModel):
         return self
 
 
+class DiscoveryPolicy(BaseModel):
+    enabled: bool = True
+    topics: list[str] = Field(default_factory=lambda: ["cs.AI", "cs.LG", "cs.CL"])
+    initial_lookback_days: int = Field(default=7, ge=1, le=365)
+    poll_seconds: int = Field(default=86400, ge=60)
+    max_pages_per_topic: int = Field(default=2, ge=1, le=100)
+    max_response_bytes: int = Field(default=4 * MIB, ge=1024, le=32 * MIB)
+    timeout_seconds: int = Field(default=20, ge=1, le=120)
+    min_request_interval_seconds: int = Field(default=3, ge=3)
+    retry_base_seconds: int = Field(default=60, ge=1)
+    retry_max_seconds: int = Field(default=3600, ge=1)
+    user_agent: str = "ResearchAssistantSystem/0.1 (metadata discovery)"
+
+    @model_validator(mode="after")
+    def _check(self) -> "DiscoveryPolicy":
+        import re
+        if not self.topics or len(set(self.topics)) != len(self.topics):
+            raise ValueError("discovery topics must be nonempty and unique")
+        if any(not re.fullmatch(r"[a-z-]+\.[A-Z][A-Z0-9-]*", t) for t in self.topics):
+            raise ValueError("invalid arXiv category")
+        if self.retry_max_seconds < self.retry_base_seconds:
+            raise ValueError("discovery retry max must exceed base")
+        return self
+
+
 class Retention(BaseModel):
     """Cleanup and backup windows (M6)."""
 
@@ -345,6 +370,7 @@ class Settings(BaseSettings):
     upload_notice_version: str = Field(default="2026-09-24.v1", min_length=1)
     pdf_body: PdfBodyThreshold = PdfBodyThreshold()
     ingest: IngestPolicy = IngestPolicy()
+    discovery: DiscoveryPolicy = DiscoveryPolicy()
     retention: Retention = Retention()
     budget: ProviderBudget = ProviderBudget()
     embedding: EmbeddingPolicy = EmbeddingPolicy()

@@ -33,6 +33,13 @@ Brief khởi tạo và quyết định của chủ dự án ngày **2026-09-24**
 
 Nguồn kiểm tra: các trang model [embedding](https://openrouter.ai/openai/text-embedding-3-small), [rerank](https://openrouter.ai/qwen/qwen3-reranker-8b), [generation](https://openrouter.ai/openai/gpt-6-sol) và [rerank API](https://openrouter.ai/docs/api/api-reference/rerank/create-rerank) của OpenRouter; [arXiv bulk data](https://github.com/arXiv/arxiv-docs/blob/develop/source/help/bulk_data.md). Khả dụng, giá, provider và kích thước vector phải được kiểm lại khi tích hợp; phản hồi key do chủ dự án cung cấp là nguồn cho cấu hình `limit`/`limit_reset`, không cần gọi key từ repo.
 
+### M5a (2026-09-29) — metadata arXiv
+
+- Chọn OAI-PMH `arXivRaw` vì có category set, datestamp incremental và lịch sử version thực sự. Cửa sổ ban đầu, số trang/lượt, timeout, kích thước response, nhịp request và backoff đều ở `DiscoveryPolicy`. Ngày `first_discovered_at` là ngày hệ thống gặp paper; `source_published_at` là ngày version đầu nếu metadata cung cấp. Không suy diễn paper mới từ OAI datestamp.
+- **Mâu thuẫn docs/code đã xử lý cho phạm vi M5a:** bảng `DiscoveryPaper` đề xuất trong `data-model.md` có optional common item và trạng thái `indexed`, nhưng trước PR này code chưa có DiscoveryPaper hay gate quyền theo file version. M5a dùng bảng discovery độc lập, constraint `metadata_only`, không nối vào `LibraryItem`; phần quyền/full text cần migration và PR riêng. Điều này giữ đúng yêu cầu đã xác nhận rằng metadata discovery không vào search/RAG.
+- Test health từ M4a khẳng định không có route `/discovery`; điều đó đúng tại M4a nhưng trái phạm vi M5a. Đã cập nhật test để kiểm ba route discovery mới, giữ kiểm tra upload/search/RAG cũ.
+- Trang khám phá cho mọi tài khoản đã đăng nhập, Admin chỉ xem trạng thái sync. License URL lưu để tham khảo, không tự cấp quyền. PR #12–#14 đã merge ở main trước nhánh này; M5a không thay đổi RAG.
+
 ## Làm rõ đã xác nhận ngày 2026-09-24
 
 - Xác nhận xử lý ngoài dùng hai bước: User xác nhận riêng cho từng upload, UI tạo upload intent không có file rồi mới gửi file sau khi API chấp nhận; API kiểm intent gắn đúng upload trước khi lưu file/tạo job. Nếu client cố gửi multipart không có intent, bytes có thể đã qua mạng dù API từ chối. [Hợp đồng chi tiết](access-and-data.md#hợp-đồng-xác-nhận-upload-riêng).

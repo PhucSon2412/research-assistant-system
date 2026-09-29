@@ -39,6 +39,7 @@ EXPECTED_TABLES = {
     "embedding_user_budget_days",
     "search_request_days", "search_usage", "rag_request_days",
     "collections", "collection_items",
+    "discovery_sources", "discovery_papers", "discovery_paper_topics", "discovery_request_clock",
 }
 
 
@@ -122,7 +123,7 @@ def test_0016_upgrades_m3c_database_with_data(empty_db_url: str) -> None:
                             {"u": user})
     upgrade(empty_db_url)
     with eng.connect() as conn:
-        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == "0016"
+        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == HEAD_REVISION
         assert conn.scalar(text("SELECT title FROM library_items WHERE id=:i"), {"i": item}) == "Synthetic M3c item"
         assert conn.scalar(text("SELECT count(*) FROM collection_items WHERE collection_id=:c"), {"c": collection}) == 1
         assert conn.scalar(text("SELECT status FROM search_usage WHERE id=:u"), {"u": usage}) == "uncertain"

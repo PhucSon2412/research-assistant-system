@@ -9,13 +9,17 @@ from celery import Celery
 from app.config import get_settings
 from app.db import get_sessionmaker
 from app.ingest.worker import due_job_ids, process_job
+from app.discovery import run_sync
+from app.db import get_engine
 
 settings = get_settings()
 celery_app = Celery("ras_ingest", broker=settings.celery_broker_url())
 celery_app.conf.update(task_ignore_result=True, worker_prefetch_multiplier=1,
                        broker_connection_retry_on_startup=True,
                        beat_schedule={"discover-ingest-jobs": {
-                           "task": "ras.ingest.discover", "schedule": settings.ingest.poll_seconds}})
+                           "task": "ras.ingest.discover", "schedule": settings.ingest.poll_seconds},
+                                      "arxiv-metadata-discovery": {
+                           "task": "ras.discovery.sync", "schedule": min(300, settings.discovery.poll_seconds)}})
 
 
 @celery_app.task(name="ras.ingest.discover")
@@ -30,3 +34,8 @@ def discover() -> int:
 @celery_app.task(name="ras.ingest.process")
 def ingest_job(job_id: str) -> str:
     return process_job(uuid.UUID(job_id), settings)
+
+
+@celery_app.task(name="ras.discovery.sync")
+def sync_arxiv() -> dict:
+    return run_sync(get_engine(), settings.discovery)
