@@ -384,13 +384,23 @@ def test_collection_and_all_scope_multi_paper_citations_and_acl(upload_api, monk
 
 def test_scoped_rag_membership_recheck_and_comparison_abstention(upload_api, monkeypatch):
     api, storage = upload_api
-    _, a, _, _, first, _, settings = setup(api, storage, monkeypatch,
+    _, a, b, admin, first, _, settings = setup(api, storage, monkeypatch,
         b"## Methods\nSharedword first result seven units.\n")
     second = indexed(api, storage, a, b"## Results\nSharedword second result nine units.\n", settings)
+    with api.engine.begin() as conn:
+        conn.execute(text("UPDATE library_items SET title='first-method' WHERE id=:i"),
+                     {"i": uuid.UUID(first["item_id"])})
+        conn.execute(text("UPDATE library_items SET title='second-method' WHERE id=:i"),
+                     {"i": uuid.UUID(second["item_id"])})
     collection = a.post("/collections", {"name": "Pair"}).json()["collection"]["id"]
     for item in (first, second):
         assert a.post(f"/collections/{collection}/items", {"item_id": item["item_id"]}).status_code == 201
-    req = {"collection_id": collection, "question": "Compare Sharedword", "mode": "keyword"}
+    common = api.add_item(owner=None, title="third-method metadata_only")
+    assert a.post(f"/collections/{collection}/items", {"item_id": str(common)}).status_code == 201
+    req = {"collection_id": collection, "question": "Compare First Method and Second Method Sharedword",
+           "mode": "keyword"}
+    for browser in (b, admin):
+        assert browser.post("/rag/ask", req).status_code == 404
     calls = []
     monkeypatch.setattr("app.rag.generate", lambda *args: calls.append(args))
     settings.generation.max_evidence_papers = 1
@@ -441,6 +451,57 @@ def test_evidence_pack_limits_papers_chunks_and_bytes(api):
     settings.generation.max_evidence_papers = 2
     settings.generation.max_evidence_bytes = 5
     assert len(_pack(hits, settings)) == 1
+
+
+def test_comparison_pack_named_papers_deep_sections_duplicates_and_caps(api):
+    settings = settings_with_fake_key()
+    settings.generation.max_evidence_chunks = 6
+    settings.generation.max_evidence_papers = 3
+    settings.generation.max_evidence_bytes = 12000
+    ids = {name: str(uuid.uuid4()) for name in ("noise1", "noise2", "noise3", "aurora", "birch")}
+
+    def hit(paper, title, heading, body, kind="body"):
+        return {"chunk_id": str(uuid.uuid4()), "item_id": ids[paper], "title": title,
+                "text": f"## {heading}\n{body}", "section_kind": kind}
+
+    hits = [hit(f"noise{n}", f"unrelated-{n}", "Results", "Common comparison text") for n in (1, 2, 3)]
+    hits += [hit("aurora", "aurora-routing", "Abstract", "Early abstract"),
+             hit("birch", "birch-adapters", "Abstract", "Early abstract"),
+             hit("aurora", "aurora-routing", "Introduction", "Early introduction"),
+             hit("birch", "birch-adapters", "Introduction", "Early introduction"),
+             hit("aurora", "aurora-routing", "Results", "AURORA_DEEP_EVIDENCE"),
+             hit("birch", "birch-adapters", "Methods", "BIRCH_DEEP_EVIDENCE"),
+             hit("aurora", "aurora-routing", "References", "FAKE_REFERENCE", "references")]
+    hits.append(hits[-3])  # duplicate chunk ID in the ranked input
+    pack = _pack(hits, settings, comparing=True, question="Compare Aurora Routing and Birch Adapters")
+    selected = list(pack.values())
+    assert len(pack) <= 6
+    assert {row["item_id"] for row in selected} == {ids["aurora"], ids["birch"]}
+    assert any("AURORA_DEEP_EVIDENCE" in row["text"] for row in selected)
+    assert any("BIRCH_DEEP_EVIDENCE" in row["text"] for row in selected)
+    assert all("FAKE_REFERENCE" not in row["text"] for row in selected)
+    assert sum(len(row["text"].encode("utf-8")) for row in selected) <= 12000
+    settings.generation.max_evidence_chunks = 2
+    settings.generation.max_evidence_bytes = len(hits[-3]["text"].encode()) + len(hits[-2]["text"].encode())
+    limited = _pack(hits, settings, comparing=True, question="Compare Aurora Routing and Birch Adapters")
+    assert len(limited) <= 2
+    assert sum(len(row["text"].encode("utf-8")) for row in limited.values()) <= settings.generation.max_evidence_bytes
+    settings.generation.max_evidence_papers = 1
+    assert len({row["item_id"] for row in _pack(hits, settings, comparing=True,
+               question="Compare Aurora Routing and Birch Adapters").values()}) <= 1
+
+
+def test_comparison_pack_ambiguous_names_and_one_valid_paper(api):
+    settings = settings_with_fake_key()
+    first = str(uuid.uuid4())
+    second = str(uuid.uuid4())
+    hits = [{"chunk_id": str(uuid.uuid4()), "item_id": first, "title": "unnamed-paper",
+             "text": "## Results\nFirst evidence", "section_kind": "body"},
+            {"chunk_id": str(uuid.uuid4()), "item_id": second, "title": "other-paper",
+             "text": "## References\nSecond evidence", "section_kind": "references"}]
+    pack = _pack(hits, settings, comparing=True, question="Compare their findings")
+    assert {row["item_id"] for row in pack.values()} == {first}
+    assert _pack(hits, settings, comparing=True, question="Compare their findings") == pack
 
 
 def test_comparison_pack_reserves_a_chunk_for_later_paper(api):

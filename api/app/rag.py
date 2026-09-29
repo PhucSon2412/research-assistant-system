@@ -159,7 +159,43 @@ def _fresh(db: Session, principal: Principal, item_id: uuid.UUID | None,
     return rows
 
 
-def _pack(hits: list[dict], settings: Settings, *, comparing: bool = False) -> dict[uuid.UUID, dict]:
+_PACK_WORD = re.compile(r"[^\W_]+", re.UNICODE)
+_PACK_ABBREVIATION = re.compile(r"\b[A-Z][A-Z0-9]{1,}\b")
+_PACK_HYPHENATED = re.compile(r"\b\w+(?:-\w+){1,3}\b", re.UNICODE)
+_PACK_SECTION_ORDER = ("results", "methods", "limitations", "analysis", "discussion",
+                       "abstract", "efficiency", "introduction", "other", "conclusion")
+
+
+def _pack_words(value: str) -> list[str]:
+    return _PACK_WORD.findall(value.casefold())
+
+
+def _named_paper(question: str, title: str | None) -> bool:
+    """A title is a selection hint only; it never supports a generated claim.
+
+    Uploaded items currently use the file stem as title. Allow two shared title
+    words or an explicit abbreviation (DAS / a hyphenated phrase's initials).
+    A generated item prefix such as p07 is not a paper name.
+    """
+    title_words = [word for word in _pack_words(title or "") if not re.fullmatch(r"p\d+", word)]
+    question_words = set(_pack_words(question))
+    if len(set(title_words) & question_words) >= 2:
+        return True
+    abbreviations = {word.casefold() for word in _PACK_ABBREVIATION.findall(question)}
+    abbreviations.update("".join(part[0] for part in _pack_words(phrase))
+                         for phrase in _PACK_HYPHENATED.findall(question))
+    initials = {"".join(part[0] for part in title_words[start:start + length])
+                for length in range(2, 5) for start in range(len(title_words) - length + 1)}
+    return bool(abbreviations & (set(title_words) | initials))
+
+
+def _pack_section(hit: dict) -> str:
+    heading = hit["text"].split("\n", 1)[0].strip().lstrip("#").strip().casefold()
+    return heading if heading in _PACK_SECTION_ORDER else "other"
+
+
+def _pack(hits: list[dict], settings: Settings, *, comparing: bool = False,
+          question: str = "") -> dict[uuid.UUID, dict]:
     pack: dict[uuid.UUID, dict] = {}
     used = 0
     papers: set[str] = set()
@@ -188,7 +224,31 @@ def _pack(hits: list[dict], settings: Settings, *, comparing: bool = False) -> d
         grouped: dict[str, list[tuple[dict, int]]] = {}
         for hit, size in eligible:
             grouped.setdefault(hit["item_id"], []).append((hit, size))
-        selected = list(grouped)[:policy.max_evidence_papers]
+        named = [paper for paper, rows in grouped.items() if _named_paper(question, rows[0][0].get("title"))]
+        # With two clear names, spend the pack on those papers instead of earlier
+        # distractors. When names are unclear, retain the existing search-order pack.
+        selected = (named[:2] if len(named) >= 2 else list(grouped)[:policy.max_evidence_papers])
+        selected = selected[:policy.max_evidence_papers]
+        if len(named) >= 2:
+            # Prefer result/method sections while preserving hit rank within each
+            # section. Round-robin prevents one named paper filling every slot.
+            ordered = {paper: [row for section in _PACK_SECTION_ORDER
+                               for row in grouped[paper] if _pack_section(row[0]) == section]
+                       for paper in selected}
+            minimum = {paper: min(size for _, size in ordered[paper]) for paper in selected}
+            for pos, paper in enumerate(selected):
+                reserved = sum(minimum[other] for other in selected[pos + 1:])
+                for hit, size in ordered[paper]:
+                    if used + size + reserved <= policy.max_evidence_bytes and add(hit, size):
+                        break
+            for _ in range(policy.max_evidence_chunks):
+                if len(pack) >= policy.max_evidence_chunks:
+                    break
+                for paper in selected:
+                    for hit, size in ordered[paper]:
+                        if add(hit, size):
+                            break
+            return pack
         minimum = {paper: min(size for _, size in grouped[paper]) for paper in selected}
         for pos, paper in enumerate(selected):
             reserved = sum(minimum[other] for other in selected[pos + 1:])
@@ -312,7 +372,7 @@ def answer(db: Session, principal: Principal, settings: Settings, item_id: uuid.
     comparing = is_comparison(question) and item_id is None
     retrieval_query = COMPARISON_CUE.sub(" ", question).strip() if comparing and mode == "keyword" else question
     found = search(db, principal, settings, retrieval_query or question, mode, item_id, False, collection_id)
-    pack = _pack(found["hits"], settings, comparing=comparing)
+    pack = _pack(found["hits"], settings, comparing=comparing, question=question)
     coverages = {row["coverage"] for row in pack.values()}
     coverage = ("partial" if "partial" in coverages else next(iter(coverages), None))
     if coverage is None and item_id is not None:
