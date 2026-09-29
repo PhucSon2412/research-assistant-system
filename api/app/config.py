@@ -161,6 +161,15 @@ class DiscoveryPolicy(BaseModel):
         return self
 
 
+class CitationPolicy(BaseModel):
+    """M5b-1 exact arXiv reference links; bounded background reconciliation."""
+
+    enabled: bool = True
+    reconcile_poll_seconds: int = Field(default=300, ge=30, le=86400)
+    reconcile_batch_size: int = Field(default=500, ge=1, le=5000)
+    reconcile_max_batches: int = Field(default=20, ge=1, le=1000)
+
+
 class Retention(BaseModel):
     """Cleanup and backup windows (M6)."""
 
@@ -371,6 +380,7 @@ class Settings(BaseSettings):
     pdf_body: PdfBodyThreshold = PdfBodyThreshold()
     ingest: IngestPolicy = IngestPolicy()
     discovery: DiscoveryPolicy = DiscoveryPolicy()
+    citations: CitationPolicy = CitationPolicy()
     retention: Retention = Retention()
     budget: ProviderBudget = ProviderBudget()
     embedding: EmbeddingPolicy = EmbeddingPolicy()

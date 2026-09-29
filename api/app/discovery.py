@@ -1,7 +1,8 @@
 """Bounded OAI-PMH harvesting. PostgreSQL owns every page checkpoint.
 
 Only descriptive metadata is written. This module deliberately does not import
-LibraryItem, SourceFile, indexer, search, RAG, or a provider client.
+LibraryItem, SourceFile, indexer, search, RAG, or a provider client. Each page
+re-targets existing exact citation links (M5b-1) in the same transaction.
 """
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
+from app.citations import reconcile_arxiv_ids
 from app.config import DiscoveryPolicy
 from app.models.discovery import (DiscoveryDeletedRecord, DiscoveryPaper, DiscoveryPaperLicense,
                                   DiscoveryPaperTopic, DiscoveryRequestClock, DiscoverySource)
@@ -236,6 +238,7 @@ def _write_page(db: Session, topic: str, page: Page, now: datetime) -> None:
                     where=DiscoveryPaperLicense.oai_datestamp <= paper.datestamp))
         db.execute(insert(DiscoveryPaperTopic).values(paper_id=paper_id, topic=topic)
                    .on_conflict_do_nothing(index_elements=["paper_id", "topic"]))
+    reconcile_arxiv_ids(db, [p.remote_id for p in page.papers] + [r for r, _ in page.deleted], now)
 
 
 def run_sync(engine: Engine, policy: DiscoveryPolicy, *, fetcher: Callable[[dict[str, str], DiscoveryPolicy], bytes] = fetch_page,

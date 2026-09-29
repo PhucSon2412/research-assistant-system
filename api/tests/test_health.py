@@ -28,3 +28,5 @@ def test_m5a_discovery_routes_registered() -> None:
     assert "/search" in paths
     assert "/rag/ask" in paths
     assert {"/discovery/papers", "/discovery/topics", "/discovery/sources"} <= paths
+    assert "/discovery/papers/{paper_id}/citing-items" in paths
+    assert "/library/items/{item_id}/references" in paths
