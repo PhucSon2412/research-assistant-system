@@ -16,7 +16,7 @@ from threading import Barrier, Thread
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from app import db as app_db
 from app import publication
@@ -446,12 +446,15 @@ def test_revoke_hides_the_copy_from_t_rev_and_touches_nothing_else(upload_api, m
             ("UPDATE library_items SET rights_epoch=0 WHERE id=:i", "never decreases")):
         with pytest.raises(IntegrityError, match=message), api.engine.begin() as conn:
             conn.execute(text(statement), {"i": uuid.UUID(copy)})
-    with pytest.raises(IntegrityError, match="never deleted"), api.engine.begin() as conn:
+    with pytest.raises(DBAPIError), api.engine.begin() as conn:  # FK from retention records, and the trigger
         conn.execute(text("TRUNCATE deletion_tombstones"))
+    with pytest.raises(IntegrityError, match="never deleted|append-only"), api.engine.begin() as conn:
+        conn.execute(text("TRUNCATE deletion_tombstones CASCADE"))
     with api.engine.connect() as conn:
         audit = conn.execute(text("SELECT details FROM audit_events WHERE action='common_copy.revoke'"
                                   " AND outcome='success'")).scalar_one()
     assert audit == {"reason_code": "rights_withdrawn", "from_state": "listed", "tombstone_id": tomb["id"],
+                     "retained_fields": [],
                      "cancelled_jobs": 1}
     no_secrets_in(api, caplog)
 
@@ -559,7 +562,10 @@ def test_cleanup_removes_only_the_common_object_and_is_safe_to_repeat(upload_api
     no_secrets_in(api, caplog)
 
 
-def test_restore_replays_tombstones_before_serving(upload_api, monkeypatch, admin_engine, app_env):
+def test_restored_backup_serves_the_copy_until_the_journal_is_applied(upload_api, monkeypatch, admin_engine,
+                                                                     app_env):
+    """Shows the gap, not a guarantee: an old backup serves the copy again until the
+    manual ``tombstones apply`` step runs. Nothing enforces that order at startup."""
     api, storage = upload_api
     a, b, admin, ids_a, _ = world(api, storage, monkeypatch)
     copy = new_copy(api, a, admin, ids_a)
@@ -601,6 +607,8 @@ def test_restore_replays_tombstones_before_serving(upload_api, monkeypatch, admi
         assert tuple(row) == ("revoked", 1, "rights_withdrawn", True)
         assert publication.cleanup_revoked(snapshot, storage, api.clock.now, 50) == {"deleted": 1}
         assert not key_present(storage, key)
+        with snapshot.connect() as conn:  # the restored metadata is removed again too
+            assert conn.scalar(text("SELECT title FROM library_items WHERE id=:i"), {"i": uuid.UUID(copy)}) is None
         assert publication.apply_tombstones(snapshot, journal) == {"present": 1}  # safe to repeat
         assert storage.open(api.scalar("SELECT storage_key FROM source_files WHERE id=:f",
                                        f=uuid.UUID(ids_a["file_id"]))).read() == A_BODY
@@ -665,3 +673,179 @@ def test_schema_keeps_publication_and_revocation_consistent(upload_api, monkeypa
         for statement in (revoke_item, revoke_rights, revoke_pub, tombstone):
             conn.execute(text(statement), p)
     assert state(api, copies[0]) == "revoked" and live_publications(api) == 0
+
+
+# --- metadata after revocation (M6b-2a review) -----------------------------------------------------
+
+REMOVABLE = {"title", "source_url", "original_filename", "verified_source", "license_url", "evidence_note",
+             "scope_conditions"}
+CONDITIONS = "Ghi nguồn khi trích dẫn"
+ADMIN_STRINGS = ("Bản chung đã kiểm", SOURCE_URL, ADMIN_SOURCE, ADMIN_EVIDENCE, ADMIN_LICENSE, CONDITIONS)
+
+
+def copy_metadata(api, item_id) -> dict:
+    with api.engine.connect() as conn:
+        return dict(conn.execute(text("""SELECT i.title, v.source_url, v.source_identifier, v.version_label,
+            f.original_filename, r.verified_source, r.verified_source_url, r.license_url, r.evidence_note,
+            r.scope_conditions, r.metadata_scrubbed_at IS NOT NULL AS scrubbed
+            FROM library_items i JOIN paper_versions v ON v.item_id=i.id JOIN source_files f ON f.item_id=i.id
+            JOIN access_rights r ON r.item_id=i.id WHERE i.id=:i"""), {"i": uuid.UUID(item_id)}).mappings().one())
+
+
+def private_rows(api, ids) -> dict:
+    """Everything of A's private copy and review requests that removal must never touch."""
+    with api.engine.connect() as conn:
+        return {table: [tuple(r) for r in conn.execute(text(f"SELECT * FROM {table} WHERE {col}=:i ORDER BY id"),
+                                                       {"i": uuid.UUID(ids["item_id"])}).all()]
+                for table, col in (("library_items", "id"), ("paper_versions", "item_id"),
+                                   ("source_files", "item_id"), ("review_requests", "item_id"))}
+
+
+def other_reference_paths(admin, a, b, copy, rid) -> str:
+    """Every route or export that could still name the copy after cleanup, concatenated."""
+    responses = [admin.get(f"/admin/common-copies/{copy}"), admin.get("/admin/common-copies?state=revoked"),
+                 admin.get(f"/admin/review-requests/{rid}"), admin.get("/admin/review-requests?status=closed"),
+                 admin.get("/admin/pending-publications"), a.get(f"/review-requests/{rid}"), a.get("/review-requests")]
+    for browser in (a, b, admin):
+        responses += [browser.get("/library/items?limit=100"), browser.get(f"/library/items/{copy}")]
+    with app_db.get_sessionmaker()() as db:
+        journal = publication.export_tombstones(db)
+    return " ".join(r.text for r in responses) + str(journal)
+
+
+def test_cleanup_removes_revoked_metadata_by_default(upload_api, monkeypatch):
+    api, storage = upload_api
+    a, b, admin, ids_a, _ = world(api, storage, monkeypatch)
+    rid = submit(a, ids_a).json()["request"]["id"]
+    copy = approve(admin, api, rid).json()["request"]["pending_publication_id"]
+    assert publish(admin, copy).status_code == 200
+    box = write(b, "POST", "/collections", {"name": "B"}).json()["collection"]
+    write(b, "POST", f"/collections/{box['id']}/items", {"item_id": copy})
+    filename = api.scalar("SELECT original_filename FROM source_files WHERE id=:f", f=uuid.UUID(ids_a["file_id"]))
+    before = private_rows(api, ids_a)
+
+    assert revoke(admin, copy).status_code == 200
+    # Blocked from t_rev, while the metadata is still there awaiting cleanup.
+    assert copy_metadata(api, copy)["title"] == "Bản chung đã kiểm"
+    for who, browser in (("a", a), ("b", b), ("admin", admin)):
+        assert_hidden(browser, copy, common_file(api, copy), who)
+    assert b.get(f"/collections/{box['id']}/items").json()["total"] == 0
+
+    assert publication.cleanup_revoked(api.engine, storage, api.clock.now, 50) == {"deleted": 1}
+    meta = copy_metadata(api, copy)
+    assert meta.pop("scrubbed") is True and set(meta.values()) == {None}
+    with api.engine.connect() as conn:
+        tomb = conn.execute(text("SELECT purged_at, scrubbed_fields, retained_fields FROM deletion_tombstones")).one()
+    assert tomb.purged_at is not None and set(tomb.scrubbed_fields) == REMOVABLE and tomb.retained_fields == []
+    # Nowhere in the database: the Admin's strings are gone and the file name survives only on private files.
+    dumped = api.dump_all_text()
+    for value in ADMIN_STRINGS:
+        assert value not in dumped, value
+    assert api.scalar("""SELECT count(*) FROM source_files f JOIN library_items i ON i.id=f.item_id
+        WHERE f.original_filename=:n AND i.visibility='common'""", n=filename) == 0
+    assert api.scalar("SELECT original_filename FROM source_files WHERE id=:f", f=uuid.UUID(ids_a["file_id"])) ==         filename
+    # Nor through any API route or the journal.
+    seen = other_reference_paths(admin, a, b, copy, rid)
+    for value in ADMIN_STRINGS:
+        assert value not in seen, value
+    detail = admin.get(f"/admin/common-copies/{copy}").json()["item"]
+    assert (detail["title"], detail["file"]["filename"], detail["version"]["source_url"]) == (None, None, None)
+    assert detail["rights"]["metadata_removed_at"] and detail["retention_bases"] == []
+    assert set(detail["tombstone"]["removed_fields"]) == REMOVABLE
+    # A's private item, version, file (name included) and review request are untouched.
+    assert private_rows(api, ids_a) == before
+    assert a.get(f"/files/{ids_a['file_id']}/original").content == A_BODY
+    # Removed values cannot be written back, and nothing else of the rights changes.
+    for statement, message in (
+            ("UPDATE library_items SET title='again' WHERE id=:i", "can only be removed"),
+            ("UPDATE paper_versions SET source_url='https://x.test/p' WHERE item_id=:i", "source removed"),
+            ("UPDATE source_files SET original_filename='again.md' WHERE item_id=:i", "immutable"),
+            ("UPDATE access_rights SET evidence_note='again' WHERE item_id=:i", "final")):
+        with pytest.raises(IntegrityError, match=message), api.engine.begin() as conn:
+            conn.execute(text(statement), {"i": uuid.UUID(copy)})
+    assert publication.cleanup_revoked(api.engine, storage, api.clock.now, 50) == {}  # rerun is a no-op
+
+
+def test_revocation_keeps_only_fields_with_a_recorded_basis(upload_api, monkeypatch):
+    api, storage = upload_api
+    a, b, admin, ids_a, _ = world(api, storage, monkeypatch)
+    rid = submit(a, ids_a).json()["request"]["id"]
+    copy = approve(admin, api, rid).json()["request"]["pending_publication_id"]
+    assert publish(admin, copy).status_code == 200
+    basis = {"policy_source": "Synthetic retention policy RP-7 section 2", "scope": "Admin-only audit, 12 months",
+             "reason": "Synthetic: answer a rights holder follow-up about this revocation"}
+    keep = [basis | {"field": "title"}, basis | {"field": "evidence_note"}]
+
+    # Invalid bases revoke nothing.
+    assert revoke(admin, copy, retain=keep).json() == {"error": "retention_confirmation_required"}
+    assert revoke(admin, copy, retain=keep * 2, confirm_retention_basis=True).status_code == 422
+    for bad in (basis | {"field": "checksum"}, basis | {"field": "title", "reason": "  "},
+                basis | {"field": "title", "value": "x"}):
+        assert revoke(admin, copy, retain=[bad], confirm_retention_basis=True).status_code == 422, bad
+    assert state(api, copy) == "listed"
+
+    response = revoke(admin, copy, "rights_withdrawn", retain=keep, confirm_retention_basis=True)
+    assert response.status_code == 200, response.text
+    for who, browser in (("a", a), ("b", b), ("admin", admin)):  # a kept title opens nothing
+        assert_hidden(browser, copy, common_file(api, copy), who)
+    assert publication.cleanup_revoked(api.engine, storage, api.clock.now, 50) == {"deleted": 1}
+    meta = copy_metadata(api, copy)
+    assert (meta["title"], meta["evidence_note"]) == ("Bản chung đã kiểm", ADMIN_EVIDENCE)
+    assert {k for k, v in meta.items() if k != "scrubbed" and v is not None} == {"title", "evidence_note"}
+    detail = admin.get(f"/admin/common-copies/{copy}").json()["item"]
+    assert set(detail["tombstone"]["removed_fields"]) == REMOVABLE - {"title", "evidence_note"}
+    assert detail["tombstone"]["retained_fields"] == ["evidence_note", "title"]
+    assert [(r["field"], r["policy_source"], r["scope"], r["reason"], r["confirmed_by_email"])
+            for r in detail["retention_bases"]] == [
+        ("evidence_note", basis["policy_source"], basis["scope"], basis["reason"], "admin@example.org"),
+        ("title", basis["policy_source"], basis["scope"], basis["reason"], "admin@example.org")]
+    dumped = api.dump_all_text()
+    for value in (SOURCE_URL, ADMIN_SOURCE, ADMIN_LICENSE, CONDITIONS):
+        assert value not in dumped, value
+    # Audit keeps field names only, never the kept values or the basis text.
+    audits = api.scalar("SELECT string_agg(details::text, ' ') FROM audit_events WHERE action LIKE 'common_copy.%'")
+    assert '"retained_fields": ["evidence_note", "title"]' in audits
+    for value in ("Bản chung đã kiểm", ADMIN_EVIDENCE, basis["policy_source"], basis["reason"]):
+        assert value not in audits, value
+    # Bases are append-only and must precede the purge.
+    with api.engine.connect() as conn:
+        tomb_id = conn.scalar(text("SELECT id FROM deletion_tombstones"))
+        admin_id = conn.scalar(text("SELECT id FROM users WHERE role='admin'"))
+    late = """INSERT INTO revocation_metadata_retentions(tombstone_id, item_id, field, policy_source, scope, reason,
+        confirmed_by_user_id, recorded_at) VALUES (:t, :i, 'license_url', 'p', 's', 'r', :a, now())"""
+    for statement, message in ((late, "before cleanup"),
+                               ("UPDATE revocation_metadata_retentions SET reason='changed'", "append-only"),
+                               ("DELETE FROM revocation_metadata_retentions", "append-only")):
+        with pytest.raises(IntegrityError, match=message), api.engine.begin() as conn:
+            conn.execute(text(statement), {"t": tomb_id, "i": uuid.UUID(copy), "a": admin_id})
+    # The journal carries the bases so a replay keeps the same decision.
+    with app_db.get_sessionmaker()() as db:
+        (entry,) = publication.export_tombstones(db)
+    assert [r["field"] for r in entry["retentions"]] == ["evidence_note", "title"]
+
+
+def test_db_refuses_a_purge_that_leaves_metadata_without_basis(upload_api, monkeypatch):
+    api, storage = upload_api
+    a, _, admin, ids_a, _ = world(api, storage, monkeypatch)
+    copy = new_copy(api, a, admin, ids_a)
+    assert revoke(admin, copy).status_code == 200
+    purge = """UPDATE deletion_tombstones SET purged_at=now(), object_outcome='no_object', scrubbed_fields='{}',
+        retained_fields='{}' WHERE item_id=:i"""
+    with pytest.raises(IntegrityError, match="cleanup must remove evidence_note, license_url, original_filename, "
+                                             "scope_conditions, source_url, title, verified_source"), \
+            api.engine.begin() as conn:
+        conn.execute(text(purge), {"i": uuid.UUID(copy)})
+    with pytest.raises(IntegrityError, match="field_lists"), api.engine.begin() as conn:
+        conn.execute(text("UPDATE deletion_tombstones SET scrubbed_fields='{}' WHERE item_id=:i"),
+                     {"i": uuid.UUID(copy)})
+    # A pending (not revoked) copy's metadata cannot be removed through these paths.
+    live = new_copy(api, a, admin, ids_a)
+    for statement, message in (("UPDATE source_files SET original_filename=NULL WHERE item_id=:i", "immutable"),
+                               ("UPDATE access_rights SET evidence_note=NULL, metadata_scrubbed_at=now()"
+                                " WHERE item_id=:i", "only update to access rights")):
+        with pytest.raises(IntegrityError, match=message), api.engine.begin() as conn:
+            conn.execute(text(statement), {"i": uuid.UUID(live)})
+    # The private original's name is never removable.
+    with pytest.raises(IntegrityError, match="immutable"), api.engine.begin() as conn:
+        conn.execute(text("UPDATE source_files SET original_filename=NULL WHERE id=:f"),
+                     {"f": uuid.UUID(ids_a["file_id"])})

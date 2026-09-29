@@ -28,9 +28,16 @@ and RAG never served it. Private items and other common copies are untouched.
 **Cleanup** works from unpurged tombstones, each in its own transaction, and
 is safe to repeat: it refuses while derived full-text rows exist (none can in
 this PR), removes collection memberships, deletes the common object unless a
-row that is not revoked names the same key, and records the outcome.
-Tombstones are never deleted, so ``export_tombstones``/``apply_tombstones``
-can replay them into a restored snapshot before it serves traffic.
+row that is not revoked names the same key, and **removes the copy's
+metadata** (``RevokedMetadataField``: title, source URL, file name, the rights'
+source text, licence URL, evidence note and conditions) unless a retention
+basis recorded at revocation names that field. Having been publishable is
+not such a basis. The DB refuses ``purged_at`` while a field without basis
+is left. Only the common copy's rows are touched, never the private item.
+
+Tombstones are never deleted; ``export_tombstones``/``apply_tombstones`` are
+a *manual* recovery step after a restore. Until the journal is applied, a
+restored backup that predates the revocation serves the copy again.
 
 Audit rows carry IDs and codes only: no title, source, URL, evidence,
 checksum, bytes or secrets.
@@ -50,10 +57,10 @@ from app.api.errors import ApiError
 from app.audit import record_event
 from app.authz import Principal, review_copy_admin_clause
 from app.models import (AccessRights, Chunk, CollectionItem, CommonPublication, DeletionTombstone, IndexGeneration,
-                        IngestionJob, LibraryItem, MetadataCandidate, PdfPage, ReferenceEntry, Section, SourceFile,
-                        User)
+                        IngestionJob, LibraryItem, MetadataCandidate, PaperVersion, PdfPage, ReferenceEntry,
+                        RevocationMetadataRetention, Section, SourceFile, User)
 from app.models.enums import (AuditActorType, AuditOutcome, CleanupObjectOutcome, ContentStatus, PublicationState,
-                              RevocationReason, TombstoneKind, UserRole)
+                              RevocationReason, RevokedMetadataField, TombstoneKind, UserRole)
 from app.promotion import verified_read
 from app.storage import OriginalStorage, is_missing_object
 
@@ -65,6 +72,16 @@ class Published:
 
 
 @dataclass(frozen=True)
+class RetentionBasis:
+    """Why one field of a revoked copy may be kept: never the value itself."""
+
+    field: RevokedMetadataField
+    policy_source: str
+    scope: str
+    reason: str
+
+
+@dataclass(frozen=True)
 class Revoked:
     item: LibraryItem
     tombstone: DeletionTombstone
@@ -72,7 +89,7 @@ class Revoked:
 
 
 def _audit(db: Session, admin: Principal, action: str, outcome: AuditOutcome, item_id: uuid.UUID,
-           **details: str | int) -> None:
+           **details: str | int | list[str]) -> None:
     record_event(db, action=action, outcome=outcome, actor_type=AuditActorType.USER, actor_user_id=admin.user_id,
                  target_type="library_item", target_id=str(item_id), details=details)
 
@@ -221,7 +238,7 @@ def _revoke_rows(db: Session, item: LibraryItem, rights: list[AccessRights], rev
 
 
 def revoke(db: Session, admin: Principal, item_id: uuid.UUID, reason: RevocationReason, now: datetime,
-           cleanup_deadline: timedelta) -> Revoked:
+           cleanup_deadline: timedelta, retain: tuple[RetentionBasis, ...] = ()) -> Revoked:
     item = _copy(db, admin, item_id, lock=True)
     if item is None:
         db.rollback()
@@ -243,8 +260,14 @@ def revoke(db: Session, admin: Principal, item_id: uuid.UUID, reason: Revocation
         purge_due_at=now + cleanup_deadline)
     db.add(tombstone)
     db.flush()
+    for basis in retain:
+        db.add(RevocationMetadataRetention(
+            tombstone_id=tombstone.id, item_id=item.id, field=basis.field.value, policy_source=basis.policy_source,
+            scope=basis.scope, reason=basis.reason, confirmed_by_user_id=admin.user_id, recorded_at=now))
+    db.flush()
     _audit(db, admin, "common_copy.revoke", AuditOutcome.SUCCESS, item.id, reason_code=reason.value,
-           from_state=prior, tombstone_id=str(tombstone.id), cancelled_jobs=cancelled)
+           from_state=prior, tombstone_id=str(tombstone.id), cancelled_jobs=cancelled,
+           retained_fields=sorted(b.field.value for b in retain))
     try:
         db.commit()  # t_rev
     except Exception:
@@ -291,6 +314,33 @@ def _remove_object(storage: OriginalStorage, key: str) -> CleanupObjectOutcome:
     raise CleanupError("object_still_present")
 
 
+def _remove_metadata(db: Session, item_id: uuid.UUID, now: datetime) -> tuple[list[str], list[str]]:
+    """Null every RevokedMetadataField of the copy that no retention basis names.
+
+    Only rows of the revoked common item are updated; the private item, its
+    version/file and the review request are separate rows and stay as they are.
+    """
+    kept = set(db.scalars(select(RevocationMetadataRetention.field)
+                          .where(RevocationMetadataRetention.item_id == item_id)).all())
+    removed = [f.value for f in RevokedMetadataField if f.value not in kept]
+    F = RevokedMetadataField
+    if F.TITLE.value in removed:
+        db.execute(update(LibraryItem).where(LibraryItem.id == item_id).values(title=None))
+    if F.SOURCE_URL.value in removed:
+        db.execute(update(PaperVersion).where(PaperVersion.item_id == item_id).values(
+            source_url=None, source_identifier=None, version_label=None))
+    if F.ORIGINAL_FILENAME.value in removed:
+        db.execute(update(SourceFile).where(SourceFile.item_id == item_id).values(original_filename=None))
+    columns = {F.SOURCE_URL.value: "verified_source_url", F.VERIFIED_SOURCE.value: "verified_source",
+               F.LICENSE_URL.value: "license_url", F.EVIDENCE_NOTE.value: "evidence_note",
+               F.SCOPE_CONDITIONS.value: "scope_conditions"}
+    values = {column: None for field, column in columns.items() if field in removed}
+    db.execute(update(AccessRights).where(AccessRights.item_id == item_id,
+                                          AccessRights.metadata_scrubbed_at.is_(None))
+               .values(metadata_scrubbed_at=now, **values))
+    return removed, sorted(kept)
+
+
 def _purge_one(db: Session, storage: OriginalStorage, tombstone_id: uuid.UUID, now: datetime) -> str | None:
     tomb = db.scalar(select(DeletionTombstone).where(DeletionTombstone.id == tombstone_id)
                      .with_for_update(skip_locked=True))
@@ -310,14 +360,18 @@ def _purge_one(db: Session, storage: OriginalStorage, tombstone_id: uuid.UUID, n
         outcome = CleanupObjectOutcome.SHARED_KEPT
     else:
         outcome = _remove_object(storage, tomb.storage_key)
-    tomb.purged_at = now
+    scrubbed, kept = _remove_metadata(db, tomb.item_id, now) if item is not None else ([], [])
+    tomb.scrubbed_fields = scrubbed
+    tomb.retained_fields = kept
+    tomb.purged_at = now  # the DB refuses this while a field without basis is left
     tomb.object_outcome = outcome.value
     tomb.cleanup_attempts += 1
     tomb.last_cleanup_at = now
     tomb.last_cleanup_error = None
     record_event(db, action="common_copy.cleanup", outcome=AuditOutcome.SUCCESS, actor_type=AuditActorType.SYSTEM,
                  target_type="deletion_tombstone", target_id=str(tomb.id),
-                 details={"object_outcome": outcome.value, "memberships_removed": removed})
+                 details={"object_outcome": outcome.value, "memberships_removed": removed,
+                          "scrubbed_fields": scrubbed, "retained_fields": kept})
     db.commit()
     return outcome.value
 
@@ -353,16 +407,23 @@ JOURNAL_FIELDS = ("id", "target_kind", "item_id", "version_id", "source_file_id"
                   "recorded_by_user_id", "purge_due_at")
 
 
+RETENTION_FIELDS = ("field", "policy_source", "scope", "reason", "confirmed_by_user_id", "recorded_at")
+
+
+def _plain(value):
+    return value.isoformat() if isinstance(value, datetime) else (str(value) if isinstance(value, uuid.UUID) else value)
+
+
 def export_tombstones(db: Session) -> list[dict]:
-    """Identity fields of every tombstone: IDs, object key, codes, epoch and times; no content."""
+    """Identity fields of every tombstone and its retention bases: IDs, object key,
+    codes, epoch, times and the recorded justification; no paper metadata or content."""
     rows = db.scalars(select(DeletionTombstone).order_by(DeletionTombstone.recorded_at, DeletionTombstone.id)).all()
     out = []
     for row in rows:
-        entry = {}
-        for name in JOURNAL_FIELDS:
-            value = getattr(row, name)
-            entry[name] = value.isoformat() if isinstance(value, datetime) else (
-                str(value) if isinstance(value, uuid.UUID) else value)
+        entry = {name: _plain(getattr(row, name)) for name in JOURNAL_FIELDS}
+        bases = db.scalars(select(RevocationMetadataRetention).where(RevocationMetadataRetention.tombstone_id == row.id)
+                           .order_by(RevocationMetadataRetention.field)).all()
+        entry["retentions"] = [{name: _plain(getattr(b, name)) for name in RETENTION_FIELDS} for b in bases]
         out.append(entry)
     return out
 
@@ -401,6 +462,12 @@ def apply_tombstone(db: Session, entry: dict) -> str:
         prior_publication_state=entry["prior_publication_state"],
         rights_epoch=item.rights_epoch if item is not None else epoch, recorded_at=recorded_at,
         recorded_by_user_id=revoked_by, purge_due_at=datetime.fromisoformat(entry["purge_due_at"])))
+    db.flush()
+    for basis in entry.get("retentions", []):
+        db.add(RevocationMetadataRetention(
+            tombstone_id=tombstone_id, item_id=item_id, field=basis["field"], policy_source=basis["policy_source"],
+            scope=basis["scope"], reason=basis["reason"], confirmed_by_user_id=uuid.UUID(basis["confirmed_by_user_id"]),
+            recorded_at=datetime.fromisoformat(basis["recorded_at"])))
     db.flush()
     record_event(db, action="common_copy.tombstone_replay", outcome=AuditOutcome.SUCCESS,
                  actor_type=AuditActorType.SYSTEM, target_type="deletion_tombstone", target_id=str(tombstone_id),

@@ -39,10 +39,12 @@ export type PendingPublication = {
   version: { id: string; source_url: string | null; received_at: string };
   file: { id: string; filename: string | null; verified_mime: string; byte_size: number; page_count: number | null;
     checksum_sha256: string };
+  // verified_source is null once cleanup removed a revoked copy's metadata (M6b-2a).
   rights: { id: string; origin_kind: string; origin_review_request_id: string; file_checksum_sha256: string;
-    verified_source: string; verified_source_url: string | null; license_url: string | null;
+    verified_source: string | null; verified_source_url: string | null; license_url: string | null;
     evidence_note: string | null; checked_on: string; recorded_at: string; reviewer_email: string;
-    scope: RightsScope; revoked_at?: string | null; revocation_reason_code?: string | null };
+    scope: RightsScope; revoked_at?: string | null; revocation_reason_code?: string | null;
+    metadata_removed_at?: string | null };
 };
 
 // Any reviewed common copy, as /admin/common-copies returns it (M6b-2a).
@@ -51,8 +53,27 @@ export type CommonCopy = PendingPublication & {
   duplicate_published_item_id?: string | null;
   tombstone: { id: string; reason_code: string; prior_publication_state: "pending" | "listed"; recorded_at: string;
     purge_due_at: string; purged_at: string | null; object_outcome: string | null; cleanup_attempts: number;
-    last_cleanup_error: string | null; overdue: boolean } | null;
+    last_cleanup_error: string | null; overdue: boolean; removed_fields: string[] | null;
+    retained_fields: string[] | null } | null;
+  retention_bases: { field: string; policy_source: string; scope: string; reason: string;
+    confirmed_by_email: string; recorded_at: string }[];
 };
+
+// Metadata cleanup removes from a revoked copy unless a per-field basis keeps it.
+export const REVOKED_METADATA_FIELDS: Record<string, string> = {
+  title: "tiêu đề",
+  source_url: "URL nguồn",
+  original_filename: "tên file",
+  verified_source: "nguồn đã kiểm",
+  license_url: "URL giấy phép",
+  evidence_note: "ghi chú bằng chứng",
+  scope_conditions: "điều kiện sử dụng",
+};
+
+export function fieldList(fields: string[] | null): string {
+  if (!fields || fields.length === 0) return "không";
+  return fields.map((f) => REVOKED_METADATA_FIELDS[f] ?? f).join(", ");
+}
 
 export const PUBLICATION_STATE_TEXT: Record<PublicationState, string> = {
   pending: "Chờ công bố",

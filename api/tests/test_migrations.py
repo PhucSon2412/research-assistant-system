@@ -44,7 +44,7 @@ EXPECTED_TABLES = {
     "reference_citation_links",
     "review_requests",
     "access_rights",
-    "common_publications", "deletion_tombstones",
+    "common_publications", "deletion_tombstones", "revocation_metadata_retentions",
 }
 
 
@@ -305,6 +305,75 @@ def test_0022_upgrades_m6b1_database_keeps_pending_and_listed_then_gates_publica
     eng.dispose()
     with pytest.raises(Exception, match="published or revoked common copies exist"):
         command.downgrade(alembic_config(empty_db_url), "0021")
+
+
+def test_0023_removes_metadata_of_copies_already_purged_under_0022(empty_db_url: str) -> None:
+    from app.identity.passwords import hash_password
+
+    upgrade(empty_db_url, "0022")
+    eng = create_engine(empty_db_url)
+    verifier = hash_password("synthetic-password-long")
+    h = "d" * 64
+    with eng.begin() as conn:
+        owner = conn.scalar(text("INSERT INTO users(email,password_verifier) VALUES('m6d@example.org',:p) RETURNING id"),
+                            {"p": verifier})
+        admin = conn.scalar(text("INSERT INTO users(email,password_verifier,role) VALUES('adm6d@example.org',:p,"
+                                 "'admin') RETURNING id"), {"p": verifier})
+        item = conn.scalar(text("INSERT INTO library_items(visibility,owner_user_id,title) VALUES('private',:o,"
+                                "'Private title') RETURNING id"), {"o": owner})
+        version = conn.scalar(text("INSERT INTO paper_versions(item_id,source_url) VALUES(:i,'https://p.test/own')"
+                                   " RETURNING id"), {"i": item})
+        source = conn.scalar(text("INSERT INTO source_files(item_id,version_id,storage_key,verified_mime,byte_size,"
+                                  "checksum_sha256,original_filename) VALUES(:i,:v,'private-key','text/markdown',100,"
+                                  ":h,'own.md') RETURNING id"), {"i": item, "v": version, "h": h})
+        rr = conn.scalar(text("""INSERT INTO review_requests(item_id,version_id,source_file_id,requester_user_id,status,
+            file_checksum_sha256,rights_epoch_at_submit,notice_version,declared_source,declared_rights,submitted_at)
+            VALUES(:i,:v,:f,:o,'open',:h,0,'n','src','rights',now()) RETURNING id"""),
+                         {"i": item, "v": version, "f": source, "o": owner, "h": h})
+        copy = conn.scalar(text("INSERT INTO library_items(visibility,publication_state,title)"
+                                " VALUES('common','pending','Copy title') RETURNING id"))
+        cv = conn.scalar(text("INSERT INTO paper_versions(item_id,source_url) VALUES(:i,'https://c.test/src')"
+                              " RETURNING id"), {"i": copy})
+        cf = conn.scalar(text("INSERT INTO source_files(item_id,version_id,storage_key,verified_mime,byte_size,"
+                              "checksum_sha256,original_filename) VALUES(:i,:v,'copy-key','text/markdown',100,:h,"
+                              "'own.md') RETURNING id"), {"i": copy, "v": cv, "h": h})
+        rights = conn.scalar(text("""INSERT INTO access_rights(item_id,version_id,source_file_id,file_checksum_sha256,
+            origin_kind,origin_review_request_id,verified_source,verified_source_url,license_url,evidence_note,
+            checked_on,reviewer_user_id,recorded_at,scope_audience,permits_original_download,permits_fulltext_search,
+            permits_external_processing,scope_conditions,rights_epoch_at_grant) VALUES(:i,:v,:f,:h,'review_request',
+            :r,'Admin source','https://c.test/src','https://l.test/x','Evidence note',CURRENT_DATE,:a,now(),
+            'instance_users',true,false,false,'Conditions',0) RETURNING id"""),
+                             {"i": copy, "v": cv, "f": cf, "h": h, "r": rr, "a": admin})
+        conn.execute(text("UPDATE review_requests SET status='approved', closed_at=now(), closed_by_user_id=:a,"
+                          " close_reason_code='approved_by_admin' WHERE id=:r"), {"a": admin, "r": rr})
+    with eng.begin() as conn:  # revoked and purged under 0022, which left the metadata in place
+        conn.execute(text("UPDATE library_items SET publication_state='revoked', rights_epoch=1 WHERE id=:i"),
+                     {"i": copy})
+        conn.execute(text("UPDATE access_rights SET revoked_at=now(), revoked_by_user_id=:a,"
+                          " revocation_reason_code='other', rights_epoch_at_revoke=1 WHERE id=:r"),
+                     {"a": admin, "r": rights})
+        conn.execute(text("""INSERT INTO deletion_tombstones(target_kind,item_id,reason_code,prior_publication_state,
+            rights_epoch,recorded_at,recorded_by_user_id,purge_due_at,purged_at,object_outcome)
+            VALUES('common_copy',:i,'other','pending',1,now(),:a,now()+interval '1 day',now(),'deleted')"""),
+                     {"i": copy, "a": admin})
+    upgrade(empty_db_url)
+    with eng.connect() as conn:
+        left = conn.execute(text("""SELECT i.title, v.source_url, f.original_filename, r.verified_source,
+            r.verified_source_url, r.license_url, r.evidence_note, r.scope_conditions
+            FROM library_items i JOIN paper_versions v ON v.item_id=i.id JOIN source_files f ON f.item_id=i.id
+            JOIN access_rights r ON r.item_id=i.id WHERE i.id=:i"""), {"i": copy}).one()
+        assert set(left) == {None}
+        assert conn.scalar(text("SELECT metadata_scrubbed_at IS NOT NULL FROM access_rights WHERE id=:r"),
+                           {"r": rights})
+        assert conn.scalar(text("SELECT cardinality(scrubbed_fields) FROM deletion_tombstones")) == 7
+        # The private item, version and file keep everything.
+        own = conn.execute(text("""SELECT i.title, v.source_url, f.original_filename FROM library_items i
+            JOIN paper_versions v ON v.item_id=i.id JOIN source_files f ON f.item_id=i.id WHERE i.id=:i"""),
+                           {"i": item}).one()
+        assert tuple(own) == ("Private title", "https://p.test/own", "own.md")
+    eng.dispose()
+    with pytest.raises(Exception, match="removed metadata or retention records exist"):
+        command.downgrade(alembic_config(empty_db_url), "0022")
 
 
 def test_collection_membership_foreign_keys_restrict(migrated_db_url: str) -> None:

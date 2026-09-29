@@ -1,14 +1,19 @@
-"""Export or replay the revocation tombstone journal (M6b-2a restore contract).
+"""Export or replay the revocation tombstone journal: a MANUAL recovery step (M6b-2a).
+
+Nothing enforces it: a database restored from a backup older than a
+revocation serves that copy again until ``apply`` runs, and no startup gate
+refuses traffic before then. Follow the order in docs/dev-setup.md.
 
 ``export --out FILE`` writes one JSON object per tombstone: IDs, object key,
-reason code, epoch and times; never titles, text, evidence or bytes. Keep the
-file outside the database backup it is meant to correct.
+reason code, epoch, times and any per-field retention basis; never titles,
+text, evidence or bytes. Keep the file outside the database backup it is meant
+to correct; there is no scheduled export yet.
 
 ``apply --in FILE`` runs against a database restored from a backup, after
 ``alembic upgrade head`` and **before** the API/web serve traffic: every
 tombstone missing from the restored database is re-recorded and its copy is
 revoked again (epoch bump, rights and publication revoked, jobs cancelled),
-then the cleanup task removes the object and memberships. Safe to repeat.
+then the cleanup task removes the object, memberships and metadata. Safe to repeat.
 """
 
 from __future__ import annotations

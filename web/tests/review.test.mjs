@@ -4,7 +4,7 @@ import test from "node:test";
 import { loadProxyConfig, proxyRequest } from "../lib/proxy.ts";
 import {
   COMMON_METADATA_ONLY_NOTE, EMPTY_APPROVE_FORM, PUBLICATION_STATE_TEXT, REVOCATION_REASONS, closeReasonText,
-  fileChoiceLabel, makeApproveBody, makePublishBody, makeReviewBody, makeRevokeBody, reviewDownloadHref,
+  fieldList, fileChoiceLabel, makeApproveBody, makePublishBody, makeReviewBody, makeRevokeBody, reviewDownloadHref,
 } from "../lib/review.ts";
 import { streamFromApi } from "../lib/stream.ts";
 
@@ -158,4 +158,9 @@ test("publish and revoke bodies need the unticked confirmation; revoke sends a c
   // "Listed" is metadata only; the page must never read as full text being available.
   assert.match(PUBLICATION_STATE_TEXT.listed, /toàn văn chưa khả dụng/);
   assert.match(COMMON_METADATA_ONLY_NOTE, /^Toàn văn chưa khả dụng/);
+  // The page's revoke body never carries a retention basis: default is removal.
+  assert.equal("retain" in makeRevokeBody(true, "other"), false);
+  assert.equal(fieldList(["title", "evidence_note"]), "tiêu đề, ghi chú bằng chứng");
+  assert.equal(fieldList([]), "không");
+  assert.equal(fieldList(null), "không");
 });

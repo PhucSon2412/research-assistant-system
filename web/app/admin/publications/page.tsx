@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, describeError } from "../../../lib/api";
 import {
-  OBJECT_OUTCOME_TEXT, PUBLICATION_STATE_TEXT, REVOCATION_REASONS, makePublishBody, makeRevokeBody,
+  OBJECT_OUTCOME_TEXT, PUBLICATION_STATE_TEXT, REVOCATION_REASONS, fieldList, makePublishBody, makeRevokeBody,
   type CommonCopy, type PublicationState,
 } from "../../../lib/review";
 import { ErrorText, Shell, useSession } from "../../components/session";
@@ -86,7 +86,9 @@ function RevokeForm({ copy, onDone }: { copy: CommonCopy; onDone: () => void }) 
       <label>
         <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />{" "}
         Tôi xác nhận {pending ? "hủy bản chờ này" : "thu hồi bản đã công bố này"}. Thao tác là cuối cùng: từ lúc
-        commit, không trang nào hiện bản này; object chung được dọn trong hạn cleanup. Bản riêng của User không đổi.
+        commit, không trang nào hiện bản này. Trong hạn cleanup, hệ thống xóa object chung và metadata (tiêu đề,
+        URL nguồn, tên file, nguồn/giấy phép/bằng chứng/điều kiện); trang này không giữ lại trường nào. Bản riêng
+        của User không đổi.
       </label>{" "}
       <button type="submit" disabled={!body}>{pending ? "Hủy bản chờ" : "Thu hồi"}</button>
     </form>
@@ -126,7 +128,7 @@ export default function CommonCopiesPage() {
       {data && <p>Tổng: {data.total}</p>}
       {data && data.items.length === 0 && <p>Không có bản nào.</p>}
       {data && data.items.map((p) => <section key={p.id} id={p.id} style={{ borderTop: "1px solid #ddd" }}>
-        <h2>{p.title ?? p.id}</h2>
+        <h2>{p.title ?? (p.rights.metadata_removed_at ? `(metadata đã xóa) ${p.id}` : p.id)}</h2>
         <p>{PUBLICATION_STATE_TEXT[p.publication_state]} · tạo {fmt(p.created_at)} · từ{" "}
           <Link href={`/admin/reviews/${encodeURIComponent(p.rights.origin_review_request_id)}`}>yêu cầu duyệt</Link>
           {p.publication_state === "listed" && <> · <Link href={`/items/${p.id}`}>trang thư viện</Link></>}</p>
@@ -134,7 +136,7 @@ export default function CommonCopiesPage() {
         <ul>
           <li>File: {p.file.filename ?? "(không tên)"} · {p.file.verified_mime} · {p.file.byte_size} byte ·
             SHA-256 <code>{p.file.checksum_sha256}</code></li>
-          <li>Nguồn đã kiểm: <span style={{ whiteSpace: "pre-wrap" }}>{p.rights.verified_source}</span>
+          <li>Nguồn đã kiểm: <span style={{ whiteSpace: "pre-wrap" }}>{p.rights.verified_source ?? "(đã xóa)"}</span>
             {p.rights.verified_source_url && ` · ${p.rights.verified_source_url}`}</li>
           {p.rights.license_url && <li>Giấy phép: {p.rights.license_url}</li>}
           {p.rights.evidence_note && <li>Bằng chứng: <span style={{ whiteSpace: "pre-wrap" }}>{p.rights.evidence_note}</span></li>}
@@ -154,6 +156,10 @@ export default function CommonCopiesPage() {
               : `chưa xong, hạn ${fmt(p.tombstone.purge_due_at)}, ${p.tombstone.cleanup_attempts} lần thử`}
             {p.tombstone.last_cleanup_error && ` · lỗi gần nhất: ${p.tombstone.last_cleanup_error}`}
             {p.tombstone.overdue && <strong> · QUÁ HẠN</strong>}</li>}
+          {p.tombstone?.purged_at && <li>Metadata đã xóa: {fieldList(p.tombstone.removed_fields)} · giữ theo căn
+            cứ: {fieldList(p.tombstone.retained_fields)}</li>}
+          {p.retention_bases.map((b) => <li key={b.field}>Căn cứ giữ {fieldList([b.field])}: {b.policy_source} ·
+            phạm vi {b.scope} · lý do {b.reason} · xác nhận {b.confirmed_by_email} {fmt(b.recorded_at)}</li>)}
         </ul>
         {p.publication_state === "pending" && <PublishForm copy={p} onDone={load} />}
         {p.publication_state !== "revoked" && <RevokeForm copy={p} onDone={load} />}

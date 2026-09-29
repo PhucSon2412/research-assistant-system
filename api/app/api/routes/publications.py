@@ -9,7 +9,9 @@ normal library routes and nothing else: ``content_status`` stays
 - ``/admin/pending-publications``: read-only view of pending copies (M6b-1).
 - ``/admin/common-copies``: every reviewed copy by state, with the recorded
   rights, publication record and tombstone/cleanup status; ``publish``
-  (pending -> listed) and ``revoke`` (pending or listed -> revoked).
+  (pending -> listed) and ``revoke`` (pending or listed -> revoked). Revoke
+  may name, per metadata field, a specific basis to keep it after cleanup;
+  every field without one is removed at cleanup.
 
 No route here returns file bytes or object keys, creates a job or index, or
 calls a provider.
@@ -19,10 +21,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -30,9 +32,10 @@ from app.api.deps import get_db, get_now, require_admin, require_trusted_origin
 from app.api.errors import ApiError
 from app.authz import Principal, pending_publication_clause, review_copy_admin_clause
 from app.config import Settings, get_settings
-from app.models import AccessRights, CommonPublication, DeletionTombstone, LibraryItem, PaperVersion, SourceFile, User
-from app.models.enums import PublicationState, RevocationReason
-from app.publication import live_duplicate, publish, revoke
+from app.models import (AccessRights, CommonPublication, DeletionTombstone, LibraryItem, PaperVersion,
+                        RevocationMetadataRetention, SourceFile, User)
+from app.models.enums import PublicationState, RevocationReason, RevokedMetadataField
+from app.publication import RetentionBasis, live_duplicate, publish, revoke
 from app.storage import OriginalStorage, get_storage
 
 router = APIRouter(prefix="/admin/pending-publications", tags=["review"])
@@ -42,8 +45,9 @@ PENDING_NOTE = ("Bản chung đã có quyền do Admin ghi nhận nhưng chưa c
                 "file, kết quả tìm kiếm, chunk hay RAG của bản này. Chưa có index; công bố là bước riêng.")
 LISTED_NOTE = ("Đã công bố metadata: mọi tài khoản thấy tiêu đề và version trong thư viện. Toàn văn chưa khả dụng: "
                "chưa có file gốc, tìm kiếm toàn văn, chunk hay hỏi đáp cho bản này, kể cả khi quyền đã ghi cho phép.")
-REVOKED_NOTE = ("Đã thu hồi: không route nào phục vụ bản này từ lúc thu hồi commit. Object chung và dữ liệu phát "
-                "sinh được dọn theo tombstone; bản riêng của User không đổi.")
+REVOKED_NOTE = ("Đã thu hồi: không route nào phục vụ bản này từ lúc thu hồi commit. Cleanup xóa object chung, dữ "
+                "liệu phát sinh và metadata (tiêu đề, URL nguồn, tên file, nguồn/giấy phép/bằng chứng/điều kiện) trừ "
+                "trường có căn cứ giữ riêng; bản riêng của User không đổi.")
 NOTES = {PublicationState.PENDING.value: PENDING_NOTE, PublicationState.LISTED.value: LISTED_NOTE,
          PublicationState.REVOKED.value: REVOKED_NOTE}
 
@@ -55,10 +59,30 @@ class PublishInput(BaseModel):
     file_checksum_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
+def _basis_text(value: str) -> str:
+    value = value.strip()
+    if not value:
+        raise ValueError("empty")
+    return value
+
+
+class RetentionInput(BaseModel):
+    """A specific basis to keep one field of this copy after cleanup (never the value)."""
+
+    model_config = ConfigDict(extra="forbid")
+    field: RevokedMetadataField
+    policy_source: Annotated[str, Field(max_length=500), AfterValidator(_basis_text)]
+    scope: Annotated[str, Field(max_length=500), AfterValidator(_basis_text)]
+    reason: Annotated[str, Field(max_length=1000), AfterValidator(_basis_text)]
+
+
 class RevokeInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     confirm_revoke: Literal[True]
     reason_code: RevocationReason
+    # Default: nothing kept. Each entry is confirmed by the revoking Admin.
+    retain: list[RetentionInput] = Field(default_factory=list, max_length=len(RevokedMetadataField))
+    confirm_retention_basis: bool = False
 
 
 def _storage(settings: Settings = Depends(get_settings)) -> OriginalStorage:
@@ -111,6 +135,7 @@ def _out(item: LibraryItem, version: PaperVersion, source: SourceFile, rights: A
                       "external_processing": rights.permits_external_processing,
                       "conditions": rights.scope_conditions},
             "revoked_at": _iso(rights.revoked_at), "revocation_reason_code": rights.revocation_reason_code,
+            "metadata_removed_at": _iso(rights.metadata_scrubbed_at),
         },
     }
 
@@ -133,7 +158,15 @@ def _full_out(db: Session, row: tuple, now: datetime) -> dict:
         "purge_due_at": tombstone.purge_due_at.isoformat(), "purged_at": _iso(tombstone.purged_at),
         "object_outcome": tombstone.object_outcome, "cleanup_attempts": tombstone.cleanup_attempts,
         "last_cleanup_error": tombstone.last_cleanup_error,
-        "overdue": tombstone.purged_at is None and now > tombstone.purge_due_at}
+        "overdue": tombstone.purged_at is None and now > tombstone.purge_due_at,
+        "removed_fields": tombstone.scrubbed_fields, "retained_fields": tombstone.retained_fields}
+    bases = db.execute(select(RevocationMetadataRetention, User.email)
+                       .join(User, User.id == RevocationMetadataRetention.confirmed_by_user_id)
+                       .where(RevocationMetadataRetention.item_id == item.id)
+                       .order_by(RevocationMetadataRetention.field)).all()
+    out["retention_bases"] = [{"field": b.field, "policy_source": b.policy_source, "scope": b.scope,
+                               "reason": b.reason, "confirmed_by_email": email,
+                               "recorded_at": b.recorded_at.isoformat()} for b, email in bases]
     return out
 
 
@@ -209,5 +242,12 @@ def revoke_copy(
     now: datetime = Depends(get_now),
     settings: Settings = Depends(get_settings),
 ) -> dict:
-    done = revoke(db, admin, _parse_id(item_id), body.reason_code, now, settings.retention.deleted_cleanup_deadline)
+    fields = [r.field for r in body.retain]
+    if len(set(fields)) != len(fields):
+        raise ApiError(422, "retention_field_repeated")
+    if body.retain and not body.confirm_retention_basis:
+        raise ApiError(422, "retention_confirmation_required")
+    retain = tuple(RetentionBasis(r.field, r.policy_source, r.scope, r.reason) for r in body.retain)
+    done = revoke(db, admin, _parse_id(item_id), body.reason_code, now, settings.retention.deleted_cleanup_deadline,
+                  retain)
     return {"item": _copy_out(db, admin, done.item.id, now), "cancelled_jobs": done.cancelled_jobs}

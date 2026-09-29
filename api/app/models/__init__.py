@@ -11,7 +11,7 @@ from app.models.index import EmbeddingBudgetDay, EmbeddingCall, EmbeddingUserBud
 from app.models.ingest import Chunk, IngestionJob, IngestStepAttempt, MetadataCandidate, PdfPage, ReferenceEntry, Section
 from app.models.library import LibraryItem, PaperVersion, SourceFile
 from app.models.review import ReviewRequest
-from app.models.rights import AccessRights, CommonPublication, DeletionTombstone
+from app.models.rights import AccessRights, CommonPublication, DeletionTombstone, RevocationMetadataRetention
 from app.models.search import RagRequestDay, SearchRequestDay, SearchUsage
 from app.models.upload import ProcessingAcknowledgement, UploadIntent
 
@@ -37,7 +37,7 @@ __all__ = [
     "PaperVersion",
     "PasswordResetToken",
     "SourceFile",
-    "ReviewRequest",
+    "ReviewRequest", "RevocationMetadataRetention",
     "RagRequestDay", "SearchRequestDay", "SearchUsage",
     "User",
     "UserSession",

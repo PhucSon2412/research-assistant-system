@@ -128,6 +128,23 @@ class RevocationReason(StrEnum):
     OTHER = "other"
 
 
+class RevokedMetadataField(StrEnum):
+    """Metadata of a revoked common copy that cleanup removes unless a per-field
+    retention basis names it (``revocation_metadata_retentions``).
+
+    ``source_url`` covers the common version's ``source_url``/``source_identifier``/
+    ``version_label`` and the rights' ``verified_source_url``.
+    """
+
+    TITLE = "title"
+    SOURCE_URL = "source_url"
+    ORIGINAL_FILENAME = "original_filename"
+    VERIFIED_SOURCE = "verified_source"
+    LICENSE_URL = "license_url"
+    EVIDENCE_NOTE = "evidence_note"
+    SCOPE_CONDITIONS = "scope_conditions"
+
+
 class TombstoneKind(StrEnum):
     COMMON_COPY = "common_copy"
 

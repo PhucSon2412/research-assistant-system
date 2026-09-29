@@ -206,11 +206,22 @@ def main() -> None:
                 assert keys[copy] not in present and keys[dup] not in present
                 for private in (a_item, b_item):
                     assert hashlib.sha256(storage.open(keys[private["id"]]).read()).hexdigest() == private["sha256"]
+                with engine.connect() as conn:
+                    left = conn.execute(text("""SELECT count(*) FROM library_items i
+                        JOIN source_files f ON f.item_id=i.id JOIN access_rights r ON r.item_id=i.id
+                        WHERE i.visibility='common' AND (i.title IS NOT NULL OR f.original_filename IS NOT NULL
+                          OR r.verified_source IS NOT NULL OR r.evidence_note IS NOT NULL)""")).scalar_one()
+                    own_name = conn.scalar(text("SELECT original_filename FROM source_files WHERE item_id=:i"),
+                                           {"i": uuid.UUID(a_item["id"])})
+                assert left == 0 and own_name
                 page_admin.get_by_role("button", name="Đã thu hồi").click()
-                done = page_admin.locator("section", has=page_admin.get_by_role("heading", name=TITLE))
+                done = page_admin.locator("section", has=page_admin.get_by_role(
+                    "heading", name=f"(metadata đã xóa) {copy}"))
                 expect(done.get_by_text(re.compile("đã xóa object chung"))).to_be_visible()
-                ok("Cleanup: both common objects deleted, rerun no-op, A/B private objects hash intact; "
-                   "revoked tab shows cleanup done")
+                expect(done.get_by_text(re.compile("^Metadata đã xóa: tiêu đề"))).to_be_visible()
+                expect(page_admin.get_by_text(TITLE)).to_have_count(0)
+                ok("Cleanup: both common objects and their metadata removed (title, file name, source, evidence), "
+                   "rerun no-op, A/B private objects and A's file name intact; revoked tab shows it")
 
                 STAGE = "A unchanged"
                 assert get_json(page_a, f"/api/library/items/{a_item['id']}") == a_before

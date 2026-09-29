@@ -3,14 +3,14 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import (BigInteger, Boolean, CheckConstraint, Date, DateTime, ForeignKey, ForeignKeyConstraint,
-                        Index, Integer, Text, UniqueConstraint, text)
+from sqlalchemy import (ARRAY, BigInteger, Boolean, CheckConstraint, Date, DateTime, ForeignKey,
+                        ForeignKeyConstraint, Index, Integer, Text, UniqueConstraint, text)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
-from app.models.enums import (CleanupObjectOutcome, PublicationState, RevocationReason, RightsAudience, RightsOrigin,
-                              TombstoneKind, sql_in)
+from app.models.enums import (CleanupObjectOutcome, PublicationState, RevocationReason, RevokedMetadataField,
+                              RightsAudience, RightsOrigin, TombstoneKind, sql_in)
 
 RIGHTS_TEXT_MAX_CHARS = 2000
 RIGHTS_URL_MAX_CHARS = 2048
@@ -34,6 +34,9 @@ class AccessRights(Base):
     stays as the Admin wrote it. Deferred triggers require the origin request
     to be ``approved`` at commit, the common file to use its own object key
     rather than the private one, and revoked rights to have a revoked copy.
+    After revocation, cleanup may set ``verified_source``,
+    ``verified_source_url``, ``license_url``, ``evidence_note`` and
+    ``scope_conditions`` to NULL once (``metadata_scrubbed_at``, 0023).
     """
 
     __tablename__ = "access_rights"
@@ -62,7 +65,11 @@ class AccessRights(Base):
         CheckConstraint(_url_check("license_url"), name="license_url"),
         CheckConstraint("evidence_note IS NULL OR length(btrim(evidence_note))"
                         f" BETWEEN 1 AND {RIGHTS_TEXT_MAX_CHARS}", name="evidence_note_length"),
-        CheckConstraint("license_url IS NOT NULL OR evidence_note IS NOT NULL", name="evidence_required"),
+        CheckConstraint("license_url IS NOT NULL OR evidence_note IS NOT NULL"
+                        " OR metadata_scrubbed_at IS NOT NULL", name="evidence_required"),
+        CheckConstraint("verified_source IS NOT NULL OR metadata_scrubbed_at IS NOT NULL",
+                        name="verified_source_present"),
+        CheckConstraint("metadata_scrubbed_at IS NULL OR revoked_at IS NOT NULL", name="scrub_after_revoke"),
         # One day of slack for an Admin whose local date is ahead of UTC.
         CheckConstraint("checked_on <= (recorded_at AT TIME ZONE 'UTC')::date + 1", name="checked_not_future"),
         CheckConstraint(f"scope_audience IN ({sql_in(RightsAudience)})", name="scope_audience_valid"),
@@ -95,7 +102,7 @@ class AccessRights(Base):
     file_checksum_sha256: Mapped[str] = mapped_column(Text)
     origin_kind: Mapped[str] = mapped_column(Text)
     origin_review_request_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
-    verified_source: Mapped[str] = mapped_column(Text)
+    verified_source: Mapped[str | None] = mapped_column(Text)
     verified_source_url: Mapped[str | None] = mapped_column(Text)
     license_url: Mapped[str | None] = mapped_column(Text)
     evidence_note: Mapped[str | None] = mapped_column(Text)
@@ -116,6 +123,7 @@ class AccessRights(Base):
                                        name="fk_access_rights_revoked_by_user_id_users"))
     revocation_reason_code: Mapped[str | None] = mapped_column(Text)
     rights_epoch_at_revoke: Mapped[int | None] = mapped_column(BigInteger)
+    metadata_scrubbed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class CommonPublication(Base):
@@ -162,8 +170,10 @@ class DeletionTombstone(Base):
     Written in the revocation transaction, whose commit is ``t_rev``. No
     foreign keys: it outlives the rows it names and can be replayed into a
     restored snapshot that predates them (``app.cli.tombstones``). Never
-    deleted; only the cleanup columns change (DB trigger). It carries IDs,
-    the object key, codes and times only: no title, text, evidence or bytes.
+    deleted; only the cleanup columns change (DB trigger), and ``purged_at``
+    cannot be set while a ``RevokedMetadataField`` of the copy is still
+    present without a retention basis (0023). It carries IDs, the object key,
+    codes, field names and times only: no title, text, evidence or bytes.
     """
 
     __tablename__ = "deletion_tombstones"
@@ -182,6 +192,10 @@ class DeletionTombstone(Base):
         CheckConstraint("last_cleanup_error IS NULL OR last_cleanup_error ~ '^[a-z_]{1,64}$'",
                         name="error_is_code"),
         Index("ix_deletion_tombstones_unpurged", "purge_due_at", postgresql_where=text("purged_at IS NULL")),
+        CheckConstraint("(purged_at IS NULL) = (scrubbed_fields IS NULL)"
+                        " AND (purged_at IS NULL) = (retained_fields IS NULL)", name="field_lists"),
+        # Target for retention records: a basis names the tombstone and its item.
+        UniqueConstraint("id", "item_id", name="uq_deletion_tombstones_id_item_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True,
@@ -203,3 +217,40 @@ class DeletionTombstone(Base):
     cleanup_attempts: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     last_cleanup_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_cleanup_error: Mapped[str | None] = mapped_column(Text)
+    # Field names only, set with purged_at: what cleanup removed and what a basis kept.
+    scrubbed_fields: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    retained_fields: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+
+
+class RevocationMetadataRetention(Base):
+    """A specific basis to keep one metadata field of one revoked common copy.
+
+    Without such a row cleanup removes the field; having once had the right to
+    publish is not a basis. It records the policy source, its scope, the
+    confirming Admin and the reason, never the kept value itself. Append-only,
+    and only insertable before the tombstone is purged (DB trigger).
+    """
+
+    __tablename__ = "revocation_metadata_retentions"
+    __table_args__ = (
+        ForeignKeyConstraint(["tombstone_id", "item_id"], ["deletion_tombstones.id", "deletion_tombstones.item_id"],
+                             name="fk_revocation_metadata_retentions_tombstone", ondelete="RESTRICT"),
+        UniqueConstraint("tombstone_id", "field", name="uq_revocation_metadata_retentions_tombstone_id_field"),
+        CheckConstraint(f"field IN ({sql_in(RevokedMetadataField)})", name="field_valid"),
+        CheckConstraint("length(btrim(policy_source)) BETWEEN 1 AND 500", name="policy_source_length"),
+        CheckConstraint("length(btrim(scope)) BETWEEN 1 AND 500", name="scope_length"),
+        CheckConstraint("length(btrim(reason)) BETWEEN 1 AND 1000", name="reason_length"),
+        Index("ix_revocation_metadata_retentions_item_id", "item_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True,
+                                          server_default=text("gen_random_uuid()"))
+    tombstone_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    field: Mapped[str] = mapped_column(Text)
+    policy_source: Mapped[str] = mapped_column(Text)
+    scope: Mapped[str] = mapped_column(Text)
+    reason: Mapped[str] = mapped_column(Text)
+    confirmed_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),
+                                                            ForeignKey("users.id", ondelete="RESTRICT"))
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
