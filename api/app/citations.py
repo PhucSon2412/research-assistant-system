@@ -4,6 +4,8 @@ A link means only "the citing paper lists this work in its bibliography"; it
 is never evidence and never enters a keyword/vector index or provider payload.
 The matcher links only when a raw citation carries exactly one arXiv ID in an
 explicit arXiv context (``arXiv:``, arxiv.org URL, arXiv DOI, ``abs/`` path).
+A context must start a token, and a URL host must be exactly an arXiv host;
+look-alikes ("fake-arXiv:", "evil-arxiv.org/abs/") only yield a bare ID.
 Bare numbers, several IDs, malformed IDs and conflicting versions stay
 unlinked; titles are never used.
 
@@ -32,20 +34,31 @@ from app.models.citation import ReferenceCitationLink
 from app.models.discovery import DiscoveryDeletedRecord, DiscoveryPaper
 from app.models.ingest import ReferenceEntry
 
-MATCHER_VERSION = "arxiv-exact-v1"
+MATCHER_VERSION = "arxiv-exact-v2"
 METHOD = "arxiv_id_exact"
 LINK_LOCK = 0x5B1C17E
 EXACT = ("linked", "no_discovery_record", "discovery_record_deleted")
 
+# A marker must begin a token: start of text, whitespace or opening/separating
+# punctuation. ``\b`` is not enough, since "fake-arXiv:" and "evil-arxiv.org"
+# have a word boundary after "-" (v1 bug).
+START = r"(?<![^\s(\[{<,;\"'\u201c\u2018\u00ab])"
+# A URL may also follow "URL:"; its host is verified exactly, so ":" is safe there.
+URL_START = r"(?<![^\s(\[{<,;:\"'\u201c\u2018\u00ab])"
+ARXIV_HOSTS = frozenset({"arxiv.org", "www.arxiv.org", "export.arxiv.org"})
 # Explicit arXiv contexts. ``abs/`` covers DBLP/Semantic Scholar style
-# ("CoRR abs/1810.04805", "ArXiv, abs/2005.14165").
-MARKER = re.compile(r"""
-    (?P<arxiv_prefix>\barxiv[ \t]*:[ \t]*(?:\r?\n[ \t]*)?)
-  | (?P<arxiv_url>\barxiv\.org/(?:abs|pdf)/)
-  | (?P<arxiv_doi>\b10\.48550/arxiv\.)
-  | (?P<abs_path>\b(?:corr|arxiv)[ \t]*,?[ \t]*abs/)
+# ("CoRR abs/1810.04805", "ArXiv, abs/2005.14165"). URL hosts are checked
+# against ARXIV_HOSTS after matching; DOIs may carry a doi.org resolver.
+MARKER = re.compile(rf"""
+    (?P<arxiv_prefix>{START}arxiv[ \t]*:[ \t]*(?:\r?\n[ \t]*)?)
+  | (?P<arxiv_url>{URL_START}(?:https?://)?(?P<host>[a-z0-9-]+(?:\.[a-z0-9-]+)+)/(?:abs|pdf)/)
+  | (?P<arxiv_doi>{START}(?:doi[ \t]*:[ \t]*|(?:https?://)?(?:dx\.)?doi\.org/)?10\.48550/arxiv\.)
+  | (?P<abs_path>{START}(?:corr|arxiv)[ \t]*,?[ \t]*abs/)
 """, re.I | re.X)
-TOKEN = re.compile(r"[^\s,;()\[\]{}<>\"']+")
+# Anything that merely looks like one of those contexts. An ID after a
+# look-alike that is not a trusted marker counts as a bare identifier.
+LOOKALIKE = re.compile(r"arxiv[ \t]*:[ \t]*|(?:abs|pdf)/|10\.48550/arxiv\.", re.I)
+TOKEN = re.compile(r"[^\s,;()\[\]{}<>\"'\u201c\u201d\u2018\u2019\u00ab\u00bb]+")
 NEW_ID = re.compile(r"(?P<yymm>\d{4})\.(?P<num>\d{4,5})(?P<ver>v[1-9]\d*)?")
 OLD_ID = re.compile(r"(?P<archive>[a-z]+(?:-[a-z]+)?)(?:\.[A-Z]{2})?/(?P<yymm>\d{4})(?P<num>\d{3})(?P<ver>v[1-9]\d*)?")
 BARE_NEW = re.compile(r"(?<![\w./:-])\d{4}\.\d{4,5}(?:v\d+)?(?![\w/])")
@@ -97,8 +110,12 @@ def parse_citation(raw: str) -> ArxivParse:
     found: list[tuple[str, str | None, str, int, int]] = []
     invalid = False
     covered: list[tuple[int, int]] = []
+    trusted_ends: set[int] = set()
     for marker in MARKER.finditer(raw):
-        form = marker.lastgroup
+        form = next(name for name in ("arxiv_prefix", "arxiv_url", "arxiv_doi", "abs_path") if marker.group(name))
+        if form == "arxiv_url" and marker.group("host").lower() not in ARXIV_HOSTS:
+            continue  # e.g. evil-arxiv.org, arxiv.org.evil.com: handled as a look-alike below
+        trusted_ends.add(marker.end())
         token_match = TOKEN.match(raw, marker.end())
         if token_match is None:
             invalid = invalid or form != "arxiv_prefix"
@@ -120,6 +137,13 @@ def parse_citation(raw: str) -> ArxivParse:
         if any(a <= match.start() < b for a, b in covered):
             continue
         parsed = normalize_arxiv_id(match.group())
+        if parsed is not None:
+            bare.append(parsed)
+    for lookalike in LOOKALIKE.finditer(raw):
+        if lookalike.end() in trusted_ends:
+            continue
+        token_match = TOKEN.match(raw, lookalike.end())
+        parsed = normalize_arxiv_id(_clean(token_match.group(), "arxiv_url")) if token_match else None
         if parsed is not None:
             bare.append(parsed)
     if invalid:

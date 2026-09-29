@@ -175,6 +175,76 @@ def test_parse_exact_arxiv_id(raw, status, arxiv_id, version, form):
         assert normalize_arxiv_id(raw[parsed.start:parsed.end])[0] == arxiv_id
 
 
+# Look-alike contexts: "\b" matches after "-" and ".", so v1 accepted these (review PR #16).
+LOOKALIKES = [
+    "https://evil-arxiv.org/abs/1706.03762",
+    "fake-arXiv:1706.03762",
+    "fake-CoRR abs/1706.03762",
+    "fake.arXiv:1706.03762",
+    "fake/arXiv:1706.03762",
+    "fake-ArXiv, abs/1706.03762",
+    "evil-arxiv.org/pdf/1706.03762v2.pdf",
+    "https://arxiv.org.evil.com/abs/1706.03762",
+    "https://notarxiv.org/abs/1706.03762",
+    "https://arxiv.org@evil.com/abs/1706.03762",
+    "https://x@arxiv.org/abs/1706.03762",
+    "https://arxiv.org:8443/abs/1706.03762",
+    "https://evil.org/?u=https://arxiv.org/abs/1706.03762",
+    "https://evil.org/arxiv.org/abs/1706.03762",
+    "https://openreview.net/pdf/1706.03762",
+    "evil-doi:10.48550/arXiv.1706.03762",
+    "https://evil-doi.org/10.48550/arXiv.1706.03762",
+    "fake-10.48550/arXiv.1706.03762",
+]
+
+
+@pytest.mark.parametrize("raw", LOOKALIKES)
+def test_lookalike_arxiv_contexts_never_match_exactly(raw):
+    parsed = parse_citation(raw)
+    assert parsed.status == "bare_identifier" and parsed.arxiv_id is None, parsed
+
+
+@pytest.mark.parametrize("raw,status,arxiv_id", [
+    # A look-alike carrying a different ID makes a genuine one ambiguous.
+    ("arXiv:1706.03762; mirror https://evil-arxiv.org/abs/1810.04805", "multiple_arxiv_ids", None),
+    ("fake-arXiv:1810.04805 then arXiv:1706.03762", "multiple_arxiv_ids", None),
+    # The same ID repeated in a look-alike adds no second candidate.
+    ("arXiv:1706.03762, mirror https://evil-arxiv.org/abs/1706.03762", "exact", "1706.03762"),
+    # Genuine contexts after explicit separators still match.
+    ("URL:https://arxiv.org/abs/1706.03762", "exact", "1706.03762"),
+    ("(https://www.arxiv.org/pdf/1706.03762v2.pdf)", "exact", "1706.03762"),
+    ("<https://arxiv.org/abs/1706.03762>", "exact", "1706.03762"),
+    ("https://doi.org/10.48550/arXiv.2005.14165", "exact", "2005.14165"),
+    ("https://dx.doi.org/10.48550/arXiv.2005.14165", "exact", "2005.14165"),
+    ("DOI 10.48550/arXiv.2005.14165", "exact", "2005.14165"),
+    ("In: CoRR abs/1810.04805 (2018)", "exact", "1810.04805"),
+    ("Vaswani et al., “arXiv:1706.03762”.", "exact", "1706.03762"),
+    ("«arXiv:1706.03762»", "exact", "1706.03762"),
+])
+def test_genuine_and_mixed_contexts(raw, status, arxiv_id):
+    parsed = parse_citation(raw)
+    assert (parsed.status, parsed.arxiv_id) == (status, arxiv_id), parsed
+
+
+def test_lookalike_references_create_no_exact_edge(upload_api):
+    """End to end: the cited ID exists in discovery, yet no exact edge is created."""
+    api, storage = upload_api
+    a, _, _ = two_users(api)
+    harvest(api.engine, oai_page([("1706.03762", "Look-alike Target", 5, "2026-09-28")]))
+    refs = [(raw, "bare_identifier", None, None, "1706.03762") for raw in LOOKALIKES[:3]]
+    refs.append(("Genuine control. arXiv:1706.03762v5.", "linked", "1706.03762", "v5", "1706.03762"))
+    ids = upload(a, markdown(refs))
+    assert process_job(uuid.UUID(ids["job_id"]), storage=storage) == "awaiting_index"
+    got = refs_of(a, ids["item_id"])
+    assert [(r["citation_link"]["status"], r["citation_link"]["arxiv_id"]) for r in got] == [
+        ("bare_identifier", None)] * 3 + [("linked", "1706.03762")]
+    assert all(r["citation_link"]["target"] is None and r["citation_link"]["method"] is None for r in got[:3])
+    assert api.scalar("SELECT count(*) FROM reference_citation_links WHERE arxiv_id IS NOT NULL") == 1
+    citing = a.get(f"/discovery/papers/{paper_id(api, '1706.03762')}/citing-items").json()
+    assert (citing["total"], citing["items"][0]["linked_references"]) == (1, 1)
+    assert citing["relation"] == "cites"  # a bibliography relation, never content evidence
+
+
 def test_citation_policy_config_and_env(monkeypatch):
     assert CitationPolicy() == CitationPolicy(enabled=True, reconcile_poll_seconds=300,
                                               reconcile_batch_size=500, reconcile_max_batches=20)
