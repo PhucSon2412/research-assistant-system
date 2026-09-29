@@ -31,7 +31,9 @@ export default function ReviewListPage() {
       <h1>Yêu cầu duyệt paper riêng</h1>
       <p>
         Mỗi yêu cầu chỉ cho phép xem tạm đúng version/file User đã gửi, trong lúc yêu cầu còn mở. Yêu cầu đang chờ
-        duyệt <strong>chưa phải là công bố</strong>; bản này chưa có thao tác phê duyệt hay đưa vào kho chung.
+        duyệt <strong>chưa phải là công bố</strong>. Phê duyệt ghi nhận quyền do Admin tự kiểm và tạo một bản chung
+        riêng <strong>chờ công bố</strong> (xem <Link href="/admin/publications">bản chung chờ công bố</Link>);
+        chưa có thao tác công bố.
       </p>
       <div style={{ display: "flex", gap: "0.5rem" }}>
         <button type="button" disabled={status === "open"} onClick={() => setStatus("open")}>Đang mở</button>

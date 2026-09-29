@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (BigInteger, CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Index, Text,
-                        text)
+                        UniqueConstraint, text)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -12,6 +12,7 @@ from app.models.base import Base
 from app.models.enums import ReviewRejectReason, ReviewStatus, sql_in
 
 WITHDRAWN_BY_REQUESTER = "withdrawn_by_requester"
+APPROVED_BY_ADMIN = "approved_by_admin"
 DECLARED_TEXT_MAX_CHARS = 2000
 DECLARED_URL_MAX_CHARS = 2048
 REJECTION_NOTE_MAX_CHARS = 500
@@ -23,6 +24,8 @@ class ReviewRequest(Base):
     While ``open`` it is the only grant letting an Admin read that private
     original (and nothing else of the item). Closing is final (DB trigger);
     the ``declared_*`` fields are the User's own claim, not verified rights.
+    ``approved`` (M6b-1) always comes with one ``AccessRights`` row and a
+    pending common copy, checked at commit by deferred DB triggers.
     """
 
     __tablename__ = "review_requests"
@@ -54,6 +57,9 @@ class ReviewRequest(Base):
                         " AND closed_by_user_id = requester_user_id)", name="withdrawn"),
         CheckConstraint(f"status <> 'rejected' OR close_reason_code IN ({sql_in(ReviewRejectReason)})",
                         name="rejected_reason"),
+        CheckConstraint(f"status <> 'approved' OR close_reason_code = '{APPROVED_BY_ADMIN}'", name="approved"),
+        # Target for access_rights: rights carry the checksum the owner submitted.
+        UniqueConstraint("id", "file_checksum_sha256", name="uq_review_requests_id_file_checksum_sha256"),
         CheckConstraint("rejection_note IS NULL OR (status = 'rejected'"
                         f" AND length(btrim(rejection_note)) BETWEEN 1 AND {REJECTION_NOTE_MAX_CHARS})",
                         name="rejection_note"),

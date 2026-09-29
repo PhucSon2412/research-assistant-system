@@ -124,11 +124,13 @@ class Harness:
         with self.engine.begin() as conn:
             item = conn.scalar(
                 text(
-                    "INSERT INTO library_items (visibility, owner_user_id, title, created_at)"
-                    " VALUES (:v, :o, :t, TIMESTAMPTZ '2024-01-01 00:00:00+00'"
+                    "INSERT INTO library_items (visibility, owner_user_id, publication_state, title, created_at)"
+                    " VALUES (:v, :o, :p, :t, TIMESTAMPTZ '2024-01-01 00:00:00+00'"
                     " + make_interval(secs => :s)) RETURNING id"
                 ),
-                {"v": "private" if owner else "common", "o": owner, "t": title, "s": created_offset_s},
+                # Fixture common items are ``listed``: the pre-M6b-1 metadata behaviour.
+                {"v": "private" if owner else "common", "o": owner, "p": None if owner else "listed",
+                 "t": title, "s": created_offset_s},
             )
             conn.execute(
                 text("INSERT INTO paper_versions (item_id, version_label) VALUES (:i, 'v1')"), {"i": item}

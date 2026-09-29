@@ -335,7 +335,7 @@ def test_rights_epoch_changed_before_provider_blocks_payload(upload_api, monkeyp
 def test_common_without_file_rights_is_not_indexed(upload_api, monkeypatch):
     api, storage = upload_api
     with api.engine.begin() as conn:
-        item = conn.scalar(text("INSERT INTO library_items(visibility, title) VALUES('common','Synthetic common') RETURNING id"))
+        item = conn.scalar(text("INSERT INTO library_items(visibility, publication_state, title) VALUES('common','listed','Synthetic common') RETURNING id"))
         version = conn.scalar(text("INSERT INTO paper_versions(item_id,coverage) VALUES(:i,'complete') RETURNING id"), {"i": item})
         job = conn.scalar(text("INSERT INTO ingestion_jobs(origin,scope_visibility,item_id,version_id,idempotency_key,state,rights_epoch_at_start) VALUES('discovery','common',:i,:v,'common-test','awaiting_index',0) RETURNING id"), {"i": item, "v": version})
         conn.execute(text("INSERT INTO source_files(item_id,version_id,job_id,storage_key,verified_mime,byte_size,checksum_sha256) VALUES(:i,:v,:j,'unused','text/markdown',1,:h)"), {"i": item, "v": version, "j": job, "h": "0" * 64})

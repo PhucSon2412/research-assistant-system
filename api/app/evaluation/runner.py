@@ -257,7 +257,7 @@ def seed(env: Environment, manifest: Manifest, root: Path) -> Seeded:
     for entry in manifest.items:
         if entry.owner == "common":
             with env.engine.begin() as conn:
-                item_id = conn.scalar(text("INSERT INTO library_items (visibility, title) VALUES ('common', :t)"
+                item_id = conn.scalar(text("INSERT INTO library_items (visibility, publication_state, title) VALUES ('common', 'listed', :t)"
                                            " RETURNING id"), {"t": entry.title})
                 conn.execute(text("INSERT INTO paper_versions (item_id, version_label) VALUES (:i, 'v1')"),
                              {"i": item_id})

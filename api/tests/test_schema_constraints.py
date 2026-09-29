@@ -44,8 +44,9 @@ def add_user(conn: Connection, email: str | None = None, role: str = "user") -> 
 def add_item(conn: Connection, owner: uuid.UUID | None) -> uuid.UUID:
     visibility = "private" if owner else "common"
     return conn.scalar(
-        text("INSERT INTO library_items (visibility, owner_user_id) VALUES (:v, :o) RETURNING id"),
-        {"v": visibility, "o": owner},
+        text("INSERT INTO library_items (visibility, owner_user_id, publication_state) VALUES (:v, :o, :p)"
+             " RETURNING id"),
+        {"v": visibility, "o": owner, "p": None if owner else "listed"},
     )
 
 
@@ -133,7 +134,8 @@ def test_private_item_requires_owner_and_common_forbids_one(conn: Connection) ->
         conn, "INSERT INTO library_items (visibility) VALUES ('private')"
     )
     assert "ck_library_items_owner_matches_visibility" in expect_error(
-        conn, "INSERT INTO library_items (visibility, owner_user_id) VALUES ('common', :o)", {"o": owner}
+        conn, "INSERT INTO library_items (visibility, owner_user_id, publication_state) VALUES ('common', :o,"
+        " 'listed')", {"o": owner}
     )
 
 

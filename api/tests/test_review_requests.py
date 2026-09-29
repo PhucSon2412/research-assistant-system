@@ -367,7 +367,7 @@ def _fixture_rows(conn):
                      "h1": "1" * 64, "h2": "2" * 64}
     ids["admin"] = conn.scalar(text("INSERT INTO users(email,password_verifier,role) VALUES('adm-schema@example.org',"
                                     "'$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA','admin') RETURNING id"))
-    ids["common"] = conn.scalar(text("INSERT INTO library_items(visibility,title) VALUES('common','C') RETURNING id"))
+    ids["common"] = conn.scalar(text("INSERT INTO library_items(visibility,publication_state,title) VALUES('common','listed','C') RETURNING id"))
     return ids
 
 

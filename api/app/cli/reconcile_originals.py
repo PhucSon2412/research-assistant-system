@@ -1,8 +1,10 @@
 """Remove crash-left original objects with no SourceFile after a grace period.
 
-Run when no old upload request is still in flight. Objects remain unreachable
-through the application while unreferenced; this is operational cleanup, not
-part of the request success path.
+Run when no old upload request or review approval (M6b-1 common copy) is still
+in flight. Objects remain unreachable through the application while
+unreferenced; this is operational cleanup, not part of the request success
+path. An approval whose commit outcome was unknown leaves its copy here: if
+the commit did land, a SourceFile references the key and it is kept.
 """
 
 from __future__ import annotations

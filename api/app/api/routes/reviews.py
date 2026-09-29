@@ -4,11 +4,14 @@ The owner submits, lists and withdraws their own requests. While a request is
 open, an Admin may read the metadata needed for review and stream the one
 original it names; nothing else of the item (other versions/files, chunks,
 search, RAG, collections) opens, and the normal routes are unchanged. Closing
-(withdraw/reject) commits before any later review read and is final. This
-module creates no common item, AccessRights row, index or publication.
+(withdraw/reject/approve) commits before any later review read and is final.
+
+Approval (M6b-1, ``app.promotion``) records the Admin's own rights findings and
+creates a separate *pending* common copy; it publishes nothing, builds no
+index and calls no provider.
 
 Audit rows carry IDs and reason codes only: never declared rights text, the
-rejection note, titles, file bytes or tokens.
+rejection note, recorded evidence, titles, file bytes or tokens.
 """
 
 from __future__ import annotations
@@ -16,7 +19,7 @@ from __future__ import annotations
 import hashlib
 import tempfile
 import uuid
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from typing import Literal
 from urllib.parse import quote
 
@@ -32,10 +35,12 @@ from app.api.errors import ApiError
 from app.audit import record_event
 from app.authz import Principal, m2a_private_derivatives_clause, review_grant_clause
 from app.config import Settings, get_settings
-from app.models import LibraryItem, PaperVersion, ReviewRequest, SourceFile, User
-from app.models.enums import AuditActorType, AuditOutcome, ReviewRejectReason, ReviewStatus
+from app.models import AccessRights, LibraryItem, PaperVersion, ReviewRequest, SourceFile, User
+from app.models.enums import AuditActorType, AuditOutcome, ReviewRejectReason, ReviewStatus, RightsAudience
 from app.models.review import (DECLARED_TEXT_MAX_CHARS, DECLARED_URL_MAX_CHARS, REJECTION_NOTE_MAX_CHARS,
                                WITHDRAWN_BY_REQUESTER)
+from app.models.rights import RIGHTS_TEXT_MAX_CHARS, RIGHTS_URL_MAX_CHARS, SCOPE_CONDITIONS_MAX_CHARS
+from app.promotion import RecordedRights, approve
 from app.storage import OriginalStorage, get_storage
 
 router = APIRouter(prefix="/review-requests", tags=["review"])
@@ -51,6 +56,10 @@ NOTICE = (
 )
 DECLARATION_NOTE = "Lời khai của User; chưa được Admin xác minh, không phải bằng chứng quyền phân phối."
 PENDING_NOTE = "Yêu cầu đang chờ duyệt chưa phải là công bố; paper vẫn chỉ ở kho riêng của User."
+APPROVED_NOTE = ("Admin đã tự kiểm và ghi nhận quyền cho một bản chung riêng, đang chờ công bố; User khác chưa "
+                 "thấy bản này. Bản riêng, version và collection của User không đổi.")
+RIGHTS_NOTE = ("Quyền do Admin tự kiểm với đúng file/checksum này. Lời khai của User, việc User upload hay việc "
+               "paper đọc miễn phí trên arXiv/Hugging Face không tự cấp quyền phân phối.")
 STREAM_CHUNK_BYTES = 64 * 1024
 
 
@@ -88,6 +97,55 @@ class ReviewRequestInput(BaseModel):
         return _clean_text(value)
 
     @field_validator("declared_source_url", "declared_license_url")
+    @classmethod
+    def _urls(cls, value: str | None) -> str | None:
+        return _clean_url(value)
+
+
+def _optional_text(value: str | None) -> str | None:
+    return (value.strip() or None) if value is not None else None
+
+
+class ScopeInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    audience: RightsAudience
+    original_download: bool
+    fulltext_search: bool
+    external_processing: bool
+    conditions: str | None = Field(default=None, max_length=SCOPE_CONDITIONS_MAX_CHARS)
+
+    @field_validator("conditions")
+    @classmethod
+    def _conditions(cls, value: str | None) -> str | None:
+        return _optional_text(value)
+
+
+class ApproveInput(BaseModel):
+    """What the Admin checked themselves; the form starts empty, never from ``declared_*``."""
+
+    model_config = ConfigDict(extra="forbid")
+    confirm_verified: Literal[True]
+    # The Admin confirms the exact bytes they checked.
+    file_checksum_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    title: str = Field(min_length=1, max_length=1000)
+    verified_source: str = Field(min_length=1, max_length=RIGHTS_TEXT_MAX_CHARS)
+    verified_source_url: str | None = Field(default=None, max_length=RIGHTS_URL_MAX_CHARS)
+    license_url: str | None = Field(default=None, max_length=RIGHTS_URL_MAX_CHARS)
+    evidence_note: str | None = Field(default=None, max_length=RIGHTS_TEXT_MAX_CHARS)
+    checked_on: date
+    scope: ScopeInput
+
+    @field_validator("title", "verified_source")
+    @classmethod
+    def _texts(cls, value: str) -> str:
+        return _clean_text(value)
+
+    @field_validator("evidence_note")
+    @classmethod
+    def _note(cls, value: str | None) -> str | None:
+        return _optional_text(value)
+
+    @field_validator("verified_source_url", "license_url")
     @classmethod
     def _urls(cls, value: str | None) -> str | None:
         return _clean_url(value)
@@ -142,10 +200,15 @@ def _target_out(rr: ReviewRequest, item: LibraryItem, version: PaperVersion, sou
                      "page_count": source.page_count, "checksum_sha256": rr.file_checksum_sha256}}
 
 
+def _pending_note(rr: ReviewRequest) -> str:
+    return APPROVED_NOTE if rr.status == ReviewStatus.APPROVED.value else PENDING_NOTE
+
+
 def _owner_out(rr: ReviewRequest, item: LibraryItem, version: PaperVersion, source: SourceFile) -> dict:
+    # The owner learns the decision, never the common copy's ID or the recorded evidence.
     return _closure_out(rr) | _target_out(rr, item, version, source) | {
         "declaration": _declaration_out(rr), "rejection_note": rr.rejection_note,
-        "notice_version": rr.notice_version, "publication": False, "pending_note": PENDING_NOTE}
+        "notice_version": rr.notice_version, "publication": False, "pending_note": _pending_note(rr)}
 
 
 def _audit(db: Session, principal: Principal, action: str, outcome: AuditOutcome, rr_id: uuid.UUID | str,
@@ -277,16 +340,24 @@ def _granted(principal: Principal):
             .where(review_grant_clause(principal)))
 
 
-def _admin_out(rr: ReviewRequest, granted: tuple | None) -> dict:
+def _admin_out(rr: ReviewRequest, granted: tuple | None, pending_item_id: uuid.UUID | None = None) -> dict:
     out = _closure_out(rr) | {"review_available": granted is not None, "publication": False,
-                              "pending_note": PENDING_NOTE}
+                              "pending_note": _pending_note(rr)}
+    if pending_item_id is not None:
+        out["pending_publication_id"] = str(pending_item_id)
     if granted is None:
         # Closed (or no longer granted): only what the Admin already decided on.
         return out
     _, item, version, source, email = granted
     return out | _target_out(rr, item, version, source) | {
-        "requester_email": email, "declaration": _declaration_out(rr),
+        "requester_email": email, "declaration": _declaration_out(rr), "rights_note": RIGHTS_NOTE,
         "original_url": f"/admin/review-requests/{rr.id}/files/{source.id}/original"}
+
+
+def _pending_item_id(db: Session, rr: ReviewRequest) -> uuid.UUID | None:
+    if rr.status != ReviewStatus.APPROVED.value:
+        return None
+    return db.scalar(select(AccessRights.item_id).where(AccessRights.origin_review_request_id == rr.id))
 
 
 @admin_router.get("")
@@ -314,7 +385,8 @@ def admin_get(request_id: str, admin: Principal = Depends(require_admin), db: Se
     rr = db.get(ReviewRequest, parsed)
     if rr is None:
         raise ApiError(404, "not_found")
-    return {"request": _admin_out(rr, db.execute(_granted(admin).where(ReviewRequest.id == parsed)).first())}
+    return {"request": _admin_out(rr, db.execute(_granted(admin).where(ReviewRequest.id == parsed)).first(),
+                                  _pending_item_id(db, rr))}
 
 
 def _deny_reason(rr: ReviewRequest | None, file_id: uuid.UUID) -> str | None:
@@ -424,3 +496,30 @@ def admin_reject(
     _audit(db, admin, "review.request.reject", AuditOutcome.SUCCESS, rr.id, reason_code=body.reason_code.value)
     db.commit()
     return {"request": _admin_out(rr, None)}
+
+
+@admin_router.post("/{request_id}/approve", dependencies=[Depends(require_trusted_origin)])
+def admin_approve(
+    request_id: str,
+    body: ApproveInput,
+    admin: Principal = Depends(require_admin),
+    db: Session = Depends(get_db),
+    now: datetime = Depends(get_now),
+    storage: OriginalStorage = Depends(_storage),
+) -> dict:
+    rid = _parse_id(request_id)
+    if body.license_url is None and body.evidence_note is None:
+        raise ApiError(422, "rights_evidence_required")
+    if body.scope.external_processing and not body.scope.fulltext_search:
+        raise ApiError(422, "rights_scope_inconsistent")
+    # One day of slack for an Admin whose local date is ahead of UTC, as in the DB CHECK.
+    if body.checked_on > now.date() + timedelta(days=1):
+        raise ApiError(422, "checked_on_in_future")
+    rights = RecordedRights(
+        title=body.title, verified_source=body.verified_source, verified_source_url=body.verified_source_url,
+        license_url=body.license_url, evidence_note=body.evidence_note, checked_on=body.checked_on,
+        audience=body.scope.audience, permits_original_download=body.scope.original_download,
+        permits_fulltext_search=body.scope.fulltext_search,
+        permits_external_processing=body.scope.external_processing, scope_conditions=body.scope.conditions)
+    done = approve(db, admin, storage, rid, body.file_checksum_sha256, rights, now)
+    return {"request": _admin_out(done.request, None, done.item.id)}

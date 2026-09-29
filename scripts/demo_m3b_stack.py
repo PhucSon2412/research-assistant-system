@@ -104,7 +104,7 @@ def main(*, m3c: bool = False, m4b: bool = False) -> None:
                "owner_only": True, "rerank": result["rerank_status"]})
     if m3c:
         with engine.begin() as conn:
-            common = conn.scalar(text("INSERT INTO library_items(visibility,title) VALUES('common','M3c common metadata') RETURNING id"))
+            common = conn.scalar(text("INSERT INTO library_items(visibility,publication_state,title) VALUES('common','listed','M3c common metadata') RETURNING id"))
         collections = []
         for own, other, label in ((0, 1, "A"), (1, 0, "B")):
             client = clients[own]
