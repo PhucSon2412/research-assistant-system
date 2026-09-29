@@ -90,6 +90,7 @@ export function ReviewRequests({ itemId, files, versions }: { itemId: string; fi
         <br /><small>Version {r.version.version_label ?? "(không nhãn)"} ({r.version.id}) · File {r.file.filename ?? ""}
           {" "}({r.file.id}) · SHA-256 {r.file.checksum_sha256}</small>
         {r.rejection_note && <><br /><small>Ghi chú của Admin: {r.rejection_note}</small></>}
+        {r.status === "approved" && <><br /><small>{r.pending_note}</small></>}
         {r.status === "open" && <> <button type="button" onClick={() => withdraw(r.id)}>Rút yêu cầu</button></>}
       </li>)}</ul>}
       {files.length === 0 ? <p>Item chưa có file gốc để gửi duyệt.</p> : (

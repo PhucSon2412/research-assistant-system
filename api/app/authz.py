@@ -2,10 +2,13 @@
 
 Decisions depend on item ownership, not on role alone (docs/access-and-data.md):
 
-- everyone sees ``common`` items and their own ``private`` items;
+- everyone sees ``listed`` ``common`` items and their own ``private`` items;
 - nobody, Admin included, sees another user's private item through the
   normal API; the only exception is ``review_grant_clause``, used solely by
   the Admin review routes for the one version/file named in an open request;
+- a ``pending`` common copy (M6b-1: rights recorded, not published) is absent
+  from every normal route for everyone; only ``pending_publication_clause``
+  lets an Admin read its metadata and rights on a dedicated route;
 - ``common`` metadata is edited by Admins, ``private`` metadata by its owner.
 
 List/count queries embed ``visible_items_clause`` in SQL *before* ordering,
@@ -21,7 +24,7 @@ from dataclasses import dataclass
 from sqlalchemy import ColumnElement, and_, false, or_
 
 from app.models import LibraryItem, PaperVersion, ReviewRequest, SourceFile
-from app.models.enums import ReviewStatus, UserRole, Visibility
+from app.models.enums import PublicationState, ReviewStatus, UserRole, Visibility
 
 
 @dataclass(frozen=True)
@@ -38,8 +41,13 @@ class Principal:
 
 
 def visible_items_clause(principal: Principal) -> ColumnElement[bool]:
+    # A pending common copy (recorded rights, not published) is invisible to
+    # everyone here, Admin included; only pending_publication_clause opens it.
     return or_(
-        LibraryItem.visibility == Visibility.COMMON.value,
+        and_(
+            LibraryItem.visibility == Visibility.COMMON.value,
+            LibraryItem.publication_state == PublicationState.LISTED.value,
+        ),
         and_(
             LibraryItem.visibility == Visibility.PRIVATE.value,
             LibraryItem.owner_user_id == principal.user_id,
@@ -81,6 +89,20 @@ def review_grant_clause(principal: Principal) -> ColumnElement[bool]:
         LibraryItem.visibility == Visibility.PRIVATE.value,
         LibraryItem.owner_user_id == ReviewRequest.requester_user_id,
         LibraryItem.rights_epoch == ReviewRequest.rights_epoch_at_submit,
+    )
+
+
+def pending_publication_clause(principal: Principal) -> ColumnElement[bool]:
+    """Admin-only read of common copies approved from a review, not yet published.
+
+    Used solely by ``/admin/pending-publications``. It opens metadata and the
+    recorded AccessRights, never file bytes, chunks, search or RAG.
+    """
+    if not principal.is_admin:
+        return false()
+    return and_(
+        LibraryItem.visibility == Visibility.COMMON.value,
+        LibraryItem.publication_state == PublicationState.PENDING.value,
     )
 
 

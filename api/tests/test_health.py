@@ -32,11 +32,16 @@ def test_m5a_discovery_routes_registered() -> None:
     assert "/library/items/{item_id}/references" in paths
 
 
-def test_m6a_review_routes_registered_without_publication() -> None:
-    paths = set(app.openapi()["paths"])
+def test_review_routes_registered_without_publication() -> None:
+    spec = app.openapi()["paths"]
+    paths = set(spec)
     assert {"/review-requests", "/review-requests/notice", "/review-requests/{request_id}",
             "/review-requests/{request_id}/withdraw", "/admin/review-requests",
             "/admin/review-requests/{request_id}", "/admin/review-requests/{request_id}/reject",
-            "/admin/review-requests/{request_id}/files/{file_id}/original"} <= paths
-    # M6a has no approve/publish step and no common item or AccessRights route.
-    assert not [p for p in paths if any(word in p for word in ("approve", "publish", "promot", "access-rights"))]
+            "/admin/review-requests/{request_id}/files/{file_id}/original",
+            "/admin/review-requests/{request_id}/approve",
+            "/admin/pending-publications", "/admin/pending-publications/{item_id}"} <= paths
+    # M6b-1 approves into a pending copy; nothing publishes it or edits/opens its rights or file.
+    assert set(spec["/admin/pending-publications"]) == set(spec["/admin/pending-publications/{item_id}"]) == {"get"}
+    assert not [p for p in paths if any(word in p for word in ("/publish", "promot", "access-rights"))
+                or (p.startswith("/admin/pending-publications") and p.count("/") > 3)]

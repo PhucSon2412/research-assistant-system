@@ -38,7 +38,7 @@ with engine.begin() as conn:
         conn.execute(text("INSERT INTO users (email, role, password_verifier) VALUES (:e, :r, :p)"),
                      {"e": emails[role], "r": "admin" if role == "admin" else "user",
                       "p": hash_password(passwords[role])})
-    common = conn.scalar(text("INSERT INTO library_items (visibility, title) VALUES ('common', 'demo common') RETURNING id"))
+    common = conn.scalar(text("INSERT INTO library_items (visibility, publication_state, title) VALUES ('common', 'listed', 'demo common') RETURNING id"))
 
 
 def browser(role: str) -> httpx.Client:

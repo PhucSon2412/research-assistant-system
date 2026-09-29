@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
 import { loadProxyConfig, proxyRequest } from "../lib/proxy.ts";
-import { closeReasonText, fileChoiceLabel, makeReviewBody, reviewDownloadHref } from "../lib/review.ts";
+import {
+  EMPTY_APPROVE_FORM, closeReasonText, fileChoiceLabel, makeApproveBody, makeReviewBody, reviewDownloadHref,
+} from "../lib/review.ts";
 import { streamFromApi } from "../lib/stream.ts";
 
 // Synthetic IDs and cookies only; nothing here is a real session or paper.
@@ -26,6 +28,29 @@ test("review body names exactly the chosen version/file and needs the unticked b
   assert.equal(closeReasonText("withdrawn_by_requester"), "User đã rút yêu cầu");
   assert.equal(closeReasonText("rights_not_established"), "Chưa xác lập được quyền phân phối");
   assert.equal(closeReasonText(null), null);
+});
+
+test("approve body carries only the Admin's own findings and needs the unticked confirmation", () => {
+  const checksum = "a".repeat(64);
+  assert.equal(EMPTY_APPROVE_FORM.confirmed, false);
+  assert.deepEqual([EMPTY_APPROVE_FORM.source, EMPTY_APPROVE_FORM.licenseUrl, EMPTY_APPROVE_FORM.evidence], ["", "", ""]);
+  const filled = { ...EMPTY_APPROVE_FORM, checksum, confirmed: true, title: " Bản chung ",
+    source: " Synthetic source checked by Admin ", sourceUrl: " ", licenseUrl: "https://x.test/license",
+    evidence: "  ", checkedOn: "2026-09-29", fulltextSearch: true, conditions: " " };
+  assert.deepEqual(makeApproveBody(filled), {
+    confirm_verified: true, file_checksum_sha256: checksum, title: "Bản chung",
+    verified_source: "Synthetic source checked by Admin", verified_source_url: null,
+    license_url: "https://x.test/license", evidence_note: null, checked_on: "2026-09-29",
+    scope: { audience: "instance_users", original_download: false, fulltext_search: true,
+      external_processing: false, conditions: null },
+  });
+  assert.equal(makeApproveBody({ ...EMPTY_APPROVE_FORM, checksum }), null);
+  for (const bad of [{ confirmed: false }, { checksum: "" }, { source: "  " }, { title: "" }, { checkedOn: "" },
+    { licenseUrl: "", evidence: " " }, { externalProcessing: true, fulltextSearch: false }]) {
+    assert.equal(makeApproveBody({ ...filled, ...bad }), null, JSON.stringify(bad));
+  }
+  assert.ok(makeApproveBody({ ...filled, licenseUrl: "", evidence: "Synthetic permission letter" }));
+  assert.equal(closeReasonText("approved_by_admin"), "Admin đã phê duyệt; bản chung riêng đang chờ công bố");
 });
 
 test("review download goes through the streaming route, only for the API's review path", () => {
@@ -98,7 +123,8 @@ test("JSON proxy forwards review-request JSON but never buffers an original", as
   const config = loadProxyConfig({ API_INTERNAL_URL: api.base });
   try {
     for (const path of ["review-requests", "review-requests/notice", `review-requests/${RID}/withdraw`,
-      "admin/review-requests", `admin/review-requests/${RID}`, `admin/review-requests/${RID}/reject`]) {
+      "admin/review-requests", `admin/review-requests/${RID}`, `admin/review-requests/${RID}/reject`,
+      `admin/review-requests/${RID}/approve`, "admin/pending-publications", `admin/pending-publications/${FID}`]) {
       const res = await proxyRequest(browserGet(path), path.split("/"), config);
       assert.equal(res.status, 200, path);
       assert.equal(api.seen.at(-1).url, `/${path}`);

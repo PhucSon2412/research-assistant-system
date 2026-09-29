@@ -20,7 +20,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
-from app.models.enums import ContentStatus, Coverage, VerifiedMime, Visibility, sql_in
+from app.models.enums import ContentStatus, Coverage, PublicationState, VerifiedMime, Visibility, sql_in
 
 
 class LibraryItem(Base):
@@ -28,6 +28,8 @@ class LibraryItem(Base):
 
     ``visibility``/``owner_user_id`` are immutable (DB trigger): promotion
     creates a new common item instead of flipping a private one.
+    ``publication_state`` (common only) is set explicitly on insert and has no
+    transition yet (DB trigger); see ``PublicationState``.
     """
 
     __tablename__ = "library_items"
@@ -59,6 +61,12 @@ class LibraryItem(Base):
         Index("ix_library_items_owner_user_id", "owner_user_id"),
         # Target for (item, requester) review-request keys: requester must be the owner.
         UniqueConstraint("id", "owner_user_id", name="uq_library_items_id_owner_user_id"),
+        CheckConstraint("(visibility = 'private' AND publication_state IS NULL)"
+                        " OR (visibility = 'common' AND publication_state IS NOT NULL"
+                        f" AND publication_state IN ({sql_in(PublicationState)}))",
+                        name="publication_state_valid"),
+        # Target for access_rights: rights attach to common items only.
+        UniqueConstraint("id", "visibility", name="uq_library_items_id_visibility"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -69,6 +77,7 @@ class LibraryItem(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT")
     )
     content_status: Mapped[str] = mapped_column(Text, server_default=ContentStatus.METADATA_ONLY.value)
+    publication_state: Mapped[str | None] = mapped_column(Text)
     active_version_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     active_index_generation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     title: Mapped[str | None] = mapped_column(Text)

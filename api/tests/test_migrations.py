@@ -43,6 +43,7 @@ EXPECTED_TABLES = {
     "discovery_paper_licenses", "discovery_deleted_records",
     "reference_citation_links",
     "review_requests",
+    "access_rights",
 }
 
 
@@ -188,6 +189,62 @@ def test_0020_upgrades_m5b_database_with_data_and_binds_review_requests(empty_db
         assert conn.scalar(insert, {"i": item, "v": version, "f": source, "o": owner, "h": "c" * 64})
         conn.commit()
     eng.dispose()
+
+
+def test_0021_upgrades_m6a_database_keeps_common_listed_and_requests(empty_db_url: str) -> None:
+    from app.identity.passwords import hash_password
+
+    upgrade(empty_db_url, "0020")
+    eng = create_engine(empty_db_url)
+    verifier = hash_password("synthetic-password-long")
+    with eng.begin() as conn:
+        owner = conn.scalar(text("INSERT INTO users(email,password_verifier) VALUES('m6b@example.org',:p) RETURNING id"),
+                            {"p": verifier})
+        admin = conn.scalar(text("INSERT INTO users(email,password_verifier,role) VALUES('adm6b@example.org',:p,"
+                                 "'admin') RETURNING id"), {"p": verifier})
+        item = conn.scalar(text("INSERT INTO library_items(visibility,owner_user_id,title) VALUES('private',:o,'M6a')"
+                                " RETURNING id"), {"o": owner})
+        common = conn.scalar(text("INSERT INTO library_items(visibility,title) VALUES('common','Legacy') RETURNING id"))
+        version = conn.scalar(text("INSERT INTO paper_versions(item_id) VALUES(:i) RETURNING id"), {"i": item})
+        source = conn.scalar(text("INSERT INTO source_files(item_id,version_id,storage_key,verified_mime,byte_size,"
+                                  "checksum_sha256) VALUES(:i,:v,'m6a-key','text/markdown',100,:h) RETURNING id"),
+                             {"i": item, "v": version, "h": "e" * 64})
+        request = text("""INSERT INTO review_requests(item_id,version_id,source_file_id,requester_user_id,status,
+            file_checksum_sha256,rights_epoch_at_submit,notice_version,declared_source,declared_rights,submitted_at)
+            VALUES(:i,:v,:f,:o,'open',:h,0,'n','src','rights',now()) RETURNING id""")
+        ids = {"i": item, "v": version, "f": source, "o": owner, "h": "e" * 64}
+        withdrawn = conn.scalar(request, ids)
+        conn.execute(text("UPDATE review_requests SET status='withdrawn', closed_at=now(), closed_by_user_id=:o,"
+                          " close_reason_code='withdrawn_by_requester' WHERE id=:r"), {"o": owner, "r": withdrawn})
+        open_rr = conn.scalar(request, ids)
+    upgrade(empty_db_url)
+    with eng.connect() as conn:
+        states = dict(conn.execute(text("SELECT id, publication_state FROM library_items")).all())
+        assert states == {item: None, common: "listed"}  # existing common items keep their visibility
+        assert dict(conn.execute(text("SELECT id, status FROM review_requests")).all()) == {
+            withdrawn: "withdrawn", open_rr: "open"}
+    with eng.begin() as conn:  # the open M6a request can be approved into a pending copy
+        pending = conn.scalar(text("INSERT INTO library_items(visibility,publication_state,title)"
+                                   " VALUES('common','pending','Copy') RETURNING id"))
+        pv = conn.scalar(text("INSERT INTO paper_versions(item_id) VALUES(:i) RETURNING id"), {"i": pending})
+        pf = conn.scalar(text("INSERT INTO source_files(item_id,version_id,storage_key,verified_mime,byte_size,"
+                              "checksum_sha256) VALUES(:i,:v,'copy-key','text/markdown',100,:h) RETURNING id"),
+                         {"i": pending, "v": pv, "h": "e" * 64})
+        conn.execute(text("""INSERT INTO access_rights(item_id,version_id,source_file_id,file_checksum_sha256,
+            origin_kind,origin_review_request_id,verified_source,evidence_note,checked_on,reviewer_user_id,recorded_at,
+            scope_audience,permits_original_download,permits_fulltext_search,permits_external_processing,
+            rights_epoch_at_grant) VALUES(:i,:v,:f,:h,'review_request',:r,'checked','evidence',CURRENT_DATE,:a,now(),
+            'instance_users',false,false,false,0)"""),
+                     {"i": pending, "v": pv, "f": pf, "h": "e" * 64, "r": open_rr, "a": admin})
+        conn.execute(text("UPDATE review_requests SET status='approved', closed_at=now(), closed_by_user_id=:a,"
+                          " close_reason_code='approved_by_admin' WHERE id=:r"), {"a": admin, "r": open_rr})
+    with eng.connect() as conn:
+        with pytest.raises(IntegrityError):  # nothing can publish the pending copy yet
+            conn.execute(text("UPDATE library_items SET publication_state='listed' WHERE id=:i"), {"i": pending})
+        conn.rollback()
+    eng.dispose()
+    with pytest.raises(Exception, match="approved review requests exist"):
+        command.downgrade(alembic_config(empty_db_url), "0020")
 
 
 def test_collection_membership_foreign_keys_restrict(migrated_db_url: str) -> None:

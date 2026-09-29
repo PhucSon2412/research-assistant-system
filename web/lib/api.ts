@@ -86,6 +86,14 @@ const MESSAGES: Record<string, string> = {
   review_request_open: "File này đã có yêu cầu duyệt đang mở.",
   review_request_closed: "Yêu cầu này đã đóng; không thể thay đổi nữa.",
   review_file_integrity_failed: "File gốc không khớp checksum lúc gửi yêu cầu; không mở được để duyệt.",
+  review_grant_inactive: "Quyền duyệt của yêu cầu này không còn hiệu lực (quyền của item đã thay đổi).",
+  checksum_confirmation_mismatch: "SHA-256 xác nhận không khớp file của yêu cầu; tải lại trang và kiểm lại.",
+  rights_evidence_required: "Cần URL giấy phép hoặc ghi chú bằng chứng do Admin tự kiểm.",
+  rights_scope_inconsistent: "Xử lý qua provider (embedding/RAG) cần cả quyền tìm kiếm toàn văn.",
+  checked_on_in_future: "Ngày kiểm không được ở tương lai.",
+  approval_storage_unavailable: "Không sao chép/kiểm được file gốc sang bản chung; chưa có gì được ghi nhận. Thử lại sau.",
+  approval_unavailable: "Không ghi được quyết định; chưa có gì được ghi nhận. Thử lại sau.",
+  approval_outcome_uncertain: "Không chắc quyết định đã được ghi; tải lại trang để xem trạng thái trước khi thử lại.",
   file_unavailable: "Chưa đọc được file gốc. Thử lại sau.",
 };
 

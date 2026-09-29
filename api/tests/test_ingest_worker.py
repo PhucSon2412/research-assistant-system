@@ -119,7 +119,7 @@ def test_common_full_text_has_no_rights_gate(upload_api):
     with Session(api.engine) as db:
         private_source = db.get(SourceFile, uuid.UUID(private["file_id"]))
         with api.engine.begin() as conn:
-            item = conn.scalar(text("INSERT INTO library_items (visibility, title) VALUES ('common', 'Unreviewed') RETURNING id"))
+            item = conn.scalar(text("INSERT INTO library_items (visibility, publication_state, title) VALUES ('common', 'listed', 'Unreviewed') RETURNING id"))
             version = conn.scalar(text("INSERT INTO paper_versions (item_id) VALUES (:i) RETURNING id"), {"i": item})
             job = conn.scalar(text("INSERT INTO ingestion_jobs (origin, scope_visibility, item_id, version_id,"
                                    " idempotency_key, rights_epoch_at_start)"

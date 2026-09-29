@@ -34,6 +34,19 @@ class Visibility(StrEnum):
     PRIVATE = "private"
 
 
+class PublicationState(StrEnum):
+    """Common items only (private items keep NULL).
+
+    ``listed``: metadata visible to every User, the behaviour common items had
+    before M6b-1; it says nothing about full-text rights. ``pending``: a common
+    copy with Admin-recorded AccessRights that is not published yet; no normal
+    route lists, counts or opens it.
+    """
+
+    LISTED = "listed"
+    PENDING = "pending"
+
+
 class ContentStatus(StrEnum):
     # No active full-text index: not eligible for full-text search/RAG.
     METADATA_ONLY = "metadata_only"
@@ -79,6 +92,8 @@ class ReviewStatus(StrEnum):
     OPEN = "open"
     WITHDRAWN = "withdrawn"
     REJECTED = "rejected"
+    # Rights recorded and a pending common copy created; not a publication.
+    APPROVED = "approved"
 
 
 class ReviewRejectReason(StrEnum):
@@ -87,6 +102,15 @@ class ReviewRejectReason(StrEnum):
     WRONG_FILE_OR_VERSION = "wrong_file_or_version"
     OUT_OF_SCOPE = "out_of_scope"
     OTHER = "other"
+
+
+class RightsOrigin(StrEnum):
+    REVIEW_REQUEST = "review_request"
+
+
+class RightsAudience(StrEnum):
+    # Every invited account of this instance; no public/anonymous audience.
+    INSTANCE_USERS = "instance_users"
 
 
 class AuditActorType(StrEnum):
