@@ -2,6 +2,7 @@
 
 from app.models.audit import AuditEvent
 from app.models.base import Base
+from app.models.citation import ReferenceCitationLink
 from app.models.collection import Collection, CollectionItem
 from app.models.discovery import (DiscoveryDeletedRecord, DiscoveryPaper, DiscoveryPaperLicense,
                                   DiscoveryPaperTopic, DiscoveryRequestClock, DiscoverySource)
@@ -27,6 +28,7 @@ __all__ = [
     "Chunk",
     "PdfPage",
     "ReferenceEntry",
+    "ReferenceCitationLink",
     "Invitation",
     "LibraryItem",
     "PaperVersion",

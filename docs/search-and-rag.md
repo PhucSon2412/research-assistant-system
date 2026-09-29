@@ -47,7 +47,8 @@ flowchart LR
 
 **Thu hồi khi request đang chạy — đề xuất:** `t_rev` là commit thu hồi/xóa quyền. Request search/RAG **mới** sau mốc này phải bị chặn bằng kiểm tombstone/rights epoch kể cả cache hay index chưa kịp dọn. Request RAG đã bắt đầu kiểm lại trước khi gửi candidate/prompt tới provider, trước khi trả answer/citation và trước từng phần stream; nếu phát hiện thu hồi thì ngừng phát, hủy lời gọi provider nếu có thể và trả trạng thái phù hợp mà không tiết lộ nội dung. Không thể lấy lại chunk đã gửi provider hoặc token/bytes đã phát cho client trước khi phát hiện; không cam kết hủy hồi tố. Viewer/citation dùng API kiểm quyền theo mỗi lần mở, không là link object tồn tại lâu. Xem [hợp đồng quyền](access-and-data.md#hợp-đồng-thu-hồi-và-xóa) và [kiểm thử](testing.md).
 
-## Nguy cơ và giới hạn
+**M5b-1:** Link citation và bibliography không vào `index_entries`, embedding document/query, rerank, evidence pack, prompt, answer hay citation của câu trả lời. Test đặt canary ở raw citation, arXiv ID, title và abstract của paper discovery rồi kiểm search keyword/hybrid, payload generation giả, câu trả lời và text đã embed; không canary nào xuất hiện. Đề xuất truy hồi bibliography cho câu hỏi danh mục tài liệu vẫn mở.
+
 
 - Nội dung paper và prompt retrieval là dữ liệu không tin cậy: chống prompt injection, không cho lệnh trong paper thay đổi quyền, scope hoặc quy tắc dẫn nguồn.
 - Cache key gồm identity/scope, index/model version; không dùng cache answer xuyên quyền. Xóa/thu hồi quyền phải vô hiệu cache và index liên quan.

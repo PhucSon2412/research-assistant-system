@@ -16,6 +16,8 @@
 
 **M4b scope:** RAG nhận thêm collection của caller hoặc toàn bộ private item hiện có active index. Membership được giao với ACL và active generation trước keyword/vector top-k và kiểm lại cho từng evidence trước/sau provider; xóa membership trong lúc xử lý chặn answer. Common `metadata_only` trong collection vẫn không vào RAG; chưa có đường common full text hoặc rights gate đúng file version. Viewer kiểm ACL hiện tại mỗi lần mở và không dựa vào membership cũ.
 
+**M5b-1 citation link:** Reference entry và link của item private là dữ liệu dẫn xuất riêng của owner, đọc qua cùng gate private derivative như `/references`; Admin và User khác nhận `404`. Đích là `DiscoveryPaper` `metadata_only` công khai trong trang khám phá, nên link chỉ hiện metadata, nhãn `metadata-only` và link trang gốc arXiv; không mở file hay toàn văn. `GET /discovery/papers/{id}/citing-items` chỉ trả item private của **chính caller** có reference liên kết tới paper đó; gate owner, trạng thái `linked`, hash/matcher còn hiệu lực và tombstone được áp trong SQL trước `count`/`limit`/`offset`. Vì thế B và Admin không thấy reference, cạnh, số đếm hay ID item của A, kể cả khi hai kho có cùng citation và file cùng hash; danh sách discovery không có số đếm citation. Paper discovery có OAI tombstone không mới hơn metadata trả `404` ở chiều ngược và không được trình bày là đích khả dụng. Item chung chưa có reference hiển thị cho User (gate full text đúng version chưa có), nên chiều ngược chưa gồm item chung.
+
 ## Ma trận quyền MVP đề xuất
 
 | Hành động | User: item chung | User: item riêng của mình | User: item riêng người khác | Admin: item chung | Admin: item riêng User |

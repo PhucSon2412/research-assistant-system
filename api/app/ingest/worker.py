@@ -16,6 +16,7 @@ from types import SimpleNamespace
 from sqlalchemy import or_, select, text, true, update
 from sqlalchemy.orm import Session
 
+from app.citations import reconcile_references
 from app.config import Settings, get_settings
 from app.db import get_sessionmaker
 from app.ingest.markdown import PIPELINE_VERSION, chunk_hash, chunk_section, extract, has_body_text
@@ -296,6 +297,8 @@ def _extract(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceFil
                         provenance=PIPELINE_VERSION, locator_kind="markdown", page_number=None,
                         start_offset=ref.start, end_offset=ref.end, pipeline_version=PIPELINE_VERSION))
                     ref_ordinal += 1
+        db.flush()
+        reconcile_references(db, source_file_id=source.id, pipeline_version=PIPELINE_VERSION)
         uncertain = "bibliography_boundary_uncertain" in result.warnings
         version.coverage = result.coverage if body_present and not uncertain else "none"
         job.warnings = result.warnings if body_present else result.warnings + ["no_body_text"]
@@ -352,6 +355,8 @@ def _extract_pdf(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: Sourc
                 ordinal=ordinal, raw_citation=ref.raw, fields=ref.fields, confidence=ref.confidence,
                 provenance=pdf.PIPELINE_VERSION, locator_kind="pdf", page_number=ref.page,
                 start_offset=ref.start, end_offset=ref.end, pipeline_version=pdf.PIPELINE_VERSION))
+        db.flush()
+        reconcile_references(db, source_file_id=source.id, pipeline_version=pdf.PIPELINE_VERSION)
         version.coverage = result.coverage
         job.warnings = result.warnings
         if result.disposition != JobState.AWAITING_INDEX.value:

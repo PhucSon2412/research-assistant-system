@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { api, describeError } from "../../../lib/api";
+import { RELATION_NOTE, citationStatusText, referenceLocator, type Reference } from "../../../lib/citations";
 import { makeRagBody } from "../../../lib/rag";
 import { ErrorText, Shell, useSession } from "../../components/session";
 import type { Item } from "../../page";
@@ -68,6 +69,9 @@ export default function ItemPage() {
   const [rag, setRag] = useState<RagAnswer | null>(null);
   const [ragError, setRagError] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
+  const [references, setReferences] = useState<Reference[] | null>(null);
+  const [referencesError, setReferencesError] = useState<string | null>(null);
+  const ownPrivate = item?.visibility === "private" && item.owned_by_me;
 
   useEffect(() => {
     if (!user) return;
@@ -86,6 +90,16 @@ export default function ItemPage() {
       .then((data) => setCollections(data.collections))
       .catch((err) => setRagError(describeError(err)));
   }, [user]);
+
+  function loadReferences() {
+    api<{ references: Reference[] }>(`/library/items/${encodeURIComponent(id)}/references`)
+      .then((data) => { setReferences(data.references); setReferencesError(null); })
+      .catch((err) => setReferencesError(describeError(err)));
+  }
+
+  useEffect(() => {
+    if (user && ownPrivate) loadReferences();
+  }, [user, id, ownPrivate]);
 
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -163,6 +177,31 @@ export default function ItemPage() {
             <a href={`/api/files/${encodeURIComponent(f.id)}/original`}>{f.filename ?? "Original"}</a>
             {` · ${f.byte_size} byte`}{f.page_count ? ` · ${f.page_count} trang` : ""}
           </li>)}</ul>
+          {ownPrivate && <section>
+            <h2>Tài liệu tham khảo được trích xuất</h2>
+            <p>{RELATION_NOTE} Chỉ liên kết khi citation có đúng một arXiv ID; không đoán theo tiêu đề.
+              Danh mục tham khảo không được dùng làm bằng chứng cho câu trả lời.</p>
+            <button type="button" onClick={loadReferences}>Tải lại</button>
+            <ErrorText message={referencesError} />
+            {references && references.length === 0 && <p>Chưa có tài liệu tham khảo được trích xuất.</p>}
+            {references && references.length > 0 && <ol>{references.map((ref) => {
+              const link = ref.citation_link;
+              return <li key={ref.id} style={{ marginBottom: "0.8rem" }}>
+                <span style={{ whiteSpace: "pre-wrap" }}>{ref.raw_citation.trim()}</span><br />
+                <small>{referenceLocator(ref)} · Version {ref.version_id} · File {ref.source_file_id}</small><br />
+                <small>{citationStatusText(link.status)}
+                  {link.arxiv_id && ` · arXiv ${link.arxiv_id}`}
+                  {link.cited_version && ` · version được trích: ${link.cited_version}`}</small>
+                {link.target && <><br />
+                  Trích dẫn → <strong>{link.target.title}</strong> <span>[metadata-only]</span>{" "}
+                  <a href={link.target.original_url} target="_blank" rel="noopener noreferrer">Mở trang gốc arXiv</a>
+                  {link.target.cited_version_url && <>{" · "}<a href={link.target.cited_version_url} target="_blank"
+                    rel="noopener noreferrer">bản {link.cited_version} được trích</a></>}
+                  {link.target.latest_metadata_version && <small>{` · version mới nhất trong metadata: ${link.target.latest_metadata_version}`}</small>}
+                </>}
+              </li>;
+            })}</ol>}
+          </section>}
           {item.visibility === "private" && item.content_status === "indexed" && <section>
             <h2>Hỏi đáp có dẫn nguồn</h2>
             <p>Câu hỏi và các đoạn được chọn sẽ gửi qua OpenRouter/provider để tạo câu trả lời.</p>

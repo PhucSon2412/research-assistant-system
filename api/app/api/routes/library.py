@@ -21,7 +21,9 @@ from app.api.deps import get_db, get_now, get_principal
 from app.api.errors import ApiError
 from app.audit import record_event
 from app.authz import Principal, can_edit_item, m2a_private_derivatives_clause, visible_items_clause
-from app.models import Chunk, IngestionJob, LibraryItem, MetadataCandidate, PaperVersion, PdfPage, ReferenceEntry, Section, SourceFile
+from app.citations import RELATION_NOTE, citation_link_out, hidden_discovery_clause
+from app.models import (Chunk, DiscoveryPaper, IngestionJob, LibraryItem, MetadataCandidate, PaperVersion, PdfPage,
+                        ReferenceCitationLink, ReferenceEntry, Section, SourceFile)
 from app.models.enums import AuditActorType, AuditOutcome, Visibility
 
 router = APIRouter(prefix="/library", tags=["library"])
@@ -241,14 +243,21 @@ def get_coverage(item_id: str, principal: Principal = Depends(get_principal),
 def get_references(item_id: str, principal: Principal = Depends(get_principal),
                    db: Session = Depends(get_db)) -> dict:
     item = _get_private_derivative_item(db, principal, item_id)
-    rows = db.scalars(select(ReferenceEntry).join(LibraryItem, ReferenceEntry.item_id == LibraryItem.id)
+    rows = db.execute(select(ReferenceEntry, ReferenceCitationLink, DiscoveryPaper,
+                             hidden_discovery_clause().label("target_hidden"))
+        .join(LibraryItem, ReferenceEntry.item_id == LibraryItem.id)
+        .outerjoin(ReferenceCitationLink, ReferenceCitationLink.reference_id == ReferenceEntry.id)
+        .outerjoin(DiscoveryPaper, DiscoveryPaper.id == ReferenceCitationLink.discovery_paper_id)
         .where(ReferenceEntry.item_id == item.id, m2a_private_derivatives_clause(principal))
         .order_by(ReferenceEntry.version_id, ReferenceEntry.source_file_id, ReferenceEntry.ordinal)).all()
-    return {"references": [{"version_id": str(r.version_id), "source_file_id": str(r.source_file_id),
+    return {"references": [{"id": str(r.id), "ordinal": r.ordinal,
+        "version_id": str(r.version_id), "source_file_id": str(r.source_file_id),
         "raw_citation": r.raw_citation, "fields": r.fields, "confidence": r.confidence,
-        "provenance": r.provenance, "locator_kind": r.locator_kind,
+        "provenance": r.provenance, "pipeline_version": r.pipeline_version, "locator_kind": r.locator_kind,
         "page": r.page_number, "start_offset": r.start_offset, "end_offset": r.end_offset,
-        "evidence_kind": "bibliography_entry"} for r in rows]}
+        "evidence_kind": "bibliography_entry",
+        "citation_link": citation_link_out(r, link, paper, hidden)} for r, link, paper, hidden in rows],
+        "citation_relation_note": RELATION_NOTE}
 
 
 @router.patch("/items/{item_id}")

@@ -41,6 +41,7 @@ EXPECTED_TABLES = {
     "collections", "collection_items",
     "discovery_sources", "discovery_papers", "discovery_paper_topics", "discovery_request_clock",
     "discovery_paper_licenses", "discovery_deleted_records",
+    "reference_citation_links",
 }
 
 
@@ -109,6 +110,44 @@ def test_0018_preserves_existing_license_provenance(empty_db_url: str) -> None:
         row = conn.execute(text("SELECT version_label,license_url FROM discovery_paper_licenses WHERE paper_id=:p"),
                            {"p": paper_id}).one()
         assert row == ("v2", "http://arxiv.org/licenses/nonexclusive-distrib/1.0/")
+    eng.dispose()
+
+
+def test_0019_keeps_existing_references_and_backfill_links_them(empty_db_url: str) -> None:
+    from app.citations import reconcile_pending
+    from app.config import CitationPolicy
+    from app.identity.passwords import hash_password
+
+    upgrade(empty_db_url, "0018")
+    eng = create_engine(empty_db_url)
+    raw = "[1] Existing. arXiv:2609.00041v2."
+    with eng.begin() as conn:
+        owner = conn.scalar(text("INSERT INTO users(email,password_verifier) VALUES('m5b@example.org',:p) RETURNING id"),
+                            {"p": hash_password("synthetic-password-long")})
+        item = conn.scalar(text("INSERT INTO library_items(visibility,owner_user_id,title) VALUES('private',:o,'M5a item') RETURNING id"), {"o": owner})
+        version = conn.scalar(text("INSERT INTO paper_versions(item_id) VALUES(:i) RETURNING id"), {"i": item})
+        job = conn.scalar(text("INSERT INTO ingestion_jobs(origin,scope_visibility,scope_owner_user_id,item_id,version_id,idempotency_key,state,rights_epoch_at_start) VALUES('upload','private',:o,:i,:v,'m5a-existing','awaiting_index',0) RETURNING id"),
+                          {"o": owner, "i": item, "v": version})
+        source = conn.scalar(text("INSERT INTO source_files(item_id,version_id,job_id,storage_key,verified_mime,byte_size,checksum_sha256) VALUES(:i,:v,:j,'existing-md','text/markdown',100,:h) RETURNING id"),
+                             {"i": item, "v": version, "j": job, "h": "b" * 64})
+        conn.execute(text("INSERT INTO reference_entries(item_id,version_id,source_file_id,ordinal,raw_citation,fields,confidence,provenance,locator_kind,start_offset,end_offset,pipeline_version) VALUES(:i,:v,:f,0,:r,'{}','raw_only','markdown-v1','markdown',0,:n,'markdown-v1')"),
+                     {"i": item, "v": version, "f": source, "r": raw, "n": len(raw)})
+        conn.execute(text("INSERT INTO discovery_papers(remote_id,original_url,title,latest_version,oai_datestamp) VALUES('2609.00041','https://arxiv.org/abs/2609.00041','Existing target','v3',DATE '2026-09-28')"))
+    upgrade(empty_db_url)
+    with eng.connect() as conn:
+        assert conn.scalar(text("SELECT raw_citation FROM reference_entries")) == raw
+        assert conn.scalar(text("SELECT count(*) FROM reference_citation_links")) == 0
+    assert reconcile_pending(eng, CitationPolicy()) == {"batches": 1, "references": 1}
+    with eng.connect() as conn:
+        row = conn.execute(text("SELECT match_status, arxiv_id, cited_version FROM reference_citation_links")).one()
+        assert tuple(row) == ("linked", "2609.00041", "v2")
+        with pytest.raises(IntegrityError):  # a target is required for, and only for, linked rows
+            conn.execute(text("UPDATE reference_citation_links SET discovery_paper_id=NULL"))
+        conn.rollback()
+        with pytest.raises(IntegrityError):  # unlinked statuses may not carry an exact arXiv ID
+            conn.execute(text("UPDATE reference_citation_links SET match_status='multiple_arxiv_ids',"
+                              " discovery_paper_id=NULL"))
+        conn.rollback()
     eng.dispose()
 
 
