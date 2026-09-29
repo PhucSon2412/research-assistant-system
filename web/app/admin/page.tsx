@@ -3,6 +3,7 @@
 // Admin screens. The API enforces Admin-only access on every call; a User
 // opening this page just gets "forbidden" from the API.
 
+import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, describeError } from "../../lib/api";
 import { ErrorText, Shell, useSession } from "../components/session";
@@ -69,6 +70,7 @@ export default function AdminPage() {
   return (
     <Shell user={user}>
       <h1>Quản trị</h1>
+      <p><Link href="/admin/reviews">Yêu cầu duyệt paper riêng</Link> (chỉ xem đúng version/file User gửi)</p>
       <ErrorText message={error} />
       {notice && <p role="status">{notice}</p>}
 

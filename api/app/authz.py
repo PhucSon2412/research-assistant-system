@@ -4,7 +4,8 @@ Decisions depend on item ownership, not on role alone (docs/access-and-data.md):
 
 - everyone sees ``common`` items and their own ``private`` items;
 - nobody, Admin included, sees another user's private item through the
-  normal API (Admin review of a submitted version arrives with promotion);
+  normal API; the only exception is ``review_grant_clause``, used solely by
+  the Admin review routes for the one version/file named in an open request;
 - ``common`` metadata is edited by Admins, ``private`` metadata by its owner.
 
 List/count queries embed ``visible_items_clause`` in SQL *before* ordering,
@@ -17,10 +18,10 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import ColumnElement, and_, or_
+from sqlalchemy import ColumnElement, and_, false, or_
 
-from app.models import LibraryItem
-from app.models.enums import UserRole, Visibility
+from app.models import LibraryItem, PaperVersion, ReviewRequest, SourceFile
+from app.models.enums import ReviewStatus, UserRole, Visibility
 
 
 @dataclass(frozen=True)
@@ -56,6 +57,30 @@ def m2a_private_derivatives_clause(principal: Principal) -> ColumnElement[bool]:
     return and_(
         LibraryItem.visibility == Visibility.PRIVATE.value,
         LibraryItem.owner_user_id == principal.user_id,
+    )
+
+
+def review_grant_clause(principal: Principal) -> ColumnElement[bool]:
+    """Temporary Admin read of one private original named by an open request.
+
+    Joins ``ReviewRequest`` to exactly its ``SourceFile``/``PaperVersion``/
+    ``LibraryItem``: another version or file of the same item never matches.
+    It ends when the request closes or the item's rights epoch moves (a later
+    revoke/delete), and grants nothing for chunks, search, RAG or collections.
+    """
+    if not principal.is_admin:
+        return false()
+    return and_(
+        ReviewRequest.status == ReviewStatus.OPEN.value,
+        ReviewRequest.source_file_id == SourceFile.id,
+        ReviewRequest.version_id == SourceFile.version_id,
+        ReviewRequest.version_id == PaperVersion.id,
+        ReviewRequest.item_id == PaperVersion.item_id,
+        ReviewRequest.item_id == LibraryItem.id,
+        ReviewRequest.file_checksum_sha256 == SourceFile.checksum_sha256,
+        LibraryItem.visibility == Visibility.PRIVATE.value,
+        LibraryItem.owner_user_id == ReviewRequest.requester_user_id,
+        LibraryItem.rights_epoch == ReviewRequest.rights_epoch_at_submit,
     )
 
 

@@ -74,6 +74,21 @@ class JobState(StrEnum):
     CANCELLED = "cancelled"
 
 
+class ReviewStatus(StrEnum):
+    # Only an open request grants the Admin a temporary review read.
+    OPEN = "open"
+    WITHDRAWN = "withdrawn"
+    REJECTED = "rejected"
+
+
+class ReviewRejectReason(StrEnum):
+    RIGHTS_NOT_ESTABLISHED = "rights_not_established"
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+    WRONG_FILE_OR_VERSION = "wrong_file_or_version"
+    OUT_OF_SCOPE = "out_of_scope"
+    OTHER = "other"
+
+
 class AuditActorType(StrEnum):
     USER = "user"
     SYSTEM = "system"

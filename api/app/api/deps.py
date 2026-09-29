@@ -65,6 +65,13 @@ def get_principal(ctx: SessionContext = Depends(get_session_context)) -> Princip
     )
 
 
+def require_trusted_origin(request: Request, settings: Settings = Depends(get_settings)) -> None:
+    """Sensitive writes also require an allowed ``Origin`` header; the CSRF
+    middleware only rejects a disallowed one when the header is present."""
+    if request.headers.get("origin") not in settings.http.allowed_origins:
+        raise ApiError(403, "csrf_failed")
+
+
 def require_admin(principal: Principal = Depends(get_principal)) -> Principal:
     if not principal.is_admin:
         raise ApiError(403, "forbidden")

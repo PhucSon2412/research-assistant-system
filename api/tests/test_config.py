@@ -49,6 +49,8 @@ def test_defaults_match_documented_mvp_values() -> None:
     assert s.files.pdf_probe_timeout_seconds == 10
     assert s.files.pdf_probe_memory_bytes == 256 * MIB
     assert s.upload_notice_version
+    # M6a: a review notice version, and no maximum open duration (open decision).
+    assert s.review.notice_version and set(s.review.model_dump()) == {"notice_version"}
     assert (s.pdf_body.min_body_page_ratio, s.pdf_body.min_chars_per_body_page, s.pdf_body.min_total_body_chars) == (
         0.70, 100, 2000
     )
