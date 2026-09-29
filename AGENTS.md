@@ -44,5 +44,6 @@ Chi tiết, bản PowerShell/Git Bash và giới hạn kiểm chứng ở [môi 
 - Kết nối DB luôn qua `RAS_DB__*` → `Settings.sqlalchemy_url()`; không ghép mật khẩu vào chuỗi URL.
 - Auth M1b trên stack dev: đăng nhập `http://127.0.0.1:3000/login`; Admin mời User ở `/admin`, link mời/reset nằm ở mục Dev outbox (bộ nhớ API, chỉ `RAS_ENVIRONMENT=development`). Item metadata để thử ACL thêm bằng fixture SQL qua `docker compose exec -T db sh -c 'psql -U $POSTGRES_USER -d $POSTGRES_DB'` (không bọc biến trong nháy kép ở PowerShell 5.1): xem [dev-setup](docs/dev-setup.md#xác-thực-phiên-và-quyền-m1b).
 - Mọi route API mới phải lấy principal qua `app/api/deps.py` (session + CSRF) và lọc dữ liệu bằng `app/authz.py` trong SQL trước phân trang/đếm; item trái quyền trả `404` như không tồn tại. Test API dùng fixture `api` (đồng hồ giả, dev outbox) trong `api/tests/conftest.py`.
+- Admin chỉ đọc dữ liệu private của User qua `review_grant_clause` trong `app/authz.py` (M6a, chỉ route `/admin/review-requests/*`, đúng version/file của request còn mở); không thêm nhánh Admin vào route file/library/search/RAG/collection thông thường.
 
 Schema thay đổi qua revision Alembic mới, không sửa revision đã merge; giữ test `test_orm_models_match_migrated_schema` xanh.

@@ -2,11 +2,12 @@
 // the session cookie on the web origin and never talks to the API port
 // directly. This proxy makes no auth or permission decision: the API checks the
 // session, CSRF token, Origin and ACL on every request. Uploads and downloads
-// use their own streaming routes (app/api/uploads, app/api/files).
+// use their own streaming routes (app/api/uploads, app/api/files and the M6a
+// Admin review download under app/api/admin/review-requests).
 
 // First path segment the proxy forwards; anything else is 404 here.
 export const ALLOWED_PREFIXES = new Set([
-  "auth", "admin", "library", "uploads", "discovery", "search", "collections", "rag",
+  "auth", "admin", "library", "uploads", "discovery", "search", "collections", "rag", "review-requests",
 ]);
 const REQUEST_HEADERS = ["cookie", "content-type", "accept", "origin", "x-csrf-token"];
 const RESPONSE_HEADERS = ["content-type", "cache-control"];
@@ -52,7 +53,8 @@ function failure(status: number, error: string): Response {
 
 function allowed(path: string[]): boolean {
   // Dot segments would be collapsed by URL parsing and escape the allowlist.
-  return path.length > 0 && ALLOWED_PREFIXES.has(path[0])
+  // Originals stream through their own routes and are never buffered here.
+  return path.length > 0 && ALLOWED_PREFIXES.has(path[0]) && path.at(-1) !== "original"
     && path.every((s) => s !== "" && s !== "." && s !== ".." && !/[/\\]/.test(s));
 }
 

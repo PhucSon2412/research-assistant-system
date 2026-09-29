@@ -57,6 +57,8 @@ class LibraryItem(Base):
                              ["index_generations.id", "index_generations.item_id"],
                              name="fk_library_items_active_index_generation", use_alter=True, ondelete="RESTRICT"),
         Index("ix_library_items_owner_user_id", "owner_user_id"),
+        # Target for (item, requester) review-request keys: requester must be the owner.
+        UniqueConstraint("id", "owner_user_id", name="uq_library_items_id_owner_user_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -130,6 +132,8 @@ class SourceFile(Base):
             name="fk_source_files_job_item_ingestion_jobs", ondelete="RESTRICT",
         ),
         UniqueConstraint("id", "version_id", name="uq_source_files_id_version_id"),
+        # Review requests pin the checksum the owner submitted.
+        UniqueConstraint("id", "version_id", "checksum_sha256", name="uq_source_files_id_version_id_checksum"),
         Index("ix_source_files_version_id", "version_id"),
         Index("ix_source_files_job_id", "job_id"),
         Index("ix_source_files_storage_key", "storage_key"),

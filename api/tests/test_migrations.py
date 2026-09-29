@@ -42,6 +42,7 @@ EXPECTED_TABLES = {
     "discovery_sources", "discovery_papers", "discovery_paper_topics", "discovery_request_clock",
     "discovery_paper_licenses", "discovery_deleted_records",
     "reference_citation_links",
+    "review_requests",
 }
 
 
@@ -148,6 +149,44 @@ def test_0019_keeps_existing_references_and_backfill_links_them(empty_db_url: st
             conn.execute(text("UPDATE reference_citation_links SET match_status='multiple_arxiv_ids',"
                               " discovery_paper_id=NULL"))
         conn.rollback()
+    eng.dispose()
+
+
+def test_0020_upgrades_m5b_database_with_data_and_binds_review_requests(empty_db_url: str) -> None:
+    from app.identity.passwords import hash_password
+
+    upgrade(empty_db_url, "0019")
+    eng = create_engine(empty_db_url)
+    with eng.begin() as conn:
+        owner = conn.scalar(text("INSERT INTO users(email,password_verifier) VALUES('m6a@example.org',:p) RETURNING id"),
+                            {"p": hash_password("synthetic-password-long")})
+        item = conn.scalar(text("INSERT INTO library_items(visibility,owner_user_id,title) VALUES('private',:o,'M5b item')"
+                                " RETURNING id"), {"o": owner})
+        common = conn.scalar(text("INSERT INTO library_items(visibility,title) VALUES('common','Common') RETURNING id"))
+        version = conn.scalar(text("INSERT INTO paper_versions(item_id) VALUES(:i) RETURNING id"), {"i": item})
+        job = conn.scalar(text("INSERT INTO ingestion_jobs(origin,scope_visibility,scope_owner_user_id,item_id,version_id,"
+                               "idempotency_key,state,rights_epoch_at_start) VALUES('upload','private',:o,:i,:v,"
+                               "'m5b-existing','ready',0) RETURNING id"), {"o": owner, "i": item, "v": version})
+        source = conn.scalar(text("INSERT INTO source_files(item_id,version_id,job_id,storage_key,verified_mime,byte_size,"
+                                  "checksum_sha256) VALUES(:i,:v,:j,'existing-md','text/markdown',100,:h) RETURNING id"),
+                             {"i": item, "v": version, "j": job, "h": "c" * 64})
+    upgrade(empty_db_url)
+    insert = text("""INSERT INTO review_requests(item_id,version_id,source_file_id,requester_user_id,status,
+        file_checksum_sha256,rights_epoch_at_submit,notice_version,declared_source,declared_rights,submitted_at)
+        VALUES(:i,:v,:f,:o,'open',:h,0,'n','src','rights',now()) RETURNING id""")
+    with eng.connect() as conn:
+        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == HEAD_REVISION
+        assert conn.scalar(text("SELECT count(*) FROM library_items")) == 2
+        assert conn.scalar(text("SELECT checksum_sha256 FROM source_files WHERE id=:f"), {"f": source}) == "c" * 64
+        assert conn.scalar(text("SELECT count(*) FROM review_requests")) == 0
+        with pytest.raises(IntegrityError):  # the checksum must be the file's own
+            conn.execute(insert, {"i": item, "v": version, "f": source, "o": owner, "h": "d" * 64})
+        conn.rollback()
+        with pytest.raises(IntegrityError):  # a common item has no owner to request review
+            conn.execute(insert, {"i": common, "v": version, "f": source, "o": owner, "h": "c" * 64})
+        conn.rollback()
+        assert conn.scalar(insert, {"i": item, "v": version, "f": source, "o": owner, "h": "c" * 64})
+        conn.commit()
     eng.dispose()
 
 

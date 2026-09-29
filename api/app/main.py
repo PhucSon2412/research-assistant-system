@@ -2,6 +2,7 @@
 
 M1b adds invitation/session/reset auth, Admin account management and the
 minimal library metadata API. M1c adds private upload intent and originals.
+M6a adds owner review requests for one exact private version/file.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from sqlalchemy import text
 
 from app.api.csrf import install_csrf_middleware
 from app.api.errors import install_error_handlers
-from app.api.routes import admin, auth, library, uploads, search, collections, rag, discovery
+from app.api.routes import admin, auth, library, uploads, search, collections, rag, discovery, reviews
 from app.db import get_engine
 
 app = FastAPI(title="Research Assistant System API", version="0.2.0")
@@ -26,6 +27,8 @@ app.include_router(search.router)
 app.include_router(collections.router)
 app.include_router(rag.router)
 app.include_router(discovery.router)
+app.include_router(reviews.router)
+app.include_router(reviews.admin_router)
 
 
 @app.get("/healthz")

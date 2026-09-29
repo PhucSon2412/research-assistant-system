@@ -99,6 +99,14 @@ class FileLimits(BaseModel):
         return self
 
 
+class ReviewPolicy(BaseModel):
+    """Owner review requests (M6a). There is deliberately no maximum open
+    duration yet: that is an open decision (docs/decisions.md), and a request
+    only grants the Admin a read while it stays open."""
+
+    notice_version: str = Field(default="2026-09-29.v1", min_length=1)
+
+
 class ObjectStorage(BaseModel):
     endpoint_url: str
     access_key: SecretStr
@@ -377,6 +385,7 @@ class Settings(BaseSettings):
     auth: AuthLifetimes = AuthLifetimes()
     files: FileLimits = FileLimits()
     upload_notice_version: str = Field(default="2026-09-24.v1", min_length=1)
+    review: ReviewPolicy = ReviewPolicy()
     pdf_body: PdfBodyThreshold = PdfBodyThreshold()
     ingest: IngestPolicy = IngestPolicy()
     discovery: DiscoveryPolicy = DiscoveryPolicy()

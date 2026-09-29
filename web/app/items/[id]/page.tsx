@@ -6,6 +6,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { api, describeError } from "../../../lib/api";
 import { RELATION_NOTE, citationStatusText, referenceLocator, type Reference } from "../../../lib/citations";
 import { makeRagBody } from "../../../lib/rag";
+import { ReviewRequests } from "../../components/review-request";
 import { ErrorText, Shell, useSession } from "../../components/session";
 import type { Item } from "../../page";
 
@@ -18,7 +19,8 @@ type Version = {
   received_at: string;
 };
 type Detail = Item & { versions: Version[] };
-type FileInfo = { id: string; filename: string | null; byte_size: number; verified_mime: string; page_count: number | null };
+type FileInfo = { id: string; version_id: string; filename: string | null; byte_size: number; verified_mime: string;
+  page_count: number | null };
 type JobInfo = { id: string; state: string; origin: string; attempt_count: number;
   last_error_code: string | null; warnings: string[];
   extraction_finished_at: string | null; finished_at: string | null };
@@ -177,6 +179,8 @@ export default function ItemPage() {
             <a href={`/api/files/${encodeURIComponent(f.id)}/original`}>{f.filename ?? "Original"}</a>
             {` · ${f.byte_size} byte`}{f.page_count ? ` · ${f.page_count} trang` : ""}
           </li>)}</ul>
+          {ownPrivate && user?.role !== "admin" && <ReviewRequests itemId={item.id} files={item.files}
+            versions={item.versions} />}
           {ownPrivate && <section>
             <h2>Tài liệu tham khảo được trích xuất</h2>
             <p>{RELATION_NOTE} Chỉ liên kết khi citation có đúng một arXiv ID; không đoán theo tiêu đề.

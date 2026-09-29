@@ -83,6 +83,10 @@ const MESSAGES: Record<string, string> = {
   api_unreachable: "Không kết nối được tới máy chủ.",
   api_response_incomplete: "Phản hồi từ máy chủ bị gián đoạn. Thử lại sau.",
   api_not_configured: "Máy chủ web chưa được cấu hình đúng.",
+  review_request_open: "File này đã có yêu cầu duyệt đang mở.",
+  review_request_closed: "Yêu cầu này đã đóng; không thể thay đổi nữa.",
+  review_file_integrity_failed: "File gốc không khớp checksum lúc gửi yêu cầu; không mở được để duyệt.",
+  file_unavailable: "Chưa đọc được file gốc. Thử lại sau.",
 };
 
 export function describeError(err: unknown): string {
