@@ -79,6 +79,10 @@ const MESSAGES: Record<string, string> = {
   invalid_markdown: "Markdown không hợp lệ.",
   upload_unavailable: "Chưa thể lưu file. Hãy thử lại.",
   rag_generation_unavailable_unverified_pricing: "Hỏi đáp hiện chưa khả dụng vì chi phí và provider chưa được xác minh.",
+  api_timeout: "Máy chủ không phản hồi kịp. Thử lại sau.",
+  api_unreachable: "Không kết nối được tới máy chủ.",
+  api_response_incomplete: "Phản hồi từ máy chủ bị gián đoạn. Thử lại sau.",
+  api_not_configured: "Máy chủ web chưa được cấu hình đúng.",
 };
 
 export function describeError(err: unknown): string {
