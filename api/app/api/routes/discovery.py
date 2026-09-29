@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_principal, require_admin
 from app.authz import Principal
-from app.models.discovery import DiscoveryPaper, DiscoveryPaperTopic, DiscoverySource
+from app.models.discovery import DiscoveryDeletedRecord, DiscoveryPaper, DiscoveryPaperTopic, DiscoverySource
 
 router = APIRouter(prefix="/discovery", tags=["discovery"])
 
@@ -22,8 +22,11 @@ def list_papers(topic: str | None = None,
                 limit: int = Query(default=20, ge=1, le=100),
                 offset: int = Query(default=0, ge=0, le=100_000),
                 _: Principal = Depends(get_principal), db: Session = Depends(get_db)) -> dict:
-    where = DiscoveryPaper.content_status == "metadata_only"
-    ids = select(DiscoveryPaper.id).where(where)
+    tombstoned = select(DiscoveryDeletedRecord.source).where(
+        DiscoveryDeletedRecord.source == DiscoveryPaper.source,
+        DiscoveryDeletedRecord.remote_id == DiscoveryPaper.remote_id,
+        DiscoveryDeletedRecord.oai_datestamp >= DiscoveryPaper.oai_datestamp).exists()
+    ids = select(DiscoveryPaper.id).where(DiscoveryPaper.content_status == "metadata_only", ~tombstoned)
     if topic:
         ids = ids.join(DiscoveryPaperTopic, DiscoveryPaperTopic.paper_id == DiscoveryPaper.id).where(DiscoveryPaperTopic.topic == topic)
     ids = ids.subquery()

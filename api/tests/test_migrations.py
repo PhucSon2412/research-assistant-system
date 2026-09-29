@@ -40,6 +40,7 @@ EXPECTED_TABLES = {
     "search_request_days", "search_usage", "rag_request_days",
     "collections", "collection_items",
     "discovery_sources", "discovery_papers", "discovery_paper_topics", "discovery_request_clock",
+    "discovery_paper_licenses", "discovery_deleted_records",
 }
 
 
@@ -92,6 +93,23 @@ def test_orm_models_match_migrated_schema(migrated_db_url: str) -> None:
         diff = compare_metadata(ctx, Base.metadata)
     eng.dispose()
     assert diff == []
+
+
+def test_0018_preserves_existing_license_provenance(empty_db_url: str) -> None:
+    upgrade(empty_db_url, "0017")
+    eng = create_engine(empty_db_url)
+    with eng.begin() as conn:
+        paper_id = conn.scalar(text("""INSERT INTO discovery_papers
+            (remote_id, original_url, title, latest_version, license_url, oai_datestamp)
+            VALUES ('2609.00001', 'https://arxiv.org/abs/2609.00001', 'Before upgrade', 'v2',
+                    'http://arxiv.org/licenses/nonexclusive-distrib/1.0/', DATE '2026-09-28')
+            RETURNING id"""))
+    upgrade(empty_db_url)
+    with eng.connect() as conn:
+        row = conn.execute(text("SELECT version_label,license_url FROM discovery_paper_licenses WHERE paper_id=:p"),
+                           {"p": paper_id}).one()
+        assert row == ("v2", "http://arxiv.org/licenses/nonexclusive-distrib/1.0/")
+    eng.dispose()
 
 
 def test_collection_membership_foreign_keys_restrict(migrated_db_url: str) -> None:

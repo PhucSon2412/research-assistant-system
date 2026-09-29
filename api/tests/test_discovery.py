@@ -26,6 +26,11 @@ PAGE_TWO = b'''<?xml version="1.0"?>
  <authors>B. Author</authors><categories>cs.AI</categories></arXivRaw></metadata></record><resumptionToken />
  </ListRecords></OAI-PMH>'''
 ERROR_TOKEN = b'''<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/"><error code="badResumptionToken">expired</error></OAI-PMH>'''
+PAGE_DELETED = b'''<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/"><ListRecords>
+ <record><header status="deleted"><identifier>oai:arXiv.org:2609.00001</identifier>
+ <datestamp>2026-09-29</datestamp></header></record><resumptionToken /></ListRecords></OAI-PMH>'''
+CC = b"https://creativecommons.org/licenses/by/4.0/"
+ARXIV_LICENSE = b"http://arxiv.org/licenses/nonexclusive-distrib/1.0/"
 
 
 def policy(**kwargs) -> DiscoveryPolicy:
@@ -36,10 +41,17 @@ def test_parser_safety_and_missing_fields():
     page = parse_page(PAGE_ONE, 100_000)
     assert page.token == "page-two"
     assert page.papers[0].latest_version == "v1"
+    assert page.papers[0].license_url == ARXIV_LICENSE.decode()
     assert page.papers[0].published == datetime(2026, 9, 28, 10, tzinfo=UTC)
     assert parse_page(PAGE_TWO, 100_000).papers[0].published is None
     malformed_date = PAGE_ONE.replace(b"Mon, 28 Sep 2026 10:00:00 GMT", b"not-a-date")
     assert parse_page(malformed_date, 100_000).papers[0].published is None
+    assert parse_page(PAGE_ONE.replace(ARXIV_LICENSE, CC), 100_000).papers[0].license_url == CC.decode()
+    for invalid_license in (b"javascript:alert(1)", b"https://", b"https://user:pass@example.org/license",
+                            b"https://bad host/license", b"ftp://creativecommons.org/by/4.0/"):
+        assert parse_page(PAGE_ONE.replace(ARXIV_LICENSE, invalid_license), 100_000).papers[0].license_url is None
+    assert parse_page(PAGE_ONE.replace(b"<license>" + ARXIV_LICENSE + b"</license>", b""),
+                      100_000).papers[0].license_url is None
     for bad in (b'<!DOCTYPE a [<!ENTITY x "evil">]><a>&x;</a>',
                 PAGE_ONE.replace(b"2609.00001", b"https://evil.example/"),
                 PAGE_ONE.replace(b"<title>Discovery Alpha</title>", b"")):
@@ -164,9 +176,11 @@ def test_metadata_version_update_preserves_discovery_time(engine, monkeypatch):
     now = datetime(2026, 9, 29, 12, tzinfo=UTC)
     one = DiscoveryPolicy(topics=["cs.AI"], max_pages_per_topic=1)
     first_page = PAGE_ONE.replace(b"<resumptionToken>page-two</resumptionToken>", b"<resumptionToken />")
+    first_page = first_page.replace(ARXIV_LICENSE, CC)
     run_sync(engine, one, fetcher=lambda *_: first_page, now=now)
     updated = first_page.replace(b"<datestamp>2026-09-28</datestamp>", b"<datestamp>2026-09-29</datestamp>")
     updated = updated.replace(b"<title>Discovery Alpha</title>", b"<version version=\"v2\"><date>Tue, 29 Sep 2026 10:00:00 GMT</date></version><title>Discovery Alpha revised</title>")
+    updated = updated.replace(CC, ARXIV_LICENSE)
     run_sync(engine, one, fetcher=lambda *_: updated, now=now + timedelta(days=1), force=True)
     with engine.connect() as db:
         row = db.execute(text("SELECT title, latest_version, first_discovered_at, source_updated_at, content_status FROM discovery_papers")).one()
@@ -176,3 +190,65 @@ def test_metadata_version_update_preserves_discovery_time(engine, monkeypatch):
         assert row.source_updated_at == datetime(2026, 9, 29, 10, tzinfo=UTC)
         assert row.content_status == "metadata_only"
         assert db.scalar(text("SELECT count(*) FROM discovery_papers")) == 1
+        assert db.execute(text("SELECT version_label,license_url FROM discovery_paper_licenses ORDER BY version_label")).all() == [
+            ("v1", CC.decode()), ("v2", ARXIV_LICENSE.decode())]
+        assert db.scalar(text("SELECT count(*) FROM source_files")) == 0
+        assert db.scalar(text("SELECT count(*) FROM index_entries")) == 0
+
+
+@pytest.mark.parametrize("topic", ["cs.CL", "cs.LG"])
+def test_http_406_does_not_advance_until_success(engine, monkeypatch, topic):
+    monkeypatch.setattr("app.discovery._reserve_request", lambda db, policy: None)
+    now = datetime(2026, 9, 29, 12, tzinfo=UTC)
+    one = DiscoveryPolicy(topics=[topic], max_pages_per_topic=1)
+
+    def rejected(*_):
+        raise DiscoveryError("http_406")
+
+    assert run_sync(engine, one, fetcher=rejected, now=now)["pages"] == 0
+    with engine.connect() as db:
+        row = db.execute(text("SELECT window_from,window_until,resumption_token,last_success_at,pages_seen,records_seen,state,last_error FROM discovery_sources WHERE topic=:t"), {"t": topic}).one()
+        assert row.window_from == now.date() - timedelta(days=7)
+        assert row.window_until == now.date()
+        assert row.resumption_token is None and row.last_success_at is None
+        assert row.pages_seen == 0 and row.records_seen == 0
+        assert row.state == "error" and row.last_error == "http_406"
+        assert db.scalar(text("SELECT count(*) FROM discovery_papers")) == 0
+
+    assert run_sync(engine, one, fetcher=lambda *_: PAGE_ONE, now=now + timedelta(minutes=2))["pages"] == 1
+    with engine.connect() as db:
+        row = db.execute(text("SELECT window_from,resumption_token,last_success_at FROM discovery_sources WHERE topic=:t"), {"t": topic}).one()
+        assert row.window_from == now.date() - timedelta(days=7)
+        assert row.resumption_token == "page-two" and row.last_success_at is None
+    assert run_sync(engine, one, fetcher=rejected, now=now + timedelta(minutes=3))["pages"] == 0
+    with engine.connect() as db:
+        row = db.execute(text("SELECT resumption_token,last_success_at,pages_seen,state,last_error FROM discovery_sources WHERE topic=:t"), {"t": topic}).one()
+        assert row.resumption_token == "page-two" and row.last_success_at is None
+        assert row.pages_seen == 1 and row.state == "error" and row.last_error == "http_406"
+    seen_params = []
+    def successful_next_page(params, _):
+        seen_params.append(params)
+        return PAGE_TWO
+    assert run_sync(engine, one, fetcher=successful_next_page, now=now + timedelta(minutes=5))["pages"] == 1
+    assert seen_params == [{"verb": "ListRecords", "resumptionToken": "page-two"}]
+    with engine.connect() as db:
+        row = db.execute(text("SELECT window_from,window_until,resumption_token,last_success_at,state FROM discovery_sources WHERE topic=:t"), {"t": topic}).one()
+        assert row.window_from == now.date() and row.window_until is None
+        assert row.resumption_token is None and row.last_success_at is not None and row.state == "idle"
+
+
+def test_persistent_oai_deleted_record_is_hidden_and_checkpointed(api, monkeypatch):
+    monkeypatch.setattr("app.discovery._reserve_request", lambda db, policy: None)
+    now = datetime(2026, 9, 29, 12, tzinfo=UTC)
+    one = DiscoveryPolicy(topics=["cs.AI"], max_pages_per_topic=1)
+    assert run_sync(api.engine, one, fetcher=lambda *_: PAGE_ONE, now=now)["records"] == 1
+    api.bootstrap_admin()
+    admin = api.admin_browser()
+    assert admin.get("/discovery/papers").json()["total"] == 1
+    assert parse_page(PAGE_DELETED, 100_000).deleted == [("2609.00001", now.date())]
+    assert run_sync(api.engine, one, fetcher=lambda *_: PAGE_DELETED, now=now + timedelta(minutes=2))["records"] == 1
+    assert admin.get("/discovery/papers").json()["total"] == 0
+    with api.engine.connect() as db:
+        assert db.scalar(text("SELECT count(*) FROM discovery_deleted_records")) == 1
+        assert db.scalar(text("SELECT last_success_at FROM discovery_sources WHERE topic='cs.AI'")) is not None
+        assert db.scalar(text("SELECT count(*) FROM source_files")) == 0

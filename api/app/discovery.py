@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from typing import Callable
+from urllib.parse import urlsplit
 
 import httpx
 from defusedxml import ElementTree as ET
@@ -21,7 +22,8 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from app.config import DiscoveryPolicy
-from app.models.discovery import DiscoveryPaper, DiscoveryPaperTopic, DiscoveryRequestClock, DiscoverySource
+from app.models.discovery import (DiscoveryDeletedRecord, DiscoveryPaper, DiscoveryPaperLicense,
+                                  DiscoveryPaperTopic, DiscoveryRequestClock, DiscoverySource)
 
 OAI_URL = "https://oaipmh.arxiv.org/oai"
 OAI = "{http://www.openarchives.org/OAI/2.0/}"
@@ -57,6 +59,7 @@ class Paper:
 @dataclass(frozen=True)
 class Page:
     papers: list[Paper]
+    deleted: list[tuple[str, date]]
     token: str | None
 
 
@@ -73,6 +76,34 @@ def _version_date(value: str | None) -> datetime | None:
         return result.astimezone(UTC) if result.tzinfo else None
     except (TypeError, ValueError, OverflowError):
         return None
+
+
+def _license_url(value: str | None) -> str | None:
+    """Keep an absolute HTTP(S) metadata URL, without inferring any rights."""
+    if not value or len(value) > 2048 or any(c.isspace() or ord(c) < 32 or c == "\\" for c in value):
+        return None
+    try:
+        parsed = urlsplit(value)
+        if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
+            return None
+        _ = parsed.port  # reject malformed port syntax
+    except ValueError:
+        return None
+    return value
+
+
+def _identity(header) -> tuple[str, date]:
+    identifier = _value(header, OAI + "identifier")
+    datestamp = _value(header, OAI + "datestamp")
+    if not identifier or not identifier.startswith("oai:arXiv.org:") or not datestamp:
+        raise DiscoveryError("invalid_record_identity")
+    remote_id = identifier.removeprefix("oai:arXiv.org:")
+    if not ID_RE.fullmatch(remote_id) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", datestamp):
+        raise DiscoveryError("invalid_record_identity")
+    try:
+        return remote_id, date.fromisoformat(datestamp)
+    except ValueError as exc:
+        raise DiscoveryError("invalid_datestamp") from exc
 
 
 def parse_page(data: bytes, max_bytes: int) -> Page:
@@ -92,46 +123,44 @@ def parse_page(data: bytes, max_bytes: int) -> Page:
         if codes == {"badResumptionToken"}:
             raise ExpiredToken("badResumptionToken")
         if codes == {"noRecordsMatch"}:
-            return Page([], None)
+            return Page([], [], None)
         raise DiscoveryError("oai_" + str(next(iter(codes))))
     listing = root.find(OAI + "ListRecords")
     if listing is None:
         raise DiscoveryError("missing_list_records")
     papers: list[Paper] = []
+    deleted: list[tuple[str, date]] = []
     for record in listing.findall(OAI + "record"):
         header = record.find(OAI + "header")
         if header is None:
             raise DiscoveryError("missing_header")
+        remote_id, stamp = _identity(header)
         if header.get("status") == "deleted":
+            deleted.append((remote_id, stamp))
             continue
-        identifier = _value(header, OAI + "identifier")
-        datestamp = _value(header, OAI + "datestamp")
+        if header.get("status") is not None:
+            raise DiscoveryError("invalid_record_status")
         raw = record.find(OAI + "metadata/" + RAW + "arXivRaw")
-        remote_id = _value(raw, RAW + "id") if raw is not None else None
+        metadata_id = _value(raw, RAW + "id") if raw is not None else None
         title = _value(raw, RAW + "title") if raw is not None else None
-        if not remote_id or not ID_RE.fullmatch(remote_id) or identifier != "oai:arXiv.org:" + remote_id or not title or not datestamp:
+        if metadata_id != remote_id or not title:
             raise DiscoveryError("invalid_record_identity")
-        try:
-            stamp = date.fromisoformat(datestamp[:10])
-        except ValueError as exc:
-            raise DiscoveryError("invalid_datestamp") from exc
         versions = raw.findall(RAW + "version")
         valid_versions = [(int(v.get("version")[1:]), v) for v in versions if v.get("version") and VERSION_RE.fullmatch(v.get("version"))]
         valid_versions.sort(key=lambda pair: pair[0])
         first_date = _version_date(_value(valid_versions[0][1], RAW + "date")) if valid_versions else None
         last_date = _version_date(_value(valid_versions[-1][1], RAW + "date")) if valid_versions else None
         latest = "v" + str(valid_versions[-1][0]) if valid_versions else None
-        license_url = _value(raw, RAW + "license")
-        # License is provenance only, never an automatic rights grant.
-        if license_url and not license_url.startswith(("https://arxiv.org/", "http://arxiv.org/")):
-            license_url = None
+        # arXivRaw's single license is metadata of its current/latest version.
+        # Keep it as provenance; rights review of a real file is separate.
+        license_url = _license_url(_value(raw, RAW + "license"))
         papers.append(Paper(remote_id, title[:1000], _value(raw, RAW + "authors"),
                             _value(raw, RAW + "abstract"), _value(raw, RAW + "categories"),
                             license_url, latest, first_date, last_date, stamp))
     token = _value(listing, OAI + "resumptionToken")
     if token and len(token) > 4096:
         raise DiscoveryError("token_too_large")
-    return Page(papers, token)
+    return Page(papers, deleted, token)
 
 
 def fetch_page(params: dict[str, str], policy: DiscoveryPolicy) -> bytes:
@@ -172,7 +201,16 @@ def _reserve_request(db: Session, policy: DiscoveryPolicy) -> None:
 
 
 def _write_page(db: Session, topic: str, page: Page, now: datetime) -> None:
+    for remote_id, stamp in page.deleted:
+        db.execute(insert(DiscoveryDeletedRecord).values(source="arxiv", remote_id=remote_id,
+                   oai_datestamp=stamp).on_conflict_do_update(
+                       index_elements=["source", "remote_id"],
+                       set_={"oai_datestamp": stamp},
+                       where=DiscoveryDeletedRecord.oai_datestamp <= stamp))
     for paper in page.papers:
+        tombstone = db.get(DiscoveryDeletedRecord, ("arxiv", paper.remote_id))
+        if tombstone is not None and tombstone.oai_datestamp >= paper.datestamp:
+            continue
         values = dict(source="arxiv", remote_id=paper.remote_id,
                       original_url=f"https://arxiv.org/abs/{paper.remote_id}", title=paper.title,
                       authors=paper.authors, abstract=paper.abstract, categories=paper.categories,
@@ -187,6 +225,15 @@ def _write_page(db: Session, topic: str, page: Page, now: datetime) -> None:
             where=DiscoveryPaper.oai_datestamp <= paper.datestamp).returning(DiscoveryPaper.id))
         if paper_id is None:
             paper_id = db.scalar(select(DiscoveryPaper.id).where(DiscoveryPaper.source == "arxiv", DiscoveryPaper.remote_id == paper.remote_id))
+        if paper.license_url and paper.latest_version:
+            db.execute(insert(DiscoveryPaperLicense).values(
+                paper_id=paper_id, version_label=paper.latest_version,
+                license_url=paper.license_url, oai_datestamp=paper.datestamp,
+                first_observed_at=now, last_observed_at=now).on_conflict_do_update(
+                    index_elements=["paper_id", "version_label"],
+                    set_={"license_url": paper.license_url, "oai_datestamp": paper.datestamp,
+                          "last_observed_at": now},
+                    where=DiscoveryPaperLicense.oai_datestamp <= paper.datestamp))
         db.execute(insert(DiscoveryPaperTopic).values(paper_id=paper_id, topic=topic)
                    .on_conflict_do_nothing(index_elements=["paper_id", "topic"]))
 
@@ -225,7 +272,7 @@ def run_sync(engine: Engine, policy: DiscoveryPolicy, *, fetcher: Callable[[dict
                             source = db.get(DiscoverySource, topic)
                             _write_page(db, topic, page, now)
                             source.pages_seen += 1
-                            source.records_seen += len(page.papers)
+                            source.records_seen += len(page.papers) + len(page.deleted)
                             source.resumption_token = page.token
                             source.state = "idle"
                             source.consecutive_errors = 0
@@ -239,7 +286,7 @@ def run_sync(engine: Engine, policy: DiscoveryPolicy, *, fetcher: Callable[[dict
                                 source.next_attempt_at = None
                             db.commit()  # paper, topics, token and counters are atomic
                             pages += 1
-                            records += len(page.papers)
+                            records += len(page.papers) + len(page.deleted)
                             if page.token is None:
                                 break
                         except ExpiredToken:

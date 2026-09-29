@@ -63,6 +63,25 @@ class DiscoveryPaperTopic(Base):
     topic: Mapped[str] = mapped_column(Text, ForeignKey("discovery_sources.topic", ondelete="RESTRICT"), primary_key=True)
 
 
+class DiscoveryPaperLicense(Base):
+    """A license URL observed for the then-latest arXiv version, not a grant."""
+    __tablename__ = "discovery_paper_licenses"
+    paper_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("discovery_papers.id", ondelete="CASCADE"), primary_key=True)
+    version_label: Mapped[str] = mapped_column(Text, primary_key=True)
+    license_url: Mapped[str] = mapped_column(Text, nullable=False)
+    oai_datestamp: Mapped[date] = mapped_column(Date, nullable=False)
+    first_observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    last_observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class DiscoveryDeletedRecord(Base):
+    """Persistent OAI tombstone, including IDs not previously discovered."""
+    __tablename__ = "discovery_deleted_records"
+    source: Mapped[str] = mapped_column(Text, primary_key=True)
+    remote_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    oai_datestamp: Mapped[date] = mapped_column(Date, nullable=False)
+
+
 class DiscoveryRequestClock(Base):
     __tablename__ = "discovery_request_clock"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
