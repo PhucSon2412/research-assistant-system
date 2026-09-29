@@ -19,7 +19,7 @@ from app.evaluation.schema import (GROUP_MINIMUMS, HOLDOUT_MINIMUM, NonEvidence,
                                    check_manifest, check_questions, load)
 from app.evaluation.validate import validate
 from app.main import app
-from app.evaluation.report import _comparison
+from app.evaluation.report import _comparison, _pack_sizes
 from app.rag import GenerationResult, is_comparison
 from tests.test_uploads import upload_api  # noqa: F401  (fixture)
 
@@ -47,6 +47,29 @@ def test_committed_dataset_is_valid_and_pending_review(dataset):
     assert {q.label_status for q in qset.questions} == {"pending_human_review"}
     assert all(p.license.redistribution_in_repo and not p.contains_third_party_text for p in manifest.papers)
     assert manifest.representativeness.papers < manifest.representativeness.target_papers
+
+
+def test_pack_size_report_counts_only_payloads_and_keeps_byte_units(dataset):
+    _, qset = dataset
+    dev = next(q for q in qset.questions if q.split == "dev")
+    holdout = next(q for q in qset.questions if q.split == "holdout")
+    records = [
+        {"question_id": dev.id, "stage": "rag_pack", "mode": "hybrid", "generation_called": True,
+         "pack_chunks": 2, "pack_papers": 2, "pack_text_bytes": 500,
+         "prompt_byte_token_ceiling": 1800},
+        {"question_id": holdout.id, "stage": "rag_pack", "mode": "hybrid", "generation_called": True,
+         "pack_chunks": 1, "pack_papers": 1, "pack_text_bytes": 200,
+         "prompt_byte_token_ceiling": 900},
+        {"question_id": dev.id, "stage": "rag_pack", "mode": "hybrid", "generation_called": False,
+         "pack_chunks": 0, "pack_papers": 0, "pack_text_bytes": 0,
+         "prompt_byte_token_ceiling": None},
+    ]
+    sizes = {row["split"]: row for row in _pack_sizes(qset, records)}
+    assert sizes["dev"]["payloads"] == 1 and sizes["dev"]["chunks"] == {2: 1}
+    assert sizes["dev"]["text_bytes"]["max"] == 500
+    assert sizes["dev"]["prompt_byte_token_ceiling"]["max"] == 1800
+    assert sizes["holdout"]["papers"] == {1: 1}
+    assert sizes["all"]["payloads"] == 2
 
 
 def test_label_status_cannot_claim_a_review(dataset):

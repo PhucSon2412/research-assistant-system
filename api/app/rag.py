@@ -159,7 +159,104 @@ def _fresh(db: Session, principal: Principal, item_id: uuid.UUID | None,
     return rows
 
 
-def _pack(hits: list[dict], settings: Settings, *, comparing: bool = False) -> dict[uuid.UUID, dict]:
+_PACK_WORD = re.compile(r"[^\W_]+", re.UNICODE)
+_PACK_ABBREVIATION = re.compile(r"\b[A-Z][A-Z0-9]{1,}\b")
+_CONTEXTUAL_PAIR = re.compile(r"\b(?:(?:these|those|the)\s+two|both)\s+(?:papers|studies|articles)\b",
+                              re.IGNORECASE)
+_EXPLICIT_TITLE_PHRASE = re.compile(r"\b[A-Z][a-z0-9-]+(?:\s+[A-Z][a-z0-9-]+)+\b")
+_EXPLICIT_PAIR_JOIN = re.compile(r"\b(?:and|versus|vs\.?)\b", re.IGNORECASE)
+_PACK_SECTION_ORDER = ("results", "methods", "limitations", "analysis", "discussion",
+                       "abstract", "efficiency", "introduction", "other", "conclusion")
+
+
+def _pack_words(value: str) -> list[str]:
+    return _PACK_WORD.findall(value.casefold())
+
+
+def _comparison_papers(question: str, grouped: dict[str, list[tuple[dict, int]]]) -> tuple[tuple[str, str], bool] | None:
+    """Resolve two distinct title mentions, independently of hit order.
+
+    Scores distinguish a whole title phrase from an abbreviation or a unique
+    title word. Equal best pairs fail closed. Titles only select candidates;
+    evidence still comes exclusively from eligible, ACL-gated chunks.
+    """
+    words: list[str] = []
+    abbreviations: dict[int, str] = {}
+    for token in re.finditer(r"[^\W_]+(?:-[^\W_]+)*", question, re.UNICODE):
+        parts = _pack_words(token.group())
+        if _PACK_ABBREVIATION.fullmatch(token.group()):
+            abbreviations[len(words)] = parts[0]
+        elif len(parts) >= 3:
+            abbreviations[len(words)] = "".join(part[0] for part in parts)
+        words.extend(parts)
+    titles = {paper: [word for word in _pack_words(rows[0][0].get("title") or "")
+                      if not re.fullmatch(r"p\d+", word)] for paper, rows in grouped.items()}
+    counts = {word: sum(word in title for title in titles.values())
+              for title in titles.values() for word in title}
+    title_initials = {paper: {"".join(part[0] for part in title[start:start + length])
+                              for length in range(2, 5) for start in range(len(title) - length + 1)}
+                      for paper, title in titles.items()}
+    matches: dict[str, list[tuple[int, int, int]]] = {}
+    for paper, title in titles.items():
+        found: list[tuple[int, int, int]] = []
+        if len(title) >= 2:
+            for start, word in enumerate(words):
+                if word != title[0]:
+                    continue
+                positions = [start]
+                for title_word in title[1:]:
+                    next_pos = next((pos for pos in range(positions[-1] + 1, min(positions[-1] + 3, len(words)))
+                                    if words[pos] == title_word), None)
+                    if next_pos is None:
+                        break
+                    positions.append(next_pos)
+                if len(positions) == len(title):
+                    gaps = positions[-1] - start + 1 - len(title)
+                    found.append((start, positions[-1], 100 + 10 * len(title) - gaps))
+        for pos, word in enumerate(words):
+            abbreviation = abbreviations.get(pos)
+            # A title such as "GSR replication" cannot claim the bare "GSR"
+            # mention when another title expands to Gated Sparse Routing.
+            conflicting_prefix = abbreviation in title and any(
+                abbreviation in other_initials for other, other_initials in title_initials.items()
+                if other != paper)
+            if abbreviation in (set(title) | title_initials[paper]) and not conflicting_prefix:
+                found.append((pos, pos, 80))
+            next_word = words[pos + 1] if pos + 1 < len(words) else ""
+            if (len(word) >= 5 and word in title and counts[word] == 1
+                    and (word == "benchmark" or next_word in {"study", "paper", "benchmark"})):
+                found.append((pos, pos, 20))
+        matches[paper] = found
+    choices: dict[frozenset[str], tuple[int, bool]] = {}
+    for first, first_matches in matches.items():
+        for second, second_matches in matches.items():
+            if first >= second:
+                continue
+            scores = [(left[2] + right[2], left[2] >= 80 and right[2] >= 80)
+                      for left in first_matches for right in second_matches
+                      if left[1] < right[0] or right[1] < left[0]]
+            if scores:
+                choices[frozenset((first, second))] = max(scores)
+    if not choices:
+        # A deictic reference can identify exactly two scoped papers. Concrete
+        # names or abbreviations must instead resolve through their titles.
+        contextual = (_CONTEXTUAL_PAIR.search(question) and not _PACK_ABBREVIATION.search(question)
+                      and not _EXPLICIT_TITLE_PHRASE.search(question)
+                      and not _EXPLICIT_PAIR_JOIN.search(question))
+        return ((tuple(sorted(grouped)), False) if len(grouped) == 2
+                and not any(matches.values()) and contextual else None)
+    best = max(score for score, _ in choices.values())
+    winners = [(tuple(sorted(pair)), strong) for pair, (score, strong) in choices.items() if score == best]
+    return winners[0] if len(winners) == 1 else None
+
+
+def _pack_section(hit: dict) -> str:
+    heading = hit["text"].split("\n", 1)[0].strip().lstrip("#").strip().casefold()
+    return heading if heading in _PACK_SECTION_ORDER else "other"
+
+
+def _pack(hits: list[dict], settings: Settings, *, comparing: bool = False,
+          question: str = "") -> dict[uuid.UUID, dict]:
     pack: dict[uuid.UUID, dict] = {}
     used = 0
     papers: set[str] = set()
@@ -188,7 +285,32 @@ def _pack(hits: list[dict], settings: Settings, *, comparing: bool = False) -> d
         grouped: dict[str, list[tuple[dict, int]]] = {}
         for hit, size in eligible:
             grouped.setdefault(hit["item_id"], []).append((hit, size))
-        selected = list(grouped)[:policy.max_evidence_papers]
+        resolution = _comparison_papers(question, grouped) if question else None
+        if question and resolution is None:
+            return pack
+        resolved, strong = resolution if resolution else (None, False)
+        selected = list(resolved) if resolved else list(grouped)[:policy.max_evidence_papers]
+        selected = selected[:policy.max_evidence_papers]
+        if strong:
+            # Prefer result/method sections while preserving hit rank within each
+            # section. Round-robin prevents one named paper filling every slot.
+            ordered = {paper: [row for section in _PACK_SECTION_ORDER
+                               for row in grouped[paper] if _pack_section(row[0]) == section]
+                       for paper in selected}
+            minimum = {paper: min(size for _, size in ordered[paper]) for paper in selected}
+            for pos, paper in enumerate(selected):
+                reserved = sum(minimum[other] for other in selected[pos + 1:])
+                for hit, size in ordered[paper]:
+                    if used + size + reserved <= policy.max_evidence_bytes and add(hit, size):
+                        break
+            for _ in range(policy.max_evidence_chunks):
+                if len(pack) >= policy.max_evidence_chunks:
+                    break
+                for paper in selected:
+                    for hit, size in ordered[paper]:
+                        if add(hit, size):
+                            break
+            return pack
         minimum = {paper: min(size for _, size in grouped[paper]) for paper in selected}
         for pos, paper in enumerate(selected):
             reserved = sum(minimum[other] for other in selected[pos + 1:])
@@ -201,6 +323,8 @@ def _pack(hits: list[dict], settings: Settings, *, comparing: bool = False) -> d
     for hit, size in eligible:
         if len(pack) >= policy.max_evidence_chunks:
             break
+        if comparing and resolved and hit["item_id"] not in selected:
+            continue
         add(hit, size)
     return pack
 
@@ -312,7 +436,7 @@ def answer(db: Session, principal: Principal, settings: Settings, item_id: uuid.
     comparing = is_comparison(question) and item_id is None
     retrieval_query = COMPARISON_CUE.sub(" ", question).strip() if comparing and mode == "keyword" else question
     found = search(db, principal, settings, retrieval_query or question, mode, item_id, False, collection_id)
-    pack = _pack(found["hits"], settings, comparing=comparing)
+    pack = _pack(found["hits"], settings, comparing=comparing, question=question)
     coverages = {row["coverage"] for row in pack.values()}
     coverage = ("partial" if "partial" in coverages else next(iter(coverages), None))
     if coverage is None and item_id is not None:
@@ -326,7 +450,7 @@ def answer(db: Session, principal: Principal, settings: Settings, item_id: uuid.
         # Only function words or out-of-range tokens: say so instead of implying a search miss.
         if mode == "keyword" and found["keyword_query"]["status"] == "no_terms":
             return {**base, "reason": "keyword_query_without_terms"}
-        return base
+        return {**base, "reason": "comparison_requires_multiple_papers"} if comparing else base
     # A comparison needs evidence from both sides before any paper text reaches generation.
     if comparing and len({row["item_id"] for row in pack.values()}) < 2:
         return {**base, "coverage": None, "reason": "comparison_requires_multiple_papers"}
@@ -363,7 +487,8 @@ def answer(db: Session, principal: Principal, settings: Settings, item_id: uuid.
     # cannot establish a comparison. This checks structure, not claim semantics.
     incomplete_comparison = bool(comparing and claims and
         not any(claim["comparison"] and COMPARATIVE_ASSERTION.search(claim["text"])
-                and len({cite["item_id"] for cite in claim["citations"]}) >= 2
+                and {cite["item_id"] for cite in claim["citations"]} ==
+                    {row["item_id"] for row in pack.values()}
                 for claim in claims))
     if incomplete_comparison:
         claims = None

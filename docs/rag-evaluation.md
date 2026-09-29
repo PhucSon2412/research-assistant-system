@@ -242,9 +242,47 @@ Tổng của lần `run` trùng báo cáo M4d-1 ở mọi dòng. Nhóm `comparis
 
 **Pipeline trước generation, câu không có đáp án và ACL.** Không đổi: RAG gửi evidence cho câu kỳ vọng `insufficient_evidence` keyword 17/28, hybrid 27/28 (dev 14/22 và 21/22, holdout 3/6 và 6/6, trước = sau); RAG keyword tự từ chối 4 câu so sánh có đáp án vì pack chỉ có một paper (CMP-05, 07, 08, 11 — cùng bốn câu như M4d-1). Báo cáo `run`: 400 bản ghi search/vector/RAG và 87 chunk × 3 identity = 261 lần mở viewer, **0 vi phạm ACL**; 0 payload chứa văn bản chỉ có trong nhãn; khóa payload chỉ `question`/`evidence`; 0 outbound HTTP bị chặn; 239 lời gọi embedder cục bộ. Script trước/sau: 0 vi phạm ở cả hai phía, viewer dev 255 và holdout 246 lần mở, 0 vi phạm.
 
+## M4d-3 — chọn evidence pack cho câu so sánh
+
+Task 3 trong [roadmap](roadmap.md#task-sau-m4c). Hành vi ở [search-and-rag](search-and-rag.md#m4d-3--chọn-evidence-pack-cho-câu-so-sánh), quyết định ở [decisions](decisions.md#quyết-định-triển-khai-m4d-3-2026-09-29). [Báo cáo JSON và bảng chi tiết](../evaluation/rag/reports/rag-eval-2026-09-29-m4d3-pack.md) chứa cả phân bố dev trước/sau. Đo trên code commit `a5edcf8e90ee207926b443d5970892e4458e1b94`, `dirty=false` **trước khi seed và trước khi tạo output**, bằng lệnh `& $py api\m4d3_same_seed.py` với Conda `ras`. Corpus `ras-synthetic-rag-v1` có 87 chunk, vector băm cục bộ, generation giả trả `claims: []`, 80 nhãn `pending_human_review`; rerank và OpenRouter **không** được gọi, `pricing_verified` trong code/config vẫn `false`. Cấu hình: keyword/vector top K 30/30, tối đa 20 hit, pack 3 paper/6 chunk/12.000 byte.
+
+**Chẩn đoán baseline M4d-2.** Tổng phủ pack hybrid 58/63 side; nhóm so sánh 19/24, đủ hai phía 8/12 câu có đáp án. Bốn side `evidence_pack` thuộc dev CMP-04/06/07/13. CMP-10 là holdout đã có chứng cứ trong pack ở baseline này. CMP-04: paper P12/P02 đều trong 3 paper đầu nhưng chunk P02 đúng ở hạng 12, sau 6 slot; CMP-06: P07 đúng ở hạng 20, trong khi P01/P08 nhiễu chen trước, nên vướng cả paper và chunk; CMP-07: P07 Methods hạng 9 và P13 Methods hạng 8 bị thay bởi chunk đầu trong cùng hai paper; CMP-13: P02 Methods hạng 6 thua abstract/section khác. Byte không phải nút thắt trên corpus này: pack gửi generation tối đa 3.207 byte text, dưới trần 12.000 byte. Con số “5 ca” gồm CMP-10 ở [baseline M4c](#kết-quả-lần-chạy-mẫu), giữ làm lịch sử và không dùng để chỉnh luật mới.
+
+**Thử trên dev.** Các phương án M4d-3 đầu tiên: chia slot kèm đếm từ trong chunk giữ 46/51 side hybrid nhưng chuyển lỗi từ CMP-13 sang CMP-08; lọc title sơ bộ không nhận viết tắt/tên file rút gọn còn 42/51. Chọn hai title khớp đầu tiên theo thứ hạng hit rồi ưu tiên section đạt 51/51 nhưng sai danh tính khi có title nhiễu. Bản sửa PR #14 phân giải hai đoạn tên độc lập với hit rank, chặn cặp đồng hạng, tránh nhầm `GSR replication` với paper GSR gốc và viết tắt `CS` từ `code-switched`. Một bản luật quá thận trọng cho 42/51 trên dev; bản cuối đạt 51/51, không làm rơi side dev cũ. Script [`api/m4d3_same_seed.py`](../api/m4d3_same_seed.py) seed qua upload/worker thật, vá tạm pack M4d-2 cho lượt dev trước, chạy pack mới trên cùng DB rồi mới chạy holdout. Lượt `--dev-shapes` chỉ đo dev trên seed riêng; báo cáo chính chứa phân bố trước/sau trên cùng seed. Holdout hoàn chỉnh chỉ chạy sau khi chốt code, không dùng để chọn luật.
+
+**Review ca scope hai paper.** Trên cùng seed dev, so luật ở code `8f0d04d` với code `a5edcf8`: Recall@5 search keyword 28/51 và hybrid 45/51 đều không đổi; phủ pack keyword **29/51 → 29/51**, hybrid **51/51 → 51/51**; nhóm comparison hybrid **20/20 → 20/20**, đủ hai phía **10/10 → 10/10**. Generation giả dev keyword **45 → 45**, hybrid **59 → 59**; số câu không có đáp án vẫn gửi evidence keyword **14 → 14**, hybrid **20 → 20**. **Không có câu dev nào đổi pack hoặc lời gọi generation**. Holdout luật mới đạt hybrid 12/12 side, 2/2 câu comparison đủ hai phía; các outcome chuẩn hóa theo câu không khác báo cáo PR #14 trước đó, nhưng hai lần holdout dùng seed khác nên không coi đây là phép so trước/sau cùng seed. Corpus này thiếu ca câu hỏi nêu GSR/DAS trên scope hai paper khác tên. Test API mới chứng minh ca đó từ chối trước generation, kể cả title chữ thường nối bằng `and`, còn câu `these two papers` dùng hai paper đúng scope; vì vậy 63/63 không kiểm chứng riêng lỗi fallback cũ.
+
+| Stage (side trúng) | Dev trước → sau (51 side) | Holdout sau (12 side) | Tổng sau (63 side) |
+| --- | --- | --- | --- |
+| Recall@5 search keyword | 28 → 28 | 7 | 35 |
+| Recall@5 search hybrid | 45 → 45 | 11 | 56 |
+| Phủ toàn pack keyword | 29 → 29 | 8 | 37 |
+| Phủ toàn pack hybrid | **46 → 51** | 12 | **63** |
+
+Nhóm `comparison` dev: Recall@5 keyword 9/20, hybrid 14/20 side (đủ hai phía lần lượt 3/10 và 5/10); phủ pack keyword 10/20, hybrid **15/20 → 20/20** (đủ hai phía **6/10 → 10/10**). Holdout sau: Recall@5 keyword 1/4, hybrid 3/4 (đủ hai phía 0/2 và 1/2); phủ pack keyword 2/4, hybrid 4/4 (đủ hai phía 1/2 và 2/2). Toàn nhóm sau: pack hybrid 24/24, đủ 12/12. Phủ toàn pack tối đa 6 chunk **không phải** Recall@5.
+
+| Nhóm | Split | Search keyword R@5 | Search hybrid R@5 | Pack keyword | Pack hybrid |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `single_paper` | dev | 10/17 | 17/17 | 10/17 | 17/17 |
+| `single_paper` | holdout | 2/4 | 4/4 | 2/4 | 4/4 |
+| `comparison` | dev | 9/20 | 14/20 | 10/20 | 20/20 |
+| `comparison` | holdout | 1/4 | 3/4 | 2/4 | 4/4 |
+| `partial_pdf` | dev | 6/6 | 6/6 | 6/6 | 6/6 |
+| `partial_pdf` | holdout | 1/1 | 1/1 | 1/1 | 1/1 |
+| `permission` | dev | 2/3 | 3/3 | 2/3 | 3/3 |
+| `permission` | holdout | 2/2 | 2/2 | 2/2 | 2/2 |
+| `references_conflict_injection` | dev | 1/5 | 5/5 | 1/5 | 5/5 |
+| `references_conflict_injection` | holdout | 1/1 | 1/1 | 1/1 | 1/1 |
+
+Trong 14 câu nhiều side có đáp án, pack hybrid sau đủ mọi side 12/12 dev và 2/2 holdout; pack keyword 4/12 dev và 1/2 holdout. Câu kỳ vọng thiếu bằng chứng nhưng vẫn gửi evidence cho generation giả: keyword 14/22 dev, 3/6 holdout; hybrid **21/22 → 20/22** dev, 5/6 holdout. Lời gọi generation giả dev: keyword 45, hybrid **60 → 59**; holdout sau 11 và 15; tổng sau 56 và 74. Câu có tên paper mơ hồ bị chặn trước generation. Không đánh giá abstention đúng vì capture luôn trả không có claim.
+
+**Kích thước pack.** Trên dev cùng seed, hybrid có **60 → 59 payload**: số chunk `{3:1, 4:4, 5:5, 6:50}` → `{3:1, 4:4, 5:5, 6:49}`; số paper `{1:28, 2:6, 3:26}` → `{1:28, 2:13, 3:18}`. Text chunk byte UTF-8 min/trung vị/p95 gần nhất/max: `550/1391,5/2906/3207` → `550/1403/2906/3207`. JSON messages byte min/trung vị/p95/max: `2914/5269/7931/8230` → `2914/5274/7943/8230`. Keyword dev có 45 payload: chunk `{1:16, 2:15, 3:7, 4:5, 5:1, 6:1}` → `{1:16, 2:15, 3:10, 4:3, 6:1}`; paper `{1:34, 2:4, 3:7}` → `{1:34, 2:7, 3:4}`; trung vị text 536 byte và JSON 2.275 byte trước/sau. Phân bố holdout và tổng sau ở báo cáo JSON. Pipeline dùng **số byte JSON messages** như một trần ước lượng token đầu vào để so với `max_input_tokens_estimate=16.000` trước reservation; đây không phải token usage provider đo. Trần evidence vẫn 3 paper/6 chunk/12.000 byte, không tăng cap.
+
+**An toàn và giới hạn.** 400 bản ghi search/vector/RAG và 261 lượt mở viewer (87 chunk × 3 identity), 0 vi phạm ACL; 0 nhãn chỉ có trong payload, 0 outbound HTTP, 239 embedding cục bộ trong lượt sau. Test bao gồm hit nhiễu, chunk sâu, cap/duplicate/reference, `metadata_only`, A/B/Admin, mất membership trước provider và khi generation đang chạy, title nhiễu xếp trước, cặp title đồng hạng và scope hai paper với tên không khớp câu hỏi. Không thay public search ranking, luật so sánh hay keyword query. Kết quả **63/63 chỉ là độ phủ evidence pack trên corpus tổng hợp nhỏ**, không chứng minh chất lượng trên paper thật; 80 nhãn agent chưa được người duyệt. Grounded answer, citation accuracy, abstention appropriateness, chi phí thật, p95 production đều chưa đo.
+
 ## Cần người đọc duyệt và việc tiếp theo
 
 - Duyệt 80 nhãn: quote/side có đủ và đúng không, kỳ vọng `insufficient_evidence` của câu mâu thuẫn (RCI-06), bibliographic (RCI-01) và so sánh một phía có hợp ý sản phẩm không. Sau khi duyệt, đổi trạng thái cần một quyết định schema mới (hiện schema cố ý chỉ nhận `pending_human_review`).
 - Chạy lại `run` với embedding/rerank/generation thật chỉ sau khi đối soát charge trên key và bật `pricing_verified` có chủ đích; khi đó mới có answer để chấm bằng phiếu người đọc và mới báo grounded/citation/abstention.
 - Thêm corpus thật có giấy phép phân phối rõ cho đúng version, tiến dần tới workload 1.000 paper; giữ holdout tách khỏi mọi lần chỉnh.
-- Ba phát hiện search/RAG được tách thành task riêng sau khi merge PR M4c (xem [roadmap](roadmap.md#task-sau-m4c)): keyword query yếu với câu hỏi tự nhiên (đã xử lý ở [M4d-1](#m4d-1--keyword-query-cho-câu-hỏi-tự-nhiên-đo-trướcsau)), regex so sánh bỏ sót “differ” (đã xử lý ở [M4d-2](#m4d-2--nhận-diện-câu-so-sánh-đo-trướcsau)), giới hạn pack so sánh làm rơi chứng cứ (M4d-3). Mỗi task đo lại bằng bộ này, không chỉnh theo holdout.
+- Ba phát hiện search/RAG được tách thành task riêng sau khi merge PR M4c (xem [roadmap](roadmap.md#task-sau-m4c)): keyword query yếu với câu hỏi tự nhiên (đã xử lý ở [M4d-1](#m4d-1--keyword-query-cho-câu-hỏi-tự-nhiên-đo-trướcsau)), regex so sánh bỏ sót “differ” (đã xử lý ở [M4d-2](#m4d-2--nhận-diện-câu-so-sánh-đo-trướcsau)), giới hạn pack so sánh làm rơi chứng cứ (đo ở [M4d-3](#m4d-3--chọn-evidence-pack-cho-câu-so-sánh)). Mỗi task đo lại bằng bộ này, không chỉnh theo holdout.

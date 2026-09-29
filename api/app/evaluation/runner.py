@@ -70,10 +70,12 @@ class Capture:
     rag_hits: list[list[dict]] = field(default_factory=list)
     blocked_hosts: list[str] = field(default_factory=list)
     embedding_calls: int = 0
+    prompt_bytes: list[int] = field(default_factory=list)
 
     def reset(self) -> None:
         self.payloads.clear()
         self.rag_hits.clear()
+        self.prompt_bytes.clear()
 
 
 def eval_settings(base: Settings) -> Settings:
@@ -108,6 +110,7 @@ def instrumented(capture: Capture) -> Iterator[None]:
 
     def capture_generation(messages, settings):
         capture.payloads.append({"system": messages[0]["content"], "user": json.loads(messages[1]["content"])})
+        capture.prompt_bytes.append(len(json.dumps(messages, ensure_ascii=False).encode("utf-8")))
         return GenerationResult('{"claims":[]}', 0, 0, settings.generation.model_id, "local-capture")
 
     def refuse(self, request):
@@ -390,6 +393,9 @@ def evaluate(env: Environment, manifest: Manifest, qset: QuestionSet, seeded: Se
                      [row["item_id"] for row in evidence] + [c["item_id"] for claim in body.get("claims", [])
                                                              for c in claim.get("citations", [])], sent),
                 chunk_ids=[row["chunk_id"] for row in evidence], generation_called=payload is not None,
+                pack_chunks=len(evidence), pack_papers=len({row["item_id"] for row in evidence}),
+                pack_text_bytes=sum(len(row["text"].encode("utf-8")) for row in evidence),
+                prompt_byte_token_ceiling=capture.prompt_bytes[0] if capture.prompt_bytes else None,
                 rag_status=body.get("status"), rag_reason=body.get("reason"), coverage=body.get("coverage"),
                 search_pool=[[h.item, h.locator_kind, h.page, h.start_offset, h.end_offset] for h in pool],
                 gold_label_in_payload=gold_leak, payload_request_keys=sorted(payload) if payload else []))

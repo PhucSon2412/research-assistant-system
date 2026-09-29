@@ -40,7 +40,7 @@ Ba task search/RAG riêng, mở sau khi PR M4c merge; mỗi task là một PR, �
 
 1. **Keyword query (M4d-1, PR riêng):** `plainto_tsquery('simple', câu hỏi)` AND mọi token nên keyword search/RAG gần như không khớp câu hỏi tự nhiên (Recall@5 keyword 1/63 side). M4d-1 dựng query giới hạn từ `ts_debug` cùng cấu hình `simple` (bỏ stop word, ≤ 8 term, khớp ≥ một nửa): Recall@5 keyword 35/63, hybrid không thoái lui; xem [rag-evaluation](rag-evaluation.md#m4d-1--keyword-query-cho-câu-hỏi-tự-nhiên-đo-trướcsau).
 2. **Nhận diện câu so sánh (M4d-2, PR riêng):** `app.rag.COMPARISON` bỏ sót câu dùng “differ” (CMP-03), nên câu đó không qua nhánh pack/gate so sánh. M4d-2 thêm `app.rag.is_comparison`: “differ” chỉ tính khi nêu đủ hai phía (“A and B differ”, “A differs from B”, “between A and B”); nhận diện 14/15 → 15/15, 0/65 dương tính giả, Recall@5/phủ pack không đổi; xem [rag-evaluation](rag-evaluation.md#m4d-2--nhận-diện-câu-so-sánh-đo-trướcsau).
-3. **Giới hạn pack so sánh (M4d-3):** pack ≤ 3 paper/6 chunk theo thứ hạng làm rơi chứng cứ đúng ở 5 câu so sánh (CMP-04, 06, 07, 10, 13); cần phương án chọn chunk/paper và đo lại byte/token.
+3. **Chọn pack so sánh (M4d-3, PR riêng):** baseline M4d-2 pack ≤ 3 paper/6 chunk/12.000 byte có 4 ca dev `evidence_pack` (CMP-04, 06, 07, 13); CMP-10 là holdout và đã có chứng cứ trong pack. Chọn paper được câu hỏi nêu rõ và phân bổ chunk theo section, đo trước/sau trên cùng seed. Con số 5 ca (gồm CMP-10) thuộc baseline M4c lịch sử, xem [rag-evaluation](rag-evaluation.md).
 
 ## Ưu tiên sau MVP — đã xác nhận về thứ tự
 
