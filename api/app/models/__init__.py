@@ -11,7 +11,7 @@ from app.models.index import EmbeddingBudgetDay, EmbeddingCall, EmbeddingUserBud
 from app.models.ingest import Chunk, IngestionJob, IngestStepAttempt, MetadataCandidate, PdfPage, ReferenceEntry, Section
 from app.models.library import LibraryItem, PaperVersion, SourceFile
 from app.models.review import ReviewRequest
-from app.models.rights import AccessRights
+from app.models.rights import AccessRights, CommonPublication, DeletionTombstone
 from app.models.search import RagRequestDay, SearchRequestDay, SearchUsage
 from app.models.upload import ProcessingAcknowledgement, UploadIntent
 
@@ -20,7 +20,7 @@ __all__ = [
     "AuditEvent",
     "Base",
     "BootstrapState",
-    "Collection", "CollectionItem",
+    "Collection", "CollectionItem", "CommonPublication", "DeletionTombstone",
     "DiscoveryDeletedRecord", "DiscoveryPaper", "DiscoveryPaperLicense", "DiscoveryPaperTopic",
     "DiscoveryRequestClock", "DiscoverySource",
     "EmbeddingBudgetDay", "EmbeddingCall", "EmbeddingUserBudgetDay", "IndexEntry", "IndexGeneration",

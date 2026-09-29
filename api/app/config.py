@@ -179,15 +179,25 @@ class CitationPolicy(BaseModel):
 
 
 class Retention(BaseModel):
-    """Cleanup and backup windows (M6)."""
+    """Cleanup and backup windows (M6).
+
+    ``deleted_cleanup_deadline`` is the promise that a revoked common copy's
+    object and derived data are gone (M6b-2a tombstone ``purge_due_at``); the
+    beat task runs every ``cleanup_poll_seconds`` and retries until then.
+    """
 
     deleted_cleanup_deadline: timedelta = timedelta(hours=24)
     backup_retention: timedelta = timedelta(days=30)
+    cleanup_poll_seconds: int = Field(default=900, gt=0)
+    cleanup_batch_size: int = Field(default=50, gt=0, le=1000)
 
     @model_validator(mode="after")
     def _check_positive(self) -> "Retention":
         if self.deleted_cleanup_deadline <= timedelta(0) or self.backup_retention <= timedelta(0):
             raise ValueError("retention windows must be positive")
+        # Several attempts must fit inside the deadline.
+        if timedelta(seconds=self.cleanup_poll_seconds * 4) > self.deleted_cleanup_deadline:
+            raise ValueError("cleanup_poll_seconds must allow at least four attempts before the deadline")
         return self
 
 

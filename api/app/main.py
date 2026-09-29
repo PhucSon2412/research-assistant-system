@@ -32,6 +32,7 @@ app.include_router(discovery.router)
 app.include_router(reviews.router)
 app.include_router(reviews.admin_router)
 app.include_router(publications.router)
+app.include_router(publications.copies_router)
 
 
 @app.get("/healthz")

@@ -38,13 +38,17 @@ class PublicationState(StrEnum):
     """Common items only (private items keep NULL).
 
     ``listed``: metadata visible to every User, the behaviour common items had
-    before M6b-1; it says nothing about full-text rights. ``pending``: a common
-    copy with Admin-recorded AccessRights that is not published yet; no normal
-    route lists, counts or opens it.
+    before M6b-1; it says nothing about full-text rights (that is
+    ``ContentStatus.INDEXED``). ``pending``: a common copy with Admin-recorded
+    AccessRights that is not published yet; no normal route lists, counts or
+    opens it. ``revoked`` (M6b-2a): a reviewed copy whose rights were revoked
+    or recorded in error; final, served by no route, tombstoned for cleanup.
+    Only copies with AccessRights change state (DB trigger).
     """
 
     LISTED = "listed"
     PENDING = "pending"
+    REVOKED = "revoked"
 
 
 class ContentStatus(StrEnum):
@@ -111,6 +115,29 @@ class RightsOrigin(StrEnum):
 class RightsAudience(StrEnum):
     # Every invited account of this instance; no public/anonymous audience.
     INSTANCE_USERS = "instance_users"
+
+
+class RevocationReason(StrEnum):
+    """Why an Admin invalidated a pending or published common copy (M6b-2a)."""
+
+    RIGHTS_RECORDED_IN_ERROR = "rights_recorded_in_error"
+    RIGHTS_WITHDRAWN = "rights_withdrawn"
+    RIGHTS_EXPIRED = "rights_expired"
+    WRONG_FILE_OR_VERSION = "wrong_file_or_version"
+    DUPLICATE_COPY = "duplicate_copy"
+    OTHER = "other"
+
+
+class TombstoneKind(StrEnum):
+    COMMON_COPY = "common_copy"
+
+
+class CleanupObjectOutcome(StrEnum):
+    DELETED = "deleted"
+    ALREADY_ABSENT = "already_absent"
+    # Another row that is not revoked still names the same object key.
+    SHARED_KEPT = "shared_kept"
+    NO_OBJECT = "no_object"
 
 
 class AuditActorType(StrEnum):

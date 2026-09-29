@@ -28,8 +28,10 @@ class LibraryItem(Base):
 
     ``visibility``/``owner_user_id`` are immutable (DB trigger): promotion
     creates a new common item instead of flipping a private one.
-    ``publication_state`` (common only) is set explicitly on insert and has no
-    transition yet (DB trigger); see ``PublicationState``.
+    ``publication_state`` (common only) is set explicitly on insert; only a
+    copy with AccessRights moves ``pending -> listed`` or to the final
+    ``revoked`` (DB trigger, M6b-2a); see ``PublicationState``.
+    A reviewed copy's ``rights_epoch`` never decreases (same trigger).
     """
 
     __tablename__ = "library_items"

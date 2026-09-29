@@ -1,0 +1,667 @@
+"""M6b-2a publication (metadata only), revocation, cleanup and tombstone replay (PostgreSQL + MinIO).
+
+``world(index_a=True)`` indexes A's private copy with the fake embedding provider
+of ``test_private_index`` (in-memory settings copy, no network); nothing here
+calls OpenRouter, and no common copy is ever indexed or sent anywhere.
+"""
+from __future__ import annotations
+
+import hashlib
+import io
+import logging
+import uuid
+from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
+from threading import Barrier, Thread
+
+import pytest
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
+
+from app import db as app_db
+from app import publication
+from app.api.routes import publications
+from app.main import app
+from tests.conftest import drop_database
+from tests.test_review_approval import (A_SHA, ADMIN_EVIDENCE, ADMIN_LICENSE, ADMIN_SOURCE, Faulty, approve,
+                                        object_keys, private_snapshot)
+from tests.test_review_requests import A_BODY, B_BODY, submit, world, write
+from tests.test_uploads import upload_api  # noqa: F401  (fixture)
+
+B_SHA = hashlib.sha256(B_BODY).hexdigest()
+SOURCE_URL = "https://source.example.org/p.md"
+MISSING = {"error": "not_found"}
+# Paper text, rights findings and the checksum must never reach audit rows, tombstones or logs.
+FORBIDDEN_IN_LOGS = ("Reviewable", "seven units", "BSECRET", ADMIN_SOURCE, ADMIN_EVIDENCE, ADMIN_LICENSE, SOURCE_URL,
+                     "Bản chung đã kiểm", A_SHA, B_SHA)
+
+
+def new_copy(api, owner, admin, ids, checksum=A_SHA) -> str:
+    """The owner's request approved into a new pending common copy; returns its item ID."""
+    rid = submit(owner, ids).json()["request"]["id"]
+    response = approve(admin, api, rid, file_checksum_sha256=checksum)
+    assert response.status_code == 200, response.text
+    return response.json()["request"]["pending_publication_id"]
+
+
+def publish(admin, item_id, checksum=A_SHA, **overrides):
+    return write(admin, "POST", f"/admin/common-copies/{item_id}/publish",
+                 {"confirm_publish": True, "file_checksum_sha256": checksum} | overrides)
+
+
+def revoke(admin, item_id, reason="rights_recorded_in_error", **overrides):
+    return write(admin, "POST", f"/admin/common-copies/{item_id}/revoke",
+                 {"confirm_revoke": True, "reason_code": reason} | overrides)
+
+
+def state(api, item_id) -> str:
+    return api.scalar("SELECT publication_state FROM library_items WHERE id=:i", i=uuid.UUID(item_id))
+
+
+def common_key(api, item_id) -> str:
+    return api.scalar("SELECT storage_key FROM source_files WHERE item_id=:i", i=uuid.UUID(item_id))
+
+
+def common_file(api, item_id) -> str:
+    return str(api.scalar("SELECT id FROM source_files WHERE item_id=:i", i=uuid.UUID(item_id)))
+
+
+def live_publications(api) -> int:
+    return api.scalar("SELECT count(*) FROM common_publications WHERE revoked_at IS NULL")
+
+
+def use_storage(fake):
+    app.dependency_overrides[publications._storage] = lambda: fake
+
+
+def listed_ids(browser, scope="all") -> set[str]:
+    return {i["id"] for i in browser.get(f"/library/items?scope={scope}&limit=100").json()["items"]}
+
+
+def content_routes(item_id, file_id) -> list[str]:
+    return [f"/library/items/{item_id}/chunks", f"/library/items/{item_id}/references",
+            f"/library/items/{item_id}/coverage", f"/library/items/{item_id}/metadata-candidates",
+            f"/files/{file_id}/original"]
+
+
+def assert_no_content_access(browser, item_id, file_id, who):
+    for path in content_routes(item_id, file_id):
+        response = browser.get(path)
+        assert (response.status_code, response.json()) == (404, MISSING), (who, path)
+    searched = write(browser, "POST", "/search", {"query": "Reviewable seven units", "mode": "keyword"}).json()
+    assert item_id not in str(searched) and file_id not in str(searched), who
+    assert write(browser, "POST", "/search", {"query": "Reviewable", "mode": "keyword",
+                                              "item_id": item_id}).json() == MISSING, who
+    assert write(browser, "POST", "/rag/ask", {"item_id": item_id, "question": "Reviewable result",
+                                               "mode": "keyword"}).json() == MISSING, who
+
+
+def assert_hidden(browser, item_id, file_id, who):
+    for scope in ("all", "common", "mine"):
+        listed = browser.get(f"/library/items?scope={scope}&limit=100").json()
+        assert item_id not in str(listed), (who, scope)
+        assert browser.get(f"/library/items/count?scope={scope}").json()["total"] == listed["total"], (who, scope)
+    assert browser.get(f"/library/items/{item_id}").json() == MISSING, who
+    assert write(browser, "PATCH", f"/library/items/{item_id}", {"title": "x"}).json() == MISSING, who
+    box = write(browser, "POST", "/collections", {"name": f"{who} probe"}).json()["collection"]
+    assert write(browser, "POST", f"/collections/{box['id']}/items", {"item_id": item_id}).json() == MISSING, who
+    assert_no_content_access(browser, item_id, file_id, who)
+
+
+def no_secrets_in(api, caplog) -> None:
+    dumped = " ".join(filter(None, (
+        api.scalar("SELECT string_agg(details::text, ' ') FROM audit_events"),
+        api.scalar("SELECT string_agg(t::text, ' ') FROM deletion_tombstones t"),
+        caplog.text)))
+    for secret in FORBIDDEN_IN_LOGS:
+        assert secret not in dumped, secret
+
+
+def test_publish_lists_metadata_only_and_nothing_else(upload_api, monkeypatch, caplog):
+    caplog.set_level(logging.INFO)
+    api, storage = upload_api
+    a, b, admin, ids_a, _ = world(api, storage, monkeypatch, index_a=True)
+    legacy = str(api.add_item(owner=None, title="Legacy listed common"))
+    copy = new_copy(api, a, admin, ids_a)
+    file_id = common_file(api, copy)
+    before = private_snapshot(api, ids_a["item_id"])
+    provider_rows = api.scalar("SELECT (SELECT count(*) FROM embedding_calls) + (SELECT count(*) FROM search_usage)")
+
+    # Before publishing, nobody sees the pending copy on a normal route.
+    for who, browser in (("a", a), ("b", b), ("admin", admin)):
+        assert_hidden(browser, copy, file_id, who)
+        assert legacy in listed_ids(browser), who
+
+    response = publish(admin, copy)
+    assert response.status_code == 200, response.text
+    out = response.json()["item"]
+    assert (out["publication_state"], out["published"], out["content_status"], out["fulltext_available"]) == (
+        "listed", True, "metadata_only", False)
+    assert "Toàn văn chưa khả dụng" in out["note"]
+    assert out["publication"]["verified_byte_size"] == len(A_BODY) and out["tombstone"] is None
+    assert out["rights"]["scope"]["original_download"] is True  # recorded, but not opened in this PR
+
+    # Every account now sees the metadata, and only the metadata.
+    for who, browser in (("a", a), ("b", b), ("admin", admin)):
+        assert {copy, legacy} <= listed_ids(browser, "common"), who
+        assert browser.get("/library/items/count?scope=common").json()["total"] == 2, who
+        detail = browser.get(f"/library/items/{copy}").json()["item"]
+        assert (detail["visibility"], detail["content_status"], detail["title"]) == (
+            "common", "metadata_only", "Bản chung đã kiểm"), who
+        assert detail["files"] == [] and detail["jobs"] == [] and detail["can_edit"] is (who == "admin"), who
+        assert [v["source_url"] for v in detail["versions"]] == [SOURCE_URL], who
+        assert "verified_source" not in str(detail) and ADMIN_EVIDENCE not in str(detail), who
+        assert_no_content_access(browser, copy, file_id, who)
+        box = write(browser, "POST", "/collections", {"name": f"{who} reading"}).json()["collection"]
+        assert write(browser, "POST", f"/collections/{box['id']}/items", {"item_id": copy}).status_code == 201, who
+        listed = browser.get(f"/collections/{box['id']}/items").json()
+        assert listed["total"] == 1 and listed["items"][0]["content_status"] == "metadata_only", who
+    assert write(b, "PATCH", f"/library/items/{copy}", {"title": "B edit"}).json() == {"error": "forbidden"}
+
+    # A's private copy still searches for A only; nothing was derived or sent for the common copy.
+    hits = write(a, "POST", "/search", {"query": "Reviewable seven units", "mode": "keyword"}).json()["hits"]
+    assert hits and {h["item_id"] for h in hits} == {ids_a["item_id"]}
+    assert write(b, "POST", "/search", {"query": "Reviewable seven units", "mode": "keyword"}).json()["hits"] == []
+    for table in ("ingestion_jobs", "chunks", "sections", "index_generations", "pdf_pages", "reference_entries"):
+        assert api.scalar(f"SELECT count(*) FROM {table} WHERE item_id=:i", i=uuid.UUID(copy)) == 0, table
+    assert api.scalar("SELECT (SELECT count(*) FROM embedding_calls) + (SELECT count(*) FROM search_usage)") == \
+        provider_rows
+    assert private_snapshot(api, ids_a["item_id"]) == before
+    assert state(api, legacy) == "listed"
+
+    # Admin-only views; the pending list is empty now.
+    assert admin.get("/admin/pending-publications").json()["total"] == 0
+    assert [i["id"] for i in admin.get("/admin/common-copies?state=listed").json()["items"]] == [copy]
+    for browser in (a, b):
+        for path in ("/admin/common-copies", f"/admin/common-copies/{copy}"):
+            assert browser.get(path).status_code == 403
+        assert publish(browser, copy).status_code == 403 and revoke(browser, copy).status_code == 403
+    with api.engine.connect() as conn:
+        audit = conn.execute(text("SELECT outcome, target_id, details FROM audit_events"
+                                  " WHERE action='common_copy.publish'")).one()
+        rights_id = conn.scalar(text("SELECT id FROM access_rights WHERE item_id=:i"), {"i": uuid.UUID(copy)})
+    assert (audit.outcome, audit.target_id) == ("success", copy)
+    assert audit.details == {"access_rights_id": str(rights_id), "source_file_id": file_id}
+    no_secrets_in(api, caplog)
+
+
+def test_publish_refuses_missing_or_altered_common_object(upload_api, monkeypatch, caplog):
+    api, storage = upload_api
+    a, _, admin, ids_a, _ = world(api, storage, monkeypatch)
+    copy = new_copy(api, a, admin, ids_a)
+    key = common_key(api, copy)
+    private_key = api.scalar("SELECT storage_key FROM source_files WHERE id=:f", f=uuid.UUID(ids_a["file_id"]))
+    integrity = {"error": "common_file_integrity_failed"}
+
+    def last_reason():
+        return api.scalar("""SELECT details->>'reason_code' FROM audit_events WHERE action='common_copy.publish'
+            ORDER BY id DESC LIMIT 1""")
+
+    # Same size, different bytes: the private file still matches, the common object does not.
+    same_size = A_BODY.replace(b"seven", b"eight")
+    assert len(same_size) == len(A_BODY)
+    storage.put(key, io.BytesIO(same_size), "text/markdown")
+    assert storage.open(private_key).read() == A_BODY
+    assert publish(admin, copy).json() == integrity and last_reason() == "checksum_mismatch"
+    storage.put(key, io.BytesIO(A_BODY + b"x"), "text/markdown")
+    assert publish(admin, copy).json() == integrity and last_reason() == "checksum_mismatch"
+    storage.delete(key)
+    assert publish(admin, copy).json() == integrity and last_reason() == "object_missing"
+
+    class Down:
+        def open(self, key):
+            raise ConnectionError("synthetic S3 outage")
+
+    use_storage(Down())
+    response = publish(admin, copy)
+    assert (response.status_code, response.json()) == (503, {"error": "publication_storage_unavailable"})
+    app.dependency_overrides.pop(publications._storage, None)
+    assert state(api, copy) == "pending" and live_publications(api) == 0
+    assert api.scalar("SELECT count(*) FROM audit_events WHERE action='common_copy.publish' AND outcome='failure'") == 4
+
+    storage.put(key, io.BytesIO(A_BODY), "text/markdown")
+    assert publish(admin, copy).status_code == 200 and state(api, copy) == "listed"
+    no_secrets_in(api, caplog)
+
+
+def test_publish_needs_confirmation_and_live_rights_at_the_current_epoch(upload_api, monkeypatch):
+    api, storage = upload_api
+    a, b, admin, ids_a, ids_b = world(api, storage, monkeypatch)
+    legacy = str(api.add_item(owner=None, title="Legacy"))
+    copy = new_copy(api, a, admin, ids_a)
+
+    assert publish(admin, copy, checksum="0" * 64).json() == {"error": "checksum_confirmation_mismatch"}
+    for overrides in ({"confirm_publish": False}, {"file_checksum_sha256": "ABC"}, {"title": "x"}):
+        assert publish(admin, copy, **overrides).status_code == 422, overrides
+    assert write(admin, "POST", f"/admin/common-copies/{copy}/publish",
+                 {"confirm_publish": True, "file_checksum_sha256": A_SHA}, origin=None).status_code == 403
+    assert write(admin, "POST", f"/admin/common-copies/{copy}/publish",
+                 {"confirm_publish": True, "file_checksum_sha256": A_SHA}, csrf=False).status_code == 403
+    for other in (uuid.uuid4(), "nope", ids_a["item_id"], ids_b["item_id"], legacy):
+        assert publish(admin, other).json() == MISSING, other  # private and legacy items are not reviewed copies
+        assert revoke(admin, other).json() == MISSING, other
+        assert admin.get(f"/admin/common-copies/{other}").json() == MISSING, other
+    assert state(api, copy) == "pending"
+
+    # A later rights change (epoch bump) makes the recorded rights stale: no publication.
+    with api.engine.begin() as conn:
+        conn.execute(text("UPDATE library_items SET rights_epoch=rights_epoch+1 WHERE id=:i"), {"i": uuid.UUID(copy)})
+    assert publish(admin, copy).json() == {"error": "rights_not_publishable"}
+    with pytest.raises(IntegrityError, match="exactly one live access rights"), api.engine.begin() as conn:
+        conn.execute(text("UPDATE library_items SET publication_state='listed' WHERE id=:i"), {"i": uuid.UUID(copy)})
+    reasons = api.scalar("""SELECT string_agg(details->>'reason_code', ',' ORDER BY id) FROM audit_events
+        WHERE action='common_copy.publish'""")
+    assert reasons.split(",") == ["checksum_confirmation_mismatch", "epoch_mismatch"]
+
+    # A fresh copy publishes once; a repeat is refused and changes nothing.
+    fresh = new_copy(api, a, admin, ids_a)
+    assert publish(admin, fresh).status_code == 200
+    assert publish(admin, fresh).json() == {"error": "already_published"}
+    assert live_publications(api) == 1 and state(api, copy) == "pending"
+
+
+def test_exact_checksum_duplicate_is_refused_and_told_only_to_the_admin(upload_api, monkeypatch):
+    api, storage = upload_api
+    a, b, admin, ids_a, _ = world(api, storage, monkeypatch)
+    first = new_copy(api, a, admin, ids_a)
+    rid2 = submit(a, ids_a).json()["request"]["id"]
+    second = approve(admin, api, rid2).json()["request"]["pending_publication_id"]
+    assert admin.get(f"/admin/common-copies/{second}").json()["item"]["duplicate_published_item_id"] is None
+
+    assert publish(admin, first).status_code == 200
+    assert admin.get(f"/admin/common-copies/{second}").json()["item"]["duplicate_published_item_id"] == first
+    assert publish(admin, second).json() == {"error": "duplicate_published_checksum"}
+    assert state(api, second) == "pending" and live_publications(api) == 1
+    # Nothing is merged, and neither User learns about the duplicate or the second copy.
+    for browser in (a, b):
+        assert first in listed_ids(browser) and second not in listed_ids(browser)
+    mine = a.get(f"/review-requests/{rid2}").json()["request"]
+    assert second not in str(mine) and first not in str(mine) and "duplicate" not in str(mine)
+
+    # The rule is about live publications: after revoking the first, the second may be published.
+    assert revoke(admin, first, "duplicate_copy").status_code == 200
+    assert publish(admin, second).status_code == 200
+    assert [i["id"] for i in admin.get("/admin/common-copies?state=listed").json()["items"]] == [second]
+
+
+def test_concurrent_same_checksum_publishes_one_wins_by_the_db_constraint(upload_api, monkeypatch):
+    api, storage = upload_api
+    a, _, admin, ids_a, _ = world(api, storage, monkeypatch)
+    admin2 = api.admin_browser()
+    copies = [new_copy(api, a, admin, ids_a) for _ in range(2)]
+    # Control: switch off the application pre-check so only the partial unique index decides.
+    monkeypatch.setattr(publication, "live_duplicate", lambda db, checksum, item_id: None)
+    barrier = Barrier(2)
+    for browser in (admin, admin2):
+        browser.csrf()
+
+    def race(pair):
+        browser, item_id = pair
+        barrier.wait()
+        return publish(browser, item_id)
+
+    with ThreadPoolExecutor(2) as pool:
+        results = list(pool.map(race, ((admin, copies[0]), (admin2, copies[1]))))
+    assert sorted(r.status_code for r in results) == [200, 409]
+    loser = next(r for r in results if r.status_code == 409)
+    assert loser.json() == {"error": "duplicate_published_checksum"}
+    assert live_publications(api) == 1 and sorted(state(api, c) for c in copies) == ["listed", "pending"]
+
+    # Two publishes of the same copy: one wins, the other sees it already published.
+    third = new_copy(api, a, admin, ids_a)
+    revoke(admin, next(c for c in copies if state(api, c) == "listed"))
+    barrier = Barrier(2)
+    with ThreadPoolExecutor(2) as pool:
+        results = list(pool.map(race, ((admin, third), (admin2, third))))
+    assert sorted(r.status_code for r in results) == [200, 409]
+    assert {r.json().get("error") for r in results if r.status_code == 409} <= {
+        "already_published", "duplicate_published_checksum"}
+    assert live_publications(api) == 1
+
+
+def test_publish_racing_revoke_never_leaves_a_revoked_copy_listed(upload_api, monkeypatch):
+    api, storage = upload_api
+    a, _, admin, ids_a, _ = world(api, storage, monkeypatch)
+    admin2 = api.admin_browser()
+    for browser in (admin, admin2):
+        browser.csrf()
+    for _ in range(3):
+        copy = new_copy(api, a, admin, ids_a)
+        barrier = Barrier(2)
+
+        def race(action):
+            barrier.wait()
+            return action()
+
+        with ThreadPoolExecutor(2) as pool:
+            published, revoked = pool.map(race, (lambda: publish(admin, copy), lambda: revoke(admin2, copy)))
+        assert revoked.status_code == 200, revoked.text
+        assert published.status_code in (200, 409), published.text
+        if published.status_code == 409:
+            assert published.json() == {"error": "common_copy_revoked"}
+        assert state(api, copy) == "revoked" and live_publications(api) == 0
+        had_publication = api.scalar("SELECT count(*) FROM common_publications WHERE item_id=:i", i=uuid.UUID(copy))
+        assert had_publication == (1 if published.status_code == 200 else 0)
+
+    # Deterministic: a revoke arriving while publish verifies the object waits for it, then wins.
+    copy = new_copy(api, a, admin, ids_a)
+    key = common_key(api, copy)
+    outcome = {}
+
+    def revoke_now():
+        outcome["revoke"] = revoke(admin2, copy)
+
+    class RevokeDuringCheck(Faulty):
+        def open(self, k):
+            if k == key and "thread" not in outcome:
+                outcome["thread"] = Thread(target=revoke_now)
+                outcome["thread"].start()
+                outcome["thread"].join(2)
+                outcome["blocked"] = outcome["thread"].is_alive()  # waiting on publish's row lock
+            return self.storage.open(k)
+
+    use_storage(RevokeDuringCheck(storage))
+    assert publish(admin, copy).status_code == 200
+    outcome["thread"].join(30)
+    assert outcome["blocked"] is True and outcome["revoke"].status_code == 200
+    assert state(api, copy) == "revoked" and live_publications(api) == 0
+    # And after a committed revoke, publishing is refused.
+    assert publish(admin, copy).json() == {"error": "common_copy_revoked"}
+
+
+def test_revoke_hides_the_copy_from_t_rev_and_touches_nothing_else(upload_api, monkeypatch, caplog):
+    caplog.set_level(logging.INFO)
+    api, storage = upload_api
+    a, b, admin, ids_a, ids_b = world(api, storage, monkeypatch, index_a=True)
+    legacy = str(api.add_item(owner=None, title="Legacy"))
+    copy = new_copy(api, a, admin, ids_a)
+    other = new_copy(api, b, admin, ids_b, B_SHA)
+    assert publish(admin, copy).status_code == 200 and publish(admin, other, B_SHA).status_code == 200
+    file_id = common_file(api, copy)
+    box = write(b, "POST", "/collections", {"name": "B reading"}).json()["collection"]
+    for item in (copy, other):
+        assert write(b, "POST", f"/collections/{box['id']}/items", {"item_id": item}).status_code == 201
+    with api.engine.begin() as conn:  # a queued common job (none are created in this PR) must be cancelled
+        job = conn.scalar(text("""INSERT INTO ingestion_jobs(origin, scope_visibility, item_id, idempotency_key)
+            VALUES ('promotion', 'common', :i, 'm6b2a-fixture') RETURNING id"""), {"i": uuid.UUID(copy)})
+    before_a, before_b = private_snapshot(api, ids_a["item_id"]), private_snapshot(api, ids_b["item_id"])
+    recorded_cols = ("verified_source, verified_source_url, license_url, evidence_note, checked_on, reviewer_user_id,"
+                     " recorded_at, scope_audience, permits_original_download, permits_fulltext_search,"
+                     " permits_external_processing, scope_conditions, rights_epoch_at_grant, file_checksum_sha256")
+    rights_before = api.scalar(f"SELECT ROW({recorded_cols})::text FROM access_rights WHERE item_id=:i",
+                               i=uuid.UUID(copy))
+    keys = object_keys(storage)
+
+    response = revoke(admin, copy, "rights_withdrawn")
+    assert response.status_code == 200, response.text
+    assert response.json()["cancelled_jobs"] == 1
+    out = response.json()["item"]
+    assert (out["publication_state"], out["published"], out["rights"]["revocation_reason_code"]) == (
+        "revoked", False, "rights_withdrawn")
+    tomb = out["tombstone"]
+    assert (tomb["reason_code"], tomb["prior_publication_state"], tomb["purged_at"], tomb["overdue"]) == (
+        "rights_withdrawn", "listed", None, False)
+
+    # From the commit, no normal route serves the copy, even though its membership row and object remain.
+    assert api.scalar("SELECT count(*) FROM collection_items WHERE item_id=:i", i=uuid.UUID(copy)) == 1
+    assert key_present(storage, common_key(api, copy))
+    for who, browser in (("a", a), ("b", b), ("admin", admin)):
+        assert_hidden(browser, copy, file_id, who)
+        assert {other, legacy} <= listed_ids(browser), who
+    assert [i["id"] for i in b.get(f"/collections/{box['id']}/items").json()["items"]] == [other]
+    assert b.get(f"/collections/{box['id']}/items").json()["total"] == 1
+
+    with api.engine.connect() as conn:
+        item = conn.execute(text("SELECT rights_epoch, publication_state FROM library_items WHERE id=:i"),
+                            {"i": uuid.UUID(copy)}).one()
+        rights = conn.execute(text("SELECT revoked_at, revocation_reason_code, rights_epoch_at_revoke"
+                                   " FROM access_rights WHERE item_id=:i"), {"i": uuid.UUID(copy)}).one()
+        cancelled = conn.execute(text("SELECT cancel_requested, cancel_requested_at FROM ingestion_jobs WHERE id=:j"),
+                                 {"j": job}).one()
+    assert tuple(item) == (1, "revoked")
+    assert rights.revoked_at == api.clock.now and tuple(rights)[1:] == ("rights_withdrawn", 1)
+    assert cancelled.cancel_requested is True and cancelled.cancel_requested_at == api.clock.now
+    # Only the revocation fields changed; what the Admin recorded stays as written.
+    assert api.scalar(f"SELECT ROW({recorded_cols})::text FROM access_rights WHERE item_id=:i",
+                      i=uuid.UUID(copy)) == rights_before
+    # A's and B's private items, the other common copy and every object are untouched.
+    assert private_snapshot(api, ids_a["item_id"]) == before_a and private_snapshot(api, ids_b["item_id"]) == before_b
+    assert state(api, other) == "listed" and state(api, legacy) == "listed"
+    assert object_keys(storage) == keys
+    hits = write(a, "POST", "/search", {"query": "Reviewable seven units", "mode": "keyword"}).json()["hits"]
+    assert {h["item_id"] for h in hits} == {ids_a["item_id"]}
+    assert a.get(f"/files/{ids_a['file_id']}/original").content == A_BODY
+
+    # Final: repeats and a publish are refused; the DB refuses any way back.
+    assert revoke(admin, copy).json() == {"error": "common_copy_revoked"}
+    assert publish(admin, copy).json() == {"error": "common_copy_revoked"}
+    for statement, message in (
+            ("UPDATE library_items SET publication_state='listed' WHERE id=:i", "not allowed"),
+            ("UPDATE access_rights SET revoked_at=NULL, revoked_by_user_id=NULL, revocation_reason_code=NULL,"
+             " rights_epoch_at_revoke=NULL WHERE item_id=:i", "final"),
+            ("UPDATE access_rights SET evidence_note='rewritten' WHERE item_id=:i", "final"),
+            ("DELETE FROM deletion_tombstones WHERE item_id=:i", "never deleted"),
+            ("UPDATE deletion_tombstones SET reason_code='other' WHERE item_id=:i", "cleanup progress"),
+            ("DELETE FROM common_publications WHERE item_id=:i", "never deleted"),
+            ("UPDATE library_items SET rights_epoch=0 WHERE id=:i", "never decreases")):
+        with pytest.raises(IntegrityError, match=message), api.engine.begin() as conn:
+            conn.execute(text(statement), {"i": uuid.UUID(copy)})
+    with pytest.raises(IntegrityError, match="never deleted"), api.engine.begin() as conn:
+        conn.execute(text("TRUNCATE deletion_tombstones"))
+    with api.engine.connect() as conn:
+        audit = conn.execute(text("SELECT details FROM audit_events WHERE action='common_copy.revoke'"
+                                  " AND outcome='success'")).scalar_one()
+    assert audit == {"reason_code": "rights_withdrawn", "from_state": "listed", "tombstone_id": tomb["id"],
+                     "cancelled_jobs": 1}
+    no_secrets_in(api, caplog)
+
+
+def key_present(storage, key) -> bool:
+    return key in object_keys(storage)
+
+
+def test_cancel_pending_copy_revokes_it_without_a_publication(upload_api, monkeypatch):
+    api, storage = upload_api
+    a, b, admin, ids_a, _ = world(api, storage, monkeypatch)
+    rid = submit(a, ids_a).json()["request"]["id"]
+    copy = approve(admin, api, rid).json()["request"]["pending_publication_id"]
+    assert revoke(admin, copy, "rights_recorded_in_error", confirm_revoke=False).status_code == 422
+    assert revoke(admin, copy, "not-a-reason").status_code == 422
+
+    response = revoke(admin, copy, "rights_recorded_in_error")
+    assert response.status_code == 200 and response.json()["cancelled_jobs"] == 0
+    tomb = response.json()["item"]["tombstone"]
+    assert tomb["prior_publication_state"] == "pending"
+    assert api.scalar("SELECT count(*) FROM common_publications") == 0
+    assert admin.get("/admin/pending-publications").json()["total"] == 0
+    assert admin.get(f"/admin/pending-publications/{copy}").json() == MISSING
+    assert [i["id"] for i in admin.get("/admin/common-copies?state=revoked").json()["items"]] == [copy]
+    assert publish(admin, copy).json() == {"error": "common_copy_revoked"}
+    for who, browser in (("a", a), ("b", b), ("admin", admin)):
+        assert_hidden(browser, copy, common_file(api, copy), who)
+    # The owner's request stays approved; the owner learns nothing of the copy or its revocation.
+    mine = a.get(f"/review-requests/{rid}").json()["request"]
+    assert mine["status"] == "approved" and copy not in str(mine) and "revoke" not in str(mine)
+    assert a.get(f"/files/{ids_a['file_id']}/original").content == A_BODY
+
+
+def test_cleanup_removes_only_the_common_object_and_is_safe_to_repeat(upload_api, monkeypatch, caplog):
+    caplog.set_level(logging.INFO)
+    api, storage = upload_api
+    a, b, admin, ids_a, _ = world(api, storage, monkeypatch)
+    private_key = api.scalar("SELECT storage_key FROM source_files WHERE id=:f", f=uuid.UUID(ids_a["file_id"]))
+    copies = [new_copy(api, a, admin, ids_a) for _ in range(4)]
+    assert publish(admin, copies[0]).status_code == 200
+    box = write(b, "POST", "/collections", {"name": "B"}).json()["collection"]
+    write(b, "POST", f"/collections/{box['id']}/items", {"item_id": copies[0]})
+    keys = {c: common_key(api, c) for c in copies}
+    # copies[2]'s object also backs a private file of A (a physical object shared by a valid item).
+    with api.engine.begin() as conn:
+        version = conn.scalar(text("INSERT INTO paper_versions(item_id, version_label) VALUES (:i, 'v2') RETURNING id"),
+                              {"i": uuid.UUID(ids_a["item_id"])})
+        conn.execute(text("""INSERT INTO source_files(item_id, version_id, storage_key, verified_mime, byte_size,
+            checksum_sha256, file_source) VALUES (:i, :v, :k, 'text/markdown', :n, :h, 'upload')"""),
+            {"i": uuid.UUID(ids_a["item_id"]), "v": version, "k": keys[copies[2]], "n": len(A_BODY), "h": A_SHA})
+    for c in copies[:3]:
+        assert revoke(admin, c).status_code == 200
+    storage.delete(keys[copies[1]])  # e.g. deleted by hand, or by a run whose commit was lost
+    now = api.clock.now
+
+    # Storage down: nothing is marked purged, the error code is kept, the next run retries.
+    class Down:
+        def size(self, key):
+            raise ConnectionError("synthetic S3 outage")
+
+    counts = publication.cleanup_revoked(api.engine, Down(), now, 50)
+    assert counts == {"error:storage_unavailable": 2, "shared_kept": 1}
+    assert api.scalar("SELECT count(*) FROM deletion_tombstones WHERE purged_at IS NULL AND cleanup_attempts=1"
+                      " AND last_cleanup_error='storage_unavailable'") == 2
+
+    counts = publication.cleanup_revoked(api.engine, storage, now + timedelta(minutes=15), 50)
+    assert counts == {"deleted": 1, "already_absent": 1}
+    remaining = object_keys(storage)
+    assert keys[copies[0]] not in remaining and keys[copies[1]] not in remaining
+    assert {private_key, keys[copies[2]], keys[copies[3]]} <= remaining  # private, shared and unrevoked kept
+    assert storage.open(private_key).read() == A_BODY
+    assert api.scalar("SELECT count(*) FROM collection_items WHERE item_id=:i", i=uuid.UUID(copies[0])) == 0
+    with api.engine.connect() as conn:
+        outcomes = dict(conn.execute(text("SELECT item_id::text, object_outcome FROM deletion_tombstones")).all())
+    assert outcomes == {copies[0]: "deleted", copies[1]: "already_absent", copies[2]: "shared_kept"}
+    detail = admin.get(f"/admin/common-copies/{copies[0]}").json()["item"]["tombstone"]
+    assert detail["object_outcome"] == "deleted" and detail["purged_at"] and detail["cleanup_attempts"] == 2
+    assert detail["last_cleanup_error"] is None
+    # A's private file sharing the key still opens for A (and only A).
+    shared_file = api.scalar("SELECT id FROM source_files WHERE storage_key=:k AND item_id=:i",
+                             k=keys[copies[2]], i=uuid.UUID(ids_a["item_id"]))
+    assert a.get(f"/files/{shared_file}/original").content == A_BODY
+    assert b.get(f"/files/{shared_file}/original").status_code == 404
+
+    # Rerunning is a no-op.
+    assert publication.cleanup_revoked(api.engine, storage, now + timedelta(hours=1), 50) == {}
+    assert state(api, copies[3]) == "pending"
+
+    # Derived full-text rows (none exist in this PR) block purging instead of being left behind.
+    assert revoke(admin, copies[3]).status_code == 200
+    with api.engine.begin() as conn:
+        conn.execute(text("""INSERT INTO metadata_candidates(item_id, version_id, source_file_id, field_name, value,
+            locator_kind, start_offset, end_offset, pipeline_version)
+            SELECT item_id, version_id, id, 'title', 'T', 'markdown', 0, 1, 'fixture' FROM source_files
+            WHERE item_id=:i"""),
+            {"i": uuid.UUID(copies[3])})
+    assert publication.cleanup_revoked(api.engine, storage, now + timedelta(hours=2), 50) == {
+        "error:derived_rows_present": 1}
+    assert key_present(storage, keys[copies[3]])
+    overdue = admin.get(f"/admin/common-copies/{copies[3]}")
+    assert overdue.json()["item"]["tombstone"]["last_cleanup_error"] == "derived_rows_present"
+    api.clock.advance(hours=25)
+    admin = api.admin_browser()  # the old session went idle
+    assert admin.get(f"/admin/common-copies/{copies[3]}").json()["item"]["tombstone"]["overdue"] is True
+    no_secrets_in(api, caplog)
+
+
+def test_restore_replays_tombstones_before_serving(upload_api, monkeypatch, admin_engine, app_env):
+    api, storage = upload_api
+    a, b, admin, ids_a, _ = world(api, storage, monkeypatch)
+    copy = new_copy(api, a, admin, ids_a)
+    assert publish(admin, copy).status_code == 200
+    key = common_key(api, copy)
+    live_url = api.engine.url
+
+    # "Backup": a copy of the database taken while the copy was published.
+    api.engine.dispose()
+    app_db.get_engine().dispose()
+    with admin_engine.connect() as conn:
+        conn.execute(text("SELECT pg_terminate_backend(pid) FROM pg_stat_activity"
+                          " WHERE datname=:d AND pid <> pg_backend_pid()"), {"d": live_url.database})
+    snapshot_url = live_url.set(database=f"ras_test_{uuid.uuid4().hex[:12]}")
+    with admin_engine.connect() as conn:
+        conn.execute(text(f'CREATE DATABASE "{snapshot_url.database}" TEMPLATE "{live_url.database}"'))
+    snapshot = app_db.make_engine(snapshot_url)
+    try:
+        assert revoke(admin, copy, "rights_withdrawn").status_code == 200
+        assert publication.cleanup_revoked(api.engine, storage, api.clock.now, 50) == {"deleted": 1}
+        with app_db.get_sessionmaker()() as db:
+            journal = publication.export_tombstones(db)
+        assert [e["item_id"] for e in journal] == [copy]
+        for secret in FORBIDDEN_IN_LOGS:
+            assert secret not in str(journal)
+
+        # Restore the old database and the object store backup: the copy would be served again...
+        app_env(snapshot_url)
+        storage.put(key, io.BytesIO(A_BODY), "text/markdown")
+        assert copy in listed_ids(b)
+        # ...so the journal is applied before traffic, and then cleanup runs on the restored store.
+        assert publication.apply_tombstones(snapshot, journal) == {"revoked": 1}
+        assert copy not in listed_ids(b) and b.get(f"/library/items/{copy}").json() == MISSING
+        with snapshot.connect() as conn:
+            row = conn.execute(text("SELECT i.publication_state, i.rights_epoch, r.revocation_reason_code,"
+                                    " p.revoked_at IS NOT NULL FROM library_items i JOIN access_rights r"
+                                    " ON r.item_id=i.id JOIN common_publications p ON p.item_id=i.id WHERE i.id=:i"),
+                               {"i": uuid.UUID(copy)}).one()
+        assert tuple(row) == ("revoked", 1, "rights_withdrawn", True)
+        assert publication.cleanup_revoked(snapshot, storage, api.clock.now, 50) == {"deleted": 1}
+        assert not key_present(storage, key)
+        assert publication.apply_tombstones(snapshot, journal) == {"present": 1}  # safe to repeat
+        assert storage.open(api.scalar("SELECT storage_key FROM source_files WHERE id=:f",
+                                       f=uuid.UUID(ids_a["file_id"]))).read() == A_BODY
+    finally:
+        snapshot.dispose()
+        app_db.get_engine().dispose()
+        app_db.get_engine.cache_clear()
+        drop_database(admin_engine, snapshot_url)
+
+
+def test_schema_keeps_publication_and_revocation_consistent(upload_api, monkeypatch):
+    api, storage = upload_api
+    a, _, admin, ids_a, _ = world(api, storage, monkeypatch)
+    copies = [new_copy(api, a, admin, ids_a) for _ in range(2)]
+    admin_id = api.scalar("SELECT id FROM users WHERE role='admin'")
+    user_id = api.scalar("SELECT id FROM users WHERE email='a@example.org'")
+    ids = [uuid.UUID(c) for c in copies]
+    list_sql = "UPDATE library_items SET publication_state='listed' WHERE id=:i"
+    record_sql = """INSERT INTO common_publications(item_id, access_rights_id, file_checksum_sha256,
+        verified_byte_size, published_at, published_by_user_id)
+        SELECT item_id, id, file_checksum_sha256, 10, now(), :by FROM access_rights WHERE item_id=:i"""
+
+    def fails(message, *statements):
+        with pytest.raises(IntegrityError, match=message), api.engine.begin() as conn:
+            for statement, params in statements:
+                conn.execute(text(statement) if isinstance(statement, str) else statement, params)
+
+    fails("only an admin publishes", (list_sql, {"i": ids[0]}), (record_sql, {"i": ids[0], "by": user_id}))
+    fails("needs its publication record", ("UPDATE library_items SET publication_state='listed' WHERE id=:i",
+                                           {"i": ids[0]}))
+    fails("no full-text path", ("UPDATE library_items SET content_status='indexed', active_version_id="
+                                "(SELECT id FROM paper_versions WHERE item_id=:i) WHERE id=:i", {"i": ids[0]}))
+    fails("live access rights", (record_sql, {"i": ids[0], "by": admin_id}))  # still pending
+    with api.engine.begin() as conn:
+        conn.execute(text(list_sql), {"i": ids[0]})
+        conn.execute(text(record_sql), {"i": ids[0], "by": admin_id})
+    # Control for the concurrency test: the partial unique index alone refuses a second live checksum.
+    fails("uq_common_publications_live_checksum", (list_sql, {"i": ids[1]}),
+          (record_sql, {"i": ids[1], "by": admin_id}))
+    fails("only update to a publication record",
+          ("UPDATE common_publications SET verified_byte_size=11 WHERE item_id=:i", {"i": ids[0]}))
+
+    revoke_item = "UPDATE library_items SET publication_state='revoked', rights_epoch=rights_epoch+:bump WHERE id=:i"
+    revoke_rights = ("UPDATE access_rights SET revoked_at=now(), revoked_by_user_id=:by, revocation_reason_code='other',"
+                     " rights_epoch_at_revoke=(SELECT rights_epoch FROM library_items WHERE id=:i) WHERE item_id=:i")
+    revoke_pub = "UPDATE common_publications SET revoked_at=now() WHERE item_id=:i"
+    tombstone = """INSERT INTO deletion_tombstones(target_kind, item_id, reason_code, prior_publication_state,
+        rights_epoch, recorded_at, recorded_by_user_id, purge_due_at)
+        VALUES ('common_copy', :i, 'other', 'listed', 1, now(), :by, now() + interval '1 day')"""
+    p = {"i": ids[0], "by": admin_id, "bump": 1}
+    fails("must bump the rights epoch", (revoke_item, p | {"bump": 0}))
+    fails("rights and publication revoked", (revoke_item, p), (tombstone, p))
+    fails("only an admin revokes", (revoke_item, p), (revoke_rights, p | {"by": user_id}))
+    fails("needs its tombstone", (revoke_item, p), (revoke_rights, p), (revoke_pub, p))
+    fails("need their common copy revoked", ("UPDATE library_items SET rights_epoch=rights_epoch+1 WHERE id=:i", p),
+          (revoke_rights, p))
+    fails("must be revoked", (tombstone, {"i": ids[1], "by": admin_id}))
+    # Legacy listed common items have no rights and no transition.
+    legacy = api.add_item(owner=None, title="Legacy")
+    fails("only a common copy with recorded rights", (revoke_item, {"i": legacy, "bump": 1}))
+    with api.engine.begin() as conn:
+        for statement in (revoke_item, revoke_rights, revoke_pub, tombstone):
+            conn.execute(text(statement), p)
+    assert state(api, copies[0]) == "revoked" and live_publications(api) == 0

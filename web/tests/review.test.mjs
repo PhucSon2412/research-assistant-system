@@ -3,7 +3,8 @@ import { createServer } from "node:http";
 import test from "node:test";
 import { loadProxyConfig, proxyRequest } from "../lib/proxy.ts";
 import {
-  EMPTY_APPROVE_FORM, closeReasonText, fileChoiceLabel, makeApproveBody, makeReviewBody, reviewDownloadHref,
+  COMMON_METADATA_ONLY_NOTE, EMPTY_APPROVE_FORM, PUBLICATION_STATE_TEXT, REVOCATION_REASONS, closeReasonText,
+  fileChoiceLabel, makeApproveBody, makePublishBody, makeReviewBody, makeRevokeBody, reviewDownloadHref,
 } from "../lib/review.ts";
 import { streamFromApi } from "../lib/stream.ts";
 
@@ -124,7 +125,9 @@ test("JSON proxy forwards review-request JSON but never buffers an original", as
   try {
     for (const path of ["review-requests", "review-requests/notice", `review-requests/${RID}/withdraw`,
       "admin/review-requests", `admin/review-requests/${RID}`, `admin/review-requests/${RID}/reject`,
-      `admin/review-requests/${RID}/approve`, "admin/pending-publications", `admin/pending-publications/${FID}`]) {
+      `admin/review-requests/${RID}/approve`, "admin/pending-publications", `admin/pending-publications/${FID}`,
+      "admin/common-copies", `admin/common-copies/${FID}`, `admin/common-copies/${FID}/publish`,
+      `admin/common-copies/${FID}/revoke`]) {
       const res = await proxyRequest(browserGet(path), path.split("/"), config);
       assert.equal(res.status, 200, path);
       assert.equal(api.seen.at(-1).url, `/${path}`);
@@ -138,4 +141,21 @@ test("JSON proxy forwards review-request JSON but never buffers an original", as
   } finally {
     await api.close();
   }
+});
+
+test("publish and revoke bodies need the unticked confirmation; revoke sends a code, never free text", () => {
+  const checksum = "b".repeat(64);
+  assert.deepEqual(makePublishBody(true, checksum), { confirm_publish: true, file_checksum_sha256: checksum });
+  for (const [confirmed, sum] of [[false, checksum], [true, ""], [true, "B".repeat(64)], [true, "b".repeat(63)]]) {
+    assert.equal(makePublishBody(confirmed, sum), null);
+  }
+  assert.deepEqual(makeRevokeBody(true, "rights_withdrawn"), { confirm_revoke: true, reason_code: "rights_withdrawn" });
+  for (const [confirmed, reason] of [[false, "other"], [true, ""], [true, "because I said so"], [true, "toString"]]) {
+    assert.equal(makeRevokeBody(confirmed, reason), null, `${confirmed} ${reason}`);
+  }
+  assert.deepEqual(Object.keys(REVOCATION_REASONS).sort(), ["duplicate_copy", "other", "rights_expired",
+    "rights_recorded_in_error", "rights_withdrawn", "wrong_file_or_version"]);
+  // "Listed" is metadata only; the page must never read as full text being available.
+  assert.match(PUBLICATION_STATE_TEXT.listed, /toàn văn chưa khả dụng/);
+  assert.match(COMMON_METADATA_ONLY_NOTE, /^Toàn văn chưa khả dụng/);
 });

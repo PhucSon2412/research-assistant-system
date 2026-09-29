@@ -44,6 +44,7 @@ EXPECTED_TABLES = {
     "reference_citation_links",
     "review_requests",
     "access_rights",
+    "common_publications", "deletion_tombstones",
 }
 
 
@@ -217,7 +218,7 @@ def test_0021_upgrades_m6a_database_keeps_common_listed_and_requests(empty_db_ur
         conn.execute(text("UPDATE review_requests SET status='withdrawn', closed_at=now(), closed_by_user_id=:o,"
                           " close_reason_code='withdrawn_by_requester' WHERE id=:r"), {"o": owner, "r": withdrawn})
         open_rr = conn.scalar(request, ids)
-    upgrade(empty_db_url)
+    upgrade(empty_db_url, "0021")
     with eng.connect() as conn:
         states = dict(conn.execute(text("SELECT id, publication_state FROM library_items")).all())
         assert states == {item: None, common: "listed"}  # existing common items keep their visibility
@@ -245,6 +246,65 @@ def test_0021_upgrades_m6a_database_keeps_common_listed_and_requests(empty_db_ur
     eng.dispose()
     with pytest.raises(Exception, match="approved review requests exist"):
         command.downgrade(alembic_config(empty_db_url), "0020")
+
+
+def test_0022_upgrades_m6b1_database_keeps_pending_and_listed_then_gates_publication(empty_db_url: str) -> None:
+    from app.identity.passwords import hash_password
+
+    upgrade(empty_db_url, "0021")
+    eng = create_engine(empty_db_url)
+    verifier = hash_password("synthetic-password-long")
+    with eng.begin() as conn:
+        owner = conn.scalar(text("INSERT INTO users(email,password_verifier) VALUES('m6c@example.org',:p) RETURNING id"),
+                            {"p": verifier})
+        admin = conn.scalar(text("INSERT INTO users(email,password_verifier,role) VALUES('adm6c@example.org',:p,"
+                                 "'admin') RETURNING id"), {"p": verifier})
+        item = conn.scalar(text("INSERT INTO library_items(visibility,owner_user_id,title) VALUES('private',:o,'P')"
+                                " RETURNING id"), {"o": owner})
+        legacy = conn.scalar(text("INSERT INTO library_items(visibility,publication_state,title)"
+                                  " VALUES('common','listed','Legacy') RETURNING id"))
+        version = conn.scalar(text("INSERT INTO paper_versions(item_id) VALUES(:i) RETURNING id"), {"i": item})
+        source = conn.scalar(text("INSERT INTO source_files(item_id,version_id,storage_key,verified_mime,byte_size,"
+                                  "checksum_sha256) VALUES(:i,:v,'private-key','text/markdown',100,:h) RETURNING id"),
+                             {"i": item, "v": version, "h": "f" * 64})
+        rr = conn.scalar(text("""INSERT INTO review_requests(item_id,version_id,source_file_id,requester_user_id,status,
+            file_checksum_sha256,rights_epoch_at_submit,notice_version,declared_source,declared_rights,submitted_at)
+            VALUES(:i,:v,:f,:o,'open',:h,0,'n','src','rights',now()) RETURNING id"""),
+                         {"i": item, "v": version, "f": source, "o": owner, "h": "f" * 64})
+        pending = conn.scalar(text("INSERT INTO library_items(visibility,publication_state,title)"
+                                   " VALUES('common','pending','Copy') RETURNING id"))
+        pv = conn.scalar(text("INSERT INTO paper_versions(item_id) VALUES(:i) RETURNING id"), {"i": pending})
+        pf = conn.scalar(text("INSERT INTO source_files(item_id,version_id,storage_key,verified_mime,byte_size,"
+                              "checksum_sha256) VALUES(:i,:v,'copy-key','text/markdown',100,:h) RETURNING id"),
+                         {"i": pending, "v": pv, "h": "f" * 64})
+        rights = conn.scalar(text("""INSERT INTO access_rights(item_id,version_id,source_file_id,file_checksum_sha256,
+            origin_kind,origin_review_request_id,verified_source,evidence_note,checked_on,reviewer_user_id,recorded_at,
+            scope_audience,permits_original_download,permits_fulltext_search,permits_external_processing,
+            rights_epoch_at_grant) VALUES(:i,:v,:f,:h,'review_request',:r,'checked','evidence',CURRENT_DATE,:a,now(),
+            'instance_users',true,false,false,0) RETURNING id"""),
+                             {"i": pending, "v": pv, "f": pf, "h": "f" * 64, "r": rr, "a": admin})
+        conn.execute(text("UPDATE review_requests SET status='approved', closed_at=now(), closed_by_user_id=:a,"
+                          " close_reason_code='approved_by_admin' WHERE id=:r"), {"a": admin, "r": rr})
+    upgrade(empty_db_url)
+    with eng.connect() as conn:
+        states = dict(conn.execute(text("SELECT id, publication_state FROM library_items")).all())
+        assert states == {item: None, legacy: "listed", pending: "pending"}  # nothing changes state on upgrade
+        assert conn.scalar(text("SELECT revoked_at FROM access_rights WHERE id=:r"), {"r": rights}) is None
+        assert conn.scalar(text("SELECT count(*) FROM common_publications")) == 0
+        assert conn.scalar(text("SELECT count(*) FROM deletion_tombstones")) == 0
+    with pytest.raises(IntegrityError, match="publication record"), eng.begin() as conn:
+        conn.execute(text("UPDATE library_items SET publication_state='listed' WHERE id=:i"), {"i": pending})
+    with pytest.raises(IntegrityError, match="recorded rights"), eng.begin() as conn:
+        conn.execute(text("UPDATE library_items SET publication_state='revoked', rights_epoch=1 WHERE id=:i"),
+                     {"i": legacy})
+    with eng.begin() as conn:  # the pre-existing pending copy can be published with its record
+        conn.execute(text("UPDATE library_items SET publication_state='listed' WHERE id=:i"), {"i": pending})
+        conn.execute(text("""INSERT INTO common_publications(item_id,access_rights_id,file_checksum_sha256,
+            verified_byte_size,published_at,published_by_user_id) VALUES(:i,:r,:h,100,now(),:a)"""),
+                     {"i": pending, "r": rights, "h": "f" * 64, "a": admin})
+    eng.dispose()
+    with pytest.raises(Exception, match="published or revoked common copies exist"):
+        command.downgrade(alembic_config(empty_db_url), "0021")
 
 
 def test_collection_membership_foreign_keys_restrict(migrated_db_url: str) -> None:

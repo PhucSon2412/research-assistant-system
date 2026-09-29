@@ -11,7 +11,10 @@ from app.db import get_sessionmaker
 from app.ingest.worker import due_job_ids, process_job
 from app.discovery import run_sync
 from app.citations import reconcile_pending
+from app.clock import utcnow
 from app.db import get_engine
+from app.publication import cleanup_revoked
+from app.storage import get_storage
 
 settings = get_settings()
 celery_app = Celery("ras_ingest", broker=settings.celery_broker_url())
@@ -22,7 +25,9 @@ celery_app.conf.update(task_ignore_result=True, worker_prefetch_multiplier=1,
                                       "arxiv-metadata-discovery": {
                            "task": "ras.discovery.sync", "schedule": min(300, settings.discovery.poll_seconds)},
                                       "citation-link-reconcile": {
-                           "task": "ras.citations.reconcile", "schedule": settings.citations.reconcile_poll_seconds}})
+                           "task": "ras.citations.reconcile", "schedule": settings.citations.reconcile_poll_seconds},
+                                      "revoked-copy-cleanup": {
+                           "task": "ras.revocation.cleanup", "schedule": settings.retention.cleanup_poll_seconds}})
 
 
 @celery_app.task(name="ras.ingest.discover")
@@ -47,3 +52,9 @@ def sync_arxiv() -> dict:
 @celery_app.task(name="ras.citations.reconcile")
 def reconcile_citation_links() -> dict:
     return reconcile_pending(get_engine(), settings.citations)
+
+
+@celery_app.task(name="ras.revocation.cleanup")
+def cleanup_revoked_copies() -> dict:
+    # Tombstones in PostgreSQL are the durable queue; a missed run is retried next time.
+    return cleanup_revoked(get_engine(), get_storage(settings), utcnow(), settings.retention.cleanup_batch_size)

@@ -94,6 +94,14 @@ const MESSAGES: Record<string, string> = {
   approval_storage_unavailable: "Không sao chép/kiểm được file gốc sang bản chung; chưa có gì được ghi nhận. Thử lại sau.",
   approval_unavailable: "Không ghi được quyết định; chưa có gì được ghi nhận. Thử lại sau.",
   approval_outcome_uncertain: "Không chắc quyết định đã được ghi; tải lại trang để xem trạng thái trước khi thử lại.",
+  already_published: "Bản này đã được công bố.",
+  common_copy_revoked: "Bản này đã bị thu hồi; không thể công bố hay thu hồi lại.",
+  rights_not_publishable: "Quyền đã ghi không còn đúng cho bản này (đã đổi epoch/thu hồi hoặc lệch file); không công bố.",
+  duplicate_published_checksum: "Đã có bản chung đã công bố với cùng SHA-256; không công bố bản trùng.",
+  common_file_integrity_failed: "Object của bản chung bị thiếu hoặc không khớp SHA-256; bản vẫn ở trạng thái chờ.",
+  publication_storage_unavailable: "Không đọc được object của bản chung; chưa công bố. Thử lại sau.",
+  publication_unavailable: "Không ghi được việc công bố; bản vẫn ở trạng thái chờ. Thử lại sau.",
+  revocation_unavailable: "Không ghi được việc thu hồi; bản chưa bị thu hồi. Thử lại ngay.",
   file_unavailable: "Chưa đọc được file gốc. Thử lại sau.",
 };
 

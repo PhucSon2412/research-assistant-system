@@ -594,9 +594,11 @@ def test_schema_binds_rights_to_exact_common_file_and_approved_request(api):
         item, version, file = _common(conn, key="second-copy")
         conn.execute(RIGHTS, params(item, version, file))
     fails(second_rights, "uq_access_rights_origin_review_request_id")
-    for statement, message in (("UPDATE access_rights SET verified_source='changed'", "no update/delete"),
-                               ("DELETE FROM access_rights", "no update/delete"),
-                               ("UPDATE library_items SET publication_state='listed' WHERE id=:c", "no transition"),
+    # M6b-2a: rights change only by revocation; listing needs a publication record at commit.
+    for statement, message in (("UPDATE access_rights SET verified_source='changed'", "only update to access rights"),
+                               ("DELETE FROM access_rights", "never deleted"),
+                               ("UPDATE library_items SET publication_state='listed' WHERE id=:c",
+                                "needs its publication record"),
                                ("UPDATE review_requests SET status='open', closed_at=NULL, closed_by_user_id=NULL,"
                                 " close_reason_code=NULL", "final")):
         fails(lambda c, s=statement: c.execute(text(s), {"c": common}), message)
