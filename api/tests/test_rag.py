@@ -317,6 +317,9 @@ def test_collection_and_all_scope_multi_paper_citations_and_acl(upload_api, monk
     collection = a.post("/collections", {"name": "Pair"}).json()["collection"]["id"]
     for item in (first["item_id"], second["item_id"], str(unindexed), str(common)):
         assert a.post(f"/collections/{collection}/items", {"item_id": item}).status_code == 201
+    from app.search import search as real_search
+    monkeypatch.setattr("app.rag.search", lambda db, principal, cfg, query, mode, item_id, rerank, collection_id:
+                        real_search(db, principal, cfg, "Sharedword", mode, item_id, rerank, collection_id))
     sent = []
     def compare(messages, cfg):
         evidence = json.loads(messages[1]["content"])["evidence"]
@@ -331,8 +334,9 @@ def test_collection_and_all_scope_multi_paper_citations_and_acl(upload_api, monk
         return GenerationResult(json.dumps({"claims": claims}), 200, 50,
                                 cfg.generation.model_id, "SyntheticProvider")
     monkeypatch.setattr("app.rag.generate", compare)
+    question = "Compare these two papers on Sharedword"
     for scope in ({"collection_id": collection}, {"scope": "all"}):
-        response = a.post("/rag/ask", {**scope, "question": "Compare Sharedword", "mode": "keyword"})
+        response = a.post("/rag/ask", {**scope, "question": question, "mode": "keyword"})
         assert response.status_code == 200, response.text
         data = response.json()
         assert data["status"] == "answered" and data["scope"]["kind"] in ("collection", "all"), (data, sent)
@@ -349,7 +353,7 @@ def test_collection_and_all_scope_multi_paper_citations_and_acl(upload_api, monk
     assert all(other_user["item_id"] not in str(payload) for payload in sent)
     monkeypatch.setattr("app.search.embed", lambda value, cfg, input_type: EmbeddingResult(
         [.1, .2, .3], cfg.embedding.model_id, 2))
-    hybrid = a.post("/rag/ask", {"collection_id": collection, "question": "Compare Sharedword",
+    hybrid = a.post("/rag/ask", {"collection_id": collection, "question": question,
                                   "mode": "hybrid"})
     assert hybrid.status_code == 200 and hybrid.json()["status"] == "answered"
     def separate_claims(messages, cfg):
@@ -361,7 +365,7 @@ def test_collection_and_all_scope_multi_paper_citations_and_acl(upload_api, monk
                 {"chunk_id": by_item[second["item_id"]]["chunk_id"], "quote": "nine units"}]}]}),
             200, 50, cfg.generation.model_id, "SyntheticProvider")
     monkeypatch.setattr("app.rag.generate", separate_claims)
-    incomplete = a.post("/rag/ask", {"collection_id": collection, "question": "Compare Sharedword"})
+    incomplete = a.post("/rag/ask", {"collection_id": collection, "question": question})
     assert incomplete.status_code == 200
     assert incomplete.json()["status"] == "insufficient_evidence" and incomplete.json()["claims"] == []
     assert incomplete.json()["reason"] == "comparison_requires_multiple_papers"
@@ -373,7 +377,7 @@ def test_collection_and_all_scope_multi_paper_citations_and_acl(upload_api, monk
                 {"chunk_id": by_item[second["item_id"]]["chunk_id"], "quote": "nine units"}]}]}),
             200, 50, cfg.generation.model_id, "SyntheticProvider")
     monkeypatch.setattr("app.rag.generate", mislabeled_claim)
-    assert a.post("/rag/ask", {"collection_id": collection, "question": "Compare Sharedword"}).json()[
+    assert a.post("/rag/ask", {"collection_id": collection, "question": question}).json()[
         "status"] == "insufficient_evidence"
     for browser in (b, admin):
         assert browser.post("/rag/ask", {"collection_id": collection, "question": "Sharedword"}).status_code == 404
@@ -565,6 +569,65 @@ def test_comparison_resolves_full_titles_before_rank_and_abstains_on_equal_pairs
     assert calls == []
 
 
+def test_two_paper_scope_requires_context_or_resolved_names(upload_api, monkeypatch):
+    api, storage = upload_api
+    _, a, b, admin, thermal, _, settings = setup(api, storage, monkeypatch,
+        b"## Results\nSharedword thermal result seven units.\n")
+    wildlife = indexed(api, storage, a, b"## Results\nSharedword wildlife result nine units.\n", settings)
+    gsr = indexed(api, storage, a, b"## Results\nSharedword GSR result eleven units.\n", settings)
+    das = indexed(api, storage, a, b"## Results\nSharedword DAS result thirteen units.\n", settings)
+    papers = ((thermal, "Thermal Scheduling"), (wildlife, "Wildlife Detector"),
+              (gsr, "Gated Sparse Routing"), (das, "Dense Adapter Stacks"))
+    with api.engine.begin() as conn:
+        for item, title in papers:
+            conn.execute(text("UPDATE library_items SET title=:title WHERE id=:item"),
+                         {"title": title, "item": uuid.UUID(item["item_id"])})
+    scopes = []
+    for name, pair in (("Other topics", (thermal, wildlife)), ("Named topics", (gsr, das))):
+        collection = a.post("/collections", {"name": name}).json()["collection"]["id"]
+        for item in pair:
+            assert a.post(f"/collections/{collection}/items", {"item_id": item["item_id"]}).status_code == 201
+        scopes.append(collection)
+    from app.search import search as real_search
+    def scoped_hits(db, principal, cfg, query, mode, item_id, rerank, collection_id):
+        # Keep the real ACL and membership gate; use a shared fixture term so
+        # name resolution, rather than keyword retrieval, is under test.
+        return real_search(db, principal, cfg, "Sharedword", "keyword", item_id, rerank, collection_id)
+    monkeypatch.setattr("app.rag.search", scoped_hits)
+    calls = []
+    def compare(messages, cfg):
+        rows = json.loads(messages[1]["content"])["evidence"]
+        calls.append(rows)
+        return GenerationResult(json.dumps({"claims": [{"text": "The first result differs from the second.",
+            "comparison": True, "citations": [{"chunk_id": row["chunk_id"],
+                                               "quote": "Sharedword"} for row in rows]}]}),
+            200, 50, cfg.generation.model_id, "SyntheticProvider")
+    monkeypatch.setattr("app.rag.generate", compare)
+    wrong_scope = {"collection_id": scopes[0], "mode": "keyword"}
+    for question in ("Compare GSR and DAS", "Compare these two papers, GSR and DAS",
+                     "Compare Gated Sparse Routing and Dense Adapter Stacks",
+                     "Compare these two papers: Gated Sparse Routing and Dense Adapter Stacks"):
+        result = a.post("/rag/ask", {**wrong_scope, "question": question})
+        assert result.status_code == 200 and result.json()["status"] == "insufficient_evidence"
+        assert result.json()["reason"] == "comparison_requires_multiple_papers"
+    assert calls == []
+    for scope, question, expected in ((scopes[0], "Compare these two papers",
+                                       {thermal["item_id"], wildlife["item_id"]}),
+                                      (scopes[1], "Compare GSR and DAS",
+                                       {gsr["item_id"], das["item_id"]})):
+        result = a.post("/rag/ask", {"collection_id": scope, "question": question, "mode": "keyword"})
+        assert result.status_code == 200 and result.json()["status"] == "answered", result.text
+        assert {row["item_id"] for row in calls[-1]} == expected
+        citations = result.json()["claims"][0]["citations"]
+        assert {cite["item_id"] for cite in citations} == expected
+        for cite in citations:
+            path = cite["url"].replace("/sources/", "/search/chunks/")
+            assert a.get(path).status_code == 200
+            assert b.get(path).status_code == 404 and admin.get(path).status_code == 404
+        assert b.post("/rag/ask", {"collection_id": scope, "question": question}).status_code == 404
+        assert admin.post("/rag/ask", {"collection_id": scope, "question": question}).status_code == 404
+
+
 def test_comparison_pack_reserves_a_chunk_for_later_paper(api):
     settings = settings_with_fake_key()
     paper_a, paper_b = str(uuid.uuid4()), str(uuid.uuid4())
@@ -676,7 +739,10 @@ def _two_paper_collection(api, storage, monkeypatch):
     original = rag.search
     def recorded(db, principal, cfg, query, mode, *args):
         queries.append((query, mode))
-        return original(db, principal, cfg, query, mode, *args)
+        fixture_query = ("How do Sharedword and codeswitch   in their behaviour on code-switched input?"
+                         if mode == "keyword" else
+                         "How do Sharedword and codeswitch differ in their behaviour on code-switched input?")
+        return original(db, principal, cfg, fixture_query, mode, *args)
     monkeypatch.setattr("app.rag.search", recorded)
     return a, b, admin, first, second, b_items, common, collection, queries
 
@@ -685,7 +751,11 @@ def test_differ_question_takes_comparison_gate_in_keyword_and_hybrid(upload_api,
     api, storage = upload_api
     a, b, admin, first, second, b_items, common, collection, queries = _two_paper_collection(
         api, storage, monkeypatch)
-    question = "How do Sharedword and codeswitch differ in their behaviour on code-switched input?"
+    with api.engine.begin() as conn:
+        for item, title in ((first, "Gated Sparse Routing"), (second, "Dense Adapter Stacks")):
+            conn.execute(text("UPDATE library_items SET title=:title WHERE id=:item"),
+                         {"title": title, "item": uuid.UUID(item["item_id"])})
+    question = "How do GSR and DAS differ in their Sharedword codeswitch behaviour on code-switched input?"
     both = (first["item_id"], second["item_id"])
     sent = []
     def claim_citing(text, cited):
@@ -716,7 +786,7 @@ def test_differ_question_takes_comparison_gate_in_keyword_and_hybrid(upload_api,
                 assert a.get(path).status_code == 200
                 assert b.get(path).status_code == 404 and admin.get(path).status_code == 404
             # Keyword retrieval drops the comparison word; generation still gets the question.
-            stripped = "How do Sharedword and codeswitch   in their behaviour on code-switched input?"
+            stripped = "How do GSR and DAS   in their Sharedword codeswitch behaviour on code-switched input?"
             assert queries == [(stripped if mode == "keyword" else question, mode)]
     assert len(sent) == 4
     assert all(not any(item in str(payload) for item in b_items) and str(common) not in str(payload)
@@ -752,8 +822,8 @@ def test_differ_question_takes_comparison_gate_in_keyword_and_hybrid(upload_api,
     assert single["status"] == "answered" and single["scope"]["kind"] == "item"
     assert queries == [(question, "keyword")]
 
-    # Admin has no paper and B's keyword hits only one of its own: neither reaches
-    # generation. B's hybrid pack may hold B's two papers, never A's.
+    # Admin has no paper. B has two papers but neither title resolves GSR/DAS,
+    # so even B's hybrid hits cannot reach generation.
     payloads = []
     def record(messages, cfg):
         payloads.append(json.loads(messages[1]["content"]))
@@ -768,7 +838,7 @@ def test_differ_question_takes_comparison_gate_in_keyword_and_hybrid(upload_api,
     assert payloads == []
     data = b.post("/rag/ask", {"scope": "all", "question": question, "mode": "hybrid"}).json()
     assert data["status"] == "insufficient_evidence" and data["claims"] == []
-    assert len(payloads) == 1 and {row["item_id"] for row in payloads[0]["evidence"]} == b_items
+    assert payloads == []
     for browser in (b, admin):
         assert browser.post("/rag/ask", {"collection_id": collection, "question": question}).status_code == 404
     assert all(item not in str(payloads) for item in both)

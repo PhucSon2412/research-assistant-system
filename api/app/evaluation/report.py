@@ -267,6 +267,8 @@ def render_markdown(data: dict) -> str:
         "`pending_human_review`, báo cáo này **chưa chứng minh** đã đạt mục tiêu chất lượng nào.",
         "", "## Tái lập", "", "```powershell", *REPRODUCE[:-1], data["command"], "```", "",
         f"- Commit `{data['git']['commit']}`" + (" (working tree có thay đổi chưa commit)" if data["git"]["dirty"] else ""),
+        f"- SHA code được đo: `{data['git']['commit']}`; trạng thái trước khi seed và tạo output: "
+        f"`dirty={str(data['git']['dirty']).lower()}`. File báo cáo được ghi sau mốc này.",
         f"- Python {env['python']}, pypdf {env['pypdf']}, parser `{env['pdf_parser']}` / `{env['markdown_parser']}`; {env['platform']}",
         f"- Dataset `{dataset['id']}`: {dataset['questions']} câu, {dataset['holdout']} holdout, "
         f"{dataset['answered_questions']} câu có đáp án với {dataset['gold_sides']} side chứng cứ; nhóm "
@@ -360,6 +362,35 @@ def render_markdown(data: dict) -> str:
             else "- **PHÁT HIỆN LỖI ACL — dừng và sửa trước khi dùng các kết quả khác.**",
             "", "## Chưa đo", ""]
     out += [f"- `{name}`: not measured — {why}" for name, why in data["not_measured"].items()]
+    review = data.get("review_pair_reference_dev")
+    if review:
+        out += ["", "## Review tham chiếu hai paper — dev cùng seed", "",
+                f"Luật trước ở code `{review['previous_code_commit']}`; luật sau ở code "
+                f"`{data['git']['commit']}`. Holdout chỉ chạy luật sau.", "",
+                "| Stage | Phía trước → sau | Đủ mọi phía trước → sau |",
+                "| --- | --- | --- |"]
+        for stage in ("search:keyword:all", "search:hybrid:all", "rag_pack:keyword:all",
+                      "rag_pack:hybrid:all", "rag_pack:keyword:comparison", "rag_pack:hybrid:comparison"):
+            previous, current = review["before"][stage], review["after"][stage]
+            out.append(f"| `{stage}` | {previous['sides']} → {current['sides']} | "
+                       f"{previous['full']} → {current['full']} |")
+        out += ["", "Generation giả dev: keyword "
+                f"{review['before']['generation']['keyword']} → {review['after']['generation']['keyword']}, "
+                f"hybrid {review['before']['generation']['hybrid']} → "
+                f"{review['after']['generation']['hybrid']}. Câu không có đáp án nhưng vẫn gửi evidence: "
+                f"keyword {review['before']['no_answer_sent']['keyword']} → "
+                f"{review['after']['no_answer_sent']['keyword']}, hybrid "
+                f"{review['before']['no_answer_sent']['hybrid']} → "
+                f"{review['after']['no_answer_sent']['hybrid']}.", "",
+                "Câu đổi kết quả pack hoặc lời gọi generation (chi tiết hit/locator trong JSON):", "",
+                "| Câu | Mode | Trước | Sau |",
+                "| --- | --- | --- | --- |"]
+        for change in review["changed_questions"]:
+            before, after = change["before"], change["after"]
+            out.append(f"| {change['question_id']} | {change['mode']} | "
+                       f"{before['rag_status']}/{before['rag_reason']} · gen={before['generation_called']} · "
+                       f"chunk={len(before['hits'])} | {after['rag_status']}/{after['rag_reason']} · "
+                       f"gen={after['generation_called']} · chunk={len(after['hits'])} |")
     out += ["", "## Theo câu hỏi", "",
             "Ô search/vector: hạng từng side (`×` = không có) và kết quả Recall@5. Ô pack: vị trí side trong pack và kết quả "
             "phủ pack. Ô RAG: HTTP, trạng thái/lý do, `→ gen` nếu evidence được gửi tới generation, và số chunk trong pack.", "",

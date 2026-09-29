@@ -5,6 +5,8 @@ uses the evaluation runner's local embedder and generation capture. No external
 provider call is made. Choose ``--dev-shapes`` to skip holdout entirely.
 """
 import json
+import ast
+import subprocess
 import uuid
 import sys
 from pathlib import Path
@@ -17,6 +19,34 @@ from app.evaluation.schema import load
 from app.evaluation.report import build, render_markdown, _pack_sizes
 
 ROOT = Path(__file__).resolve().parents[1] / "evaluation" / "rag"
+PREVIOUS_CODE_COMMIT = "8f0d04d3725c2f7912c6c81a4947fa35332fb8a4"
+
+
+def previous_comparison_resolver():
+    """Load the reviewed PR #14 resolver from its committed source for same-seed comparison."""
+    source = subprocess.run(["git", "show", f"{PREVIOUS_CODE_COMMIT}:api/app/rag.py"],
+                            cwd=ROOT.parents[1], capture_output=True, text=True, check=True).stdout
+    node = next(item for item in ast.parse(source).body
+                if isinstance(item, ast.FunctionDef) and item.name == "_comparison_papers")
+    namespace = {"re": rag.re, "_pack_words": rag._pack_words,
+                 "_PACK_ABBREVIATION": rag._PACK_ABBREVIATION}
+    exec(compile(ast.Module(body=[node], type_ignores=[]), "committed_previous_resolver", "exec"), namespace)
+    return namespace["_comparison_papers"]
+
+
+def changed_questions(before, after):
+    old = {(row["question_id"], row["mode"]): row for row in before if row["stage"] == "rag_pack"}
+    changed = []
+    for row in after:
+        if row["stage"] != "rag_pack":
+            continue
+        previous = old[row["question_id"], row["mode"]]
+        fields = ("hits", "rag_status", "rag_reason", "generation_called")
+        if any(previous[field] != row[field] for field in fields):
+            changed.append({"question_id": row["question_id"], "mode": row["mode"],
+                            "before": {field: previous[field] for field in fields},
+                            "after": {field: row[field] for field in fields}})
+    return changed
 
 def summarize(qset, records, index):
     rows = runner.score(None, qset, records, index)
@@ -76,9 +106,17 @@ def main():
         before = summarize(dev,baseline,index)
         baseline_calls = capture.embedding_calls - seed_calls
         print("BASELINE",json.dumps(before),flush=True)
+        with mock.patch("app.rag._comparison_papers", previous_comparison_resolver()):
+            review_previous_dev = runner.evaluate(env, manifest, dev, seeded, capture)
+        review_before = summarize(dev, review_previous_dev, index)
+        review_calls = capture.embedding_calls - seed_calls - baseline_calls
+        print("REVIEW_BEFORE_DEV", json.dumps(review_before), flush=True)
         final_dev = runner.evaluate(env, manifest, dev, seeded, capture)
         after = summarize(dev,final_dev,index)
+        review_changed = changed_questions(review_previous_dev, final_dev)
         print("FINAL_DEV",json.dumps(after),flush=True)
+        print("REVIEW_CHANGED_DEV", json.dumps([(row["question_id"], row["mode"])
+                                                 for row in review_changed]), flush=True)
         if "--dev-shapes" in sys.argv:
             shapes={"baseline":_pack_sizes(dev,baseline),"final":_pack_sizes(dev,final_dev),
                     "baseline_metrics":before,
@@ -91,7 +129,7 @@ def main():
         final_holdout = runner.evaluate(env, manifest, holdout, seeded, capture)
         records = final_dev + final_holdout
         viewer = runner.check_viewer(seeded,records)
-        capture.embedding_calls -= baseline_calls
+        capture.embedding_calls -= baseline_calls + review_calls
         data=build(manifest=manifest,qset=qset,records=records,
                    rows=runner.score(manifest,qset,records,index),
                    diagnostic_rows=runner.score(manifest,qset,records,index,runner.DIAGNOSTIC_OVERLAP),
@@ -111,7 +149,12 @@ def main():
                                       "pack_sizes": {"baseline": _pack_sizes(dev, baseline),
                                                      "final": _pack_sizes(dev, final_dev)},
                                       "baseline_embedding_calls":baseline_calls,
-                                      "note":"Baseline and final dev evaluated on the same seeded DB; holdout evaluated once after final rule."}
+                                      "note":"M4d-2 baseline and final dev evaluated on the same seeded DB; holdout evaluated once after final rule."}
+        data["review_pair_reference_dev"] = {"previous_code_commit": PREVIOUS_CODE_COMMIT,
+                                             "before": review_before, "after": after,
+                                             "changed_questions": review_changed,
+                                             "previous_embedding_calls": review_calls,
+                                             "note": "Previous PR #14 resolver and final resolver ran on the same dev seed; only final policy evaluated on holdout."}
     output=Path("evaluation/rag/reports/rag-eval-2026-09-29-m4d3-pack")
     output.with_suffix(".json").write_text(json.dumps(data,ensure_ascii=False,indent=1)+"\n",encoding="utf8")
     output.with_suffix(".md").write_text(render_markdown(data),encoding="utf8")

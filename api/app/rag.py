@@ -161,6 +161,9 @@ def _fresh(db: Session, principal: Principal, item_id: uuid.UUID | None,
 
 _PACK_WORD = re.compile(r"[^\W_]+", re.UNICODE)
 _PACK_ABBREVIATION = re.compile(r"\b[A-Z][A-Z0-9]{1,}\b")
+_CONTEXTUAL_PAIR = re.compile(r"\b(?:(?:these|those|the)\s+two|both)\s+(?:papers|studies|articles)\b",
+                              re.IGNORECASE)
+_EXPLICIT_TITLE_PHRASE = re.compile(r"\b[A-Z][a-z0-9-]+(?:\s+[A-Z][a-z0-9-]+)+\b")
 _PACK_SECTION_ORDER = ("results", "methods", "limitations", "analysis", "discussion",
                        "abstract", "efficiency", "introduction", "other", "conclusion")
 
@@ -234,8 +237,12 @@ def _comparison_papers(question: str, grouped: dict[str, list[tuple[dict, int]]]
             if scores:
                 choices[frozenset((first, second))] = max(scores)
     if not choices:
-        # A scope with exactly two eligible papers has only one possible pair.
-        return (tuple(sorted(grouped)), False) if len(grouped) == 2 and not any(matches.values()) else None
+        # A deictic reference can identify exactly two scoped papers. Concrete
+        # names or abbreviations must instead resolve through their titles.
+        contextual = (_CONTEXTUAL_PAIR.search(question) and not _PACK_ABBREVIATION.search(question)
+                      and not _EXPLICIT_TITLE_PHRASE.search(question))
+        return ((tuple(sorted(grouped)), False) if len(grouped) == 2
+                and not any(matches.values()) and contextual else None)
     best = max(score for score, _ in choices.values())
     winners = [(tuple(sorted(pair)), strong) for pair, (score, strong) in choices.items() if score == best]
     return winners[0] if len(winners) == 1 else None
