@@ -161,7 +161,6 @@ def _fresh(db: Session, principal: Principal, item_id: uuid.UUID | None,
 
 _PACK_WORD = re.compile(r"[^\W_]+", re.UNICODE)
 _PACK_ABBREVIATION = re.compile(r"\b[A-Z][A-Z0-9]{1,}\b")
-_PACK_HYPHENATED = re.compile(r"\b\w+(?:-\w+){1,3}\b", re.UNICODE)
 _PACK_SECTION_ORDER = ("results", "methods", "limitations", "analysis", "discussion",
                        "abstract", "efficiency", "introduction", "other", "conclusion")
 
@@ -170,23 +169,66 @@ def _pack_words(value: str) -> list[str]:
     return _PACK_WORD.findall(value.casefold())
 
 
-def _named_paper(question: str, title: str | None) -> bool:
-    """A title is a selection hint only; it never supports a generated claim.
+def _comparison_papers(question: str, grouped: dict[str, list[tuple[dict, int]]]) -> tuple[str, str] | None:
+    """Resolve two distinct title mentions, independently of hit order.
 
-    Uploaded items currently use the file stem as title. Allow two shared title
-    words or an explicit abbreviation (DAS / a hyphenated phrase's initials).
-    A generated item prefix such as p07 is not a paper name.
+    Scores distinguish a whole title phrase from an abbreviation or a unique
+    title word. Equal best pairs fail closed. Titles only select candidates;
+    evidence still comes exclusively from eligible, ACL-gated chunks.
     """
-    title_words = [word for word in _pack_words(title or "") if not re.fullmatch(r"p\d+", word)]
-    question_words = set(_pack_words(question))
-    if len(set(title_words) & question_words) >= 2:
-        return True
-    abbreviations = {word.casefold() for word in _PACK_ABBREVIATION.findall(question)}
-    abbreviations.update("".join(part[0] for part in _pack_words(phrase))
-                         for phrase in _PACK_HYPHENATED.findall(question))
-    initials = {"".join(part[0] for part in title_words[start:start + length])
-                for length in range(2, 5) for start in range(len(title_words) - length + 1)}
-    return bool(abbreviations & (set(title_words) | initials))
+    words: list[str] = []
+    abbreviations: dict[int, str] = {}
+    for token in re.finditer(r"[^\W_]+(?:-[^\W_]+)*", question, re.UNICODE):
+        parts = _pack_words(token.group())
+        if _PACK_ABBREVIATION.fullmatch(token.group()):
+            abbreviations[len(words)] = parts[0]
+        elif len(parts) > 1:
+            abbreviations[len(words)] = "".join(part[0] for part in parts)
+        words.extend(parts)
+    titles = {paper: [word for word in _pack_words(rows[0][0].get("title") or "")
+                      if not re.fullmatch(r"p\d+", word)] for paper, rows in grouped.items()}
+    counts = {word: sum(word in title for title in titles.values())
+              for title in titles.values() for word in title}
+    matches: dict[str, list[tuple[int, int, int]]] = {}
+    for paper, title in titles.items():
+        found: list[tuple[int, int, int]] = []
+        if len(title) >= 2:
+            for start, word in enumerate(words):
+                if word != title[0]:
+                    continue
+                positions = [start]
+                for title_word in title[1:]:
+                    next_pos = next((pos for pos in range(positions[-1] + 1, min(positions[-1] + 3, len(words)))
+                                    if words[pos] == title_word), None)
+                    if next_pos is None:
+                        break
+                    positions.append(next_pos)
+                if len(positions) == len(title):
+                    gaps = positions[-1] - start + 1 - len(title)
+                    found.append((start, positions[-1], 100 + 10 * len(title) - gaps))
+        initials = {"".join(part[0] for part in title[start:start + length])
+                    for length in range(2, 5) for start in range(len(title) - length + 1)}
+        for pos, word in enumerate(words):
+            if abbreviations.get(pos) in (set(title) | initials):
+                found.append((pos, pos, 80))
+            if len(word) >= 5 and word in title and counts[word] == 1:
+                found.append((pos, pos, 20))
+        matches[paper] = found
+    choices: dict[frozenset[str], int] = {}
+    for first, first_matches in matches.items():
+        for second, second_matches in matches.items():
+            if first >= second:
+                continue
+            scores = [left[2] + right[2] for left in first_matches for right in second_matches
+                      if left[1] < right[0] or right[1] < left[0]]
+            if scores:
+                choices[frozenset((first, second))] = max(scores)
+    if not choices:
+        # A scope with exactly two eligible papers has only one possible pair.
+        return tuple(sorted(grouped)) if len(grouped) == 2 and not any(matches.values()) else None
+    best = max(choices.values())
+    winners = [tuple(sorted(pair)) for pair, score in choices.items() if score == best]
+    return winners[0] if len(winners) == 1 else None
 
 
 def _pack_section(hit: dict) -> str:
@@ -224,12 +266,12 @@ def _pack(hits: list[dict], settings: Settings, *, comparing: bool = False,
         grouped: dict[str, list[tuple[dict, int]]] = {}
         for hit, size in eligible:
             grouped.setdefault(hit["item_id"], []).append((hit, size))
-        named = [paper for paper, rows in grouped.items() if _named_paper(question, rows[0][0].get("title"))]
-        # With two clear names, spend the pack on those papers instead of earlier
-        # distractors. When names are unclear, retain the existing search-order pack.
-        selected = (named[:2] if len(named) >= 2 else list(grouped)[:policy.max_evidence_papers])
+        resolved = _comparison_papers(question, grouped) if question else None
+        if question and resolved is None:
+            return pack
+        selected = list(resolved) if resolved else list(grouped)[:policy.max_evidence_papers]
         selected = selected[:policy.max_evidence_papers]
-        if len(named) >= 2:
+        if resolved:
             # Prefer result/method sections while preserving hit rank within each
             # section. Round-robin prevents one named paper filling every slot.
             ordered = {paper: [row for section in _PACK_SECTION_ORDER
@@ -386,7 +428,7 @@ def answer(db: Session, principal: Principal, settings: Settings, item_id: uuid.
         # Only function words or out-of-range tokens: say so instead of implying a search miss.
         if mode == "keyword" and found["keyword_query"]["status"] == "no_terms":
             return {**base, "reason": "keyword_query_without_terms"}
-        return base
+        return {**base, "reason": "comparison_requires_multiple_papers"} if comparing else base
     # A comparison needs evidence from both sides before any paper text reaches generation.
     if comparing and len({row["item_id"] for row in pack.values()}) < 2:
         return {**base, "coverage": None, "reason": "comparison_requires_multiple_papers"}
@@ -423,7 +465,8 @@ def answer(db: Session, principal: Principal, settings: Settings, item_id: uuid.
     # cannot establish a comparison. This checks structure, not claim semantics.
     incomplete_comparison = bool(comparing and claims and
         not any(claim["comparison"] and COMPARATIVE_ASSERTION.search(claim["text"])
-                and len({cite["item_id"] for cite in claim["citations"]}) >= 2
+                and {cite["item_id"] for cite in claim["citations"]} ==
+                    {row["item_id"] for row in pack.values()}
                 for claim in claims))
     if incomplete_comparison:
         claims = None

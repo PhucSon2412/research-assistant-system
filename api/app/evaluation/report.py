@@ -265,7 +265,7 @@ def render_markdown(data: dict) -> str:
         "kết quả chỉ kiểm pipeline, gate ACL và khớp locator, không đại diện chất lượng trên paper thật. "
         "Các ngưỡng trong docs là **mục tiêu đề xuất, cần đo**, không phải CI gate; vì cả 80 nhãn còn "
         "`pending_human_review`, báo cáo này **chưa chứng minh** đã đạt mục tiêu chất lượng nào.",
-        "", "## Tái lập", "", "```powershell", *REPRODUCE, "```", "",
+        "", "## Tái lập", "", "```powershell", *REPRODUCE[:-1], data["command"], "```", "",
         f"- Commit `{data['git']['commit']}`" + (" (working tree có thay đổi chưa commit)" if data["git"]["dirty"] else ""),
         f"- Python {env['python']}, pypdf {env['pypdf']}, parser `{env['pdf_parser']}` / `{env['markdown_parser']}`; {env['platform']}",
         f"- Dataset `{dataset['id']}`: {dataset['questions']} câu, {dataset['holdout']} holdout, "

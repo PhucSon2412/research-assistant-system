@@ -33,6 +33,9 @@ def summarize(qset, records, index):
     return out
 
 def main():
+    measured_git = runner.git_state()
+    if measured_git["dirty"]:
+        raise SystemExit("Commit code and start from a clean working tree before measuring M4d-3")
     manifest, qset = load(ROOT)
     dev = qset.model_copy(update={"questions": [q for q in qset.questions if q.split == "dev"]})
     holdout = qset.model_copy(update={"questions": [q for q in qset.questions if q.split == "holdout"]})
@@ -98,9 +101,15 @@ def main():
                              "rerank":runner.RerankPolicy().pricing_verified,
                              "generation":runner.GenerationPolicy().pricing_verified},
                    comparison_detected={q.id:rag.is_comparison(q.question) for q in qset.questions},
-                   started=started,git=runner.git_state(),modes=runner.MODES)
+                   started=started,git=measured_git,modes=runner.MODES)
+        data["command"] = "& $py api\\m4d3_same_seed.py"
+        data["measurement"] = {"base_commit": measured_git["commit"],
+                               "working_tree_dirty_before_output": measured_git["dirty"],
+                               "note": "Git state captured before seeding and before report files were written."}
         data["m4d3_same_seed_dev"]={"baseline":before,
                                       "final":after,
+                                      "pack_sizes": {"baseline": _pack_sizes(dev, baseline),
+                                                     "final": _pack_sizes(dev, final_dev)},
                                       "baseline_embedding_calls":baseline_calls,
                                       "note":"Baseline and final dev evaluated on the same seeded DB; holdout evaluated once after final rule."}
     output=Path("evaluation/rag/reports/rag-eval-2026-09-29-m4d3-pack")

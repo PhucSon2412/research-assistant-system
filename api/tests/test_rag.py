@@ -500,8 +500,69 @@ def test_comparison_pack_ambiguous_names_and_one_valid_paper(api):
             {"chunk_id": str(uuid.uuid4()), "item_id": second, "title": "other-paper",
              "text": "## References\nSecond evidence", "section_kind": "references"}]
     pack = _pack(hits, settings, comparing=True, question="Compare their findings")
-    assert {row["item_id"] for row in pack.values()} == {first}
+    assert pack == {}
     assert _pack(hits, settings, comparing=True, question="Compare their findings") == pack
+
+
+def test_comparison_resolves_full_titles_before_rank_and_abstains_on_equal_pairs(upload_api, monkeypatch):
+    api, storage = upload_api
+    api.bootstrap_admin()
+    api.create_user("titles@example.org")
+    browser = api.user_browser("titles@example.org")
+    settings = settings_with_fake_key()
+    settings.generation.pricing_verified = True
+    fake_provider(monkeypatch)
+    ids = [indexed(api, storage, browser, f"## Results\nSharedword result {name}.\n".encode(), settings)
+           for name in ("distractor", "adapter", "graph")]
+    titles = ("Dense Graph Routing", "Dense Adapter Stacks", "Graph Sparse Routing")
+    with api.engine.begin() as conn:
+        for item, title in zip(ids, titles):
+            conn.execute(text("UPDATE library_items SET title=:title WHERE id=:item"),
+                         {"title": title, "item": uuid.UUID(item["item_id"])})
+    app.dependency_overrides[get_settings] = lambda: settings
+    from app.search import search as real_search
+    def ranked_search(db, principal, cfg, query, mode, item_id, rerank, collection_id):
+        found = real_search(db, principal, cfg, "Sharedword", "keyword", item_id, rerank, collection_id)
+        order = {item["item_id"]: rank for rank, item in enumerate(ids)}
+        found["hits"].sort(key=lambda hit: order[hit["item_id"]])
+        assert len(found["hits"]) == 3
+        return found
+    monkeypatch.setattr("app.rag.search", ranked_search)
+    sent = []
+    def compare(messages, cfg):
+        evidence = json.loads(messages[1]["content"])["evidence"]
+        sent.append(evidence)
+        assert {row["item_id"] for row in evidence} == {ids[1]["item_id"], ids[2]["item_id"]}
+        return GenerationResult(json.dumps({"claims": [{"text": "Adapter results differ from graph results.",
+            "comparison": True, "citations": [
+                {"chunk_id": row["chunk_id"], "quote": "Sharedword result"} for row in evidence]}]}),
+            200, 50, cfg.generation.model_id, "SyntheticProvider")
+    monkeypatch.setattr("app.rag.generate", compare)
+    request = {"scope": "all", "question": "Compare Dense Adapter Stacks and Graph Sparse Routing",
+               "mode": "keyword"}
+    response = browser.post("/rag/ask", request)
+    assert response.status_code == 200 and response.json()["status"] == "answered", response.text
+    assert {cite["item_id"] for cite in response.json()["claims"][0]["citations"]} == {
+        ids[1]["item_id"], ids[2]["item_id"]}
+    assert len(sent) == 1
+    # A comparative claim with only one resolved side cannot pass the citation gate.
+    def one_side(messages, cfg):
+        row = json.loads(messages[1]["content"])["evidence"][0]
+        return GenerationResult(json.dumps({"claims": [{"text": "Adapter results differ from graph results.",
+            "comparison": True, "citations": [{"chunk_id": row["chunk_id"],
+                                               "quote": "Sharedword result"}]}]}),
+            200, 50, cfg.generation.model_id, "SyntheticProvider")
+    monkeypatch.setattr("app.rag.generate", one_side)
+    assert browser.post("/rag/ask", request).json()["status"] == "insufficient_evidence"
+    with api.engine.begin() as conn:
+        conn.execute(text("UPDATE library_items SET title=:title WHERE id=:item"),
+                     {"title": titles[2], "item": uuid.UUID(ids[0]["item_id"])})
+    calls = []
+    monkeypatch.setattr("app.rag.generate", lambda *args: calls.append(args))
+    ambiguous = browser.post("/rag/ask", request)
+    assert ambiguous.status_code == 200 and ambiguous.json()["status"] == "insufficient_evidence"
+    assert ambiguous.json()["reason"] == "comparison_requires_multiple_papers"
+    assert calls == []
 
 
 def test_comparison_pack_reserves_a_chunk_for_later_paper(api):
