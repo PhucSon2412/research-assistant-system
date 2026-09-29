@@ -28,6 +28,8 @@ Các milestone nhỏ, có thể review riêng. Thứ tự và phạm vi dưới 
 
 **M2a–M3b (đã merge):** worker Celery, Markdown/PDF extraction, private index và hybrid search với gate active generation/ACL; xem [môi trường phát triển](dev-setup.md) cho kiểm chứng từng PR.
 
+**M4d đã merge:** PR #12 (`96e38cd`), #13 (`aef90fd`), #14 (`2f91241`). **M5a đang review:** daily arXiv metadata/link, trang khám phá và checkpoint PostgreSQL; không gồm full text, rights review, citation graph hay Hugging Face.
+
 **M3c (PR #8 đã merge):** collection cá nhân, membership item riêng hoặc metadata chung, CRUD/list UI và `collection_id` cho search. Membership không cấp quyền; common full text chờ `AccessRights` đúng version/file. **Bàn giao M4:** dùng scope collection cho evidence pack/RAG, vẫn kiểm lại ACL và locator tại citation/viewer; không suy quyền từ membership hoặc reference edge.
 
 **M4a (PR #9 đã merge):** hỏi một paper private qua API/UI, evidence pack giới hạn, OpenRouter generation với giá chưa xác minh mặc định khóa, claim/citation/coverage/insufficient evidence và viewer kiểm quyền. **M4b (PR scope):** RAG scope collection/toàn kho, giữ lời gọi một paper và giới hạn thêm số paper trong evidence. Không streaming trong PR này. Streaming, bộ đánh giá ≥80 câu có người đọc đối chiếu claim/nguồn/abstention và baseline token đầu/hoàn tất, charge/latency là việc tiếp theo; mục tiêu p95 vẫn chưa đo.

@@ -12,7 +12,7 @@ from sqlalchemy import text
 
 from app.api.csrf import install_csrf_middleware
 from app.api.errors import install_error_handlers
-from app.api.routes import admin, auth, library, uploads, search, collections, rag
+from app.api.routes import admin, auth, library, uploads, search, collections, rag, discovery
 from app.db import get_engine
 
 app = FastAPI(title="Research Assistant System API", version="0.2.0")
@@ -25,6 +25,7 @@ app.include_router(uploads.router)
 app.include_router(search.router)
 app.include_router(collections.router)
 app.include_router(rag.router)
+app.include_router(discovery.router)
 
 
 @app.get("/healthz")

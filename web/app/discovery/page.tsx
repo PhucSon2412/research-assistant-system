@@ -1,0 +1,59 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { api, describeError } from "../../lib/api";
+import { ErrorText, Shell, useSession } from "../components/session";
+
+type Paper = {
+  id: string; arxiv_id: string; title: string; authors: string | null;
+  original_url: string; topics: string[]; latest_version: string | null;
+  source_published_at: string | null; source_updated_at: string | null;
+  first_discovered_at: string; content_status: "metadata_only";
+};
+type Page = { items: Paper[]; total: number; limit: number; offset: number };
+type Source = { topic: string; last_success_at: string | null; state: string; last_error: string | null };
+
+const LIMIT = 20;
+export default function DiscoveryPage() {
+  const user = useSession();
+  const [topic, setTopic] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [page, setPage] = useState<Page | null>(null);
+  const [sources, setSources] = useState<Source[]>([]);
+  const [topics, setTopics] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (user) api<{ topics: string[] }>("/discovery/topics").then((value) => setTopics(value.topics)).catch(() => {});
+  }, [user]);
+  useEffect(() => {
+    if (!user) return;
+    api<Page>(`/discovery/papers?limit=${LIMIT}&offset=${offset}&topic=${encodeURIComponent(topic)}`)
+      .then((value) => { setPage(value); setError(null); })
+      .catch((err) => setError(describeError(err)));
+  }, [user, topic, offset]);
+  useEffect(() => {
+    if (user?.role === "admin") {
+      api<{ sources: Source[] }>("/discovery/sources").then((value) => setSources(value.sources)).catch(() => {});
+    }
+  }, [user]);
+  return <Shell user={user}>
+    <h1>Khám phá arXiv</h1>
+    <p>Chỉ có metadata và link tới trang gốc. Các paper này không có toàn văn trong hệ thống và không được dùng làm bằng chứng RAG.</p>
+    <label>Chủ đề{" "}<select value={topic} onChange={(event) => { setTopic(event.target.value); setOffset(0); }}>
+      {["", ...topics].map((value) => <option key={value} value={value}>{value || "Tất cả"}</option>)}
+    </select></label>
+    <ErrorText message={error} />
+    {page && <><p>{page.total} paper</p><ul>
+      {page.items.map((paper) => <li key={paper.id} style={{ marginBottom: "1.2rem" }}>
+        <strong>{paper.title}</strong> <span>Chỉ có metadata</span><br />
+        {paper.authors && <span>{paper.authors}<br /></span>}
+        <span>Chủ đề: {paper.topics.join(", ") || "—"} · arXiv: {paper.arxiv_id}{paper.latest_version ?? ""}</span><br />
+        <span>Công bố: {paper.source_published_at ? new Date(paper.source_published_at).toLocaleDateString("vi-VN") : "không rõ"} · Cập nhật nguồn: {paper.source_updated_at ? new Date(paper.source_updated_at).toLocaleDateString("vi-VN") : "không rõ"} · Mới phát hiện: {new Date(paper.first_discovered_at).toLocaleDateString("vi-VN")}</span><br />
+        <a href={paper.original_url} target="_blank" rel="noopener noreferrer">Mở trang gốc trên arXiv</a>
+      </li>)}
+    </ul><p><button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - LIMIT))}>Trước</button>{" "}
+      <button disabled={offset + LIMIT >= page.total} onClick={() => setOffset(offset + LIMIT)}>Sau</button></p></>}
+    {user?.role === "admin" && <section><h2>Đồng bộ gần nhất</h2><ul>{sources.map((source) =>
+      <li key={source.topic}>{source.topic}: {source.last_success_at ? new Date(source.last_success_at).toLocaleString("vi-VN") : "chưa hoàn tất"} ({source.state}{source.last_error ? `: ${source.last_error}` : ""})</li>)}</ul></section>}
+  </Shell>;
+}

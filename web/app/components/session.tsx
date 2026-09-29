@@ -35,6 +35,7 @@ export function Shell({ user, children }: { user: User | null; children: ReactNo
       <nav style={{ display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap", marginBottom: "1.5rem" }}>
         <strong>Research Assistant</strong>
         <Link href="/">Thư viện</Link>
+        <Link href="/discovery">Khám phá</Link>
         <Link href="/account">Phiên đăng nhập</Link>
         {user.role === "admin" && <Link href="/admin">Quản trị</Link>}
         <span style={{ marginLeft: "auto" }}>

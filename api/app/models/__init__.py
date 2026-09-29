@@ -3,6 +3,8 @@
 from app.models.audit import AuditEvent
 from app.models.base import Base
 from app.models.collection import Collection, CollectionItem
+from app.models.discovery import (DiscoveryDeletedRecord, DiscoveryPaper, DiscoveryPaperLicense,
+                                  DiscoveryPaperTopic, DiscoveryRequestClock, DiscoverySource)
 from app.models.identity import BootstrapState, Invitation, PasswordResetToken, User, UserSession
 from app.models.index import EmbeddingBudgetDay, EmbeddingCall, EmbeddingUserBudgetDay, IndexEntry, IndexGeneration
 from app.models.ingest import Chunk, IngestionJob, IngestStepAttempt, MetadataCandidate, PdfPage, ReferenceEntry, Section
@@ -15,6 +17,8 @@ __all__ = [
     "Base",
     "BootstrapState",
     "Collection", "CollectionItem",
+    "DiscoveryDeletedRecord", "DiscoveryPaper", "DiscoveryPaperLicense", "DiscoveryPaperTopic",
+    "DiscoveryRequestClock", "DiscoverySource",
     "EmbeddingBudgetDay", "EmbeddingCall", "EmbeddingUserBudgetDay", "IndexEntry", "IndexGeneration",
     "IngestionJob",
     "IngestStepAttempt",
