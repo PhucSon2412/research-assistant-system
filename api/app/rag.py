@@ -164,6 +164,7 @@ _PACK_ABBREVIATION = re.compile(r"\b[A-Z][A-Z0-9]{1,}\b")
 _CONTEXTUAL_PAIR = re.compile(r"\b(?:(?:these|those|the)\s+two|both)\s+(?:papers|studies|articles)\b",
                               re.IGNORECASE)
 _EXPLICIT_TITLE_PHRASE = re.compile(r"\b[A-Z][a-z0-9-]+(?:\s+[A-Z][a-z0-9-]+)+\b")
+_EXPLICIT_PAIR_JOIN = re.compile(r"\b(?:and|versus|vs\.?)\b", re.IGNORECASE)
 _PACK_SECTION_ORDER = ("results", "methods", "limitations", "analysis", "discussion",
                        "abstract", "efficiency", "introduction", "other", "conclusion")
 
@@ -240,7 +241,8 @@ def _comparison_papers(question: str, grouped: dict[str, list[tuple[dict, int]]]
         # A deictic reference can identify exactly two scoped papers. Concrete
         # names or abbreviations must instead resolve through their titles.
         contextual = (_CONTEXTUAL_PAIR.search(question) and not _PACK_ABBREVIATION.search(question)
-                      and not _EXPLICIT_TITLE_PHRASE.search(question))
+                      and not _EXPLICIT_TITLE_PHRASE.search(question)
+                      and not _EXPLICIT_PAIR_JOIN.search(question))
         return ((tuple(sorted(grouped)), False) if len(grouped) == 2
                 and not any(matches.values()) and contextual else None)
     best = max(score for score, _ in choices.values())

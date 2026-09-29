@@ -606,7 +606,8 @@ def test_two_paper_scope_requires_context_or_resolved_names(upload_api, monkeypa
     wrong_scope = {"collection_id": scopes[0], "mode": "keyword"}
     for question in ("Compare GSR and DAS", "Compare these two papers, GSR and DAS",
                      "Compare Gated Sparse Routing and Dense Adapter Stacks",
-                     "Compare these two papers: Gated Sparse Routing and Dense Adapter Stacks"):
+                     "Compare these two papers: Gated Sparse Routing and Dense Adapter Stacks",
+                     "Compare these two papers: gated sparse routing and dense adapter stacks"):
         result = a.post("/rag/ask", {**wrong_scope, "question": question})
         assert result.status_code == 200 and result.json()["status"] == "insufficient_evidence"
         assert result.json()["reason"] == "comparison_requires_multiple_papers"
