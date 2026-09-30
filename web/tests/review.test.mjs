@@ -173,8 +173,9 @@ test("index needs the unticked provider box and explains every refusal the API c
     "rights_not_current", "unsupported_file_kind"]);
   assert.match(INDEX_ELIGIBILITY_TEXT.external_processing_not_permitted, /không tự bật tìm kiếm chỉ theo từ khóa/);
   assert.match(INDEX_EXTERNAL_NOTICE, /OpenRouter/);
-  // Indexing opens search for every account (M6b-2b3a), not RAG; rerank is an outbound step too.
+  // Indexing opens search (M6b-2b3a) and RAG (M6b-2b3b) for every account; rerank and generation are outbound too.
   assert.match(INDEX_EXTERNAL_NOTICE, /mọi tài khoản tìm kiếm/);
   assert.match(INDEX_EXTERNAL_NOTICE, /rerank/);
-  assert.match(INDEX_EXTERNAL_NOTICE, /Hỏi đáp \(RAG\) chưa dùng bản chung/);
+  assert.match(INDEX_EXTERNAL_NOTICE, /Hỏi đáp \(RAG\) cũng dùng bản chung theo cùng quyền/);
+  assert.match(INDEX_EXTERNAL_NOTICE, /được gửi tới provider để tạo câu trả lời/);
 });

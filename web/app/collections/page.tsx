@@ -8,7 +8,7 @@ import { ErrorText, Shell, useSession } from "../components/session";
 
 type Collection = { id: string; name: string };
 type Item = { id: string; title: string | null; visibility: string; content_status: string;
-  fulltext_search_available?: boolean };
+  fulltext_search_available?: boolean; rag_available?: boolean };
 
 export default function CollectionsPage() {
   const user = useSession();

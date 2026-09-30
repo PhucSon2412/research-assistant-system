@@ -49,14 +49,14 @@ export type PendingPublication = {
     metadata_removed_at?: string | null };
 };
 
-// Index status of a reviewed copy (M6b-2b2b). IDs and codes only. `search_open` is the search route's own
-// gate now (M6b-2b3a); `rag_open` stays false: RAG does not use common copies yet.
+// Index status of a reviewed copy (M6b-2b2b). IDs and codes only. `search_open` and `rag_open` are the search
+// (M6b-2b3a) and RAG (M6b-2b3b) routes' own gates now.
 export type IndexEligibility = "indexable" | "revoked" | "not_published" | "rights_not_current"
   | "audience_not_supported" | "fulltext_not_permitted" | "external_processing_not_permitted"
   | "blocked_by_conditions" | "unsupported_file_kind";
 
 export type CopyIndexStatus = {
-  eligibility: IndexEligibility; content_status: string; search_open: boolean; rag_open: false; note: string | null;
+  eligibility: IndexEligibility; content_status: string; search_open: boolean; rag_open: boolean; note: string | null;
   provider_ready: boolean;
   active_generation: { id: string; model_id: string; dimensions: number | null; index_version: string;
     expected_chunks: number; activated_at: string | null } | null;
@@ -144,7 +144,8 @@ export const INDEX_ELIGIBILITY_TEXT: Record<IndexEligibility, string> = {
 export const INDEX_EXTERNAL_NOTICE = "Text trích xuất từ file chung (không phải file gốc) sẽ được gửi tới "
   + "OpenRouter/provider để embedding; reference list không được gửi làm bằng chứng. Khi lập chỉ mục xong, mọi tài "
   + "khoản tìm kiếm và mở được đoạn trích theo quyền đã ghi; khi bật rerank, câu tìm kiếm và đoạn trích được phép "
-  + "cũng được gửi tới provider. Hỏi đáp (RAG) chưa dùng bản chung.";
+  + "cũng được gửi tới provider. Hỏi đáp (RAG) cũng dùng bản chung theo cùng quyền: khi một tài khoản hỏi, câu hỏi "
+  + "và các đoạn được chọn làm bằng chứng được gửi tới provider để tạo câu trả lời.";
 
 // Revoking needs a listed reason code and the unticked box; no free text is sent.
 export function makeRevokeBody(confirmed: boolean, reason: string) {

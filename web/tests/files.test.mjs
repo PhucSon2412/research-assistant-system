@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
 import {
-  COMMON_DOWNLOAD_NOTE, COMMON_INDEXED_NOTE, COMMON_METADATA_ONLY_NOTE, COMMON_SEARCHABLE_DOWNLOAD_NOTE,
-  COMMON_SEARCHABLE_NOTE, NO_DOWNLOADABLE_FILE, commonItemNote, contentLabel, originalDownloadHref,
+  COMMON_DOWNLOAD_NOTE, COMMON_INDEXED_NOTE, COMMON_METADATA_ONLY_NOTE, COMMON_RAG_DOWNLOAD_NOTE, COMMON_RAG_NOTE,
+  COMMON_SEARCHABLE_DOWNLOAD_NOTE, COMMON_SEARCHABLE_NOTE, NO_DOWNLOADABLE_FILE, commonItemNote, contentLabel, originalDownloadHref,
   sourceOriginalHref,
 } from "../lib/files.ts";
 import { CONDITIONS_BLOCK_NOTE, ORIGINAL_DOWNLOAD_TEXT } from "../lib/review.ts";
@@ -50,13 +50,32 @@ test("an indexed common item is searchable only when the API says so (M6b-2b3a)"
   assert.match(COMMON_SEARCHABLE_NOTE, /không mở tải file gốc/);
   for (const note of [COMMON_SEARCHABLE_NOTE, COMMON_SEARCHABLE_DOWNLOAD_NOTE]) {
     assert.match(note, /^Tìm kiếm toàn văn khả dụng/);
-    assert.match(note, /Hỏi đáp \(RAG\) chưa dùng bản chung/);
+    assert.match(note, /Hỏi đáp \(RAG\) không dùng bản này: quyền không cho gửi đoạn trích tới provider/);
   }
+});
+
+test("a searchable common item is described as a RAG source only when the API says so (M6b-2b3b)", () => {
+  assert.equal(commonItemNote([], "indexed", true, true), COMMON_RAG_NOTE);
+  assert.equal(commonItemNote([listed], "indexed", true, true), COMMON_RAG_DOWNLOAD_NOTE);
+  // The RAG flag never opens anything the full-text flag does not.
+  assert.equal(commonItemNote([], "indexed", false, true), COMMON_INDEXED_NOTE);
+  assert.equal(commonItemNote([listed], "metadata_only", false, true), COMMON_DOWNLOAD_NOTE);
+  for (const note of [COMMON_RAG_NOTE, COMMON_RAG_DOWNLOAD_NOTE]) {
+    assert.match(note, /^Tìm kiếm toàn văn khả dụng/);
+    assert.match(note, /Hỏi đáp \(RAG\) dùng được đoạn của bản này làm bằng chứng/);
+    assert.match(note, /OpenRouter\/provider/);
+  }
+  assert.match(COMMON_RAG_NOTE, /không mở tải file gốc/);
+  assert.match(COMMON_RAG_DOWNLOAD_NOTE, /SHA-256/);
 });
 
 test("content labels come from the API's full-text flag, never from content_status alone", () => {
   assert.equal(contentLabel({ visibility: "common", content_status: "indexed", fulltext_search_available: true }),
-    "Bản chung: tìm kiếm toàn văn (chưa hỏi đáp)");
+    "Bản chung: tìm kiếm toàn văn (không dùng cho hỏi đáp)");
+  assert.equal(contentLabel({ visibility: "common", content_status: "indexed", fulltext_search_available: true,
+    rag_available: true }), "Bản chung: tìm kiếm toàn văn và hỏi đáp");
+  assert.equal(contentLabel({ visibility: "common", content_status: "indexed", fulltext_search_available: false,
+    rag_available: true }), "Đã lập chỉ mục, chưa mở tìm kiếm");
   // Indexed common copy the gate does not serve (e.g. rights no longer current): no full-text label.
   assert.equal(contentLabel({ visibility: "common", content_status: "indexed", fulltext_search_available: false }),
     "Đã lập chỉ mục, chưa mở tìm kiếm");

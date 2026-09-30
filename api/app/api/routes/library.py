@@ -8,7 +8,9 @@ A common item lists a file (with its download path) only when that file's
 live AccessRights open it for download (M6b-2b1, ``common_original_clause``).
 Its chunks, coverage, references and metadata candidates open only for the
 active version/file its live rights permit for full-text search (M6b-2b3a,
-``common_derivatives_clause``); the two gates are independent.
+``common_derivatives_clause``); the two gates are independent. ``rag_available``
+of a common copy is the RAG gate (M6b-2b3b): searchable text whose rights also
+permit external processing.
 """
 
 from __future__ import annotations
@@ -56,16 +58,21 @@ def _scope_clause(principal: Principal, scope: Scope) -> ColumnElement[bool]:
     return clause
 
 
-def _searchable_common(db: Session, principal: Principal, items) -> set[uuid.UUID]:
-    """Common items among ``items`` whose indexed text search serves now (same gate as the search route)."""
+def _searchable_common(db: Session, principal: Principal, items, *,
+                       external_processing: bool = False) -> set[uuid.UUID]:
+    """Common items among ``items`` whose indexed text search serves now (same gate as the search route).
+
+    ``external_processing=True``: RAG's gate, whose evidence also goes to a provider.
+    """
     ids = [i.id for i in items if i.visibility == Visibility.COMMON.value]
     if not ids:
         return set()
-    return set(db.scalars(select(LibraryItem.id).where(LibraryItem.id.in_(ids),
-                                                       common_fulltext_items_clause(principal))).all())
+    return set(db.scalars(select(LibraryItem.id).where(LibraryItem.id.in_(ids), common_fulltext_items_clause(
+        principal, external_processing=external_processing))).all())
 
 
-def _item_out(item: LibraryItem, principal: Principal, searchable_common: set[uuid.UUID] = frozenset()) -> dict:
+def _item_out(item: LibraryItem, principal: Principal, searchable_common: set[uuid.UUID] = frozenset(),
+              ragable_common: set[uuid.UUID] = frozenset()) -> dict:
     return {
         "id": str(item.id),
         "visibility": item.visibility,
@@ -76,9 +83,10 @@ def _item_out(item: LibraryItem, principal: Principal, searchable_common: set[uu
         # copy under its live full-text rights (M6b-2b3a). ``indexed`` alone is not opened.
         "fulltext_search_available": (item.id in searchable_common if item.visibility == Visibility.COMMON.value
                                       else item.content_status == ContentStatus.INDEXED.value),
-        # RAG takes private-owner text only (M6b-2b3a): a searchable common copy is not asked.
-        "rag_available": (item.visibility == Visibility.PRIVATE.value
-                          and item.content_status == ContentStatus.INDEXED.value),
+        # RAG uses a common copy only while its rights permit search and external processing (M6b-2b3b);
+        # this flag shows the form, the server still applies the gate (and pricing) on every request.
+        "rag_available": (item.id in ragable_common if item.visibility == Visibility.COMMON.value
+                          else item.content_status == ContentStatus.INDEXED.value),
         "title": item.title,
         "active_version_id": str(item.active_version_id) if item.active_version_id else None,
         "created_at": item.created_at.isoformat(),
@@ -140,8 +148,9 @@ def list_items(
         .offset(offset)
     ).all()
     searchable = _searchable_common(db, principal, items)
+    ragable = _searchable_common(db, principal, items, external_processing=True)
     return {
-        "items": [_item_out(i, principal, searchable) for i in items],
+        "items": [_item_out(i, principal, searchable, ragable) for i in items],
         "total": total,
         "limit": limit,
         "offset": offset,
@@ -176,8 +185,9 @@ def get_item(item_id: str, principal: Principal = Depends(get_principal), db: Se
     jobs = db.scalars(select(IngestionJob).where(IngestionJob.item_id == item.id)).all() \
         if item.visibility == Visibility.PRIVATE.value else []
     searchable = _searchable_common(db, principal, [item])
+    ragable = _searchable_common(db, principal, [item], external_processing=True)
     return {
-        "item": _item_out(item, principal, searchable)
+        "item": _item_out(item, principal, searchable, ragable)
         | {
             "versions": [
                 {
@@ -330,4 +340,5 @@ def update_item(
         details={"fields": changed},
     )
     db.commit()
-    return {"item": _item_out(item, principal, _searchable_common(db, principal, [item]))}
+    return {"item": _item_out(item, principal, _searchable_common(db, principal, [item]),
+                              _searchable_common(db, principal, [item], external_processing=True))}

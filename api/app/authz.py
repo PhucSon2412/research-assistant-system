@@ -16,7 +16,9 @@ Decisions depend on item ownership, not on role alone (docs/access-and-data.md):
   coverage, references, metadata candidates, search hits) opens only through
   ``COMMON_FULLTEXT_SQL`` (M6b-2b3a): the active common generation of the exact
   version/file its live rights permit for full-text search. Neither grants the
-  other, and RAG still takes private-owner text only. A ``revoked`` copy is
+  other. RAG (M6b-2b3b) retrieves through the same gate and sends a common
+  chunk to generation only while those rights also permit external
+  processing (``external_processing=True``). A ``revoked`` copy is
   absent from every normal route. ``review_copy_admin_clause`` is the
   Admin-only view of reviewed copies in any state, used by
   ``/admin/common-copies``;
@@ -105,7 +107,7 @@ def common_fulltext_sql(*, external_processing: bool = False) -> str:
     ``permits_fulltext_search`` alone: search itself sends no paper text out.
 
     ``external_processing=True`` also requires ``permits_external_processing``:
-    only those rows may reach a provider (rerank). ``permits_original_download``
+    only those rows may reach a provider (rerank, RAG generation). ``permits_original_download``
     is never consulted: search does not open the original, nor the reverse.
 
     The subquery is uncorrelated so PostgreSQL computes it once per statement
@@ -144,13 +146,14 @@ def _common_fulltext(external_processing: bool = False):
             .subquery("common_fulltext"))
 
 
-def common_fulltext_items_clause(principal: Principal) -> ColumnElement[bool]:
+def common_fulltext_items_clause(principal: Principal, *, external_processing: bool = False) -> ColumnElement[bool]:
     """``LibraryItem`` is a common copy whose indexed text may be served now (``common_fulltext_sql``).
 
+    ``external_processing=True``: its text may also reach a provider, so RAG can use it as evidence.
     Item-level only: callers reading derived rows must also match each row's
     version/file with ``common_derivatives_clause``.
     """
-    rows = _common_fulltext()
+    rows = _common_fulltext(external_processing)
     return LibraryItem.id.in_(select(rows.c.item_id))
 
 

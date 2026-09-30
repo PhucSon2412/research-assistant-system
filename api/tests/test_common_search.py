@@ -10,7 +10,6 @@ OpenRouter and ``pricing_verified`` is only set on in-memory settings copies.
 """
 from __future__ import annotations
 
-import json
 import uuid
 from threading import Thread
 from types import SimpleNamespace
@@ -23,7 +22,6 @@ from app.config import get_settings
 from app.ingest.embedding import EmbeddingResult
 from app.ingest.worker import process_job
 from app.main import app
-from app.rag import GenerationResult
 from tests.test_common_cleanup import indexed, wait_for_lock_wait
 from tests.test_common_index import INDEXABLE, sha, start
 from tests.test_ingest_worker import upload
@@ -214,7 +212,7 @@ def test_item_collection_and_derived_reads_serve_only_the_permitted_copy(w):
         for item in (w.pending, w.meta, w.revoked, str(uuid.uuid4())):
             assert search(browser, item_id=item).json() == MISSING, (who, item)
         detail = browser.get(f"/library/items/{w.ok}").json()["item"]
-        assert (detail["fulltext_search_available"], detail["rag_available"]) == (True, False), who
+        assert (detail["fulltext_search_available"], detail["rag_available"]) == (True, True), who
         assert [v["coverage"] for v in detail["versions"]] == ["complete"], who
         chunks = browser.get(f"/library/items/{w.ok}/chunks").json()["chunks"]
         assert chunks and {c["source_file_id"] for c in chunks} == {w.ok_file}, who
@@ -247,7 +245,7 @@ def test_item_collection_and_derived_reads_serve_only_the_permitted_copy(w):
     assert members == {w.ok: True, w.meta: False, w.a_secret["item_id"]: True}  # the revoked copy is not listed
     # Admin status reports the same gate.
     index = w.admin.get(f"/admin/common-copies/{w.ok}").json()["item"]["index"]
-    assert (index["search_open"], index["rag_open"]) == (True, False)
+    assert (index["search_open"], index["rag_open"]) == (True, True)
     for item in (w.meta, w.revoked):
         assert w.admin.get(f"/admin/common-copies/{item}").json()["item"]["index"]["search_open"] is False
 
@@ -515,59 +513,9 @@ def test_revoke_waiting_on_the_response_lock_lets_that_response_finish(w, monkey
     assert_gone_for_new_requests(w)
 
 
-# ----------------------------------------------------------------------------- RAG stays private
+# ----------------------------------------------------------------------------- helpers shared with test_common_rag
 
 
 def common_chunk_texts(w) -> set[str]:
     with w.api.engine.connect() as conn:
         return set(conn.scalars(text("SELECT text FROM chunks WHERE item_id=:i"), {"i": uuid.UUID(w.ok)}).all())
-
-
-@pytest.mark.parametrize("mode", ["keyword", "hybrid"])
-def test_rag_never_retrieves_or_sends_common_chunks(w, monkeypatch, mode):
-    fake_query_embedding(monkeypatch, [])
-    generated = []
-    recorded = []
-    real_search = search_module.search
-
-    def recording_search(*args, **kwargs):
-        found = real_search(*args, **kwargs)
-        recorded.append(found)
-        return found
-    monkeypatch.setattr("app.rag.search", recording_search)
-
-    def generation(messages, settings):
-        evidence = json.loads(messages[1]["content"])["evidence"]
-        generated.append(evidence)
-        first = next(row for row in evidence if "Sharedcanary" in row["text"])
-        return GenerationResult(json.dumps({"claims": [{"text": "The body is private.",
-            "citations": [{"chunk_id": first["chunk_id"], "quote": "Sharedcanary"}]}]}),
-            100, 20, settings.generation.model_id, "SyntheticProvider")
-    monkeypatch.setattr("app.rag.generate", generation)
-    common_ids = set(w.ok_chunks)
-    question = "Sharedcanary result?"
-
-    # The common copy is searchable on /search, but not a RAG scope for anyone.
-    for who, browser in w.browsers.items():
-        assert w.ok in hit_items(search(browser, mode=mode)), who
-        assert browser.post("/rag/ask", {"item_id": w.ok, "question": question, "mode": mode}).json() == MISSING
-    # All: A and B get their own private evidence only; the Admin, with only common text, gets none.
-    for who, browser in w.browsers.items():
-        response = browser.post("/rag/ask", {"scope": "all", "question": question, "mode": mode})
-        assert response.status_code == 200, (who, response.text)
-        expected = "answered" if who != "admin" else "insufficient_evidence"
-        assert response.json()["status"] == expected, who
-    # Collection: A's collection holds the common copy and one private item; only the private one is used.
-    response = w.a.post("/rag/ask", {"collection_id": w.collection, "question": question, "mode": mode})
-    assert response.json()["status"] == "answered"
-    assert {c["item_id"] for claim in response.json()["claims"] for c in claim["citations"]} == {w.a_secret["item_id"]}
-    only_common = w.a.post("/collections", {"name": "Common only"}).json()["collection"]["id"]
-    assert w.a.post(f"/collections/{only_common}/items", {"item_id": w.ok}).status_code == 201
-    response = w.a.post("/rag/ask", {"collection_id": only_common, "question": question, "mode": mode})
-    assert response.json()["status"] == "insufficient_evidence"
-
-    assert len(generated) == 3  # A all, B all, A collection: the Admin and the common-only collection never
-    sent = [row for evidence in generated for row in evidence]
-    assert sent and not ({row["chunk_id"] for row in sent} & common_ids)
-    assert all(row["item_id"] != w.ok for row in sent)
-    assert recorded and all(hit["item_id"] != w.ok for found in recorded for hit in found["hits"])

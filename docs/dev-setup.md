@@ -891,3 +891,35 @@ Kết quả: **15/15 đạt**, 11 request embedding giả trên host, 0 lời g�
 Demo M6b-2b2b đã sửa (`scripts/demo_m6b2b2b_common_index.py`, bước “indexed and searchable for B, RAG 404”) chạy lại trên project cô lập mới: **19/19**.
 
 **Giới hạn chưa kiểm/đo:** hybrid/rerank chỉ kiểm trong test API với provider giả (container không có key nên hybrid qua web trả `503` như trước); chưa đo latency của gate trên workload 1.000 paper; smoke dùng HTTP qua proxy (không Chrome) với tài khoản tạo thẳng trong DB; RAG bản chung chưa mở; restore backup cũ vẫn cần áp tombstone journal thủ công.
+
+## Hỏi đáp (RAG) trên bản chung (M6b-2b3b)
+
+Không migration (`alembic current` vẫn `0025 (head)`), không biến môi trường mới cho stack dev. Quyết định, test và giới hạn ở [decisions](decisions.md#quyết-định-triển-khai-m6b-2b3b-2026-09-30).
+
+| Ai | Route | Thay đổi |
+| --- | --- | --- |
+| Mọi tài khoản | `POST /rag/ask` | Item/collection/all lấy thêm bản chung được phép qua gate search; chỉ chunk có quyền xử lý qua provider vào evidence. Response thêm `evidence_withheld`; `reason` có thể là `evidence_not_permitted_for_provider`; citation thêm `visibility`, `original_url` (`null` khi quyền không cho tải). `item_id` bản chung searchable → hợp lệ (còn lại `404`); `pricing_verified=false` vẫn `503` |
+| Mọi tài khoản | `GET /library/items*`, `GET /collections/{id}/items` | `rag_available` của bản chung theo gate RAG (search + `permits_external_processing`); collection thêm `rag_available` |
+| Admin | `GET /admin/common-copies[/{id}]` | `index.rag_open` theo gate RAG; ghi chú mới (mở cả hai / chỉ search / chưa mở) |
+
+Web: trang item hiện khung hỏi đáp theo `rag_available`, thông báo phạm vi gồm paper riêng và bản chung được phép (collection chỉ thu hẹp), citation ghi “Bản chung”/“Paper riêng của bạn” và chỉ có link “file gốc” khi API trả `original_url`; lý do `evidence_not_permitted_for_provider`, số đoạn bị giữ lại và `409 rag_scope_changed` có thông điệp riêng. Nhãn thư viện/collection: “Bản chung: tìm kiếm toàn văn và hỏi đáp”.
+
+**Kiểm chứng ngày 2026-09-30 (Windows 11, Conda `ras`, PowerShell 5.1):**
+
+- `& $py -m pytest api -q`: **593 passed** trong 21 phút 48 giây (một cảnh báo deprecation Starlette), gồm `api/tests/test_common_rag.py` (17 test, PostgreSQL/MinIO thật, provider giả, HTTP ra ngoài bị chặn). Không gọi OpenRouter; `pricing_verified` chỉ bật trên bản sao settings trong bộ nhớ của test.
+- Kiểm đối chứng (script tạm sửa từng chỗ, chạy test mục tiêu rồi khôi phục): bỏ `include_common` ở `search`, ở hydrate trước pack, ở `_fresh`, ở `_scope`; pack bỏ qua `provider_ok`; `_same` bỏ `provider_ok`; `_coverage` private-only; `original_url` luôn có; `rag_available` theo gate search → **9/9** bị test bắt.
+- `npm test --prefix web` **37 passed**; `npm run typecheck --prefix web` và `npm run build --prefix web` đạt.
+
+**Smoke Chrome qua proxy web trên Compose cô lập** (project `ras-rag-smoke`, không đụng DB/MinIO dev; container không có key; script chỉ đọc `POSTGRES_*`/`MINIO_ROOT_*` từ `.env`, từ chối DB có tài khoản không do nó tạo). File override `scripts/compose.smoke-host-api.yml` thêm service `web-host-api` (cùng image web) mà proxy trỏ tới một API **chạy trên host bởi script** với generation/embedding giả trên bản sao settings trong bộ nhớ và mọi HTTP không phải loopback bị từ chối; `web` → `api` của Compose giữ nguyên như stack thật.
+
+```powershell
+$env:POSTGRES_HOST_PORT="55432"; $env:API_HOST_PORT="58000"; $env:WEB_HOST_PORT="53000"; $env:MINIO_API_HOST_PORT="59000"; $env:MINIO_CONSOLE_HOST_PORT="59001"; $env:OPENROUTER_API_KEY=""; $env:RAS_DISCOVERY__ENABLED="false"; $env:SMOKE_HOST_API_PORT="58100"; $env:SMOKE_HOST_WEB_PORT="53100"
+docker compose -p ras-rag-smoke -f docker-compose.yml -f scripts/compose.smoke-host-api.yml build --no-cache
+docker compose -p ras-rag-smoke -f docker-compose.yml -f scripts/compose.smoke-host-api.yml up -d --wait
+& $py scripts/smoke_m6b2b3b_common_rag_browser.py
+docker compose -p ras-rag-smoke -f docker-compose.yml -f scripts/compose.smoke-host-api.yml down -v   # chỉ volume của project smoke
+```
+
+Kết quả (clean build `--no-cache` thành công; chạy trên volume mới, `alembic current` = `0025 (head)`): **7/7 đạt**, Chrome 154, Playwright 1.63; 9 payload generation giả, 11 request embedding giả trên host, 0 lời gọi ra ngoài. (1) A và B upload Markdown qua web (B một file **cùng bytes** với file của A), worker Compose extract, host index bằng embedding giả; Admin duyệt file của A cho tìm kiếm + xử lý ngoài, **không** cho tải, công bố, index; trang Admin báo search và RAG mở. (2) Web → API Compose (giá chưa xác minh): trang item chung hiện nhãn “tìm kiếm toàn văn và hỏi đáp”, ghi chú quyền và khung hỏi đáp; hỏi → `503`, UI hiện thông điệp giá/provider, không có hàng ledger generation. (3) Web → API host (generation giả): A, B, Admin hỏi bản chung (item scope), citation nhãn “Bản chung”, không link file gốc, mở `/sources/{chunk}` (`200`), `/api/files/{file chung}/original` `404`. (4) Scope all: evidence của mỗi người đúng private của mình + bản chung, file cùng bytes của B không tới A/Admin; citation private có link file gốc của chính mình; collection của A chỉ bản chung + paper của A. (5) 7 hàng ledger generation, mỗi hàng của đúng người hỏi, settle một lần; ledger embedding không đổi. (6) Admin thu hồi trong lúc generation giả đang giữ payload → `409 rag_scope_changed`, UI không hiện câu trả lời (payload đã gửi trước `t_rev` không lấy lại được; hàng index còn 3). (7) Sau `t_rev`: trang item và RAG item scope `404` cho cả ba, câu trả lời scope all của B không còn evidence chung. Log container 188 dòng: không traceback, không text fixture.
+
+**Giới hạn chưa kiểm/đo:** nhánh có câu trả lời qua proxy dùng API trên host với generation giả (API trong Compose không có key nên dừng ở `503` pricing, như thiết kế); hybrid, so sánh và các ca đổi quyền giữa hai lần kiểm chỉ kiểm trong test API; chưa đo latency/charge thật; restore backup cũ vẫn cần áp tombstone journal thủ công.

@@ -119,12 +119,13 @@ def restore_object(w, item: str, original: bytes) -> None:
     w.storage.put(key, io.BytesIO(original), "application/octet-stream")
 
 
-def assert_search_open_rag_closed(w, item: str) -> None:
-    """Indexed under full-text rights: search and its derived reads serve the copy to every account (M6b-2b3a;
-    the full matrix is in test_common_search), RAG does not."""
+def assert_search_and_rag_open(w, item: str) -> None:
+    """Indexed under full-text and external-processing rights: search and its derived reads serve the copy to
+    every account (M6b-2b3a; the full matrix is in test_common_search), and it is a RAG scope (M6b-2b3b; matrix in
+    test_common_rag) whose generation is still refused while pricing is unverified."""
     for who, browser in (("a", w.a), ("b", w.b), ("admin", w.admin)):
         detail = browser.get(f"/library/items/{item}").json()["item"]
-        assert (detail["fulltext_search_available"], detail["rag_available"], detail["jobs"]) == (True, False, []), who
+        assert (detail["fulltext_search_available"], detail["rag_available"], detail["jobs"]) == (True, True, []), who
         for path in ("chunks", "references", "coverage", "metadata-candidates"):
             assert browser.get(f"/library/items/{item}/{path}").status_code == 200, (who, path)
         assert browser.get(f"/library/items/{item}/chunks").json()["chunks"], who
@@ -134,8 +135,9 @@ def assert_search_open_rag_closed(w, item: str) -> None:
         scoped = write(browser, "POST", "/search", {"query": "Indexable result nine units measured observation",
                                                     "mode": "keyword", "item_id": item})
         assert scoped.status_code == 200 and {h["item_id"] for h in scoped.json()["hits"]} <= {item}, who
-        assert write(browser, "POST", "/rag/ask", {"item_id": item, "question": "Indexable result?",
-                                                   "mode": "keyword"}).json() == MISSING, who
+        asked = write(browser, "POST", "/rag/ask", {"item_id": item, "question": "Indexable result?", "mode": "keyword"})
+        # A valid scope now (not 404); the unverified-pricing gate still stops it before any provider call.
+        assert (asked.status_code, asked.json()) == (503, {"error": "rag_generation_unavailable_unverified_pricing"}), who
 
 
 @pytest.fixture
@@ -154,7 +156,7 @@ def w(upload_api, monkeypatch):
 
 
 @pytest.mark.parametrize("kind", ["md", "pdf"])
-def test_published_copy_indexes_through_the_shared_pipeline_and_opens_search_only(w, kind):
+def test_published_copy_indexes_through_the_shared_pipeline_and_opens_search_and_rag(w, kind):
     body = MD_BODY if kind == "md" else PDF_BODY
     private_before = rows_of(w.api, w.private[kind]["item_id"])
     budgets_before = budgets(w)
@@ -231,12 +233,12 @@ def test_published_copy_indexes_through_the_shared_pipeline_and_opens_search_onl
     audit = w.api.scalar("SELECT details FROM audit_events WHERE action='common_copy.index.start' AND outcome='success'")
     assert set(audit) == {"job_id", "source_file_id"}
 
-    # Indexed under full-text rights opens search (M6b-2b3a), not RAG.
-    assert_search_open_rag_closed(w, copy)
+    # Indexed under full-text and external-processing rights opens search (M6b-2b3a) and RAG (M6b-2b3b).
+    assert_search_and_rag_open(w, copy)
     status = w.admin.get(f"/admin/common-copies/{copy}").json()["item"]
     assert status["content_status"] == "indexed" and status["fulltext_available"] is True
-    assert (status["index"]["search_open"], status["index"]["rag_open"]) == (True, False)
-    assert "mở tìm kiếm toàn văn" in status["index"]["note"]
+    assert (status["index"]["search_open"], status["index"]["rag_open"]) == (True, True)
+    assert "mở tìm kiếm toàn văn và hỏi đáp" in status["index"]["note"]
     assert start(w.admin, copy).json() == {"error": "already_indexed"}
     listed = w.b.get("/library/items?scope=common").json()["items"]
     assert [(i["content_status"], i["fulltext_search_available"]) for i in listed if i["id"] == copy] == [

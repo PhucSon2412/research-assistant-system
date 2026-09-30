@@ -2,12 +2,12 @@
 
 Every query selects only from the caller's audience, in SQL before top-k:
 the caller's own ``private`` items, plus, when the caller opts in with
-``include_common=True`` (the ``/search`` route and its chunk viewer, M6b-2b3a),
-the common copies ``app.authz.common_fulltext_sql`` allows for the exact
-item/version/file/generation. The default stays private-owner only, so RAG
-(``app.rag`` calls ``search``/``hydrate``/``_scope`` without the flag) never
-retrieves, rechecks or sends common text. Rerank sends a common chunk only
-while its rights also permit external processing.
+``include_common=True`` (the ``/search`` route and its chunk viewer, M6b-2b3a;
+every ``search``/``_scope``/``hydrate`` call of ``app.rag``, M6b-2b3b), the
+common copies ``app.authz.common_fulltext_sql`` allows for the exact
+item/version/file/generation. The default stays private-owner only. Rerank
+(and RAG generation) send a common chunk only while ``hydrate`` reports
+``provider_ok``: its rights also permit external processing.
 """
 from __future__ import annotations
 
@@ -328,7 +328,8 @@ def _rank(db: Session, principal: Principal, item_id, settings: Settings, query:
 
 def hydrate(db: Session, principal: Principal, item_id, ids: list[uuid.UUID],
             collection_id: uuid.UUID | None = None, *, include_common: bool = False) -> dict[uuid.UUID, dict]:
-    """Re-read chunks through the full audience gate; ``provider_ok``: the text may go to rerank."""
+    """Re-read chunks through the full audience gate; ``provider_ok``: the text may go to a provider
+    (rerank, RAG generation)."""
     if not ids:
         return {}
     # A private chunk's owner confirmed provider processing at upload; a common chunk needs its live rights to.
