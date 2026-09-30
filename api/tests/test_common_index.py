@@ -766,3 +766,43 @@ def test_an_unchanged_head_fingerprint_does_not_stand_in_for_the_hash(w, replace
     # The call refused before sending is released (rejected, no charge); nothing was left reserved.
     assert statuses == (["completed", "rejected"] if stage == "next_call" else ["completed"] * 3)
     assert jobs_of(w, copy)[0][1] == "terminal_failed"
+
+
+def test_a_job_reusing_every_completed_call_still_hashes_before_publishing(w):
+    """Review PR #23 (round 3): no new provider call must not mean no hash before the publish."""
+    copy = copy_of(w, upload(w.a, MULTI_BODY), MULTI_BODY)
+    first = started(w, copy)
+    assert process_job(first, storage=w.storage) == "awaiting_index"
+    real_publish = indexer._publish
+
+    def stop_before_publish(*args, **kwargs):  # every call completed and every entry written
+        raise worker.StepError("index_incomplete")
+
+    w.monkeypatch.setattr(indexer, "_publish", stop_before_publish)
+    calls = fake_provider(w.monkeypatch)
+    assert process_job(first, w.settings, w.storage) == "index_incomplete"
+    assert len(calls) == distinct_texts(w, copy) == 3 and jobs_of(w, copy)[0][1] == "terminal_failed"
+    w.monkeypatch.setattr(indexer, "_publish", real_publish)
+
+    second = started(w, copy)
+    assert second != first
+    assert process_job(second, storage=w.storage) == "awaiting_index"
+    real_insert, inserted = indexer._insert_entry, []
+
+    def swap_while_writing(db, generation, chunk, call):
+        real_insert(db, generation, chunk, call)
+        inserted.append(call.status)
+        if len(inserted) == 1:
+            replace_object(w, copy, MULTI_BODY)  # same size, different bytes
+
+    w.monkeypatch.setattr(indexer, "_insert_entry", swap_while_writing)
+    calls = fake_provider(w.monkeypatch)
+    assert process_job(second, w.settings, w.storage) == "checksum_mismatch"
+    assert calls == []  # every call was reused
+    assert inserted == ["completed"] * 3
+    row = item_row(w, copy)
+    assert (row.content_status, row.active_index_generation_id) == ("metadata_only", None)
+    assert w.api.scalar("SELECT count(*) FROM index_generations WHERE item_id=:i AND state='active'",
+                        i=uuid.UUID(copy)) == 0
+    assert [j[1] for j in jobs_of(w, copy)] == ["terminal_failed", "terminal_failed"]
+

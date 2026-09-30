@@ -8,9 +8,10 @@ after each response and in the publishing transaction.
 
 No storage I/O happens while the item and job are locked (review PR #23): a
 revoke never waits on a slow object read. The whole object is read and its
-size and SHA-256 checked, with no lock held, before every provider call and
-before the publishing transaction (the read that opens a run serves the first
-call); only then are the job, lease, cancel flag, rights, epoch and tombstone
+size and SHA-256 checked, with no lock held, before every provider call (the
+read that opens a run serves the first call) and, always, once more after the
+last index entry is written and immediately before the publishing transaction,
+however many calls were new or reused; only then are the job, lease, cancel flag, rights, epoch and tombstone
 checked under the lock and committed before the call, so no lock is held while
 the provider works either. A HEAD of size/ETag/Last-Modified is used only to
 reject early (around each full read and after each response); it never
@@ -288,6 +289,7 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
     # publishing transaction need a fresh one: the loop never reads the object while locked.
     verified = _verified_unlocked(db, job_id, token, storage, settings)
     hashed_since_call = True
+    hashed_for_publish = False
     while True:
         job, item, version, source = _gate(db, job_id, token)
         job.lease_until = utcnow() + timedelta(seconds=settings.ingest.lease_seconds)
@@ -307,12 +309,13 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
             raise StepError("index_generation_changed")
         done = set(db.scalars(select(IndexEntry.chunk_id).where(IndexEntry.generation_id == generation.id)).all())
         pending = next((c for c in chunks if c.id not in done), None)
-        if pending is None and not hashed_since_call:
-            # Hash the object again before publishing, outside the lock; a revoke meanwhile wins
-            # at the next gate. The publishing transaction itself does no storage I/O.
+        if pending is None and not hashed_for_publish:
+            # Always hash again after the last entry, outside the lock, whatever happened before (new
+            # calls or completed ones reused): entries may have been written while the object changed.
+            # A revoke meanwhile wins at the next gate; the publishing transaction does no storage I/O.
             db.commit()
             verified = _verified_unlocked(db, job_id, token, storage, settings)
-            hashed_since_call = True
+            hashed_since_call = hashed_for_publish = True
             continue
         if pending is None:
             _publish(db, job, item, generation, chunks, settings)
