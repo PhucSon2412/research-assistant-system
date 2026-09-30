@@ -518,9 +518,11 @@ def test_revoke_hides_the_copy_from_t_rev_and_touches_nothing_else(upload_api, m
     box = write(b, "POST", "/collections", {"name": "B reading"}).json()["collection"]
     for item in (copy, other):
         assert write(b, "POST", f"/collections/{box['id']}/items", {"item_id": item}).status_code == 201
-    with api.engine.begin() as conn:  # a queued common job (none are created in this PR) must be cancelled
-        job = conn.scalar(text("""INSERT INTO ingestion_jobs(origin, scope_visibility, item_id, idempotency_key)
-            VALUES ('promotion', 'common', :i, 'm6b2a-fixture') RETURNING id"""), {"i": uuid.UUID(copy)})
+    with api.engine.begin() as conn:  # a queued common job must be cancelled (pinned to the reviewed file, 0025)
+        job = conn.scalar(text("""INSERT INTO ingestion_jobs(origin, scope_visibility, item_id, version_id,
+            source_file_id, idempotency_key, rights_epoch_at_start)
+            SELECT 'promotion', 'common', item_id, version_id, source_file_id, 'm6b2a-fixture', 0
+            FROM access_rights WHERE item_id=:i RETURNING id"""), {"i": uuid.UUID(copy)})
     before_a, before_b = private_snapshot(api, ids_a["item_id"]), private_snapshot(api, ids_b["item_id"])
     recorded_cols = ("verified_source, verified_source_url, license_url, evidence_note, checked_on, reviewer_user_id,"
                      " recorded_at, scope_audience, permits_original_download, permits_fulltext_search,"
@@ -781,7 +783,7 @@ def test_schema_keeps_publication_and_revocation_consistent(upload_api, monkeypa
     fails("only an admin publishes", (list_sql, {"i": ids[0]}), (record_sql, {"i": ids[0], "by": user_id}))
     fails("needs its publication record", ("UPDATE library_items SET publication_state='listed' WHERE id=:i",
                                            {"i": ids[0]}))
-    fails("no full-text path", ("UPDATE library_items SET content_status='indexed', active_version_id="
+    fails("indexed only while listed", ("UPDATE library_items SET content_status='indexed', active_version_id="
                                 "(SELECT id FROM paper_versions WHERE item_id=:i) WHERE id=:i", {"i": ids[0]}))
     fails("live access rights", (record_sql, {"i": ids[0], "by": admin_id}))  # still pending
     with api.engine.begin() as conn:

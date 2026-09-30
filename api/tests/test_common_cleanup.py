@@ -1,10 +1,14 @@
 """M6b-2b2a cleanup of a revoked common copy's derived full-text rows (PostgreSQL + MinIO).
 
-No common ingest exists yet, so ``clone_derived`` writes onto the common copy
-what the real private pipeline produced for the same bytes (Markdown and PDF:
-sections, chunks, PDF pages, references, citation links, metadata candidates,
-a job, an active generation, index entries and embedding calls with vectors),
-as a common ingest would. Each copy's texts carry a distinct canary. Private
+``clone_derived`` writes onto the common copy what the real private pipeline
+produced for the same bytes (Markdown and PDF: sections, chunks, PDF pages,
+references, citation links, metadata candidates, a job, an active generation,
+index entries and embedding calls with vectors). Written before the common
+pipeline existed, it now follows its contract (M6b-2b2b, 0025): the promotion
+job pins the copy's file, the calls are charged to the application (no owner),
+the rights permit indexing, and only a listed copy is made ``indexed`` (a
+pending copy cannot be). ``test_common_index`` runs cleanup on rows from the
+real common pipeline. Each copy's texts carry a distinct canary. Private
 indexing uses the fake embedding provider of ``test_private_index``; nothing
 calls OpenRouter.
 """
@@ -52,9 +56,14 @@ def indexed(storage, browser, body: bytes, settings, *, pdf: bool = False) -> di
     return ids
 
 
+# Rights that permit indexing (0025 gate); download stays off, so the original route stays closed as before.
+INDEXABLE_SCOPE = {"audience": "instance_users", "original_download": False, "fulltext_search": True,
+                   "external_processing": True, "conditions": None}
+
+
 def common_copy(api, owner, admin, ids, body: bytes) -> str:
     rid = submit(owner, ids).json()["request"]["id"]
-    response = approve(admin, api, rid, file_checksum_sha256=sha(body))
+    response = approve(admin, api, rid, file_checksum_sha256=sha(body), scope=INDEXABLE_SCOPE)
     assert response.status_code == 200, response.text
     return response.json()["request"]["pending_publication_id"]
 
@@ -69,8 +78,8 @@ def clone_derived(api, src_item: str, copy: str, canary: str) -> None:
              "adm": conn.scalar(text("SELECT id FROM users WHERE role='admin'")),
              "key": f"m6b2b2a-{uuid.uuid4()}", "flight": sha(canary.encode())}
         p["job"] = conn.scalar(text("""INSERT INTO ingestion_jobs(origin, scope_visibility, item_id, version_id,
-            idempotency_key, state, rights_epoch_at_start, attempt_count, lease_token, lease_until)
-            VALUES ('promotion', 'common', :dst, :dv, :key, 'indexing', 0, 1, gen_random_uuid(),
+            source_file_id, idempotency_key, state, rights_epoch_at_start, attempt_count, lease_token, lease_until)
+            VALUES ('promotion', 'common', :dst, :dv, :df, :key, 'indexing', 0, 1, gen_random_uuid(),
                     now() + interval '1 hour') RETURNING id"""), p)
         for statement in (
             "INSERT INTO ingest_step_attempts(job_id, step, attempt_no, outcome) VALUES (:job, 'index', 1, 'running')",
@@ -114,7 +123,7 @@ def clone_derived(api, src_item: str, copy: str, canary: str) -> None:
             """INSERT INTO embedding_calls(id, source_file_id, owner_user_id, model_id, provider, pipeline_version,
                chunk_hash, status, vector, dimensions, input_tokens, reserved_usd, cost_usd, cost_status,
                reserved_day, finished_at, response_model_id, response_provider)
-               SELECT DISTINCT ON (mc.new) mc.new, :df, :adm, ec.model_id, ec.provider, ec.pipeline_version, nc.chunk_hash, ec.status,
+               SELECT DISTINCT ON (mc.new) mc.new, :df, NULL, ec.model_id, ec.provider, ec.pipeline_version, nc.chunk_hash, ec.status,
                ('[' || array_to_string(array_fill(0.7::float8, ARRAY[ec.dimensions]), ',') || ']')::vector,
                ec.dimensions, ec.input_tokens, ec.reserved_usd, ec.cost_usd, ec.cost_status, ec.reserved_day,
                ec.finished_at, ec.response_model_id, ec.response_provider
@@ -123,14 +132,16 @@ def clone_derived(api, src_item: str, copy: str, canary: str) -> None:
             # A request still in flight at cleanup: reserved, no vector yet.
             """INSERT INTO embedding_calls(source_file_id, owner_user_id, model_id, provider, pipeline_version,
                chunk_hash, status, reserved_usd, cost_status, reserved_day, lease_until)
-               SELECT :df, :adm, model_id, provider, pipeline_version, :flight, 'reserved', 0.00001, 'unknown',
+               SELECT :df, NULL, model_id, provider, pipeline_version, :flight, 'reserved', 0.00001, 'unknown',
                CURRENT_DATE, now() + interval '1 hour' FROM index_generations WHERE item_id=:dst""",
             """INSERT INTO index_entries(generation_id, chunk_id, embedding_call_id, chunk_hash, text)
                SELECT mg.new, mch.new, mc.new, nc.chunk_hash, nc.text FROM index_entries e
                JOIN m mg ON mg.old = e.generation_id JOIN m mch ON mch.old = e.chunk_id
                JOIN chunks nc ON nc.id = mch.new JOIN m mc ON mc.old = e.embedding_call_id""",
+            # Only a listed copy is indexed (0025 gate); a pending one keeps its rows without an active pointer.
             """UPDATE library_items SET active_index_generation_id =
-               (SELECT id FROM index_generations WHERE item_id=:dst) WHERE id=:dst"""):
+               (SELECT id FROM index_generations WHERE item_id=:dst), content_status='indexed', active_version_id=:dv
+               WHERE id=:dst AND publication_state='listed'"""):
             conn.execute(text(statement), p)
 
 
@@ -355,7 +366,7 @@ def late_writes(api, copy: str, private: dict) -> list[tuple[str, str]]:
             VALUES (:i, {f}, {c}, (SELECT id FROM ingestion_jobs WHERE item_id=:i), 'm', 'p', 'late', 'late', 1, 1)""",
          CLOSED),
         (f"""INSERT INTO embedding_calls(source_file_id, owner_user_id, model_id, provider, pipeline_version, chunk_hash,
-            status, reserved_usd, cost_status, reserved_day) VALUES ({c}, (SELECT id FROM users WHERE role='admin'),
+            status, reserved_usd, cost_status, reserved_day) VALUES ({c}, NULL,
             'm', 'p', 'late', repeat('b', 64), 'reserved', 0, 'unknown', CURRENT_DATE)""", CLOSED),
         # An entry of A's private generation that names the copy's (scrubbed) embedding call.
         (f"""INSERT INTO index_entries(generation_id, chunk_id, embedding_call_id, chunk_hash, text)
@@ -384,8 +395,9 @@ def test_late_writes_after_purge_are_refused_and_cost_stays_reconcilable(world):
             ("UPDATE index_generations SET state='superseded' WHERE item_id=:i", CLOSED)):
         with pytest.raises(IntegrityError, match=message), api.engine.begin() as conn:
             conn.execute(text(statement), {"i": uuid.UUID(md), "g": generation})
-    with api.engine.begin() as conn:
-        conn.execute(text("UPDATE library_items SET active_index_generation_id=NULL WHERE id=:i"), {"i": uuid.UUID(md)})
+    # Revoke already left the index (M6b-2b2b): no active pointer from t_rev, and it cannot come back.
+    assert api.scalar("SELECT active_index_generation_id IS NULL AND content_status='metadata_only'"
+                      " FROM library_items WHERE id=:i", i=uuid.UUID(md))
     with pytest.raises(IntegrityError, match="never indexed again"), api.engine.begin() as conn:
         conn.execute(text("UPDATE library_items SET active_index_generation_id=:g WHERE id=:i"),
                      {"i": uuid.UUID(md), "g": generation})

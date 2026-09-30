@@ -146,10 +146,11 @@ export default function ItemPage() {
           <h1>{item.title ?? "(chưa có tiêu đề)"}</h1>
           <p>
             Kho: {item.visibility === "common" ? "chung" : "riêng của bạn"} · Nội dung:{" "}
-            {item.content_status === "indexed" ? "đã index" : "chỉ metadata"}
+            {item.content_status !== "indexed" ? "chỉ metadata"
+              : item.visibility === "common" ? "đã lập chỉ mục, chưa mở tìm kiếm/hỏi đáp" : "đã index"}
           </p>
-          {item.visibility === "common" && item.content_status !== "indexed" && (
-            <p style={{ background: "#f3f3f3", padding: "0.5rem" }}>{commonItemNote(item.files)}</p>
+          {item.visibility === "common" && (
+            <p style={{ background: "#f3f3f3", padding: "0.5rem" }}>{commonItemNote(item.files, item.content_status)}</p>
           )}
           {item.can_edit && (
             <form onSubmit={save} style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>

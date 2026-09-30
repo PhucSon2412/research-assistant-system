@@ -27,7 +27,7 @@ from app.authz import (Principal, can_edit_item, common_original_clause, m2a_pri
 from app.citations import RELATION_NOTE, citation_link_out, hidden_discovery_clause
 from app.models import (Chunk, DiscoveryPaper, IngestionJob, LibraryItem, MetadataCandidate, PaperVersion, PdfPage,
                         ReferenceCitationLink, ReferenceEntry, Section, SourceFile)
-from app.models.enums import AuditActorType, AuditOutcome, Visibility
+from app.models.enums import AuditActorType, AuditOutcome, ContentStatus, Visibility
 
 router = APIRouter(prefix="/library", tags=["library"])
 
@@ -60,6 +60,10 @@ def _item_out(item: LibraryItem, principal: Principal) -> dict:
         # Owner identity is never exposed; only whether it is the caller.
         "owned_by_me": item.owner_user_id == principal.user_id,
         "content_status": item.content_status,
+        # Whether search/RAG serve this item's text. A common copy can be ``indexed`` (M6b-2b2b)
+        # while no route serves it yet: indexed is not opened.
+        "fulltext_search_available": (item.visibility == Visibility.PRIVATE.value
+                                      and item.content_status == ContentStatus.INDEXED.value),
         "title": item.title,
         "active_version_id": str(item.active_version_id) if item.active_version_id else None,
         "created_at": item.created_at.isoformat(),

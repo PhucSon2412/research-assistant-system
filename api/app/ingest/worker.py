@@ -3,6 +3,15 @@
 Beat re-discovers all eligible rows, including M1c jobs and rows left after a
 broker outage. Row locks claim a lease. Every result commit fences the token
 and rights epoch, so an expired worker cannot publish after a replacement.
+
+Two origins run: ``upload`` (a private item's own file, ``SourceFile.job_id``)
+and ``promotion`` (M6b-2b2b: a published reviewed common copy, the file pinned
+in ``IngestionJob.source_file_id``; the common file's ``job_id`` stays NULL).
+A promotion step re-checks the common rights gate (``app.common_index``) with
+the item locked, so a revoke either committed before (the job ends
+``cancelled``) or waits for the step's commit. Every step locks the **item
+first, then the job**, the order revoke, publish and cleanup use, so a revoke
+that holds the item and then flags the job cannot deadlock with a worker.
 """
 
 from __future__ import annotations
@@ -13,7 +22,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Callable
 from types import SimpleNamespace
 
-from sqlalchemy import or_, select, text, true, update
+from sqlalchemy import and_, or_, select, text, true, update
 from sqlalchemy.orm import Session
 
 from app.citations import reconcile_references
@@ -22,7 +31,7 @@ from app.db import get_sessionmaker
 from app.ingest.markdown import PIPELINE_VERSION, chunk_hash, chunk_section, extract, has_body_text
 from app.ingest import pdf
 from app.models import Chunk, EmbeddingCall, IngestionJob, IngestStepAttempt, LibraryItem, MetadataCandidate, PaperVersion, PdfPage, ReferenceEntry, Section, SourceFile
-from app.models.enums import JobState, VerifiedMime, Visibility
+from app.models.enums import JobOrigin, JobState, VerifiedMime, Visibility
 from app.storage import OriginalStorage
 
 STEPS = {"validate": JobState.VALIDATING.value, "extract": JobState.EXTRACTING.value,
@@ -47,23 +56,57 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _context(db: Session, job: IngestionJob) -> tuple[LibraryItem, PaperVersion, SourceFile]:
-    # Hold the item row until this step commits. A concurrent epoch bump then
-    # orders before our check or after our result, never between the two.
-    item = (db.scalar(select(LibraryItem).where(LibraryItem.id == job.item_id)
-                      .with_for_update().execution_options(populate_existing=True))
-            if job.item_id else None)
+def _job_files(db: Session, job: IngestionJob) -> list[SourceFile]:
+    if job.origin == JobOrigin.PROMOTION.value:
+        source = db.get(SourceFile, job.source_file_id) if job.source_file_id else None
+        return [source] if source is not None else []
+    return list(db.scalars(select(SourceFile).where(SourceFile.job_id == job.id)).all())
+
+
+def _context(db: Session, job: IngestionJob, item: LibraryItem | None) -> tuple[LibraryItem, PaperVersion, SourceFile]:
+    """The job's item (already locked by the caller), version and file, or the reason it may not run."""
     version = db.get(PaperVersion, job.version_id) if job.version_id else None
-    files = db.scalars(select(SourceFile).where(SourceFile.job_id == job.id)).all()
+    files = _job_files(db, job)
     if (item is None or version is None or len(files) != 1 or version.item_id != item.id
             or files[0].item_id != item.id or files[0].version_id != version.id):
         raise StepError("invalid_job_file_relation")
-    if (job.origin != "upload" or job.scope_visibility != Visibility.PRIVATE.value
+    if job.origin == JobOrigin.PROMOTION.value:
+        if job.scope_visibility != Visibility.COMMON.value or item.visibility != Visibility.COMMON.value:
+            raise StepError("rights_gate_missing")
+        _guard(job, item)  # a revoke bumps the epoch: the job is cancelled, not refused
+        from app.common_index import block_reason
+        reason, _, source = block_reason(db, item)
+        if reason == "revoked":
+            raise StepError("cancelled")
+        if reason is not None:
+            raise StepError(f"common_{reason}")
+        if source.id != files[0].id:
+            raise StepError("common_file_mismatch")
+    elif (job.origin != JobOrigin.UPLOAD.value or job.scope_visibility != Visibility.PRIVATE.value
             or item.visibility != Visibility.PRIVATE.value or job.scope_owner_user_id != item.owner_user_id):
         raise StepError("rights_gate_missing")
     if files[0].verified_mime not in (VerifiedMime.MARKDOWN.value, VerifiedMime.PDF.value):
         raise StepError("unsupported_file_kind")
     return item, version, files[0]
+
+
+def _lock_item_then_job(db: Session, job_id: uuid.UUID) -> tuple[IngestionJob | None, LibraryItem | None]:
+    """Lock the job's item, then the job, ``FOR UPDATE`` until the step commits.
+
+    Item first, as revoke/publish/cleanup do: a revoke holding the item and
+    flagging the job cannot wait on a worker that holds the job. A concurrent
+    epoch bump then orders before our check or after our result, never between.
+    A job's item never changes once it has a file (DB triggers).
+    """
+    item_id = db.scalar(select(IngestionJob.item_id).where(IngestionJob.id == job_id))
+    item = (db.scalar(select(LibraryItem).where(LibraryItem.id == item_id)
+                      .with_for_update().execution_options(populate_existing=True))
+            if item_id else None)
+    job = db.scalar(select(IngestionJob).where(IngestionJob.id == job_id)
+                    .with_for_update().execution_options(populate_existing=True))
+    if job is not None and job.item_id != item_id:
+        raise StepError("invalid_job_file_relation")
+    return job, item
 
 
 def _guard(job: IngestionJob, item: LibraryItem) -> None:
@@ -83,7 +126,7 @@ def claim_job(db: Session, job_id: uuid.UUID, settings: Settings, now: datetime 
         return None
     if job.attempt_count >= settings.ingest.max_attempts:
         db.execute(update(EmbeddingCall).where(EmbeddingCall.source_file_id.in_(
-            select(SourceFile.id).where(SourceFile.job_id == job.id)),
+            select(SourceFile.id).where(or_(SourceFile.job_id == job.id, SourceFile.id == job.source_file_id))),
             EmbeddingCall.status == "reserved").values(status="uncertain"))
         job.state = JobState.TERMINAL_FAILED.value
         job.last_error_code = "attempts_exhausted"
@@ -110,11 +153,10 @@ def claim_job(db: Session, job_id: uuid.UUID, settings: Settings, now: datetime 
 
 
 def _locked(db: Session, job_id: uuid.UUID, token: uuid.UUID) -> tuple[IngestionJob, LibraryItem, PaperVersion, SourceFile]:
-    job = db.scalar(select(IngestionJob).where(IngestionJob.id == job_id)
-                    .with_for_update().execution_options(populate_existing=True))
+    job, item = _lock_item_then_job(db, job_id)
     if job is None or job.lease_token != token or job.lease_until is None or job.lease_until <= utcnow():
         raise StepError("lease_lost")
-    item, version, source = _context(db, job)
+    item, version, source = _context(db, job, item)
     _guard(job, item)
     return job, item, version, source
 
@@ -156,14 +198,13 @@ def _finish(db: Session, job_id: uuid.UUID, token: uuid.UUID, step: str,
 def _fail(db: Session, job_id: uuid.UUID, token: uuid.UUID, step: str, exc: StepError,
           settings: Settings) -> None:
     db.rollback()
-    job = db.scalar(select(IngestionJob).where(IngestionJob.id == job_id)
-                    .with_for_update().execution_options(populate_existing=True))
+    try:
+        job, item = _lock_item_then_job(db, job_id)
+    except StepError:
+        job = item = None
     if job is None or job.lease_token != token:
         db.rollback()
         return
-    item = (db.scalar(select(LibraryItem).where(LibraryItem.id == job.item_id)
-                      .with_for_update().execution_options(populate_existing=True))
-            if job.item_id else None)
     if item is not None and (job.cancel_requested or item.rights_epoch != job.rights_epoch_at_start):
         exc = StepError("cancelled")
     now = utcnow()
@@ -249,6 +290,9 @@ def _validate(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceFi
         _read_markdown(source, storage, settings)
 
     def save(db: Session, job: IngestionJob, item: LibraryItem, _version: PaperVersion, source: SourceFile) -> str:
+        if job.origin == JobOrigin.PROMOTION.value:
+            # A common copy is one reviewed file; exact-byte duplicates are the publication's rule.
+            return JobState.STORED.value
         # Transaction advisory lock serializes same-owner/same-hash validation.
         # It avoids both jobs choosing the other as canonical.
         lock_key = f"{item.owner_user_id}:{source.checksum_sha256}"
@@ -268,6 +312,23 @@ def _validate(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceFi
     return _finish(db, job_id, token, "validate", save)
 
 
+def _rows(db: Session, model, source: SourceFile, pipeline: str, order) -> list:
+    order = order if isinstance(order, tuple) else (order,)
+    return list(db.scalars(select(model).where(model.source_file_id == source.id, model.pipeline_version == pipeline)
+                           .order_by(*order)).all())
+
+
+def _reuse(existing: list, fresh: list[tuple], key) -> bool:
+    """True when rows of this file/pipeline already exist and equal the fresh result (a later
+    job of the same common file); ``extraction_changed`` when they differ; False when there are
+    none. Same bytes (checked) and pipeline version give the same rows, so none is written twice."""
+    if not existing:
+        return False
+    if [key(row) for row in existing] != fresh:
+        raise StepError("extraction_changed")
+    return True
+
+
 def _extract(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceFile,
              storage: OriginalStorage, settings: Settings) -> str:
     if source.verified_mime == VerifiedMime.PDF.value:
@@ -277,26 +338,31 @@ def _extract(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceFil
     body_present = has_body_text(result)
 
     def save(db: Session, job: IngestionJob, item: LibraryItem, version: PaperVersion, source: SourceFile) -> str:
-        for candidate in result.candidates:
-            db.add(MetadataCandidate(item_id=item.id, version_id=version.id, source_file_id=source.id,
-                   field_name=candidate.field_name, value=candidate.value,
-                   locator_kind="markdown",
-                   start_offset=candidate.start_offset, end_offset=candidate.end_offset,
-                   pipeline_version=PIPELINE_VERSION))
-        ref_ordinal = 0
-        for section in result.sections:
-            db.add(Section(item_id=item.id, version_id=version.id, source_file_id=source.id,
-                   kind=section.kind, heading=section.heading, ordinal=section.ordinal, text=section.text,
-                   locator_kind="markdown",
-                   start_offset=section.start_offset, end_offset=section.end_offset,
-                   start_line=section.start_line, end_line=section.end_line, pipeline_version=PIPELINE_VERSION))
-            if section.kind == "references":
-                for ref in pdf._references(0, original, section.start_offset, section.end_offset):
-                    db.add(ReferenceEntry(item_id=item.id, version_id=version.id, source_file_id=source.id,
-                        ordinal=ref_ordinal, raw_citation=ref.raw, fields=ref.fields, confidence=ref.confidence,
-                        provenance=PIPELINE_VERSION, locator_kind="markdown", page_number=None,
-                        start_offset=ref.start, end_offset=ref.end, pipeline_version=PIPELINE_VERSION))
-                    ref_ordinal += 1
+        references = [ref for section in result.sections if section.kind == "references"
+                      for ref in pdf._references(0, original, section.start_offset, section.end_offset)]
+        if not _reuse(_rows(db, MetadataCandidate, source, PIPELINE_VERSION, MetadataCandidate.field_name),
+                      sorted((c.field_name, c.value) for c in result.candidates), lambda r: (r.field_name, r.value)):
+            for candidate in result.candidates:
+                db.add(MetadataCandidate(item_id=item.id, version_id=version.id, source_file_id=source.id,
+                       field_name=candidate.field_name, value=candidate.value,
+                       locator_kind="markdown",
+                       start_offset=candidate.start_offset, end_offset=candidate.end_offset,
+                       pipeline_version=PIPELINE_VERSION))
+        if not _reuse(_rows(db, Section, source, PIPELINE_VERSION, Section.ordinal),
+                      [(s.kind, s.ordinal, s.text) for s in result.sections], lambda r: (r.kind, r.ordinal, r.text)):
+            for section in result.sections:
+                db.add(Section(item_id=item.id, version_id=version.id, source_file_id=source.id,
+                       kind=section.kind, heading=section.heading, ordinal=section.ordinal, text=section.text,
+                       locator_kind="markdown",
+                       start_offset=section.start_offset, end_offset=section.end_offset,
+                       start_line=section.start_line, end_line=section.end_line, pipeline_version=PIPELINE_VERSION))
+        if not _reuse(_rows(db, ReferenceEntry, source, PIPELINE_VERSION, ReferenceEntry.ordinal),
+                      [(n, ref.raw) for n, ref in enumerate(references)], lambda r: (r.ordinal, r.raw_citation)):
+            for ref_ordinal, ref in enumerate(references):
+                db.add(ReferenceEntry(item_id=item.id, version_id=version.id, source_file_id=source.id,
+                    ordinal=ref_ordinal, raw_citation=ref.raw, fields=ref.fields, confidence=ref.confidence,
+                    provenance=PIPELINE_VERSION, locator_kind="markdown", page_number=None,
+                    start_offset=ref.start, end_offset=ref.end, pipeline_version=PIPELINE_VERSION))
         db.flush()
         reconcile_references(db, source_file_id=source.id, pipeline_version=PIPELINE_VERSION)
         uncertain = "bibliography_boundary_uncertain" in result.warnings
@@ -325,7 +391,15 @@ def _extract_pdf(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: Sourc
         for segment in result.segments:
             if segment.kind == "body":
                 body_chars[segment.page] += sum(not c.isspace() for c in segment.text)
-        for page in result.pages:
+        reuse_pages = _reuse(_rows(db, PdfPage, source, pdf.PIPELINE_VERSION, PdfPage.page_number),
+                             [(page.number, page.text) for page in result.pages], lambda r: (r.page_number, r.text))
+        reuse_sections = _reuse(_rows(db, Section, source, pdf.PIPELINE_VERSION, Section.ordinal),
+                                [(s.kind, n, s.text) for n, s in enumerate(result.segments) if s.text],
+                                lambda r: (r.kind, r.ordinal, r.text))
+        reuse_references = _reuse(_rows(db, ReferenceEntry, source, pdf.PIPELINE_VERSION, ReferenceEntry.ordinal),
+                                  [(n, ref.raw) for n, ref in enumerate(result.references)],
+                                  lambda r: (r.ordinal, r.raw_citation))
+        for page in ([] if reuse_pages else result.pages):
             kinds = {s.kind for s in result.segments if s.page == page.number}
             role = ("unextractable" if page.number in result.failed_pages else
                     "bibliography_uncertain" if page.number in result.uncertain_reference_pages else
@@ -339,7 +413,7 @@ def _extract_pdf(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: Sourc
                 error_code=page.error or ("page_text_missing" if page.number in result.failed_pages else None),
                 layout_mode=page.layout_mode,
                 pipeline_version=pdf.PIPELINE_VERSION))
-        for ordinal, segment in enumerate(result.segments):
+        for ordinal, segment in enumerate([] if reuse_sections else result.segments):
             if not segment.text:
                 continue
             page = result.pages[segment.page - 1]
@@ -350,7 +424,7 @@ def _extract_pdf(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: Sourc
                                 "offset_unit": "page_text_codepoint", "page_width_pt": page.width,
                                 "page_height_pt": page.height, "geometry": None,
                                 "parser": pdf.PIPELINE_VERSION}, pipeline_version=pdf.PIPELINE_VERSION))
-        for ordinal, ref in enumerate(result.references):
+        for ordinal, ref in enumerate([] if reuse_references else result.references):
             db.add(ReferenceEntry(item_id=item.id, version_id=version.id, source_file_id=source.id,
                 ordinal=ordinal, raw_citation=ref.raw, fields=ref.fields, confidence=ref.confidence,
                 provenance=pdf.PIPELINE_VERSION, locator_kind="pdf", page_number=ref.page,
@@ -385,7 +459,11 @@ def _chunk(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceFile,
         raise StepError("no_extractable_text")
 
     def save(db: Session, _job: IngestionJob, _item: LibraryItem, _version: PaperVersion,
-             _source: SourceFile) -> str:
+             source: SourceFile) -> str:
+        if _reuse(_rows(db, Chunk, source, PIPELINE_VERSION, (Chunk.section_id, Chunk.ordinal)),
+                  sorted((str(section.id), span.ordinal, span.text) for section, span in chunks),
+                  lambda r: (str(r.section_id), r.ordinal, r.text)):
+            return JobState.AWAITING_INDEX.value
         for section, span in chunks:
             db.add(Chunk(section_id=section.id, item_id=section.item_id, version_id=section.version_id,
                          source_file_id=section.source_file_id, ordinal=span.ordinal, text=span.text,
@@ -421,7 +499,11 @@ def _chunk_pdf(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceF
         raise StepError("no_extractable_text")
 
     def save(db: Session, _job: IngestionJob, _item: LibraryItem, _version: PaperVersion,
-             _source: SourceFile) -> str:
+             source: SourceFile) -> str:
+        if _reuse(_rows(db, Chunk, source, pdf.PIPELINE_VERSION, (Chunk.section_id, Chunk.ordinal)),
+                  sorted((str(section.id), span.ordinal, span.text) for section, span, _ in chunks),
+                  lambda r: (str(r.section_id), r.ordinal, r.text)):
+            return JobState.AWAITING_INDEX.value
         for section, span, page in chunks:
             db.add(Chunk(section_id=section.id, item_id=section.item_id, version_id=section.version_id,
                 source_file_id=section.source_file_id, ordinal=span.ordinal, text=span.text,
@@ -493,8 +575,15 @@ def due_job_ids(db: Session, settings: Settings, now: datetime | None = None) ->
     configured = (true() if provider_ready else
                   or_(IngestionJob.state != JobState.RETRYABLE_FAILED.value,
                       IngestionJob.resume_state.is_distinct_from(JobState.INDEXING.value)))
-    return list(db.scalars(select(IngestionJob.id).join(SourceFile, SourceFile.job_id == IngestionJob.id)
-        .where(IngestionJob.origin == "upload", IngestionJob.scope_visibility == Visibility.PRIVATE.value,
+    # Upload jobs find their file by SourceFile.job_id; promotion jobs pin it (the common file's job_id is NULL).
+    own_file = or_(and_(IngestionJob.origin == JobOrigin.UPLOAD.value,
+                        IngestionJob.scope_visibility == Visibility.PRIVATE.value, SourceFile.job_id == IngestionJob.id),
+                   and_(IngestionJob.origin == JobOrigin.PROMOTION.value,
+                        IngestionJob.scope_visibility == Visibility.COMMON.value,
+                        SourceFile.id == IngestionJob.source_file_id))
+    return list(db.scalars(select(IngestionJob.id).join(SourceFile, or_(SourceFile.job_id == IngestionJob.id,
+                                                                        SourceFile.id == IngestionJob.source_file_id))
+        .where(own_file,
                SourceFile.verified_mime.in_([VerifiedMime.MARKDOWN.value, VerifiedMime.PDF.value]),
                IngestionJob.state.in_(states),
                configured,

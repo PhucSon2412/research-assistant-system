@@ -1,10 +1,10 @@
 """Publish, revoke and clean up reviewed common copies (M6b-2a).
 
 **Publish** moves a ``pending`` copy (M6b-1) to ``listed``: every User then
-sees its *metadata* in the library, and nothing else. ``content_status``
-stays ``metadata_only``; there is no job, chunk, index, search hit, RAG
-evidence or provider call, and the original stays behind the private-owner
-file gate whatever ``permits_original_download`` says. Order:
+sees its *metadata* in the library. ``content_status`` stays
+``metadata_only``; publishing creates no job, index or provider call. The
+original opens only under ``common_original_clause`` (M6b-2b1), and an Admin
+may then index the listed copy through ``app.common_index`` (M6b-2b2b). Order:
 
 1. Lock the item, then its rights, ``FOR UPDATE`` (the order revoke and
    tombstone replay use) and only then check state, exactly one live
@@ -23,11 +23,15 @@ file gate whatever ``permits_original_download`` says. Order:
    concurrency; the DB triggers re-check rights and epoch.
 
 **Revoke** (pending or listed) is one transaction whose commit is ``t_rev``:
-bump ``rights_epoch``, set ``revoked``, revoke the rights and publication,
-flag the item's unfinished jobs ``cancel_requested`` and write a
-``deletion_tombstones`` row. From that commit every normal route (library
-list/count/detail, collections) drops the item in SQL; file, chunk, search
-and RAG never served it. Private items and other common copies are untouched.
+bump ``rights_epoch``, set ``revoked`` (and, for a copy indexed by
+``app.common_index``, back to ``metadata_only`` with no active generation),
+revoke the rights and publication, flag the item's unfinished jobs
+``cancel_requested`` and write a ``deletion_tombstones`` row. It locks the
+item, then rights, publication and jobs; the index worker locks the item
+before its job too, so the two cannot deadlock. From that commit every normal
+route (library list/count/detail, collections) drops the item in SQL; file,
+chunk, search and RAG never served it. Private items and other common copies
+are untouched.
 
 **Cleanup** works from unpurged tombstones, each in its own transaction, and
 is safe to repeat: it locks the tombstone, then the item; deletes the copy's
@@ -227,9 +231,15 @@ def _cancel_jobs(db: Session, item_id: uuid.UUID, now: datetime) -> int:
 
 def _revoke_rows(db: Session, item: LibraryItem, rights: list[AccessRights], revoked_by: uuid.UUID,
                  reason: str, at: datetime, epoch: int) -> None:
-    """Flip item, rights and publication to revoked; the DB checks it all at commit."""
+    """Flip item, rights and publication to revoked; the DB checks it all at commit.
+
+    An indexed copy leaves ``indexed`` in the same statement (M6b-2b2b): from
+    ``t_rev`` it names no active generation, and cleanup removes the rows.
+    """
     item.rights_epoch = epoch
     item.publication_state = PublicationState.REVOKED.value
+    item.active_index_generation_id = None
+    item.content_status = ContentStatus.METADATA_ONLY.value
     item.updated_at = at
     db.flush()
     for recorded in rights:

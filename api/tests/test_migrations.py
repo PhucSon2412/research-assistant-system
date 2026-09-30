@@ -515,6 +515,105 @@ def test_0024_removes_derived_rows_of_copies_purged_under_0023_and_fences_writes
         command.downgrade(alembic_config(empty_db_url), "0023")
 
 
+def _reviewed_copy_0024(conn, owner, admin, *, h: str, label: str) -> tuple:
+    """A private item/file, its approved request and the pending common copy with rights (0024 schema)."""
+    item = conn.scalar(text("INSERT INTO library_items(visibility,owner_user_id,title) VALUES('private',:o,:t)"
+                            " RETURNING id"), {"o": owner, "t": label})
+    version = conn.scalar(text("INSERT INTO paper_versions(item_id) VALUES(:i) RETURNING id"), {"i": item})
+    source = conn.scalar(text("INSERT INTO source_files(item_id,version_id,storage_key,verified_mime,byte_size,"
+                              "checksum_sha256) VALUES(:i,:v,:k,'text/markdown',100,:h) RETURNING id"),
+                         {"i": item, "v": version, "h": h, "k": f"private-{label}"})
+    rr = conn.scalar(text("""INSERT INTO review_requests(item_id,version_id,source_file_id,requester_user_id,
+        status,file_checksum_sha256,rights_epoch_at_submit,notice_version,declared_source,declared_rights,
+        submitted_at) VALUES(:i,:v,:f,:o,'open',:h,0,'n','src','rights',now()) RETURNING id"""),
+                     {"i": item, "v": version, "f": source, "o": owner, "h": h})
+    copy = conn.scalar(text("INSERT INTO library_items(visibility,publication_state) VALUES('common','pending')"
+                            " RETURNING id"))
+    cv = conn.scalar(text("INSERT INTO paper_versions(item_id) VALUES(:i) RETURNING id"), {"i": copy})
+    cf = conn.scalar(text("INSERT INTO source_files(item_id,version_id,storage_key,verified_mime,byte_size,"
+                          "checksum_sha256) VALUES(:i,:v,:k,'text/markdown',100,:h) RETURNING id"),
+                     {"i": copy, "v": cv, "h": h, "k": f"copy-{label}"})
+    conn.execute(text("""INSERT INTO access_rights(item_id,version_id,source_file_id,file_checksum_sha256,
+        origin_kind,origin_review_request_id,verified_source,evidence_note,checked_on,reviewer_user_id,
+        recorded_at,scope_audience,permits_original_download,permits_fulltext_search,
+        permits_external_processing,rights_epoch_at_grant) VALUES(:i,:v,:f,:h,'review_request',:r,'Admin src',
+        'Evidence',CURRENT_DATE,:a,now(),'instance_users',false,true,true,0)"""),
+                 {"i": copy, "v": cv, "f": cf, "h": h, "r": rr, "a": admin})
+    conn.execute(text("UPDATE review_requests SET status='approved', closed_at=now(), closed_by_user_id=:a,"
+                      " close_reason_code='approved_by_admin' WHERE id=:r"), {"a": admin, "r": rr})
+    return item, source, copy, cv, cf
+
+
+def test_0025_pins_promotion_jobs_and_charges_common_calls_to_the_application(empty_db_url: str) -> None:
+    from app.identity.passwords import hash_password
+
+    upgrade(empty_db_url, "0024")
+    eng = create_engine(empty_db_url)
+    verifier = hash_password("synthetic-password-long")
+    with eng.begin() as conn:
+        owner = conn.scalar(text("INSERT INTO users(email,password_verifier) VALUES('m6f@example.org',:p) RETURNING id"),
+                            {"p": verifier})
+        admin = conn.scalar(text("INSERT INTO users(email,password_verifier,role) VALUES('adm6f@example.org',:p,"
+                                 "'admin') RETURNING id"), {"p": verifier})
+        item, source, copy, cv, cf = _reviewed_copy_0024(conn, owner, admin, h="f" * 64, label="M6F")
+        # 0024 allowed a promotion job without its file (fixtures only) and a common call owned by the Admin.
+        job = conn.scalar(text("""INSERT INTO ingestion_jobs(origin,scope_visibility,item_id,version_id,
+            idempotency_key,state) VALUES('promotion','common',:i,:v,'legacy-promotion','received') RETURNING id"""),
+                          {"i": copy, "v": cv})
+        upload = conn.scalar(text("""INSERT INTO ingestion_jobs(origin,scope_visibility,scope_owner_user_id,item_id,
+            version_id,idempotency_key) VALUES('upload','private',:o,:i,(SELECT version_id FROM source_files
+            WHERE id=:f),'upload-0024') RETURNING id"""), {"o": owner, "i": item, "f": source})
+        legacy_call = conn.scalar(text("""INSERT INTO embedding_calls(source_file_id,owner_user_id,model_id,provider,
+            pipeline_version,chunk_hash,status,reserved_usd,cost_status,reserved_day) VALUES(:f,:a,'m','openrouter',
+            'md-v1',:h,'uncertain',0.00000100,'unknown',CURRENT_DATE) RETURNING id"""),
+                                  {"f": cf, "a": admin, "h": "c" * 64})
+    upgrade(empty_db_url)
+    with eng.connect() as conn:
+        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == HEAD_REVISION
+        assert tuple(conn.execute(text("SELECT source_file_id, version_id FROM ingestion_jobs WHERE id=:j"),
+                                  {"j": job}).one()) == (cf, cv)
+        assert conn.scalar(text("SELECT source_file_id FROM ingestion_jobs WHERE id=:j"), {"j": upload}) is None
+        # Existing rows are not rewritten: the legacy call keeps its owner and cost.
+        assert tuple(conn.execute(text("SELECT owner_user_id, reserved_usd FROM embedding_calls WHERE id=:c"),
+                                  {"c": legacy_call}).one()) == (admin, Decimal("0.00000100"))
+    insert_call = text("""INSERT INTO embedding_calls(source_file_id,owner_user_id,model_id,provider,pipeline_version,
+        chunk_hash,status,reserved_usd,cost_status,reserved_day) VALUES(:f,:o,'m','openrouter','md-v1',:h,'reserved',
+        0,'unknown',CURRENT_DATE)""")
+    with pytest.raises(IntegrityError, match="charged to the application"), eng.begin() as conn:
+        conn.execute(insert_call, {"f": cf, "o": admin, "h": "d" * 64})
+    with pytest.raises(IntegrityError, match="keeps its pinned"), eng.begin() as conn:
+        conn.execute(text("UPDATE ingestion_jobs SET source_file_id=NULL WHERE id=:j"), {"j": job})
+    with eng.begin() as conn:
+        conn.execute(insert_call, {"f": cf, "o": None, "h": "d" * 64})
+    eng.dispose()
+    # 0024 cannot represent an application-charged call.
+    with pytest.raises(Exception, match="common copies were indexed"):
+        command.downgrade(alembic_config(empty_db_url), "0024")
+    eng = create_engine(empty_db_url)
+    with eng.begin() as conn:
+        conn.execute(text("DELETE FROM embedding_calls WHERE owner_user_id IS NULL"))
+    eng.dispose()
+    command.downgrade(alembic_config(empty_db_url), "0024")
+    upgrade(empty_db_url)
+    eng = create_engine(empty_db_url)
+    with eng.connect() as conn:  # re-pinned on the way back up
+        assert conn.scalar(text("SELECT source_file_id FROM ingestion_jobs WHERE id=:j"), {"j": job}) == cf
+    eng.dispose()
+
+
+def test_0025_refuses_a_promotion_job_it_cannot_pin(empty_db_url: str) -> None:
+    upgrade(empty_db_url, "0024")
+    eng = create_engine(empty_db_url)
+    with eng.begin() as conn:  # a legacy common item has no AccessRights, hence no reviewed file
+        item = conn.scalar(text("INSERT INTO library_items(visibility,publication_state,title) VALUES('common',"
+                                "'listed','Legacy') RETURNING id"))
+        conn.execute(text("INSERT INTO ingestion_jobs(origin,scope_visibility,item_id,idempotency_key)"
+                          " VALUES('promotion','common',:i,'orphan-promotion')"), {"i": item})
+    eng.dispose()
+    with pytest.raises(Exception, match="promotion jobs without a reviewed common file"):
+        upgrade(empty_db_url)
+
+
 def test_collection_membership_foreign_keys_restrict(migrated_db_url: str) -> None:
     eng = create_engine(migrated_db_url)
     with eng.connect() as conn:

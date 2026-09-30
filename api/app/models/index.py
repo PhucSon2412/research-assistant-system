@@ -1,4 +1,4 @@
-"""Private full-text generations and durable embedding reservations."""
+"""Full-text generations (private, and common since M6b-2b2b) and durable embedding reservations."""
 
 from __future__ import annotations
 
@@ -60,7 +60,9 @@ class EmbeddingCall(Base):
     )
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     source_file_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("source_files.id", ondelete="RESTRICT"))
-    owner_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"))
+    # The user whose quota the call counts against; NULL (0025) charges a common
+    # copy's call to the application buckets only (DB trigger keeps it = item scope).
+    owner_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"))
     model_id: Mapped[str] = mapped_column(Text)
     provider: Mapped[str] = mapped_column(Text)
     response_model_id: Mapped[str | None] = mapped_column(Text)

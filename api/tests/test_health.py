@@ -42,13 +42,14 @@ def test_review_routes_registered_with_publish_and_revoke_only_on_common_copies(
             "/admin/review-requests/{request_id}/approve",
             "/admin/pending-publications", "/admin/pending-publications/{item_id}",
             "/admin/common-copies", "/admin/common-copies/{item_id}",
-            "/admin/common-copies/{item_id}/publish", "/admin/common-copies/{item_id}/revoke"} <= paths
+            "/admin/common-copies/{item_id}/publish", "/admin/common-copies/{item_id}/revoke",
+            "/admin/common-copies/{item_id}/index"} <= paths
     # The pending view stays read-only; M6b-2a actions live on /admin/common-copies.
     assert set(spec["/admin/pending-publications"]) == set(spec["/admin/pending-publications/{item_id}"]) == {"get"}
-    assert set(spec["/admin/common-copies/{item_id}/publish"]) == set(spec["/admin/common-copies/{item_id}/revoke"])         == {"post"}
-    # Nothing opens or edits a common copy's rights or file (full text is a later PR).
+    assert set(spec["/admin/common-copies/{item_id}/publish"]) == set(spec["/admin/common-copies/{item_id}/revoke"])         == set(spec["/admin/common-copies/{item_id}/index"]) == {"post"}
+    # Nothing opens or edits a common copy's rights, file or chunks; M6b-2b2b only queues its index job.
     assert not [p for p in paths if any(word in p for word in ("promot", "access-rights"))
                 or (p.startswith("/admin/pending-publications") and p.count("/") > 3)
                 or (p.startswith("/admin/common-copies") and p.count("/") > 3
-                    and not p.endswith(("/publish", "/revoke")))]
+                    and not p.endswith(("/publish", "/revoke", "/index")))]
     assert [p for p in paths if "/publish" in p] == ["/admin/common-copies/{item_id}/publish"]
