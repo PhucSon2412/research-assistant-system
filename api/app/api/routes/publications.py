@@ -3,8 +3,10 @@
 A ``pending`` common item is absent from every normal route (library, count,
 collections, files, search, chunks, RAG), for the Admin too; so is a
 ``revoked`` one. A ``listed`` (published) copy shows its *metadata* on the
-normal library routes and nothing else: ``content_status`` stays
-``metadata_only`` and file/chunk/search/RAG still refuse it.
+normal library routes; its original opens on ``/files/{id}/original`` only
+when its rights permit download without conditions (M6b-2b1,
+``original_download``). ``content_status`` stays ``metadata_only`` and
+chunk/search/RAG still refuse it.
 
 - ``/admin/pending-publications``: read-only view of pending copies (M6b-1).
 - ``/admin/common-copies``: every reviewed copy by state, with the recorded
@@ -31,6 +33,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_now, require_admin, require_trusted_origin
 from app.api.errors import ApiError
 from app.authz import Principal, pending_publication_clause, review_copy_admin_clause
+from app.common_original import common_original_rows
 from app.config import Settings, get_settings
 from app.models import (AccessRights, CommonPublication, DeletionTombstone, LibraryItem, PaperVersion,
                         RevocationMetadataRetention, SourceFile, User)
@@ -43,8 +46,10 @@ copies_router = APIRouter(prefix="/admin/common-copies", tags=["review"])
 
 PENDING_NOTE = ("Bản chung đã có quyền do Admin ghi nhận nhưng chưa công bố: User khác không thấy metadata, "
                 "file, kết quả tìm kiếm, chunk hay RAG của bản này. Chưa có index; công bố là bước riêng.")
-LISTED_NOTE = ("Đã công bố metadata: mọi tài khoản thấy tiêu đề và version trong thư viện. Toàn văn chưa khả dụng: "
-               "chưa có file gốc, tìm kiếm toàn văn, chunk hay hỏi đáp cho bản này, kể cả khi quyền đã ghi cho phép.")
+LISTED_NOTE = ("Đã công bố metadata: mọi tài khoản thấy tiêu đề và version trong thư viện. File gốc chỉ tải được khi "
+               "quyền đã ghi cho phép tải và không có điều kiện sử dụng (hệ thống chưa thi hành được điều kiện dạng "
+               "text); mỗi lần tải đều kiểm lại quyền và SHA-256. Toàn văn chưa khả dụng: chưa có tìm kiếm toàn văn, "
+               "chunk hay hỏi đáp cho bản này, kể cả khi quyền đã ghi cho phép.")
 REVOKED_NOTE = ("Đã thu hồi: không route nào phục vụ bản này từ lúc thu hồi commit. Cleanup xóa object chung, dữ "
                 "liệu phát sinh và metadata (tiêu đề, URL nguồn, tên file, nguồn/giấy phép/bằng chứng/điều kiện) trừ "
                 "trường có căn cứ giữ riêng; bản riêng của User không đổi.")
@@ -109,13 +114,43 @@ def _rows(clause):
             .where(clause))
 
 
-def _out(item: LibraryItem, version: PaperVersion, source: SourceFile, rights: AccessRights, reviewer: str) -> dict:
+def _gate_opens(db: Session, admin: Principal, source_file_id: uuid.UUID) -> bool:
+    """The download route's own SQL gate, for this file, now (audience: every account)."""
+    return db.execute(common_original_rows(admin).where(SourceFile.id == source_file_id)).first() is not None
+
+
+def original_download_status(item: LibraryItem, rights: AccessRights, gate_opens: bool) -> str:
+    """Why the copy's original does or does not download, for the Admin page.
+
+    ``open`` only when ``common_original_clause`` itself opens the file
+    (``gate_opens``); the other codes explain a closed gate. ``rights_not_current``
+    covers what the recorded rights alone cannot show: an epoch that moved after
+    the rights were recorded, a publication that is not live, or a file, version,
+    checksum or size that no longer matches. Each download still re-checks all of
+    it and the object's SHA-256.
+    """
+    if gate_opens:
+        return "open"
+    if item.publication_state == PublicationState.PENDING.value:
+        return "not_published"
+    if item.publication_state == PublicationState.REVOKED.value or rights.revoked_at is not None:
+        return "revoked"
+    if not rights.permits_original_download:
+        return "not_permitted"
+    if rights.scope_conditions is not None:
+        return "blocked_by_conditions"
+    return "rights_not_current"
+
+
+def _out(item: LibraryItem, version: PaperVersion, source: SourceFile, rights: AccessRights, reviewer: str,
+         gate_opens: bool = False) -> dict:
     return {
         "id": str(item.id), "title": item.title, "visibility": item.visibility,
         "publication_state": item.publication_state,
         "published": item.publication_state == PublicationState.LISTED.value,
         # Publication is metadata only; full text is a separate, later gate.
         "content_status": item.content_status, "fulltext_available": False,
+        "original_download": original_download_status(item, rights, gate_opens),
         "created_at": item.created_at.isoformat(), "note": NOTES[item.publication_state],
         "version": {"id": str(version.id), "source_url": version.source_url,
                     "received_at": version.received_at.isoformat()},
@@ -140,9 +175,9 @@ def _out(item: LibraryItem, version: PaperVersion, source: SourceFile, rights: A
     }
 
 
-def _full_out(db: Session, row: tuple, now: datetime) -> dict:
-    item = row[0]
-    out = _out(*row)
+def _full_out(db: Session, admin: Principal, row: tuple, now: datetime) -> dict:
+    item, source = row[0], row[2]
+    out = _out(*row, gate_opens=_gate_opens(db, admin, source.id))
     publication = db.get(CommonPublication, item.id)
     out["publication"] = None if publication is None else {
         "published_at": publication.published_at.isoformat(), "revoked_at": _iso(publication.revoked_at),
@@ -203,7 +238,7 @@ def list_copies(
     stmt = _rows(review_copy_admin_clause(admin)).where(LibraryItem.publication_state == state)
     total = db.scalar(select(func.count()).select_from(stmt.subquery()))
     rows = db.execute(stmt.order_by(LibraryItem.updated_at.desc(), LibraryItem.id).limit(limit).offset(offset)).all()
-    return {"items": [_full_out(db, row, now) for row in rows], "total": total, "state": state,
+    return {"items": [_full_out(db, admin, row, now) for row in rows], "total": total, "state": state,
             "limit": limit, "offset": offset}
 
 
@@ -211,7 +246,7 @@ def _copy_out(db: Session, admin: Principal, item_id: uuid.UUID, now: datetime) 
     row = db.execute(_rows(review_copy_admin_clause(admin)).where(LibraryItem.id == item_id)).first()
     if row is None:
         raise ApiError(404, "not_found")
-    return _full_out(db, row, now)
+    return _full_out(db, admin, row, now)
 
 
 @copies_router.get("/{item_id}")

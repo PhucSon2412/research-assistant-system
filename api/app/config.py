@@ -89,6 +89,10 @@ class FileLimits(BaseModel):
     pdf_probe_timeout_seconds: int = Field(default=10, gt=0)
     pdf_probe_memory_bytes: int = Field(default=256 * MIB, gt=0)
     orphan_grace: timedelta = timedelta(hours=24)
+    # M6b-2b1: a common original is read into a temp file and verified before
+    # its first byte is sent. Per API process, at most this many such spools
+    # exist at once (disk <= slots x the largest file limit); beyond it -> 503.
+    verified_download_max_concurrent: int = Field(default=4, gt=0, le=64)
 
     @model_validator(mode="after")
     def _check_lifetime(self) -> "FileLimits":

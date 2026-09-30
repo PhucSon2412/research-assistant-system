@@ -1,8 +1,10 @@
 "use client";
 
 // Admin-only list of common copies approved from a review (M6b-1, M6b-2a), by
-// state. Publishing lists a pending copy's METADATA for every account; full text,
-// the original file, search, chunks and RAG stay closed. Revoking (pending or
+// state. Publishing lists a pending copy's METADATA for every account; its
+// original opens only where the recorded rights allow download without
+// conditions (M6b-2b1, decided by the API); full text, search, chunks and RAG
+// stay closed. Revoking (pending or
 // listed) is final and hides the copy from every page from its commit; cleanup
 // then removes the common object. The API enforces all of it.
 
@@ -10,7 +12,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, describeError } from "../../../lib/api";
 import {
-  OBJECT_OUTCOME_TEXT, PUBLICATION_STATE_TEXT, REVOCATION_REASONS, fieldList, makePublishBody, makeRevokeBody,
+  OBJECT_OUTCOME_TEXT, ORIGINAL_DOWNLOAD_TEXT, PUBLICATION_STATE_TEXT, REVOCATION_REASONS, fieldList, makePublishBody,
+  makeRevokeBody,
   type CommonCopy, type PublicationState,
 } from "../../../lib/review";
 import { ErrorText, Shell, useSession } from "../../components/session";
@@ -46,8 +49,9 @@ function PublishForm({ copy, onDone }: { copy: CommonCopy; onDone: () => void })
       <label>
         <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />{" "}
         Tôi xác nhận công bố <strong>metadata</strong> (tiêu đề, version, URL nguồn) của bản này cho mọi tài khoản.
-        Toàn văn, file gốc, tìm kiếm, đoạn trích và hỏi đáp <strong>vẫn chưa mở</strong>; hệ thống đọc lại object
-        chung và kiểm SHA-256 trước khi công bố.
+        Sau khi công bố, file gốc chỉ tải được nếu quyền đã ghi cho phép tải và không kèm điều kiện (API quyết
+        định ở mỗi lần tải). Toàn văn, tìm kiếm, đoạn trích và hỏi đáp <strong>vẫn chưa mở</strong>; hệ thống đọc
+        lại object chung và kiểm SHA-256 trước khi công bố.
       </label>{" "}
       <button type="submit" disabled={!body}>Công bố metadata</button>
     </form>
@@ -118,7 +122,8 @@ export default function CommonCopiesPage() {
       <p>
         Quyền dưới đây do Admin ghi nhận cho đúng file/checksum. <strong>Đã ghi nhận quyền chưa phải là đã công
         bố</strong>, và <strong>đã công bố (listed) chưa phải là có toàn văn (indexed)</strong>: công bố chỉ cho mọi
-        tài khoản thấy metadata; file gốc, tìm kiếm toàn văn, đoạn trích và hỏi đáp chưa mở ở bước này.
+        tài khoản thấy metadata, và file gốc chỉ tải được khi quyền đã ghi cho phép tải mà không kèm điều kiện; tìm
+        kiếm toàn văn, đoạn trích và hỏi đáp chưa mở ở bước này.
       </p>
       <p style={{ display: "flex", gap: "0.5rem" }}>
         {STATES.map((s) => <button key={s} onClick={() => setState(s)} disabled={s === state}>
@@ -144,8 +149,9 @@ export default function CommonCopiesPage() {
           <li>Phạm vi đã ghi (mọi tài khoản của hệ thống): tải file gốc {yes(p.rights.scope.original_download)} ·
             tìm kiếm toàn văn {yes(p.rights.scope.fulltext_search)} · gửi qua provider{" "}
             {yes(p.rights.scope.external_processing)}
-            {p.rights.scope.conditions && ` · điều kiện: ${p.rights.scope.conditions}`}. Chưa quyền nào được mở
-            ở bước này.</li>
+            {p.rights.scope.conditions && ` · điều kiện: ${p.rights.scope.conditions}`}. Tìm kiếm toàn văn và gửi
+            qua provider chưa mở ở bước này.</li>
+          <li>Tải file gốc qua thư viện: {ORIGINAL_DOWNLOAD_TEXT[p.original_download] ?? p.original_download}</li>
           {p.publication && <li>Công bố {fmt(p.publication.published_at)} (object đã kiểm:{" "}
             {p.publication.verified_byte_size} byte){p.publication.revoked_at && ` · thu hồi ${fmt(p.publication.revoked_at)}`}</li>}
           {p.tombstone && <li>Thu hồi {fmt(p.tombstone.recorded_at)} từ trạng thái{" "}

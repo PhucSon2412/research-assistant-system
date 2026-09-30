@@ -139,7 +139,10 @@ def test_publish_lists_metadata_only_and_nothing_else(upload_api, monkeypatch, c
         "listed", True, "metadata_only", False)
     assert "Toàn văn chưa khả dụng" in out["note"]
     assert out["publication"]["verified_byte_size"] == len(A_BODY) and out["tombstone"] is None
-    assert out["rights"]["scope"]["original_download"] is True  # recorded, but not opened in this PR
+    # Download is recorded, but these rights carry a text condition the system cannot enforce,
+    # so the original stays closed (M6b-2b1; the permitted case is in test_common_original).
+    assert out["rights"]["scope"]["original_download"] is True and out["rights"]["scope"]["conditions"]
+    assert out["original_download"] == "blocked_by_conditions"
 
     # Every account now sees the metadata, and only the metadata.
     for who, browser in (("a", a), ("b", b), ("admin", admin)):

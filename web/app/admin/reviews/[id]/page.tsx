@@ -10,7 +10,8 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, describeError } from "../../../../lib/api";
 import {
-  EMPTY_APPROVE_FORM, REJECT_REASONS, STATUS_TEXT, closeReasonText, makeApproveBody, reviewDownloadHref,
+  CONDITIONS_BLOCK_NOTE, EMPTY_APPROVE_FORM, REJECT_REASONS, STATUS_TEXT, closeReasonText, makeApproveBody,
+  reviewDownloadHref,
   type AdminReviewRequest, type ApproveForm,
 } from "../../../../lib/review";
 import { ErrorText, Shell, useSession } from "../../../components/session";
@@ -90,6 +91,7 @@ function ApproveSection({ request, onDone }: { request: AdminReviewRequest; onDo
           <br /><input value={form.conditions} onChange={(e) => set("conditions", e.target.value)} maxLength={1000}
             style={wide} />
         </label>
+        <br /><small>{CONDITIONS_BLOCK_NOTE}</small>
       </fieldset>
       <label>
         <input type="checkbox" checked={form.confirmed} onChange={(e) => set("confirmed", e.target.checked)} />

@@ -4,6 +4,8 @@ Permission filtering happens in SQL before ordering/pagination/counting.
 Direct access by ID re-applies the same filter, and a forbidden private item
 answers exactly like a missing one (404 ``not_found``). M1c includes
 ACL-filtered file/job metadata in item detail; file bytes have a separate route.
+A common item lists a file (with its download path) only when that file's
+live AccessRights open it for download (M6b-2b1, ``common_original_clause``).
 """
 
 from __future__ import annotations
@@ -20,7 +22,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_now, get_principal
 from app.api.errors import ApiError
 from app.audit import record_event
-from app.authz import Principal, can_edit_item, m2a_private_derivatives_clause, visible_items_clause
+from app.authz import (Principal, can_edit_item, common_original_clause, m2a_private_derivatives_clause,
+                       visible_items_clause)
 from app.citations import RELATION_NOTE, citation_link_out, hidden_discovery_clause
 from app.models import (Chunk, DiscoveryPaper, IngestionJob, LibraryItem, MetadataCandidate, PaperVersion, PdfPage,
                         ReferenceCitationLink, ReferenceEntry, Section, SourceFile)
@@ -131,10 +134,16 @@ def get_item(item_id: str, principal: Principal = Depends(get_principal), db: Se
     versions = db.scalars(
         select(PaperVersion).where(PaperVersion.item_id == item.id).order_by(PaperVersion.received_at)
     ).all()
+    # A common item lists only the file its live rights open for download
+    # (M6b-2b1), from the same SQL gate as the download route; otherwise none.
+    file_gate = PaperVersion.item_id == item.id
+    if item.visibility == Visibility.COMMON.value:
+        file_gate = and_(file_gate, common_original_clause(principal))
     files = db.scalars(
         select(SourceFile).join(PaperVersion, SourceFile.version_id == PaperVersion.id)
-        .where(PaperVersion.item_id == item.id)
-    ).all() if item.visibility == Visibility.PRIVATE.value else []
+        .join(LibraryItem, PaperVersion.item_id == LibraryItem.id)
+        .where(file_gate).order_by(SourceFile.created_at, SourceFile.id)
+    ).all()
     jobs = db.scalars(select(IngestionJob).where(IngestionJob.item_id == item.id)).all() \
         if item.visibility == Visibility.PRIVATE.value else []
     return {
@@ -153,7 +162,8 @@ def get_item(item_id: str, principal: Principal = Depends(get_principal), db: Se
             ],
             "files": [{"id": str(f.id), "version_id": str(f.version_id),
                          "filename": f.original_filename, "byte_size": f.byte_size,
-                         "verified_mime": f.verified_mime, "page_count": f.page_count}
+                         "verified_mime": f.verified_mime, "page_count": f.page_count,
+                         "original_url": f"/files/{f.id}/original"}
                         for f in files],
             "jobs": [{"id": str(j.id), "state": j.state, "origin": j.origin,
                       "attempt_count": j.attempt_count, "last_error_code": j.last_error_code,

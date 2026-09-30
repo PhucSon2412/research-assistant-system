@@ -1,7 +1,8 @@
 // M6a review requests, M6b-1 approval and M6b-2a publish/revoke: shapes and pure
 // helpers shared by the owner and Admin screens. The API decides who may submit,
 // withdraw, reject, approve, publish, revoke or open a file. Approval creates a
-// pending common copy; publishing lists its metadata only (full text stays closed).
+// pending common copy; publishing lists its metadata, and its original opens only
+// where the recorded rights allow (M6b-2b1); full text stays closed.
 
 export type ReviewStatus = "open" | "withdrawn" | "rejected" | "approved";
 
@@ -35,7 +36,7 @@ export type PublicationState = "pending" | "listed" | "revoked";
 // A common copy with Admin-recorded rights that is not published (M6b-1).
 export type PendingPublication = {
   id: string; title: string | null; publication_state: PublicationState; published: boolean; content_status: string;
-  fulltext_available: false; created_at: string; note: string;
+  fulltext_available: false; original_download: OriginalDownloadStatus; created_at: string; note: string;
   version: { id: string; source_url: string | null; received_at: string };
   file: { id: string; filename: string | null; verified_mime: string; byte_size: number; page_count: number | null;
     checksum_sha256: string };
@@ -109,9 +110,24 @@ export function makeRevokeBody(confirmed: boolean, reason: string) {
   return { confirm_revoke: true as const, reason_code: reason };
 }
 
-// The library item page shows this for any common item that is not indexed.
-export const COMMON_METADATA_ONLY_NOTE = "Toàn văn chưa khả dụng: bản chung này hiện chỉ có metadata. Chưa có file "
-  + "gốc, tìm kiếm toàn văn, đoạn trích hay hỏi đáp cho bản này.";
+// scope_conditions is free text the system cannot enforce, so the API keeps the
+// original closed while it is set (M6b-2b1). The approve form says so up front.
+export const CONDITIONS_BLOCK_NOTE = "Hệ thống chưa thi hành được điều kiện dạng text: nếu nhập điều kiện, file gốc "
+  + "của bản chung sẽ không mở tải cho ai, kể cả khi chọn “Cho User tải file gốc”.";
+
+// What the API's download gate decides for a copy's file (`original_download`).
+// "open" only when the download route's own SQL gate opens the file right now.
+export type OriginalDownloadStatus = "open" | "not_permitted" | "blocked_by_conditions" | "not_published" | "revoked"
+  | "rights_not_current";
+
+export const ORIGINAL_DOWNLOAD_TEXT: Record<OriginalDownloadStatus, string> = {
+  open: "mở cho mọi tài khoản (mỗi lần tải kiểm lại quyền và SHA-256)",
+  not_permitted: "không mở (quyền đã ghi không cho tải)",
+  blocked_by_conditions: "không mở (có điều kiện sử dụng hệ thống chưa thi hành được)",
+  not_published: "chưa mở (bản chưa công bố)",
+  revoked: "không mở (đã thu hồi)",
+  rights_not_current: "không mở (quyền đã ghi không còn khớp trạng thái hiện tại: epoch, publication hoặc file)",
+};
 
 export type FileChoice = { id: string; version_id: string; filename: string | null };
 export type VersionInfo = { id: string; version_label: string | null };

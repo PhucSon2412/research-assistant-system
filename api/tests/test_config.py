@@ -48,6 +48,8 @@ def test_defaults_match_documented_mvp_values() -> None:
     assert s.files.orphan_grace == timedelta(hours=24)
     assert s.files.pdf_probe_timeout_seconds == 10
     assert s.files.pdf_probe_memory_bytes == 256 * MIB
+    # M6b-2b1: verified common downloads spooled at once per API process.
+    assert s.files.verified_download_max_concurrent == 4
     assert s.upload_notice_version
     # M6a: a review notice version, and no maximum open duration (open decision).
     assert s.review.notice_version and set(s.review.model_dump()) == {"notice_version"}
@@ -113,6 +115,8 @@ def test_redis_broker_password_is_url_escaped() -> None:
         lambda: FileLimits(upload_intent_lifetime=timedelta(0)),
         lambda: FileLimits(orphan_grace=timedelta(minutes=10)),
         lambda: FileLimits(pdf_probe_timeout_seconds=0),
+        lambda: FileLimits(verified_download_max_concurrent=0),
+        lambda: FileLimits(verified_download_max_concurrent=65),
         lambda: PdfBodyThreshold(min_body_page_ratio=1.01),
         lambda: PdfBodyThreshold(min_body_page_ratio=0),
         lambda: Retention(backup_retention=timedelta(0)),

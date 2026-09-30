@@ -109,6 +109,23 @@ def resolve_session(db: Session, raw_token: str | None, *, now: datetime, idle: 
     )
 
 
+def session_is_live(db: Session, session_id: uuid.UUID, *, now: datetime, idle: timedelta) -> bool:
+    """Re-check an already resolved session without touching it (same validity rule).
+
+    Used before serving bytes that were prepared after the request's first
+    check, so a logout, revocation or deactivation committed meanwhile wins.
+    """
+    return db.scalar(
+        select(UserSession.id).join(User, User.id == UserSession.user_id).where(
+            UserSession.id == session_id,
+            UserSession.revoked_at.is_(None),
+            UserSession.absolute_expires_at > now,
+            UserSession.last_activity_at > now - idle,
+            User.status == UserStatus.ACTIVE.value,
+        )
+    ) is not None
+
+
 def rotate_csrf(db: Session, session_id: uuid.UUID) -> str:
     """New CSRF token for a live session whose CSRF cookie was lost."""
     csrf_token, csrf_hash = generate_token()
