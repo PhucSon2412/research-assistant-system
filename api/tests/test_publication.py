@@ -680,22 +680,27 @@ def test_cleanup_removes_only_the_common_object_and_is_safe_to_repeat(upload_api
     assert publication.cleanup_revoked(api.engine, storage, now + timedelta(hours=1), 50) == {}
     assert state(api, copies[3]) == "pending"
 
-    # Derived full-text rows (none exist in this PR) block purging instead of being left behind.
-    assert revoke(admin, copies[3]).status_code == 200
+    # A derived full-text row is removed with the copy (M6b-2b2a; full coverage in test_common_cleanup);
+    # while cleanup keeps failing it stays, and the Admin page flags the tombstone overdue after 24 hours.
     with api.engine.begin() as conn:
         conn.execute(text("""INSERT INTO metadata_candidates(item_id, version_id, source_file_id, field_name, value,
             locator_kind, start_offset, end_offset, pipeline_version)
             SELECT item_id, version_id, id, 'title', 'T', 'markdown', 0, 1, 'fixture' FROM source_files
             WHERE item_id=:i"""),
             {"i": uuid.UUID(copies[3])})
-    assert publication.cleanup_revoked(api.engine, storage, now + timedelta(hours=2), 50) == {
-        "error:derived_rows_present": 1}
+    assert revoke(admin, copies[3]).status_code == 200
+    assert publication.cleanup_revoked(api.engine, Down(), now + timedelta(hours=2), 50) == {
+        "error:storage_unavailable": 1}
+    assert api.scalar("SELECT count(*) FROM metadata_candidates WHERE item_id=:i", i=uuid.UUID(copies[3])) == 1
     assert key_present(storage, keys[copies[3]])
     overdue = admin.get(f"/admin/common-copies/{copies[3]}")
-    assert overdue.json()["item"]["tombstone"]["last_cleanup_error"] == "derived_rows_present"
+    assert overdue.json()["item"]["tombstone"]["last_cleanup_error"] == "storage_unavailable"
     api.clock.advance(hours=25)
     admin = api.admin_browser()  # the old session went idle
     assert admin.get(f"/admin/common-copies/{copies[3]}").json()["item"]["tombstone"]["overdue"] is True
+    assert publication.cleanup_revoked(api.engine, storage, api.clock.now, 50) == {"deleted": 1}
+    assert api.scalar("SELECT count(*) FROM metadata_candidates WHERE item_id=:i", i=uuid.UUID(copies[3])) == 0
+    assert not key_present(storage, keys[copies[3]])
     no_secrets_in(api, caplog)
 
 

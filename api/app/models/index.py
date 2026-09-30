@@ -50,6 +50,9 @@ class EmbeddingCall(Base):
         CheckConstraint("reserved_usd >= 0 AND (cost_usd IS NULL OR cost_usd >= 0)", name="cost_non_negative"),
         CheckConstraint("dimensions IS NULL OR dimensions > 0", name="dimensions_positive"),
         CheckConstraint("vector IS NULL OR (dimensions IS NOT NULL AND vector_dims(vector) = dimensions)", name="vector_dimensions_match"),
+        # 0024: cleanup of a revoked common copy keeps the cost ledger and removes vector + chunk hash.
+        CheckConstraint("chunk_hash IS NOT NULL OR content_removed_at IS NOT NULL", name="content_present"),
+        CheckConstraint("content_removed_at IS NULL OR (vector IS NULL AND chunk_hash IS NULL)", name="content_removed"),
         UniqueConstraint("source_file_id", "model_id", "pipeline_version", "chunk_hash", name="uq_embedding_call_content"),
         Index("ix_embedding_calls_status", "status"),
         Index("ix_embedding_calls_reserved_lease", "lease_until",
@@ -63,7 +66,7 @@ class EmbeddingCall(Base):
     response_model_id: Mapped[str | None] = mapped_column(Text)
     response_provider: Mapped[str | None] = mapped_column(Text)
     pipeline_version: Mapped[str] = mapped_column(Text)
-    chunk_hash: Mapped[str] = mapped_column(Text)
+    chunk_hash: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text)
     vector: Mapped[list[float] | None] = mapped_column(Vector())
     dimensions: Mapped[int | None] = mapped_column(Integer)
@@ -75,6 +78,7 @@ class EmbeddingCall(Base):
     lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    content_removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class IndexEntry(Base):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import io
 from decimal import Decimal
 
@@ -374,6 +375,144 @@ def test_0023_removes_metadata_of_copies_already_purged_under_0022(empty_db_url:
     eng.dispose()
     with pytest.raises(Exception, match="removed metadata or retention records exist"):
         command.downgrade(alembic_config(empty_db_url), "0022")
+
+
+def _derived_fixture(conn, item, version, source, owner, job_origin: str, label: str) -> dict:
+    """One row of every derived table for ``item`` (0023 schema), with ``label`` in each text."""
+    p = {"i": item, "v": version, "f": source, "o": owner, "t": label, "origin": job_origin,
+         "vis": "private" if owner else "common", "key": f"k-{label}", "h": hashlib.sha256(label.encode()).hexdigest()}
+    p["job"] = conn.scalar(text("""INSERT INTO ingestion_jobs(origin,scope_visibility,scope_owner_user_id,item_id,
+        version_id,idempotency_key) VALUES(:origin,:vis,:o,:i,:v,:key) RETURNING id"""), p)
+    p["s"] = conn.scalar(text("""INSERT INTO sections(item_id,version_id,source_file_id,kind,ordinal,text,locator_kind,
+        start_offset,end_offset,start_line,end_line,pipeline_version) VALUES(:i,:v,:f,'body',0,:t,'markdown',0,5,1,1,
+        'md-v1') RETURNING id"""), p)
+    p["c"] = conn.scalar(text("""INSERT INTO chunks(item_id,version_id,source_file_id,section_id,ordinal,text,
+        start_offset,end_offset,start_line,end_line,chunk_hash,pipeline_version,locator_kind)
+        VALUES(:i,:v,:f,:s,0,:t,0,5,1,1,:h,'md-v1','markdown') RETURNING id"""), p)
+    p["g"] = conn.scalar(text("""INSERT INTO index_generations(item_id,version_id,source_file_id,job_id,model_id,provider,
+        dimensions,pipeline_version,index_version,expected_chunks,rights_epoch,state) VALUES(:i,:v,:f,:job,'m','openrouter',
+        3,'md-v1','x',1,0,'active') RETURNING id"""), p)
+    p["e"] = conn.scalar(text("""INSERT INTO embedding_calls(source_file_id,owner_user_id,model_id,provider,
+        pipeline_version,chunk_hash,status,vector,dimensions,input_tokens,reserved_usd,cost_usd,cost_status,reserved_day)
+        VALUES(:f,coalesce(:o,(SELECT id FROM users WHERE role='admin')),'m','openrouter','md-v1',:h,'completed',
+        '[0.5,0.5,0.5]',3,5,0.001,0.0001,'usage_price_estimate',CURRENT_DATE) RETURNING id"""), p)
+    conn.execute(text("""INSERT INTO index_entries(generation_id,chunk_id,embedding_call_id,chunk_hash,text)
+        VALUES(:g,:c,:e,:h,:t)"""), p)
+    conn.execute(text("""INSERT INTO pdf_pages(item_id,version_id,source_file_id,page_number,text,width,height,role,
+        body_chars,body_page,qualifies,layout_mode,pipeline_version) VALUES(:i,:v,:f,1,:t,1,1,'body',5,true,true,
+        'plain','pdf-v1')"""), p)
+    p["r"] = conn.scalar(text("""INSERT INTO reference_entries(item_id,version_id,source_file_id,ordinal,raw_citation,
+        fields,confidence,provenance,locator_kind,start_offset,end_offset,pipeline_version)
+        VALUES(:i,:v,:f,0,:t,'{}','low','parser','markdown',0,5,'md-v1') RETURNING id"""), p)
+    conn.execute(text("""INSERT INTO reference_citation_links(reference_id,matcher_version,raw_citation_sha256,
+        match_status) VALUES(:r,'arxiv-exact-v2',:h,'no_arxiv_id')"""), p)
+    conn.execute(text("""INSERT INTO metadata_candidates(item_id,version_id,source_file_id,field_name,value,locator_kind,
+        start_offset,end_offset,pipeline_version) VALUES(:i,:v,:f,'title',:t,'markdown',0,5,'md-v1')"""), p)
+    conn.execute(text("UPDATE library_items SET active_index_generation_id=:g WHERE id=:i"), p)
+    return p
+
+
+DERIVED_0024 = ("sections", "chunks", "pdf_pages", "reference_entries", "metadata_candidates", "index_generations")
+
+
+def _derived_rows(conn, item) -> dict:
+    out = {t: [tuple(r) for r in conn.execute(text(f"SELECT * FROM {t} WHERE item_id=:i ORDER BY id"), {"i": item})]
+           for t in DERIVED_0024}
+    for name, sql in (("entries", "SELECT e.* FROM index_entries e JOIN chunks c ON c.id=e.chunk_id WHERE c.item_id=:i"),
+                      ("links", "SELECT l.* FROM reference_citation_links l JOIN reference_entries r"
+                                " ON r.id=l.reference_id WHERE r.item_id=:i"),
+                      ("calls", "SELECT c.id, c.vector::text, c.chunk_hash, c.cost_usd, c.input_tokens, c.status"
+                                " FROM embedding_calls c JOIN source_files f ON f.id=c.source_file_id WHERE f.item_id=:i"),
+                      ("item", "SELECT active_index_generation_id FROM library_items WHERE id=:i")):
+        out[name] = [tuple(r) for r in conn.execute(text(sql), {"i": item})]
+    return out
+
+
+def test_0024_removes_derived_rows_of_copies_purged_under_0023_and_fences_writes(empty_db_url: str) -> None:
+    from app.identity.passwords import hash_password
+
+    upgrade(empty_db_url, "0023")
+    eng = create_engine(empty_db_url)
+    verifier = hash_password("synthetic-password-long")
+    h = "e" * 64
+    with eng.begin() as conn:
+        owner = conn.scalar(text("INSERT INTO users(email,password_verifier) VALUES('m6e@example.org',:p) RETURNING id"),
+                            {"p": verifier})
+        admin = conn.scalar(text("INSERT INTO users(email,password_verifier,role) VALUES('adm6e@example.org',:p,"
+                                 "'admin') RETURNING id"), {"p": verifier})
+        item = conn.scalar(text("INSERT INTO library_items(visibility,owner_user_id,title) VALUES('private',:o,'P')"
+                                " RETURNING id"), {"o": owner})
+        version = conn.scalar(text("INSERT INTO paper_versions(item_id) VALUES(:i) RETURNING id"), {"i": item})
+        source = conn.scalar(text("INSERT INTO source_files(item_id,version_id,storage_key,verified_mime,byte_size,"
+                                  "checksum_sha256) VALUES(:i,:v,'private-key','text/markdown',100,:h) RETURNING id"),
+                             {"i": item, "v": version, "h": h})
+        private = _derived_fixture(conn, item, version, source, owner, "upload", "PRIVATETEXT")
+        copies = {}
+        for label in ("PURGEDTEXT", "PENDINGTEXT"):
+            rr = conn.scalar(text("""INSERT INTO review_requests(item_id,version_id,source_file_id,requester_user_id,
+                status,file_checksum_sha256,rights_epoch_at_submit,notice_version,declared_source,declared_rights,
+                submitted_at) VALUES(:i,:v,:f,:o,'open',:h,0,'n','src','rights',now()) RETURNING id"""),
+                             {"i": item, "v": version, "f": source, "o": owner, "h": h})
+            copy = conn.scalar(text("INSERT INTO library_items(visibility,publication_state) VALUES('common','pending')"
+                                    " RETURNING id"))
+            cv = conn.scalar(text("INSERT INTO paper_versions(item_id) VALUES(:i) RETURNING id"), {"i": copy})
+            cf = conn.scalar(text("INSERT INTO source_files(item_id,version_id,storage_key,verified_mime,byte_size,"
+                                  "checksum_sha256) VALUES(:i,:v,:k,'text/markdown',100,:h) RETURNING id"),
+                             {"i": copy, "v": cv, "h": h, "k": f"copy-{label}"})
+            conn.execute(text("""INSERT INTO access_rights(item_id,version_id,source_file_id,file_checksum_sha256,
+                origin_kind,origin_review_request_id,verified_source,evidence_note,checked_on,reviewer_user_id,
+                recorded_at,scope_audience,permits_original_download,permits_fulltext_search,
+                permits_external_processing,rights_epoch_at_grant) VALUES(:i,:v,:f,:h,'review_request',:r,'Admin src',
+                'Evidence',CURRENT_DATE,:a,now(),'instance_users',true,true,false,0)"""),
+                         {"i": copy, "v": cv, "f": cf, "h": h, "r": rr, "a": admin})
+            conn.execute(text("UPDATE review_requests SET status='approved', closed_at=now(), closed_by_user_id=:a,"
+                              " close_reason_code='approved_by_admin' WHERE id=:r"), {"a": admin, "r": rr})
+            copies[label] = (copy, _derived_fixture(conn, copy, cv, cf, None, "promotion", label))
+    for label, (copy, _) in copies.items():
+        with eng.begin() as conn:
+            conn.execute(text("UPDATE library_items SET publication_state='revoked', rights_epoch=1 WHERE id=:i"),
+                         {"i": copy})
+            conn.execute(text("""UPDATE access_rights SET revoked_at=now(), revoked_by_user_id=:a,
+                revocation_reason_code='other', rights_epoch_at_revoke=1 WHERE item_id=:i"""), {"a": admin, "i": copy})
+            conn.execute(text("""INSERT INTO deletion_tombstones(target_kind,item_id,reason_code,prior_publication_state,
+                rights_epoch,recorded_at,recorded_by_user_id,purge_due_at) VALUES('common_copy',:i,'other','pending',1,
+                now(),:a,now()+interval '1 day')"""), {"i": copy, "a": admin})
+    purged = copies["PURGEDTEXT"][0]
+    with eng.begin() as conn:  # purged under 0023 (metadata removed), which never looked at derived rows
+        conn.execute(text("""UPDATE access_rights SET verified_source=NULL, evidence_note=NULL,
+            metadata_scrubbed_at=now() WHERE item_id=:i"""), {"i": purged})
+        conn.execute(text("""UPDATE deletion_tombstones SET purged_at=now(), object_outcome='deleted',
+            scrubbed_fields='{}', retained_fields='{}' WHERE item_id=:i"""), {"i": purged})
+        before = {"private": _derived_rows(conn, item), "pending": _derived_rows(conn, copies["PENDINGTEXT"][0])}
+        cost_before = conn.execute(text("SELECT id, cost_usd, input_tokens, status FROM embedding_calls"
+                                        " WHERE id=:e"), {"e": copies["PURGEDTEXT"][1]["e"]}).one()
+
+    upgrade(empty_db_url)
+    with eng.connect() as conn:
+        after = _derived_rows(conn, purged)
+        assert all(after[t] == [] for t in (*DERIVED_0024, "entries", "links"))
+        assert after["item"] == [(None,)]
+        call = conn.execute(text("SELECT id, cost_usd, input_tokens, status, vector, chunk_hash,"
+                                 " content_removed_at IS NOT NULL FROM embedding_calls WHERE id=:e"),
+                            {"e": copies["PURGEDTEXT"][1]["e"]}).one()
+        assert tuple(call[:4]) == tuple(cost_before) and tuple(call[4:]) == (None, None, True)
+        assert conn.scalar(text("SELECT ras_common_copy_derived_left(:i)"), {"i": purged}) == []
+        # The private item and the copy still awaiting cleanup are left exactly as they were.
+        assert _derived_rows(conn, item) == before["private"]
+        assert _derived_rows(conn, copies["PENDINGTEXT"][0]) == before["pending"]
+        dumped = " ".join(str(r) for t in ("sections", "chunks", "pdf_pages", "reference_entries", "index_entries",
+                                             "metadata_candidates") for r in conn.execute(text(f"SELECT * FROM {t}")))
+        assert "PURGEDTEXT" not in dumped and "PRIVATETEXT" in dumped and "PENDINGTEXT" in dumped
+    with pytest.raises(IntegrityError, match="derived rows cannot be written for a revoked common copy"), \
+            eng.begin() as conn:
+        conn.execute(text("""INSERT INTO sections(item_id,version_id,source_file_id,kind,ordinal,text,locator_kind,
+            start_offset,end_offset,start_line,end_line,pipeline_version) SELECT item_id,version_id,id,'body',1,'late',
+            'markdown',0,4,1,1,'md-v1' FROM source_files WHERE item_id=:i"""), {"i": purged})
+    with eng.begin() as conn:  # the private item's pipeline is not fenced
+        conn.execute(text("UPDATE chunks SET text=text WHERE id=:c"), {"c": private["c"]})
+    eng.dispose()
+    with pytest.raises(Exception, match="removed embedding content exists"):
+        command.downgrade(alembic_config(empty_db_url), "0023")
 
 
 def test_collection_membership_foreign_keys_restrict(migrated_db_url: str) -> None:
