@@ -339,19 +339,19 @@ def test_rate_limit_retry_and_a_new_job_reuse_completed_embeddings_and_extractio
     other = copy_of(w, upload(w.a, other_body), other_body)
     first = started(w, other)
     assert process_job(first, storage=w.storage) == "awaiting_index"
-    real, seen = indexer._check_unchanged, []
+    real, seen = indexer._verify_object, []
 
-    def fails_third(source, storage, verified):
+    def fails_second(source, storage, settings):
         seen.append(1)
-        if len(seen) == 3:  # the object check before the second chunk's call
+        if len(seen) == 2:  # the full hash before the second chunk's call (the first opens the run)
             raise worker.StepError("checksum_mismatch")
-        return real(source, storage, verified)
+        return real(source, storage, settings)
 
-    w.monkeypatch.setattr(indexer, "_check_unchanged", fails_third)
+    w.monkeypatch.setattr(indexer, "_verify_object", fails_second)
     calls = fake_provider(w.monkeypatch)
     assert process_job(first, w.settings, w.storage) == "checksum_mismatch"
     assert len(calls) == 1
-    w.monkeypatch.setattr(indexer, "_check_unchanged", real)
+    w.monkeypatch.setattr(indexer, "_verify_object", real)
     rows = {t: rows_of(w.api, other)[t] for t in ("sections", "chunks", "metadata_candidates", "reference_entries")}
     second = started(w, other)
     assert second != first and [KEY.match(j[2]) is not None for j in jobs_of(w, other)] == [True, True]
@@ -686,12 +686,14 @@ def _blocking_reads(w, block_at: int):
     return reads, reading, release
 
 
-@pytest.mark.parametrize("block_at, phase", [(1, "before_any_call"), (2, "before_publish")])
-def test_revoke_commits_while_the_index_step_reads_the_object(w, block_at, phase):
+@pytest.mark.parametrize("block_at, calls_before", [(1, 0), (2, 1), (4, 3)],
+                         ids=["before_any_call", "before_second_call", "before_publish"])
+def test_revoke_commits_while_the_index_step_reads_the_object(w, block_at, calls_before):
     """A slow object read holds no DB lock: the revoke commits during it, and the worker then stops."""
     copy = copy_of(w, upload(w.a, MULTI_BODY), MULTI_BODY)
     job = started(w, copy)
     assert process_job(job, storage=w.storage) == "awaiting_index"
+    assert distinct_texts(w, copy) == 3  # reads: open the run (call 1), before calls 2 and 3, before publish
     reads, reading, release = _blocking_reads(w, block_at)
     calls = fake_provider(w.monkeypatch)
     result, outcome = {}, {}
@@ -706,7 +708,7 @@ def test_revoke_commits_while_the_index_step_reads_the_object(w, block_at, phase
     release.set()
     runner.join(20)
     assert result == {"worker": "cancelled"}
-    assert len(calls) == (0 if phase == "before_any_call" else distinct_texts(w, copy))
+    assert len(calls) == calls_before  # nothing sent after t_rev
     row = item_row(w, copy)
     assert (row.publication_state, row.content_status, row.active_index_generation_id) == (
         "revoked", "metadata_only", None)
@@ -715,7 +717,7 @@ def test_revoke_commits_while_the_index_step_reads_the_object(w, block_at, phase
     assert jobs_of(w, copy)[0][1] == "cancelled"
 
 
-def test_the_object_is_hashed_twice_per_run_not_once_per_chunk(w):
+def test_the_object_is_hashed_before_every_call_and_before_publish(w):
     copy = copy_of(w, upload(w.a, MULTI_BODY), MULTI_BODY)
     job = started(w, copy)
     assert process_job(job, storage=w.storage) == "awaiting_index"
@@ -730,7 +732,37 @@ def test_the_object_is_hashed_twice_per_run_not_once_per_chunk(w):
     calls = fake_provider(w.monkeypatch)
     assert process_job(job, w.settings, w.storage) == "ready"
     assert len(calls) == distinct_texts(w, copy) >= 3
-    # One full SHA-256 read before the first call and one before publishing; a HEAD before and after
-    # each call compares against the hashed object (two more around each full read).
-    assert len(reads) == 2
-    assert len(heads) == 2 * len(calls) + 2 * len(reads)
+    # A full SHA-256 read opens the run (and serves the first call), one precedes every later call and
+    # one precedes publishing; HEADs only reject early: two around each read, one after each response.
+    assert len(reads) == len(calls) + 1
+    assert len(heads) == 2 * len(reads) + len(calls)
+
+
+@pytest.mark.parametrize("replace_at, stage", [(1, "next_call"), (3, "publish")])
+def test_an_unchanged_head_fingerprint_does_not_stand_in_for_the_hash(w, replace_at, stage):
+    """The store keeps the same size/ETag/Last-Modified while same-sized bytes change: the hash still refuses."""
+    copy = copy_of(w, upload(w.a, MULTI_BODY), MULTI_BODY)
+    job = started(w, copy)
+    assert process_job(job, storage=w.storage) == "awaiting_index"
+    assert distinct_texts(w, copy) == 3
+    frozen = w.storage.fingerprint(w.api.scalar("SELECT storage_key FROM source_files WHERE item_id=:i",
+                                                i=uuid.UUID(copy)))
+    w.monkeypatch.setattr(w.storage, "fingerprint", lambda key: frozen)
+
+    def swap(n):
+        if n == replace_at:
+            replace_object(w, copy, MULTI_BODY)
+
+    calls = fake_provider(w.monkeypatch, action=swap)
+    assert process_job(job, w.settings, w.storage) == "checksum_mismatch"
+    # The call made with the old bytes' chunks completes; the next provider call (or the publish) is refused.
+    assert len(calls) == replace_at
+    row = item_row(w, copy)
+    assert (row.content_status, row.active_index_generation_id) == ("metadata_only", None)
+    assert w.api.scalar("SELECT count(*) FROM index_generations WHERE item_id=:i AND state='active'",
+                        i=uuid.UUID(copy)) == 0
+    statuses = sorted(w.api.scalar("""SELECT array_agg(status) FROM embedding_calls
+        WHERE source_file_id=:f""", f=common_file(w, copy)))
+    # The call refused before sending is released (rejected, no charge); nothing was left reserved.
+    assert statuses == (["completed", "rejected"] if stage == "next_call" else ["completed"] * 3)
+    assert jobs_of(w, copy)[0][1] == "terminal_failed"

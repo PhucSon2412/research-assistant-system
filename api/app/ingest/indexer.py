@@ -7,13 +7,16 @@ item locked, before every reservation, immediately before each provider call,
 after each response and in the publishing transaction.
 
 No storage I/O happens while the item and job are locked (review PR #23): a
-revoke never waits on a slow object read. The object's size and SHA-256 are
-checked by a full read before the first provider call of a run and again
-before the publishing transaction, both with no lock held; before and after
-each call a HEAD compares the object's size/ETag/Last-Modified with those of
-the SHA-256-verified read, so the file is not re-read once per chunk. Then the
-rights, epoch, cancel flag and lease are checked under the lock and committed
-before the call (no lock is held while the provider works). A common copy's calls are charged to
+revoke never waits on a slow object read. The whole object is read and its
+size and SHA-256 checked, with no lock held, before every provider call and
+before the publishing transaction (the read that opens a run serves the first
+call); only then are the job, lease, cancel flag, rights, epoch and tombstone
+checked under the lock and committed before the call, so no lock is held while
+the provider works either. A HEAD of size/ETag/Last-Modified is used only to
+reject early (around each full read and after each response); it never
+replaces the hash. Between the last hash and the call there are only DB
+steps: an object replaced in that gap is not seen before that call, but the
+next hash (before the next call or before publishing) refuses it. A common copy's calls are charged to
 the application and embedding buckets only (``owner_user_id`` NULL), never to a
 User's quota. Publishing makes the copy ``indexed``, which opens nothing yet:
 chunk, search and RAG routes keep the private-owner gate.
@@ -96,8 +99,8 @@ def _fingerprint(storage: OriginalStorage, source: SourceFile) -> tuple:
 def _verify_object(source: SourceFile, storage: OriginalStorage, settings: Settings) -> VerifiedObject:
     """Full size + SHA-256 of the stored object, including same-sized replacements.
 
-    Called with no DB lock held. The fingerprint is taken before and after the read, so an
-    overwrite during the read is refused too.
+    Called with no DB lock held. A fingerprint that changes during the read also refuses
+    (early reject only; the hash is the check).
     """
     before = _fingerprint(storage, source)
     if source.verified_mime == VerifiedMime.PDF.value:
@@ -111,7 +114,9 @@ def _verify_object(source: SourceFile, storage: OriginalStorage, settings: Setti
 
 
 def _check_unchanged(source: SourceFile, storage: OriginalStorage, verified: VerifiedObject) -> None:
-    """HEAD only: the object is still the one whose SHA-256 was verified. No DB lock held."""
+    """Early reject by HEAD: refuses a fingerprint that moved since the last hash. It cannot prove the
+    bytes unchanged (see ``OriginalStorage.fingerprint``), so it never stands in for ``_verify_object``.
+    No DB lock held."""
     if _fingerprint(storage, source) != verified.fingerprint:
         raise StepError("checksum_mismatch")
 
@@ -279,10 +284,10 @@ def _verified_unlocked(db: Session, job_id: uuid.UUID, token: uuid.UUID, storage
 
 def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
                   storage: OriginalStorage, settings: Settings) -> str:
-    # One full read for the run, before any provider call; the loop below never reads the object
-    # while holding the item/job locks.
+    # Full SHA-256 read with no lock held; it serves the first provider call. Every later call and the
+    # publishing transaction need a fresh one: the loop never reads the object while locked.
     verified = _verified_unlocked(db, job_id, token, storage, settings)
-    hashed_for_publish = False
+    hashed_since_call = True
     while True:
         job, item, version, source = _gate(db, job_id, token)
         job.lease_until = utcnow() + timedelta(seconds=settings.ingest.lease_seconds)
@@ -302,12 +307,12 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
             raise StepError("index_generation_changed")
         done = set(db.scalars(select(IndexEntry.chunk_id).where(IndexEntry.generation_id == generation.id)).all())
         pending = next((c for c in chunks if c.id not in done), None)
-        if pending is None and not hashed_for_publish:
+        if pending is None and not hashed_since_call:
             # Hash the object again before publishing, outside the lock; a revoke meanwhile wins
             # at the next gate. The publishing transaction itself does no storage I/O.
             db.commit()
             verified = _verified_unlocked(db, job_id, token, storage, settings)
-            hashed_for_publish = True
+            hashed_since_call = True
             continue
         if pending is None:
             _publish(db, job, item, generation, chunks, settings)
@@ -323,12 +328,14 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
         call_id = call.id
         db.commit()  # durable reservation before any external request
         try:
-            # The stored object is still the SHA-256-verified one (HEAD, no DB lock held), then a fresh
+            # Full SHA-256 of the object since the last call (no DB lock held), then a fresh
             # rights/lease/ack check under the item lock, committed before the call: no lock is held
             # while the provider works.
-            _check_unchanged(source, storage, verified)
+            if not hashed_since_call:
+                verified = _verify_object(source, storage, settings)
             _, _, _, source = _gate(db, job_id, token)
             db.commit()
+            hashed_since_call = False
             with reservation_heartbeat(db.get_bind(), EmbeddingCall, call_id,
                                        settings.embedding.reservation_lease_seconds):
                 result = embed(pending.text, settings)
@@ -339,7 +346,7 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
             _provider_failure(db, call_id, EmbeddingError("pre_call_guard_rejected", definitely_rejected=True))
             raise
         try:
-            _check_unchanged(source, storage, verified)
+            _check_unchanged(source, storage, verified)  # early reject only; the next call re-hashes
             job, item, version, source = _gate(db, job_id, token)
             generation = db.get(IndexGeneration, generation.id)
             call = db.scalar(select(EmbeddingCall).where(EmbeddingCall.id == call_id).with_for_update())

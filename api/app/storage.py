@@ -54,9 +54,11 @@ class OriginalStorage:
     def fingerprint(self, key: str) -> tuple[int, str, str]:
         """Size, ETag and Last-Modified of the stored object (a HEAD request, no body).
 
-        Any overwrite, even with same-sized bytes, changes the ETag (content digest) and
-        Last-Modified, so an unchanged fingerprint means the object whose bytes were last
-        hashed is still the one stored.
+        Only a cheap early reject: a *changed* fingerprint means the object changed, but an
+        unchanged one proves nothing about the bytes. The S3-compatible contract of this
+        project does not promise that every overwrite changes these values, and an ETag is
+        not a whole-object checksum for every upload or encryption mode. Integrity is the
+        caller's full SHA-256 read.
         """
         head = self.client.head_object(Bucket=self.bucket, Key=key)
         return int(head["ContentLength"]), str(head.get("ETag")), str(head.get("LastModified"))
