@@ -116,7 +116,9 @@ export const CONDITIONS_BLOCK_NOTE = "Hệ thống chưa thi hành được đi�
   + "của bản chung sẽ không mở tải cho ai, kể cả khi chọn “Cho User tải file gốc”.";
 
 // What the API's download gate decides for a copy's file (`original_download`).
-export type OriginalDownloadStatus = "open" | "not_permitted" | "blocked_by_conditions" | "not_published" | "revoked";
+// "open" only when the download route's own SQL gate opens the file right now.
+export type OriginalDownloadStatus = "open" | "not_permitted" | "blocked_by_conditions" | "not_published" | "revoked"
+  | "rights_not_current";
 
 export const ORIGINAL_DOWNLOAD_TEXT: Record<OriginalDownloadStatus, string> = {
   open: "mở cho mọi tài khoản (mỗi lần tải kiểm lại quyền và SHA-256)",
@@ -124,6 +126,7 @@ export const ORIGINAL_DOWNLOAD_TEXT: Record<OriginalDownloadStatus, string> = {
   blocked_by_conditions: "không mở (có điều kiện sử dụng hệ thống chưa thi hành được)",
   not_published: "chưa mở (bản chưa công bố)",
   revoked: "không mở (đã thu hồi)",
+  rights_not_current: "không mở (quyền đã ghi không còn khớp trạng thái hiện tại: epoch, publication hoặc file)",
 };
 
 export type FileChoice = { id: string; version_id: string; filename: string | null };

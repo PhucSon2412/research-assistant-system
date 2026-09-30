@@ -5,6 +5,8 @@ creates a job for it or calls a provider.
 """
 from __future__ import annotations
 
+import asyncio
+import gc
 import hashlib
 import io
 import logging
@@ -196,8 +198,11 @@ def test_common_original_refused_unless_live_rights_open_that_exact_file(upload_
         assert [f["id"] for f in browser.get(f"/library/items/{allowed}").json()["item"]["files"]] == [allowed_file]
         assert_missing(browser, f"/library/items/{pending}", who)
     status = {i: admin.get(f"/admin/common-copies/{i}").json()["item"]["original_download"]
-              for i in (not_permitted, conditioned, pending)}
-    assert status == {not_permitted: "not_permitted", conditioned: "blocked_by_conditions", pending: "not_published"}
+              for i in (not_permitted, conditioned, pending, stale, allowed)}
+    # "open" comes from the download gate itself: the stale-epoch copy's recorded rights still say
+    # download, no condition, but the route refuses it, and so does the Admin status.
+    assert status == {not_permitted: "not_permitted", conditioned: "blocked_by_conditions", pending: "not_published",
+                      stale: "rights_not_current", allowed: "open"}
     # Refusals by the first gate are plain 404s: no audit row, nothing read from storage.
     assert {r["target_id"] for r in download_audits(api)} == {allowed_file}
 
@@ -376,5 +381,165 @@ def test_spool_slots_bound_concurrent_verified_downloads(upload_api, monkeypatch
     app.dependency_overrides.pop(uploads._storage, None)
     assert first["response"].status_code == 200 and first["response"].content == A_BODY
     # The slot came back when the first response's spool closed.
+    assert b.get(url(file_id)).content == A_BODY
+    assert admin.get(url(file_id)).content == A_BODY
+
+
+def _advance_while_reading(api, storage, **delta):
+    class Slow:
+        def open(self, key):
+            api.clock.advance(**delta)  # the object read takes this long
+            return storage.open(key)
+    use_storage(Slow())
+
+
+def test_session_expiring_while_the_object_is_read_gets_no_bytes(upload_api, monkeypatch):
+    """The last check reads the clock again: an idle or absolute expiry reached during the read refuses."""
+    api, storage = upload_api
+    a, _, admin, ids_a, _ = world(api, storage, monkeypatch)
+    _, file_id = copy_of(api, a, admin, ids_a)
+    idle = app_config.get_settings().auth.session_idle
+
+    def fresh_b():
+        return api.user_browser("b@example.org")  # its session's last activity is clock.now
+
+    def expire_b_sessions_in(**delta):
+        with api.engine.begin() as conn:
+            conn.execute(text("""UPDATE sessions SET absolute_expires_at=:t WHERE revoked_at IS NULL
+                AND user_id=(SELECT id FROM users WHERE email='b@example.org')"""),
+                         {"t": api.clock.now + timedelta(**delta)})
+
+    try:
+        # Idle: exactly at the boundary the session is expired (same rule as resolve_session).
+        b = fresh_b()
+        _advance_while_reading(api, storage, seconds=idle.total_seconds())
+        response = b.get(url(file_id))
+        assert (response.status_code, response.json()["error"]) == (401, "session_expired")
+        assert b"Reviewable" not in response.content and "content-disposition" not in response.headers
+        b = fresh_b()
+        _advance_while_reading(api, storage, seconds=idle.total_seconds() - 1)
+        assert b.get(url(file_id)).content == A_BODY
+
+        # Absolute: the session is valid when the request starts and expires during the read.
+        b = fresh_b()
+        expire_b_sessions_in(minutes=5)
+        _advance_while_reading(api, storage, minutes=5)
+        response = b.get(url(file_id))
+        assert (response.status_code, response.json()["error"]) == (401, "session_expired")
+        assert b"Reviewable" not in response.content
+        b = fresh_b()
+        expire_b_sessions_in(minutes=5)
+        _advance_while_reading(api, storage, minutes=4)
+        assert b.get(url(file_id)).content == A_BODY
+    finally:
+        app.dependency_overrides.pop(uploads._storage, None)
+
+
+def test_verified_original_frees_slot_and_file_on_every_exit():
+    slots = threading.BoundedSemaphore(1)
+
+    def slot_free() -> bool:
+        if slots.acquire(blocking=False):
+            slots.release()
+            return True
+        return False
+
+    def held() -> common_original.VerifiedOriginal:
+        assert slots.acquire(blocking=False)
+        verified = common_original.VerifiedOriginal(slots)
+        verified.open_spool().write(b"x" * (3 * common_original.STREAM_CHUNK_BYTES))
+        return verified
+
+    # Closed before the first read (a generator's finally would not run here).
+    verified = held()
+    spool = verified._hold.spool
+    assert not slot_free()
+    verified.close()
+    assert slot_free() and spool.closed and verified.closed
+    verified.close()  # idempotent: the semaphore is not over-released
+    assert slot_free()
+    assert list(verified) == []
+
+    # Closed after one chunk; and read to the end.
+    verified = held()
+    assert len(next(verified)) == common_original.STREAM_CHUNK_BYTES
+    verified.close()
+    assert slot_free()
+    verified = held()
+    assert sum(len(block) for block in verified) == 3 * common_original.STREAM_CHUNK_BYTES
+    assert slot_free() and verified.closed
+
+    # Dropped without close (a response that was never sent): the finalizer frees both.
+    verified = held()
+    spool = verified._hold.spool
+    del verified
+    gc.collect()
+    assert slot_free() and spool.closed
+
+
+def _asgi_download(api, file_id, session_token, *, spec_version, disconnect_at_start):
+    """Drive the ASGI app directly as a client that goes away before the first body chunk."""
+    scope = {"type": "http", "asgi": {"version": "3.0", "spec_version": spec_version}, "http_version": "1.1",
+             "method": "GET", "scheme": "http", "path": url(file_id), "raw_path": url(file_id).encode(),
+             "query_string": b"", "root_path": "", "client": ("127.0.0.1", 50000), "server": ("testserver", 80),
+             "headers": [(b"host", b"testserver"), (b"cookie", f"ras_session={session_token}".encode())]}
+    sent: list[dict] = []
+    requested = {"done": False}
+
+    async def receive():
+        if not requested["done"]:
+            requested["done"] = True
+            return {"type": "http.request", "body": b"", "more_body": False}
+        return {"type": "http.disconnect"}  # the client is gone
+
+    async def send(message):
+        if disconnect_at_start and message["type"] == "http.response.start":
+            raise OSError("synthetic: client closed the connection")
+        sent.append(message)
+
+    async def run():
+        try:
+            await app(scope, receive, send)
+        except Exception:  # ClientDisconnect or a cancelled stream: what matters is what was released
+            pass
+
+    asyncio.run(run())
+    return sent
+
+
+def test_early_disconnect_or_spool_failure_gives_the_slot_back(upload_api, monkeypatch):
+    api, storage = upload_api
+    a, b, admin, ids_a, _ = world(api, storage, monkeypatch)
+    monkeypatch.setenv("RAS_FILES__VERIFIED_DOWNLOAD_MAX_CONCURRENT", "1")
+    app_config.get_settings.cache_clear()
+    _, file_id = copy_of(api, a, admin, ids_a)
+    spools: list = []
+    real_temporary_file = common_original.tempfile.TemporaryFile
+
+    def recording(*args, **kwargs):
+        spool = real_temporary_file(*args, **kwargs)
+        spools.append(spool)
+        return spool
+
+    monkeypatch.setattr(common_original.tempfile, "TemporaryFile", recording)
+    token = b.session_token()
+    # ASGI 2.4: the first send fails (ClientDisconnect, Starlette skips background tasks).
+    _asgi_download(api, file_id, token, spec_version="2.4", disconnect_at_start=True)
+    # ASGI 2.3: the disconnect message cancels the stream, possibly before any body chunk.
+    sent = _asgi_download(api, file_id, token, spec_version="2.3", disconnect_at_start=False)
+    assert not any(m.get("body") for m in sent if m["type"] == "http.response.body"), "no body was expected"
+    assert len(spools) == 2 and all(spool.closed for spool in spools)
+    # With one slot, a leak from either disconnect would make this 503 download_busy.
+    assert b.get(url(file_id)).content == A_BODY
+    assert all(spool.closed for spool in spools)
+
+    # The temp file cannot be created: controlled 503, and the slot is not kept.
+    def failing(*args, **kwargs):
+        raise OSError("synthetic: no space left for the spool")
+
+    monkeypatch.setattr(common_original.tempfile, "TemporaryFile", failing)
+    response = b.get(url(file_id))
+    assert (response.status_code, response.json()) == (503, {"error": "file_unavailable"})
+    monkeypatch.setattr(common_original.tempfile, "TemporaryFile", real_temporary_file)
     assert b.get(url(file_id)).content == A_BODY
     assert admin.get(url(file_id)).content == A_BODY

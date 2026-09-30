@@ -33,7 +33,7 @@ test("a common item's note depends only on whether the API listed a file", () =>
   assert.match(NO_DOWNLOADABLE_FILE, /Không có file gốc/);
   assert.match(CONDITIONS_BLOCK_NOTE, /không mở tải/);
   assert.deepEqual(Object.keys(ORIGINAL_DOWNLOAD_TEXT).sort(),
-    ["blocked_by_conditions", "not_permitted", "not_published", "open", "revoked"]);
+    ["blocked_by_conditions", "not_permitted", "not_published", "open", "revoked", "rights_not_current"]);
 });
 
 async function upstream(handler) {

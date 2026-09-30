@@ -6,6 +6,7 @@ import hashlib
 import os
 import tempfile
 import uuid
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
@@ -18,11 +19,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_now, get_principal
+from app.api.deps import get_clock, get_db, get_now, get_principal
 from app.api.errors import ApiError
 from app.audit import record_event
 from app.authz import Principal, common_original_clause, m2a_private_derivatives_clause
-from app.common_original import prepare_common_original
+from app.common_original import VerifiedFileResponse, prepare_common_original
 from app.config import Settings, get_settings
 from app.identity.tokens import generate_token, hash_token, plausible_token
 from app.models import IngestionJob, LibraryItem, PaperVersion, ProcessingAcknowledgement, SourceFile, UploadIntent
@@ -244,7 +245,7 @@ def download_original(
     file_id: str,
     principal: Principal = Depends(get_principal),
     db: Session = Depends(get_db),
-    now: datetime = Depends(get_now),
+    clock: Callable[[], datetime] = Depends(get_clock),
     settings: Settings = Depends(get_settings),
     storage: OriginalStorage = Depends(_storage),
 ) -> StreamingResponse:
@@ -275,8 +276,9 @@ def download_original(
         "Cache-Control": "no-store",
     }
     if visibility == Visibility.COMMON.value:
-        verified = prepare_common_original(db, principal, storage, source, rights_epoch, now=now, settings=settings)
-        return StreamingResponse(verified.chunks(), media_type=source.verified_mime, headers=headers)
+        verified = prepare_common_original(db, principal, storage, source, rights_epoch, clock=clock,
+                                           settings=settings)
+        return VerifiedFileResponse(verified, media_type=source.verified_mime, headers=headers)
     try:
         body = storage.open(source.storage_key)
     except Exception:

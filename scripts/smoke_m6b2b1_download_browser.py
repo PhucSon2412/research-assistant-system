@@ -227,6 +227,16 @@ def main() -> None:
                 copy_big, file_big = approve_copy(page_admin, rid_big, approve_body(big_sha, TITLE_BIG))
                 publish(page_admin, copy_big, big_sha)
                 with closing(web_client(web, accounts["b"])) as client_b:
+                    # Clients that go away right after the headers, more times than the API has spool
+                    # slots (default 4): a slot kept by any of them would turn a later one into 503.
+                    early = []
+                    for _ in range(6):
+                        with client_b.stream("GET", f"/api/files/{file_big}/original") as response:
+                            early.append(response.status_code)  # closed without reading the body
+                        time.sleep(0.5)
+                    assert early == [200] * 6, early
+                    assert download_facts(page_b, f"/api/files/{file_big}/original")["sha"] == big_sha
+                    print(f"      6 streams closed right after the headers: {early}; next full download OK")
                     started = time.monotonic()
                     with client_b.stream("GET", f"/api/files/{file_big}/original") as response:
                         assert response.status_code == 200 and response.headers["cache-control"] == "no-store"
@@ -239,7 +249,7 @@ def main() -> None:
                         received = first + b"".join(chunks)
                 assert len(received) == len(big) and hashlib.sha256(received).hexdigest() == big_sha
                 print(f"      large copy: {len(big)} bytes, first byte after {ttfb_ms:.0f} ms (verified spool)")
-                ok("Revoke committed while B's response was streaming: that response still delivered the whole "
+                ok("6 early client disconnects gave their spool slots back; revoke committed while B's response was streaming: that response still delivered the whole "
                    "verified file (documented limit); B's new request right after the commit → 404")
 
                 STAGE = "Admin revokes in the UI"

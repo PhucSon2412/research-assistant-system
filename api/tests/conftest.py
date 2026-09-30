@@ -152,7 +152,7 @@ def db_env(url: URL) -> dict[str, str]:
 @pytest.fixture
 def api(app_env, migrated_db_url: URL, monkeypatch: pytest.MonkeyPatch, engine: Engine):
     """Migrated DB + development auth settings + a controllable clock."""
-    from app.api.deps import get_now
+    from app.api.deps import get_clock, get_now
     from app.delivery import get_delivery
     from app.main import app
     from tests.helpers import DEV_ENV, FakeClock, Harness
@@ -163,6 +163,7 @@ def api(app_env, migrated_db_url: URL, monkeypatch: pytest.MonkeyPatch, engine: 
     get_delivery.cache_clear()
     clock = FakeClock()
     app.dependency_overrides[get_now] = lambda: clock.now
+    app.dependency_overrides[get_clock] = lambda: (lambda: clock.now)
     yield Harness(engine=engine, clock=clock)
     app.dependency_overrides.clear()
     get_delivery.cache_clear()

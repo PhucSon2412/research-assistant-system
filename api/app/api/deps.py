@@ -8,7 +8,7 @@ that session. Authorisation is then decided per resource (``app/authz.py``).
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import datetime
 
 from fastapi import Depends, Request
@@ -32,6 +32,12 @@ def get_db() -> Iterator[Session]:
 
 def get_now() -> datetime:
     return utcnow()
+
+
+def get_clock() -> Callable[[], datetime]:
+    """The current time on demand, for a check made after slow work in the same
+    request (``get_now`` is fixed when the request starts)."""
+    return utcnow
 
 
 def get_session_context(

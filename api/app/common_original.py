@@ -23,11 +23,15 @@ Order, so that no byte leaves before the bytes and the rights are both proved:
    first (then rights, then publication), so this single lock never inverts
    their order: a revoke that committed while step 2 ran is seen by the next
    statement; one still running is waited for, then seen. Re-check the session
-   and re-run the whole gate as a new statement (READ COMMITTED: a fresh
-   snapshot); the file, key, checksum, size and epoch must be the ones
-   verified. Failure -> ``401``/``404``. Record the audit row and commit, which
-   releases the lock.
-4. Stream the verified temp file; the slot is freed when it closes.
+   (at the time *now*, not the request's start: an idle or absolute expiry
+   reached while reading refuses) and re-run the whole gate as a new statement
+   (READ COMMITTED: a fresh snapshot); the file, key, checksum, size and epoch
+   must be the ones verified. Failure -> ``401``/``404``. Record the audit row
+   and commit, which releases the lock.
+4. Stream the verified temp file. The slot and the file are released on every
+   path: a failure above, the end of the stream, a client that disconnects
+   before or after the first chunk (``VerifiedFileResponse``), or, as a last
+   resort, when the unclosed object is garbage-collected.
 
 Limit: a revoke that commits after step 3 (``t_rev`` later than the last
 check) does not stop a response that already passed it, and bytes already
@@ -42,10 +46,14 @@ from __future__ import annotations
 import tempfile
 import threading
 import uuid
-from collections.abc import Iterator
+import weakref
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from functools import lru_cache
 from typing import IO
+
+from fastapi.responses import StreamingResponse
 
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
@@ -91,31 +99,82 @@ def _slots(limit: int) -> threading.BoundedSemaphore:
     return threading.BoundedSemaphore(limit)
 
 
-class VerifiedOriginal:
-    """A temp file holding bytes already proved; iterate once to stream, then it closes."""
+class _Hold:
+    """One spool slot and the temp file it pays for; released exactly once."""
 
-    def __init__(self, spool: IO[bytes], slots: threading.BoundedSemaphore):
-        self._spool, self._slots, self._closed = spool, slots, False
-        self._lock = threading.Lock()
+    def __init__(self, slots: threading.BoundedSemaphore):
+        self.slots, self.spool, self.done = slots, None, False
+        self.lock = threading.Lock()
+
+    def release(self) -> None:
+        with self.lock:
+            if self.done:
+                return
+            self.done = True
+        try:
+            if self.spool is not None:
+                self.spool.close()
+        finally:
+            self.slots.release()
+
+
+class VerifiedOriginal:
+    """Bytes already proved, in a temp file that holds one spool slot.
+
+    An iterator object rather than a generator: ``close()`` frees the file and
+    the slot even when nothing was read yet (the ``finally`` of a generator
+    that never started does not run). ``VerifiedFileResponse`` calls it however
+    the response ends; a finalizer frees them if the object is dropped unclosed.
+    """
+
+    def __init__(self, slots: threading.BoundedSemaphore):
+        self._hold = _Hold(slots)
+        self._finalizer = weakref.finalize(self, self._hold.release)
+        self._started = False
+
+    def open_spool(self) -> IO[bytes]:
+        self._hold.spool = tempfile.TemporaryFile(prefix="ras-common-original-")
+        return self._hold.spool
+
+    @property
+    def closed(self) -> bool:
+        return self._hold.done
 
     def close(self) -> None:
-        with self._lock:
-            if self._closed:
-                return
-            self._closed = True
-        try:
-            self._spool.close()
-        finally:
-            self._slots.release()
+        self._finalizer()  # runs _Hold.release at most once, then detaches
 
-    def chunks(self) -> Iterator[bytes]:
+    def __iter__(self) -> "VerifiedOriginal":
+        return self
+
+    def __next__(self) -> bytes:
         # Bytes sent after a later revoke commits cannot be recalled (docs/access-and-data.md).
-        try:
-            self._spool.seek(0)
-            while block := self._spool.read(STREAM_CHUNK_BYTES):
-                yield block
-        finally:
+        block = b""
+        with self._hold.lock:
+            spool = None if self._hold.done else self._hold.spool
+            if spool is not None:
+                if not self._started:
+                    spool.seek(0)
+                    self._started = True
+                block = spool.read(STREAM_CHUNK_BYTES)
+        if not block:
             self.close()
+            raise StopIteration
+        return block
+
+
+class VerifiedFileResponse(StreamingResponse):
+    """Streams a ``VerifiedOriginal`` and closes it however the response ends:
+    completion, client disconnect (before or after the first chunk) or error."""
+
+    def __init__(self, verified: VerifiedOriginal, **kwargs):
+        super().__init__(verified, **kwargs)
+        self._verified = verified
+
+    async def __call__(self, scope, receive, send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            self._verified.close()
 
 
 def _audit(db: Session, principal: Principal, outcome: AuditOutcome, target: _Target, **details: str) -> None:
@@ -136,16 +195,24 @@ def _refuse(db: Session, principal: Principal, target: _Target, outcome: AuditOu
 
 
 def prepare_common_original(db: Session, principal: Principal, storage: OriginalStorage, source: SourceFile,
-                            rights_epoch: int, *, now, settings: Settings) -> VerifiedOriginal:
-    """Steps 1-3 above for a file the route's gate query matched through ``common_original_clause``."""
+                            rights_epoch: int, *, clock: Callable[[], datetime],
+                            settings: Settings) -> VerifiedOriginal:
+    """Steps 1-3 above for a file the route's gate query matched through ``common_original_clause``.
+
+    ``clock`` is read again at the last check: a session that expired (idle or
+    absolute) while the object was being read does not get the bytes.
+    """
     target = _target(source, rights_epoch)
     db.rollback()  # no lock or snapshot while reading the object
     slots = _slots(settings.files.verified_download_max_concurrent)
     if not slots.acquire(blocking=False):
         raise ApiError(503, "download_busy")
-    spool = tempfile.TemporaryFile(prefix="ras-common-original-")
-    verified = VerifiedOriginal(spool, slots)
+    verified = VerifiedOriginal(slots)  # owns the slot from here: every exit below releases it
     try:
+        try:
+            spool = verified.open_spool()
+        except OSError:
+            raise ApiError(503, "file_unavailable") from None
         try:
             intact = verified_read(storage, target.storage_key, target.byte_size, target.checksum, spool)
         except Exception as exc:
@@ -159,7 +226,7 @@ def prepare_common_original(db: Session, principal: Principal, storage: Original
                           ApiError(409, "common_file_integrity_failed"))
         # Last check before the first byte, under the lock publish/revoke take first.
         db.execute(select(LibraryItem.id).where(LibraryItem.id == target.item_id).with_for_update(read=True))
-        if not session_is_live(db, principal.session_id, now=now, idle=settings.auth.session_idle):
+        if not session_is_live(db, principal.session_id, now=clock(), idle=settings.auth.session_idle):
             db.rollback()
             raise ApiError(401, "session_expired", clear_session=True)
         again = db.execute(common_original_rows(principal).where(SourceFile.id == target.file_id)).first()
