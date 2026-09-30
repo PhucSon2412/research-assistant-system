@@ -30,6 +30,11 @@ class IngestionJob(Base):
 
     The job's scope must equal its item's visibility/owner (DB trigger), and
     its version must belong to its item (composite FK). Step attempts are M2.
+    A ``promotion`` job (M6b-2b2b) pins ``source_file_id`` (composite FK with
+    its version), the reviewed file of its common copy, and never changes its
+    item, version, file, key or ``rights_epoch_at_start`` (DB trigger). Its
+    key, label, warnings and error codes carry IDs and codes only: the job
+    outlives cleanup of a revoked copy.
     """
 
     __tablename__ = "ingestion_jobs"
@@ -64,6 +69,24 @@ class IngestionJob(Base):
             postgresql_nulls_not_distinct=True,
         ),
         UniqueConstraint("id", "item_id", name="uq_ingestion_jobs_id_item_id"),
+        # 0025: a job pins the exact file it reads; a common file's own job_id stays NULL.
+        ForeignKeyConstraint(
+            ["source_file_id", "version_id"],
+            ["source_files.id", "source_files.version_id"],
+            name="fk_ingestion_jobs_source_file_version",
+            use_alter=True,  # source_files also names ingestion_jobs
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("source_file_id IS NULL OR version_id IS NOT NULL", name="source_file_requires_version"),
+        CheckConstraint(
+            "origin <> 'promotion' OR (scope_visibility = 'common' AND item_id IS NOT NULL"
+            " AND version_id IS NOT NULL AND source_file_id IS NOT NULL)",
+            name="promotion_pins_file",
+        ),
+        # Repeated or concurrent index starts cannot run two jobs on one common file.
+        Index("uq_ingestion_jobs_live_promotion_file", "source_file_id", unique=True,
+              postgresql_where=text("origin = 'promotion' AND finished_at IS NULL")),
+        Index("ix_ingestion_jobs_source_file_id", "source_file_id"),
         Index("ix_ingestion_jobs_item_id", "item_id"),
         Index("ix_ingestion_jobs_state", "state"),
     )
@@ -84,6 +107,7 @@ class IngestionJob(Base):
         UUID(as_uuid=True), ForeignKey("library_items.id", ondelete="RESTRICT")
     )
     version_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    source_file_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     idempotency_key: Mapped[str] = mapped_column(Text)
     state: Mapped[str] = mapped_column(Text, server_default=JobState.RECEIVED.value)
     cancel_requested: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))

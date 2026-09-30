@@ -1,4 +1,4 @@
-"""Admin views and actions for common copies approved from a review (M6b-1, M6b-2a).
+"""Admin views and actions for common copies approved from a review (M6b-1, M6b-2a, M6b-2b2b).
 
 A ``pending`` common item is absent from every normal route (library, count,
 collections, files, search, chunks, RAG), for the Admin too; so is a
@@ -10,13 +10,16 @@ chunk/search/RAG still refuse it.
 
 - ``/admin/pending-publications``: read-only view of pending copies (M6b-1).
 - ``/admin/common-copies``: every reviewed copy by state, with the recorded
-  rights, publication record and tombstone/cleanup status; ``publish``
-  (pending -> listed) and ``revoke`` (pending or listed -> revoked). Revoke
-  may name, per metadata field, a specific basis to keep it after cleanup;
-  every field without one is removed at cleanup.
+  rights, publication record, index status and tombstone/cleanup status;
+  ``publish`` (pending -> listed), ``index`` (start or return the index job of
+  a listed copy whose rights permit full-text search and external processing,
+  M6b-2b2b) and ``revoke`` (pending or listed -> revoked). Revoke may name, per
+  metadata field, a specific basis to keep it after cleanup; every field
+  without one is removed at cleanup.
 
-No route here returns file bytes or object keys, creates a job or index, or
-calls a provider.
+No route here returns file bytes, object keys or extracted text, or calls a
+provider: ``index`` only queues a durable job for the worker. An indexed copy
+is still served by no chunk, search or RAG route.
 """
 
 from __future__ import annotations
@@ -33,6 +36,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_now, require_admin, require_trusted_origin
 from app.api.errors import ApiError
 from app.authz import Principal, pending_publication_clause, review_copy_admin_clause
+from app import common_index
 from app.common_original import common_original_rows
 from app.config import Settings, get_settings
 from app.models import (AccessRights, CommonPublication, DeletionTombstone, LibraryItem, PaperVersion,
@@ -49,12 +53,20 @@ PENDING_NOTE = ("Bản chung đã có quyền do Admin ghi nhận nhưng chưa c
 LISTED_NOTE = ("Đã công bố metadata: mọi tài khoản thấy tiêu đề và version trong thư viện. File gốc chỉ tải được khi "
                "quyền đã ghi cho phép tải và không có điều kiện sử dụng (hệ thống chưa thi hành được điều kiện dạng "
                "text); mỗi lần tải đều kiểm lại quyền và SHA-256. Toàn văn chưa khả dụng: chưa có tìm kiếm toàn văn, "
-               "chunk hay hỏi đáp cho bản này, kể cả khi quyền đã ghi cho phép.")
+               "chunk hay hỏi đáp cho bản này, kể cả khi quyền đã ghi cho phép. Admin có thể lập chỉ mục khi quyền "
+               "cho tìm kiếm toàn văn và gửi qua provider, không kèm điều kiện; đã lập chỉ mục vẫn chưa mở tìm "
+               "kiếm/hỏi đáp.")
 REVOKED_NOTE = ("Đã thu hồi: không route nào phục vụ bản này từ lúc thu hồi commit. Cleanup xóa object chung, dữ "
                 "liệu phát sinh và metadata (tiêu đề, URL nguồn, tên file, nguồn/giấy phép/bằng chứng/điều kiện) trừ "
                 "trường có căn cứ giữ riêng; bản riêng của User không đổi.")
 NOTES = {PublicationState.PENDING.value: PENDING_NOTE, PublicationState.LISTED.value: LISTED_NOTE,
          PublicationState.REVOKED.value: REVOKED_NOTE}
+
+
+class IndexInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # The page says the copy's extracted text goes to OpenRouter for embedding; nothing is pre-ticked.
+    confirm_external_processing: Literal[True]
 
 
 class PublishInput(BaseModel):
@@ -186,6 +198,7 @@ def _full_out(db: Session, admin: Principal, row: tuple, now: datetime) -> dict:
         # Admin-only: a live copy with the same bytes blocks publishing this one.
         duplicate = live_duplicate(db, out["file"]["checksum_sha256"], item.id)
         out["duplicate_published_item_id"] = str(duplicate) if duplicate else None
+    out["index"] = common_index.status(db, item, get_settings())
     tombstone = db.scalar(select(DeletionTombstone).where(DeletionTombstone.item_id == item.id))
     out["tombstone"] = None if tombstone is None else {
         "id": str(tombstone.id), "reason_code": tombstone.reason_code,
@@ -266,6 +279,20 @@ def publish_copy(
 ) -> dict:
     done = publish(db, admin, storage, _parse_id(item_id), body.file_checksum_sha256, now)
     return {"item": _copy_out(db, admin, done.item.id, now)}
+
+
+@copies_router.post("/{item_id}/index", dependencies=[Depends(require_trusted_origin)])
+def index_copy(
+    item_id: str,
+    body: IndexInput,
+    admin: Principal = Depends(require_admin),
+    db: Session = Depends(get_db),
+    now: datetime = Depends(get_now),
+) -> dict:
+    """Queue (or return the running) index job; the worker does the rest under the same gate."""
+    started = common_index.start(db, admin, _parse_id(item_id), now)
+    return {"item": _copy_out(db, admin, started.job.item_id, now),
+            "job": {"id": str(started.job.id), "state": started.job.state}, "created": started.created}
 
 
 @copies_router.post("/{item_id}/revoke", dependencies=[Depends(require_trusted_origin)])

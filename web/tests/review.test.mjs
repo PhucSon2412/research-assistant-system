@@ -4,6 +4,7 @@ import test from "node:test";
 import { loadProxyConfig, proxyRequest } from "../lib/proxy.ts";
 import {
   EMPTY_APPROVE_FORM, PUBLICATION_STATE_TEXT, REVOCATION_REASONS, closeReasonText,
+  INDEX_ELIGIBILITY_TEXT, INDEX_EXTERNAL_NOTICE, makeIndexBody,
   fieldList, fileChoiceLabel, makeApproveBody, makePublishBody, makeReviewBody, makeRevokeBody, reviewDownloadHref,
 } from "../lib/review.ts";
 import { streamFromApi } from "../lib/stream.ts";
@@ -162,4 +163,15 @@ test("publish and revoke bodies need the unticked confirmation; revoke sends a c
   assert.equal(fieldList(["title", "evidence_note"]), "tiêu đề, ghi chú bằng chứng");
   assert.equal(fieldList([]), "không");
   assert.equal(fieldList(null), "không");
+});
+
+test("index needs the unticked provider box and explains every refusal the API can give (M6b-2b2b)", () => {
+  assert.equal(makeIndexBody(false), null);
+  assert.deepEqual(makeIndexBody(true), { confirm_external_processing: true });
+  assert.deepEqual(Object.keys(INDEX_ELIGIBILITY_TEXT).sort(), ["audience_not_supported", "blocked_by_conditions",
+    "external_processing_not_permitted", "fulltext_not_permitted", "indexable", "not_published", "revoked",
+    "rights_not_current", "unsupported_file_kind"]);
+  assert.match(INDEX_ELIGIBILITY_TEXT.external_processing_not_permitted, /không tự bật tìm kiếm chỉ theo từ khóa/);
+  assert.match(INDEX_EXTERNAL_NOTICE, /OpenRouter/);
+  assert.match(INDEX_EXTERNAL_NOTICE, /chưa mở\s+tìm kiếm\/hỏi đáp/);
 });

@@ -48,8 +48,24 @@ export type PendingPublication = {
     metadata_removed_at?: string | null };
 };
 
+// Index status of a reviewed copy (M6b-2b2b). IDs and codes only; `search_open` stays false in this step.
+export type IndexEligibility = "indexable" | "revoked" | "not_published" | "rights_not_current"
+  | "audience_not_supported" | "fulltext_not_permitted" | "external_processing_not_permitted"
+  | "blocked_by_conditions" | "unsupported_file_kind";
+
+export type CopyIndexStatus = {
+  eligibility: IndexEligibility; content_status: string; search_open: false; note: string | null;
+  provider_ready: boolean;
+  active_generation: { id: string; model_id: string; dimensions: number | null; index_version: string;
+    expected_chunks: number; activated_at: string | null } | null;
+  job: { id: string; state: string; attempt_count: number; last_error_code: string | null; warnings: string[];
+    cancel_requested: boolean; created_at: string; extraction_finished_at: string | null;
+    finished_at: string | null } | null;
+};
+
 // Any reviewed common copy, as /admin/common-copies returns it (M6b-2a).
 export type CommonCopy = PendingPublication & {
+  index: CopyIndexStatus;
   publication: { published_at: string; revoked_at: string | null; verified_byte_size: number } | null;
   duplicate_published_item_id?: string | null;
   tombstone: { id: string; reason_code: string; prior_publication_state: "pending" | "listed"; recorded_at: string;
@@ -103,6 +119,29 @@ export function makePublishBody(confirmed: boolean, checksum: string) {
   if (!confirmed || !/^[0-9a-f]{64}$/.test(checksum)) return null;
   return { confirm_publish: true as const, file_checksum_sha256: checksum };
 }
+
+// Indexing sends the copy's extracted text to OpenRouter for embedding; null until the unticked box is ticked.
+export function makeIndexBody(confirmed: boolean) {
+  return confirmed ? { confirm_external_processing: true as const } : null;
+}
+
+// Why the API would refuse to index a copy now (`index.eligibility`); the API decides, the page only explains.
+export const INDEX_ELIGIBILITY_TEXT: Record<IndexEligibility, string> = {
+  indexable: "lập chỉ mục được (quyền cho tìm kiếm toàn văn và gửi qua provider, không kèm điều kiện)",
+  revoked: "không (đã thu hồi)",
+  not_published: "chưa (bản chưa công bố)",
+  rights_not_current: "không (quyền đã ghi không còn khớp trạng thái hiện tại: epoch, publication hoặc file)",
+  audience_not_supported: "không (phạm vi người dùng chưa hỗ trợ)",
+  fulltext_not_permitted: "không (quyền không cho tìm kiếm toàn văn: không tạo dữ liệu trích xuất)",
+  external_processing_not_permitted: "không (quyền cho toàn văn nhưng không cho gửi qua provider: index vector hiện "
+    + "tại không hoàn tất được, và hệ thống không tự bật tìm kiếm chỉ theo từ khóa)",
+  blocked_by_conditions: "không (có điều kiện sử dụng hệ thống chưa thi hành được)",
+  unsupported_file_kind: "không (định dạng file chưa hỗ trợ)",
+};
+
+export const INDEX_EXTERNAL_NOTICE = "Text trích xuất từ file chung (không phải file gốc) sẽ được gửi tới "
+  + "OpenRouter/provider để embedding; reference list không được gửi làm bằng chứng. Đã lập chỉ mục vẫn chưa mở "
+  + "tìm kiếm/hỏi đáp cho bản chung ở bước này.";
 
 // Revoking needs a listed reason code and the unticked box; no free text is sent.
 export function makeRevokeBody(confirmed: boolean, reason: string) {

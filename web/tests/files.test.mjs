@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
 import {
-  COMMON_DOWNLOAD_NOTE, COMMON_METADATA_ONLY_NOTE, NO_DOWNLOADABLE_FILE, commonItemNote, originalDownloadHref,
+  COMMON_DOWNLOAD_NOTE, COMMON_INDEXED_NOTE, COMMON_METADATA_ONLY_NOTE, NO_DOWNLOADABLE_FILE, commonItemNote,
+  originalDownloadHref,
 } from "../lib/files.ts";
 import { CONDITIONS_BLOCK_NOTE, ORIGINAL_DOWNLOAD_TEXT } from "../lib/review.ts";
 import { streamFromApi } from "../lib/stream.ts";
@@ -34,6 +35,13 @@ test("a common item's note depends only on whether the API listed a file", () =>
   assert.match(CONDITIONS_BLOCK_NOTE, /không mở tải/);
   assert.deepEqual(Object.keys(ORIGINAL_DOWNLOAD_TEXT).sort(),
     ["blocked_by_conditions", "not_permitted", "not_published", "open", "revoked", "rights_not_current"]);
+});
+
+test("an indexed common item says it is not searchable yet, whatever the files (M6b-2b2b)", () => {
+  assert.equal(commonItemNote([], "indexed"), COMMON_INDEXED_NOTE);
+  assert.equal(commonItemNote([listed], "indexed"), COMMON_INDEXED_NOTE);
+  assert.equal(commonItemNote([listed], "metadata_only"), COMMON_DOWNLOAD_NOTE);
+  assert.match(COMMON_INDEXED_NOTE, /^Đã lập chỉ mục, chưa mở tìm kiếm\/hỏi đáp/);
 });
 
 async function upstream(handler) {

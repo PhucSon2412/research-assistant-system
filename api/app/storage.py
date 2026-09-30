@@ -51,6 +51,18 @@ class OriginalStorage:
     def size(self, key: str) -> int:
         return int(self.client.head_object(Bucket=self.bucket, Key=key)["ContentLength"])
 
+    def fingerprint(self, key: str) -> tuple[int, str, str]:
+        """Size, ETag and Last-Modified of the stored object (a HEAD request, no body).
+
+        Only a cheap early reject: a *changed* fingerprint means the object changed, but an
+        unchanged one proves nothing about the bytes. The S3-compatible contract of this
+        project does not promise that every overwrite changes these values, and an ETag is
+        not a whole-object checksum for every upload or encryption mode. Integrity is the
+        caller's full SHA-256 read.
+        """
+        head = self.client.head_object(Bucket=self.bucket, Key=key)
+        return int(head["ContentLength"]), str(head.get("ETag")), str(head.get("LastModified"))
+
     def orphan_keys(self, prefix: str = "originals/") -> Iterator[tuple[str, object]]:
         paginator = self.client.get_paginator("list_objects_v2")
         for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):

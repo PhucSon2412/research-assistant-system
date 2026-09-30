@@ -1,9 +1,34 @@
-"""Build private keyword/vector generations before atomically publishing them."""
+"""Build keyword/vector generations before atomically publishing them.
+
+Private uploads (M3a) and, since M6b-2b2b, published reviewed common copies
+(``promotion`` jobs) use the same steps. For a common copy the rights gate of
+``app.common_index`` replaces the upload acknowledgement and runs, with the
+item locked, before every reservation, immediately before each provider call,
+after each response and in the publishing transaction.
+
+No storage I/O happens while the item and job are locked (review PR #23): a
+revoke never waits on a slow object read. The whole object is read and its
+size and SHA-256 checked, with no lock held, before every provider call (the
+read that opens a run serves the first call) and, always, once more after the
+last index entry is written and immediately before the publishing transaction,
+however many calls were new or reused; only then are the job, lease, cancel flag, rights, epoch and tombstone
+checked under the lock and committed before the call, so no lock is held while
+the provider works either. A HEAD of size/ETag/Last-Modified is used only to
+reject early (around each full read and after each response); it never
+replaces the hash. Between the last hash and the call there are only DB
+steps: an object replaced in that gap is not seen before that call, but the
+next hash (before the next call or before publishing) refuses it. A common copy's calls are charged to
+the application and embedding buckets only (``owner_user_id`` NULL), never to a
+User's quota. Publishing makes the copy ``indexed``, which opens nothing yet:
+chunk, search and RAG routes keep the private-owner gate.
+"""
 
 from __future__ import annotations
 
 import hashlib
 import uuid
+from dataclasses import dataclass
+from datetime import timedelta
 from decimal import Decimal, ROUND_UP
 
 from sqlalchemy import func, select, text
@@ -16,17 +41,29 @@ from app.ingest.worker import StepError, _locked, _read_markdown, _read_pdf, utc
 from app.models import (Chunk, EmbeddingBudgetDay, EmbeddingCall, EmbeddingUserBudgetDay, IndexEntry, IndexGeneration,
                         IngestionJob, IngestStepAttempt, LibraryItem, PaperVersion, PdfPage, ProcessingAcknowledgement,
                         SearchUsage, Section, SourceFile, UploadIntent)
-from app.models.enums import JobState, VerifiedMime
+from app.models.enums import JobOrigin, JobState, VerifiedMime
 from app.provider_capacity import LOCK, lease_deadline, reap_expired, reservation_heartbeat
-from app.storage import OriginalStorage
+from app.storage import OriginalStorage, is_missing_object
 
 INDEX_VERSION = "private-keyword-vector-v1"
+COMMON_INDEX_VERSION = "common-keyword-vector-v1"
+
+
+def index_version(job: IngestionJob) -> str:
+    return COMMON_INDEX_VERSION if job.origin == JobOrigin.PROMOTION.value else INDEX_VERSION
 
 
 def _gate(db: Session, job_id: uuid.UUID, token: uuid.UUID):
     job, item, version, source = _locked(db, job_id, token)
-    if (source.job_id != job.id or job.scope_owner_user_id != item.owner_user_id or
-            version.coverage not in ("complete", "partial")):
+    if version.coverage not in ("complete", "partial"):
+        raise StepError("index_rights_or_coverage_invalid")
+    if job.origin == JobOrigin.PROMOTION.value:
+        # _locked already re-checked the common rights gate (full text + external processing,
+        # no conditions, live publication, epoch) with the item locked.
+        if source.id != job.source_file_id or job.scope_owner_user_id is not None or item.owner_user_id is not None:
+            raise StepError("index_rights_or_coverage_invalid")
+        return job, item, version, source
+    if source.job_id != job.id or job.scope_owner_user_id != item.owner_user_id:
         raise StepError("index_rights_or_coverage_invalid")
     acknowledged = db.scalar(select(UploadIntent.id).join(ProcessingAcknowledgement,
         UploadIntent.acknowledgement_id == ProcessingAcknowledgement.id).where(
@@ -43,15 +80,57 @@ def _gate(db: Session, job_id: uuid.UUID, token: uuid.UUID):
     return job, item, version, source
 
 
+@dataclass(frozen=True)
+class VerifiedObject:
+    """The stored object as last hashed: its fingerprint, and the decoded text of a Markdown file."""
+
+    fingerprint: tuple
+    text: str | None
+
+
+def _fingerprint(storage: OriginalStorage, source: SourceFile) -> tuple:
+    try:
+        return storage.fingerprint(source.storage_key)
+    except Exception as exc:
+        if is_missing_object(exc):
+            raise StepError("checksum_mismatch") from None
+        raise StepError("storage_unavailable", retryable=True) from None
+
+
+def _verify_object(source: SourceFile, storage: OriginalStorage, settings: Settings) -> VerifiedObject:
+    """Full size + SHA-256 of the stored object, including same-sized replacements.
+
+    Called with no DB lock held. A fingerprint that changes during the read also refuses
+    (early reject only; the hash is the check).
+    """
+    before = _fingerprint(storage, source)
+    if source.verified_mime == VerifiedMime.PDF.value:
+        _read_pdf(source, storage, settings)
+        text_value = None
+    else:
+        text_value = _read_markdown(source, storage, settings)
+    if _fingerprint(storage, source) != before:
+        raise StepError("checksum_mismatch")
+    return VerifiedObject(before, text_value)
+
+
+def _check_unchanged(source: SourceFile, storage: OriginalStorage, verified: VerifiedObject) -> None:
+    """Early reject by HEAD: refuses a fingerprint that moved since the last hash. It cannot prove the
+    bytes unchanged (see ``OriginalStorage.fingerprint``), so it never stands in for ``_verify_object``.
+    No DB lock held."""
+    if _fingerprint(storage, source) != verified.fingerprint:
+        raise StepError("checksum_mismatch")
+
+
 def _eligible_chunks(db: Session, source: SourceFile, version: PaperVersion,
-                     storage: OriginalStorage, settings: Settings) -> tuple[str, list[Chunk]]:
+                     verified: VerifiedObject, settings: Settings) -> tuple[str, list[Chunk]]:
+    """Chunks to index, checked against the extracted pages or the verified Markdown text. No storage I/O."""
     pipeline = pdf.PIPELINE_VERSION if source.verified_mime == VerifiedMime.PDF.value else markdown.PIPELINE_VERSION
     chunks = db.scalars(select(Chunk).where(Chunk.source_file_id == source.id,
         Chunk.pipeline_version == pipeline).order_by(Chunk.section_id, Chunk.ordinal)).all()
     if not chunks or not any(db.get(Section, c.section_id).kind == "body" for c in chunks):
         raise StepError("index_body_missing")
     if source.verified_mime == VerifiedMime.PDF.value:
-        _read_pdf(source, storage, settings)  # full SHA-256, including same-sized replacements
         pages = db.scalars(select(PdfPage).where(PdfPage.source_file_id == source.id,
             PdfPage.pipeline_version == pipeline)).all()
         if len(pages) != source.page_count or any(p.pipeline_version != pipeline for p in pages):
@@ -63,7 +142,9 @@ def _eligible_chunks(db: Session, source: SourceFile, version: PaperVersion,
         source_text = {p.page_number: p.text for p in pages}
         page_by_number = {p.page_number: p for p in pages}
     else:
-        source_text = _read_markdown(source, storage, settings)
+        source_text = verified.text
+        if source_text is None:
+            raise StepError("index_object_unverified")
     eligible = []
     for chunk in chunks:
         section = db.get(Section, chunk.section_id)
@@ -101,6 +182,14 @@ def _eligible_chunks(db: Session, source: SourceFile, version: PaperVersion,
     return pipeline, eligible
 
 
+def _user_budget(db: Session, day, user_id: uuid.UUID | None) -> EmbeddingUserBudgetDay | None:
+    """The User's daily quota row, locked; ``None`` for a common copy's call (application only)."""
+    if user_id is None:
+        return None
+    return db.scalar(select(EmbeddingUserBudgetDay).where(
+        EmbeddingUserBudgetDay.day == day, EmbeddingUserBudgetDay.user_id == user_id).with_for_update())
+
+
 def _amount(tokens: int, settings: Settings) -> Decimal:
     price = Decimal(str(settings.embedding.max_usd_per_million_tokens))
     return (Decimal(tokens) * price / Decimal(1_000_000)).quantize(Decimal("0.00000001"), rounding=ROUND_UP)
@@ -113,10 +202,11 @@ def _reserve(db: Session, job: IngestionJob, item: LibraryItem, source: SourceFi
     db.execute(text(LOCK))
     db.execute(text("INSERT INTO embedding_budget_days(day) VALUES (:day) ON CONFLICT DO NOTHING"), {"day": day})
     budget = db.scalar(select(EmbeddingBudgetDay).where(EmbeddingBudgetDay.day == day).with_for_update())
-    db.execute(text("INSERT INTO embedding_user_budget_days(day,user_id) VALUES (:day,:user) ON CONFLICT DO NOTHING"),
-               {"day": day, "user": item.owner_user_id})
-    user_budget = db.scalar(select(EmbeddingUserBudgetDay).where(
-        EmbeddingUserBudgetDay.day == day, EmbeddingUserBudgetDay.user_id == item.owner_user_id).with_for_update())
+    # A common copy (no owner) is charged to the application and embedding buckets only.
+    if item.owner_user_id is not None:
+        db.execute(text("INSERT INTO embedding_user_budget_days(day,user_id) VALUES (:day,:user) ON CONFLICT DO NOTHING"),
+                   {"day": day, "user": item.owner_user_id})
+    user_budget = _user_budget(db, day, item.owner_user_id)
     existing = db.scalar(select(EmbeddingCall).where(EmbeddingCall.source_file_id == source.id,
         EmbeddingCall.model_id == settings.embedding.model_id,
         EmbeddingCall.pipeline_version == chunk.pipeline_version, EmbeddingCall.chunk_hash == chunk.chunk_hash).with_for_update())
@@ -148,17 +238,18 @@ def _reserve(db: Session, job: IngestionJob, item: LibraryItem, source: SourceFi
     if budget.committed_usd + budget.reserved_usd + query_spend + amount > cap:
         raise StepError("embedding_budget_exhausted", retryable=True)
     user_cap = Decimal(str(settings.budget.user_embedding_daily_usd))
-    user_query_spend = db.scalar(select(func.coalesce(func.sum(func.coalesce(SearchUsage.cost_usd, SearchUsage.reserved_usd)), 0)).where(
+    user_query_spend = Decimal(0) if user_budget is None else db.scalar(select(func.coalesce(func.sum(func.coalesce(SearchUsage.cost_usd, SearchUsage.reserved_usd)), 0)).where(
         SearchUsage.day == day, SearchUsage.user_id == item.owner_user_id,
         SearchUsage.task_type == "embed_query", SearchUsage.status.in_(("reserved", "completed", "uncertain"))))
-    if user_budget.committed_usd + user_budget.reserved_usd + user_query_spend + amount > user_cap:
+    if user_budget is not None and user_budget.committed_usd + user_budget.reserved_usd + user_query_spend + amount > user_cap:
         raise StepError("embedding_user_quota_exhausted", retryable=True)
     budget.reserved_usd += amount
-    user_budget.reserved_usd += amount
+    if user_budget is not None:
+        user_budget.reserved_usd += amount
     if (budget.committed_usd + budget.reserved_usd + query_spend >=
             cap * Decimal(str(settings.budget.embedding_warning_fraction))):
         job.warnings = list(dict.fromkeys([*job.warnings, "embedding_bucket_near_limit"]))
-    if (user_budget.committed_usd + user_budget.reserved_usd + user_query_spend >=
+    if user_budget is not None and (user_budget.committed_usd + user_budget.reserved_usd + user_query_spend >=
             user_cap * Decimal(str(settings.budget.user_embedding_warning_fraction))):
         job.warnings = list(dict.fromkeys([*job.warnings, "embedding_user_quota_near_limit"]))
     if existing is None:
@@ -183,20 +274,33 @@ def _reserve(db: Session, job: IngestionJob, item: LibraryItem, source: SourceFi
     return existing
 
 
+def _verified_unlocked(db: Session, job_id: uuid.UUID, token: uuid.UUID, storage: OriginalStorage,
+                       settings: Settings) -> VerifiedObject:
+    """Check the gate, commit (releasing item and job), then read and hash the object with no lock held."""
+    job, _, _, source = _gate(db, job_id, token)
+    job.lease_until = utcnow() + timedelta(seconds=settings.ingest.lease_seconds)
+    db.commit()
+    return _verify_object(source, storage, settings)
+
+
 def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
                   storage: OriginalStorage, settings: Settings) -> str:
+    # Full SHA-256 read with no lock held; it serves the first provider call. Every later call and the
+    # publishing transaction need a fresh one: the loop never reads the object while locked.
+    verified = _verified_unlocked(db, job_id, token, storage, settings)
+    hashed_since_call = True
+    hashed_for_publish = False
     while True:
         job, item, version, source = _gate(db, job_id, token)
-        from datetime import timedelta
         job.lease_until = utcnow() + timedelta(seconds=settings.ingest.lease_seconds)
-        pipeline, chunks = _eligible_chunks(db, source, version, storage, settings)
+        pipeline, chunks = _eligible_chunks(db, source, version, verified, settings)
         generation = db.scalar(select(IndexGeneration).where(IndexGeneration.job_id == job.id,
             IndexGeneration.model_id == settings.embedding.model_id,
-            IndexGeneration.index_version == INDEX_VERSION).with_for_update())
+            IndexGeneration.index_version == index_version(job)).with_for_update())
         if generation is None:
             generation = IndexGeneration(item_id=item.id, version_id=version.id, source_file_id=source.id,
                 job_id=job.id, model_id=settings.embedding.model_id, provider=settings.embedding.provider,
-                pipeline_version=pipeline, index_version=INDEX_VERSION, expected_chunks=len(chunks),
+                pipeline_version=pipeline, index_version=index_version(job), expected_chunks=len(chunks),
                 rights_epoch=item.rights_epoch, state="building")
             db.add(generation)
             db.flush()
@@ -205,6 +309,14 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
             raise StepError("index_generation_changed")
         done = set(db.scalars(select(IndexEntry.chunk_id).where(IndexEntry.generation_id == generation.id)).all())
         pending = next((c for c in chunks if c.id not in done), None)
+        if pending is None and not hashed_for_publish:
+            # Always hash again after the last entry, outside the lock, whatever happened before (new
+            # calls or completed ones reused): entries may have been written while the object changed.
+            # A revoke meanwhile wins at the next gate; the publishing transaction does no storage I/O.
+            db.commit()
+            verified = _verified_unlocked(db, job_id, token, storage, settings)
+            hashed_since_call = hashed_for_publish = True
+            continue
         if pending is None:
             _publish(db, job, item, generation, chunks, settings)
             db.commit()
@@ -219,11 +331,14 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
         call_id = call.id
         db.commit()  # durable reservation before any external request
         try:
-            # Fresh rights/lease/ack check immediately before the call.
+            # Full SHA-256 of the object since the last call (no DB lock held), then a fresh
+            # rights/lease/ack check under the item lock, committed before the call: no lock is held
+            # while the provider works.
+            if not hashed_since_call:
+                verified = _verify_object(source, storage, settings)
             _, _, _, source = _gate(db, job_id, token)
-            if source.verified_mime == VerifiedMime.PDF.value:
-                _read_pdf(source, storage, settings)
             db.commit()
+            hashed_since_call = False
             with reservation_heartbeat(db.get_bind(), EmbeddingCall, call_id,
                                        settings.embedding.reservation_lease_seconds):
                 result = embed(pending.text, settings)
@@ -234,9 +349,8 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
             _provider_failure(db, call_id, EmbeddingError("pre_call_guard_rejected", definitely_rejected=True))
             raise
         try:
+            _check_unchanged(source, storage, verified)  # early reject only; the next call re-hashes
             job, item, version, source = _gate(db, job_id, token)
-            if source.verified_mime == VerifiedMime.PDF.value:
-                _read_pdf(source, storage, settings)
             generation = db.get(IndexGeneration, generation.id)
             call = db.scalar(select(EmbeddingCall).where(EmbeddingCall.id == call_id).with_for_update())
             if (generation.state != "building" or
@@ -263,11 +377,10 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
             budget = db.scalar(select(EmbeddingBudgetDay).where(EmbeddingBudgetDay.day == call.reserved_day).with_for_update())
             budget.reserved_usd -= call.reserved_usd
             budget.committed_usd += settled
-            user_budget = db.scalar(select(EmbeddingUserBudgetDay).where(
-                EmbeddingUserBudgetDay.day == call.reserved_day,
-                EmbeddingUserBudgetDay.user_id == call.owner_user_id).with_for_update())
-            user_budget.reserved_usd -= call.reserved_usd
-            user_budget.committed_usd += settled
+            user_budget = _user_budget(db, call.reserved_day, call.owner_user_id)
+            if user_budget is not None:
+                user_budget.reserved_usd -= call.reserved_usd
+                user_budget.committed_usd += settled
             _insert_entry(db, generation, pending, call)
             db.commit()
         except Exception:
@@ -295,10 +408,9 @@ def _provider_failure(db: Session, call_id: uuid.UUID, error: EmbeddingError) ->
             call.cost_usd = Decimal("0")
             budget = db.scalar(select(EmbeddingBudgetDay).where(EmbeddingBudgetDay.day == call.reserved_day).with_for_update())
             budget.reserved_usd -= call.reserved_usd
-            user_budget = db.scalar(select(EmbeddingUserBudgetDay).where(
-                EmbeddingUserBudgetDay.day == call.reserved_day,
-                EmbeddingUserBudgetDay.user_id == call.owner_user_id).with_for_update())
-            user_budget.reserved_usd -= call.reserved_usd
+            user_budget = _user_budget(db, call.reserved_day, call.owner_user_id)
+            if user_budget is not None:
+                user_budget.reserved_usd -= call.reserved_usd
         else:
             call.cost_status = "unknown_reserved_ceiling"
     db.commit()

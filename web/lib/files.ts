@@ -15,11 +15,15 @@ export function originalDownloadHref(originalUrl: string | null | undefined): st
     ? `/api${originalUrl}` : null;
 }
 
-// A common item that is not indexed: which note to show depends only on
-// whether the API listed a downloadable file.
-export function commonItemNote(files: readonly ItemFile[]): string {
+// A common item's note: indexed is said first (and is not searchable yet, M6b-2b2b);
+// otherwise it depends only on whether the API listed a downloadable file.
+export function commonItemNote(files: readonly ItemFile[], contentStatus = "metadata_only"): string {
+  if (contentStatus === "indexed") return COMMON_INDEXED_NOTE;
   return files.length > 0 ? COMMON_DOWNLOAD_NOTE : COMMON_METADATA_ONLY_NOTE;
 }
+
+export const COMMON_INDEXED_NOTE = "Đã lập chỉ mục, chưa mở tìm kiếm/hỏi đáp: bản chung này có index toàn văn, "
+  + "nhưng chưa có tìm kiếm toàn văn, đoạn trích hay hỏi đáp nào phục vụ nó.";
 
 export const COMMON_METADATA_ONLY_NOTE = "Toàn văn chưa khả dụng: bản chung này hiện chỉ có metadata. Không có file "
   + "gốc được phép tải; chưa có tìm kiếm toàn văn, đoạn trích hay hỏi đáp cho bản này.";

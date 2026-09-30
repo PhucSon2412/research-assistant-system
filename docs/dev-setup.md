@@ -820,3 +820,36 @@ Không có lệnh hay biến môi trường mới: `python -m app.cli.cleanup_re
 - `docker compose up -d --build --wait` trên stack dev: DB dev nâng từ `0023` lên `0024 (head)`; 5 item chung `listed`, 29 item riêng, 55 chunk, 14 embedding call có vector giữ nguyên (0 call bị scrub, 0 tombstone); 10 trigger fence/purge có mặt; `docker compose exec -T worker python -m app.cli.cleanup_revoked` → `nothing to do`; mọi service healthy.
 
 **Giới hạn chưa kiểm/đo:** bản chung chưa có ingest thật, nên dữ liệu dẫn xuất trong test là bản sao output pipeline private cùng bytes; chưa đo thời gian/khóa của giao dịch cleanup với PDF 100 trang; kiểm `derived_rows_shared` quét `index_entries` toàn bảng; restore từ backup cũ vẫn khôi phục cả dẫn xuất cho tới khi áp journal và chạy cleanup (chưa có gate).
+
+## Lập chỉ mục bản chung đã công bố (M6b-2b2b)
+
+Revision `0025` (xem [decisions](decisions.md#quyết-định-triển-khai-m6b-2b2b-2026-09-30)). Không có biến môi trường mới; bước index dùng cấu hình embedding/budget hiện có và vẫn cần key + `RAS_EMBEDDING__PRICING_VERIFIED=true` (mặc định `false`: job dừng ở `awaiting_index`).
+
+| Ai | Route | Ghi chú |
+| --- | --- | --- |
+| Admin | `POST /admin/common-copies/{item_id}/index` | Body `{"confirm_external_processing": true}`; session + CSRF + `Origin`. Trả `{item, job: {id, state}, created}`: `created=false` khi đã có job chưa kết thúc của file. `409`: `common_copy_revoked`, `common_copy_not_published`, `rights_not_current`, `audience_not_supported`, `fulltext_not_permitted`, `external_processing_not_permitted`, `blocked_by_conditions`, `unsupported_file_kind`, `already_indexed`, `extraction_rejected`; item không phải bản chung từ review → `404` |
+| Admin | `GET /admin/common-copies[/{id}]` | Thêm `index`: `eligibility`, `job` (trạng thái/mã lỗi/số lần thử), `active_generation`, `provider_ready`, `search_open=false`, `note` “Đã lập chỉ mục, chưa mở tìm kiếm/hỏi đáp” khi `indexed` |
+| Mọi tài khoản | `GET /library/items*` | Thêm `fulltext_search_available` (chỉ `true` cho item private `indexed`); bản chung `indexed` vẫn `false`; chunks/references/coverage/search/RAG của bản chung `404`/0 hit |
+
+Web: `/admin/publications` hiện trạng thái index và form “Lập chỉ mục” (ô xác nhận gửi text trích xuất tới OpenRouter/provider, không chọn sẵn) cho bản `listed` đủ quyền; `/items/{id}` của bản chung `indexed` ghi “đã lập chỉ mục, chưa mở tìm kiếm/hỏi đáp”.
+
+**Kiểm chứng ngày 2026-09-30 (Windows 11, Conda `ras`, Git Bash):**
+
+- `"$PY" -m pytest api -q`: **557 passed** (một cảnh báo deprecation Starlette); gồm `api/tests/test_common_index.py` (19 test) và hai test migration `0025`. Kiểm đối chứng: đưa lại thứ tự khóa cũ (job rồi item) làm 2/2 test race tất định fail (`processing_unavailable` do PostgreSQL hủy vì deadlock), khôi phục thì pass.
+- `npm test --prefix web` **30 passed**; `npm run typecheck --prefix web` và `npm run build --prefix web` đạt.
+- Stack dev: `docker compose up -d --build --wait` nâng DB dev từ `0024` lên `0025 (head)`; 5 item chung, 29 item riêng, 55 chunk, 14 embedding call (0 owner `NULL`), 0 job promotion, 0 rights giữ nguyên; ba trigger mới có mặt; mọi service healthy.
+
+**Demo Compose cô lập** (không đụng DB/MinIO dev; script từ chối DB có tài khoản không do nó tạo, chỉ đọc `POSTGRES_*`/`MINIO_ROOT_*` từ `.env`, container không có key):
+
+```bash
+export POSTGRES_HOST_PORT=55432 API_HOST_PORT=58000 WEB_HOST_PORT=53000 MINIO_API_HOST_PORT=59000 MINIO_CONSOLE_HOST_PORT=59001 OPENROUTER_API_KEY= RAS_DISCOVERY__ENABLED=false
+docker compose -p ras-index-demo up -d --build --wait
+"$USERPROFILE/.conda/envs/ras/python.exe" scripts/demo_m6b2b2b_common_index.py
+docker compose -p ras-index-demo down -v   # chỉ xóa volume của project demo
+```
+
+Kết quả: **18/18 đạt**. Worker Celery trong container extract file private và file chung của Markdown và PDF (job chung do beat dispatch qua `source_file_id`) rồi dừng ở `awaiting_index` vì container không có key; bước index chạy trên host qua `process_job` với transport embedding giả (8 request giả, 0 lời gọi ra ngoài) → `ready`/`indexed`; bấm index lặp trả cùng job; chunk chung rời chunk private, call chung owner `NULL`, quota User không đổi; B search 0 hit, chunks/RAG `404`, trang Admin có ghi chú “chưa mở tìm kiếm/hỏi đáp”; revoke + cleanup xóa hàng dẫn xuất chung (`deleted: 2`), hàng private còn. Thời gian quan sát (extract trong container 0,5–4 s gồm chu kỳ poll beat, bước index trên host 0,2–0,5 s, cleanup 0,1 s) là fixture tổng hợp trên máy dev, **không phải SLO**. Log container 180 dòng không có traceback hay text paper.
+
+**Sau review PR #23:** indexer không còn đọc object khi giữ khóa item/job; object được đọc toàn bộ + SHA-256 ngoài khóa trước mỗi lời gọi provider và luôn ngay trước công bố, kể cả khi job chỉ dùng lại call đã hoàn tất (n lời gọi mới → n + 1 lần đọc), HEAD chỉ từ chối sớm ([decisions](decisions.md#sửa-theo-review-pr-23-2026-09-30)). Kết quả kiểm chứng sau sửa ở các comment của PR #23.
+
+**Giới hạn chưa kiểm/đo:** không gọi OpenRouter thật, chưa đối soát charge; bước index trong demo chạy trên host với transport giả (container không được cấp key); chưa đo PDF 100 trang hay nhiều bản chung đồng thời; bản chung `indexed` chưa phục vụ search/RAG (PR sau); restore backup cũ vẫn cần áp tombstone journal thủ công.
