@@ -22,9 +22,11 @@ of the file or inserts a new one; a partial unique index keeps it to one per
 file whatever the concurrency. The job pins item, version, file and
 ``rights_epoch_at_start``; its key, label and audit carry IDs only.
 
-Indexing is not opening: a copy that reaches ``indexed`` is still served by no
-chunk, search or RAG route (they keep the private-owner gate). That is the next
-step, with its own gate before top-k.
+Indexing is not opening by itself: search, the chunk viewer and the chunk,
+coverage, reference and metadata-candidate routes serve an ``indexed`` copy only
+through ``app.authz.common_fulltext_sql`` (M6b-2b3a), which re-reads the same
+rights, publication, epoch and generation at each request. RAG does not serve
+common copies yet.
 """
 
 from __future__ import annotations
@@ -39,7 +41,7 @@ from sqlalchemy.orm import Session
 
 from app.api.errors import ApiError
 from app.audit import record_event
-from app.authz import Principal, review_copy_admin_clause
+from app.authz import Principal, common_fulltext_items_clause, review_copy_admin_clause
 from app.config import Settings
 from app.models import (AccessRights, CommonPublication, DeletionTombstone, IndexGeneration, IngestionJob, LibraryItem,
                         SourceFile)
@@ -50,8 +52,10 @@ INDEXABLE = "indexable"
 # Deterministic extraction outcomes: running the same pipeline on the same bytes gives the same answer.
 EXTRACTION_REJECTED = (JobState.FULLTEXT_REJECTED.value, JobState.NEEDS_REVIEW.value)
 JOB_LABEL = "admin_index"
-NOT_OPEN_NOTE = ("Đã lập chỉ mục, chưa mở tìm kiếm/hỏi đáp: bản chung này có index toàn văn nhưng chưa có route "
-                 "tìm kiếm, đoạn trích hay hỏi đáp nào phục vụ nó (bước sau).")
+NOT_OPEN_NOTE = ("Đã lập chỉ mục nhưng không mở tìm kiếm: quyền, công bố hoặc generation hiện tại không còn cho "
+                 "phục vụ toàn văn của bản chung này.")
+SEARCH_OPEN_NOTE = ("Đã lập chỉ mục, mở tìm kiếm toàn văn cho mọi tài khoản theo quyền đã ghi; hỏi đáp (RAG) chưa "
+                    "dùng bản chung. Quyền tìm kiếm không mở tải file gốc.")
 # 409 code for each refusal; "revoked" keeps the code publish/revoke already use.
 REFUSAL_CODES = {"revoked": "common_copy_revoked", "not_published": "common_copy_not_published",
                  "rights_not_current": "rights_not_current", "audience_not_supported": "audience_not_supported",
@@ -190,12 +194,15 @@ def status(db: Session, item: LibraryItem, settings: Settings) -> dict:
     generation = (db.get(IndexGeneration, item.active_index_generation_id)
                   if item.active_index_generation_id else None)
     indexed = item.content_status == ContentStatus.INDEXED.value
+    # The search route's own gate, now: indexed alone does not open search, and RAG stays closed.
+    search_open = db.scalar(select(LibraryItem.id).where(
+        LibraryItem.id == item.id, common_fulltext_items_clause(None))) is not None
     return {
         "eligibility": reason or INDEXABLE,
         "content_status": item.content_status,
-        # Indexing does not open anything: chunk, search and RAG routes do not serve common copies yet.
-        "search_open": False,
-        "note": NOT_OPEN_NOTE if indexed else None,
+        "search_open": search_open,
+        "rag_open": False,
+        "note": SEARCH_OPEN_NOTE if search_open else NOT_OPEN_NOTE if indexed else None,
         "provider_ready": provider_ready(settings),
         "active_generation": None if generation is None else {
             "id": str(generation.id), "model_id": generation.model_id, "dimensions": generation.dimensions,

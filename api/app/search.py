@@ -1,4 +1,14 @@
-"""Private, active-generation retrieval and cost-accounted provider calls."""
+"""Active-generation retrieval and cost-accounted provider calls.
+
+Every query selects only from the caller's audience, in SQL before top-k:
+the caller's own ``private`` items, plus, when the caller opts in with
+``include_common=True`` (the ``/search`` route and its chunk viewer, M6b-2b3a),
+the common copies ``app.authz.common_fulltext_sql`` allows for the exact
+item/version/file/generation. The default stays private-owner only, so RAG
+(``app.rag`` calls ``search``/``hydrate``/``_scope`` without the flag) never
+retrieves, rechecks or sends common text. Rerank sends a common chunk only
+while its rights also permit external processing.
+"""
 from __future__ import annotations
 
 import logging
@@ -11,15 +21,16 @@ from decimal import Decimal, ROUND_UP
 from typing import NamedTuple
 
 import httpx
-from sqlalchemy import bindparam, func, select, text
+from sqlalchemy import bindparam, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from app import keyword_query
 from app.api.errors import ApiError
-from app.authz import Principal
+from app.authz import Principal, common_fulltext_sql, common_original_clause, m2a_private_derivatives_clause
 from app.config import Settings
 from app.ingest.embedding import EmbeddingError, embed
-from app.models import EmbeddingBudgetDay, EmbeddingCall, EmbeddingUserBudgetDay, LibraryItem, SearchRequestDay, SearchUsage
+from app.models import (EmbeddingBudgetDay, EmbeddingCall, EmbeddingUserBudgetDay, LibraryItem, PaperVersion,
+                        SearchRequestDay, SearchUsage, SourceFile)
 from app.provider_capacity import LOCK, lease_deadline, reap_expired, reservation_heartbeat
 from app.provider_identity import VERIFIED_RERANK_IDENTITIES, audit_identity, verified_identity
 
@@ -205,22 +216,34 @@ def settle(db: Session, usage_id: uuid.UUID, *, tokens: int | None = None,
     return status
 
 
+PRIVATE_OWNER = "i.visibility='private' AND i.owner_user_id=:owner"
+
+
+def _audience(include_common: bool) -> str:
+    """Rows of the caller's own private items, or also of servable common copies (aliases i, v, f, g)."""
+    if not include_common:
+        return PRIVATE_OWNER
+    return f"(({PRIVATE_OWNER}) OR (i.id, v.id, f.id, g.id) IN ({common_fulltext_sql()}))"
+
+
 def _scope(db: Session, principal: Principal, item_id: uuid.UUID | None,
-           collection_id: uuid.UUID | None = None):
+           collection_id: uuid.UUID | None = None, *, include_common: bool = False):
     if item_id is not None:
-        item = db.scalar(select(LibraryItem).where(LibraryItem.id == item_id,
-            LibraryItem.visibility == "private", LibraryItem.owner_user_id == principal.user_id))
-        if item is None:
+        # A common copy is a valid item scope only while its text may be served; otherwise, like
+        # another user's private item or a missing ID, it is not found.
+        common = f" OR i.id IN (SELECT item_id FROM ({common_fulltext_sql()}) c)" if include_common else ""
+        if db.execute(text(f"SELECT 1 FROM library_items i WHERE i.id=:item AND (({PRIVATE_OWNER}){common})"),
+                      {"item": item_id, "owner": principal.user_id}).first() is None:
             raise ApiError(404, "not_found")
     if collection_id is not None and db.execute(text(
         "SELECT 1 FROM collections WHERE id=:collection AND owner_user_id=:owner"),
         {"collection": collection_id, "owner": principal.user_id}).first() is None:
         raise ApiError(404, "not_found")
-    rows = db.execute(text("""SELECT g.model_id, g.dimensions FROM library_items i
+    rows = db.execute(text(f"""SELECT g.model_id, g.dimensions FROM library_items i
         JOIN index_generations g ON g.id=i.active_index_generation_id AND g.item_id=i.id
         JOIN paper_versions v ON v.id=g.version_id AND v.item_id=i.id
         JOIN source_files f ON f.id=g.source_file_id AND f.version_id=v.id AND f.item_id=i.id
-        WHERE i.visibility='private' AND i.owner_user_id=:owner AND i.content_status='indexed'
+        WHERE {_audience(include_common)} AND i.content_status='indexed'
           AND i.active_version_id=g.version_id AND i.rights_epoch=g.rights_epoch
           AND g.state='active' AND g.dimensions IS NOT NULL
           AND (CAST(:item AS uuid) IS NULL OR i.id=CAST(:item AS uuid))
@@ -230,7 +253,9 @@ def _scope(db: Session, principal: Principal, item_id: uuid.UUID | None,
     return {(r.model_id, r.dimensions) for r in rows}
 
 
-BASE = """FROM index_entries e
+def _base(include_common: bool = False) -> str:
+    # Collection membership only narrows the audience: it never admits an item the audience lacks.
+    return f"""FROM index_entries e
  JOIN index_generations g ON g.id=e.generation_id
  JOIN library_items i ON i.id=g.item_id AND i.active_index_generation_id=g.id
  JOIN paper_versions v ON v.id=g.version_id AND v.item_id=i.id AND i.active_version_id=v.id
@@ -238,7 +263,7 @@ BASE = """FROM index_entries e
  JOIN chunks c ON c.id=e.chunk_id AND c.item_id=i.id AND c.version_id=v.id AND c.source_file_id=f.id
  JOIN sections s ON s.id=c.section_id AND s.item_id=i.id AND s.version_id=v.id AND s.source_file_id=f.id
  JOIN embedding_calls ec ON ec.id=e.embedding_call_id AND ec.source_file_id=f.id
- WHERE i.visibility='private' AND i.owner_user_id=:owner AND i.content_status='indexed'
+ WHERE {_audience(include_common)} AND i.content_status='indexed'
    AND i.rights_epoch=g.rights_epoch AND g.state='active' AND g.dimensions IS NOT NULL
    AND s.kind IN ('body','abstract') AND c.pipeline_version=g.pipeline_version
    AND c.chunk_hash=e.chunk_hash AND c.chunk_hash=ec.chunk_hash AND c.text=e.text
@@ -249,12 +274,19 @@ BASE = """FROM index_entries e
      (SELECT 1 FROM collection_items ci WHERE ci.collection_id=CAST(:collection AS uuid) AND ci.item_id=i.id))"""
 
 
+BASE = _base()
+
+
 # Chunks matching at least :min of the bounded terms; the full gate in BASE applies inside the
 # subquery, before ordering and LIMIT. Ties: more terms matched, cover density, chunk ID.
-KEYWORD = ("SELECT chunk_id FROM (SELECT e.chunk_id, e.keywords,"
-    " (SELECT count(*) FROM unnest(CAST(:terms AS text[])) t WHERE e.keywords @@ CAST(t AS tsquery)) matched "
-    + BASE + " AND e.keywords @@ CAST(:any AS tsquery)) hit WHERE matched >= :min"
-    " ORDER BY matched DESC, ts_rank_cd(keywords, CAST(:any AS tsquery)) DESC, chunk_id LIMIT :k")
+def _keyword_sql(include_common: bool = False) -> str:
+    return ("SELECT chunk_id FROM (SELECT e.chunk_id, e.keywords,"
+            " (SELECT count(*) FROM unnest(CAST(:terms AS text[])) t WHERE e.keywords @@ CAST(t AS tsquery)) matched "
+            + _base(include_common) + " AND e.keywords @@ CAST(:any AS tsquery)) hit WHERE matched >= :min"
+            " ORDER BY matched DESC, ts_rank_cd(keywords, CAST(:any AS tsquery)) DESC, chunk_id LIMIT :k")
+
+
+KEYWORD = _keyword_sql()
 
 
 class Ranked(NamedTuple):
@@ -266,25 +298,26 @@ class Ranked(NamedTuple):
 
 
 def _keyword(db: Session, params: dict, keywords: keyword_query.KeywordQuery,
-             settings: Settings) -> list[uuid.UUID]:
+             settings: Settings, include_common: bool = False) -> list[uuid.UUID]:
     if not keywords.terms:
         return []
-    return db.execute(text(KEYWORD), {**params, "terms": keywords.term_queries(),
+    return db.execute(text(_keyword_sql(include_common)), {**params, "terms": keywords.term_queries(),
         "any": keywords.any_query(), "min": keywords.min_match,
         "k": settings.search.keyword_top_k}).scalars().all()
 
 
 def _rank(db: Session, principal: Principal, item_id, settings: Settings, query: str,
-          vector: list[float] | None, collection_id: uuid.UUID | None = None) -> Ranked:
+          vector: list[float] | None, collection_id: uuid.UUID | None = None, *,
+          include_common: bool = False) -> Ranked:
     params = {"owner": principal.user_id, "item": item_id, "collection": collection_id}
     start = time.perf_counter()
     keywords = keyword_query.build(db, query, settings.search)
-    keyword = _keyword(db, params, keywords, settings)
+    keyword = _keyword(db, params, keywords, settings, include_common)
     keyword_ms = int((time.perf_counter() - start) * 1000)
     semantic, vector_ms = [], 0
     if vector is not None:
         start = time.perf_counter()
-        semantic = db.execute(text("SELECT e.chunk_id " + BASE +
+        semantic = db.execute(text("SELECT e.chunk_id " + _base(include_common) +
             " AND g.model_id=:model AND g.dimensions=:dim"
             " ORDER BY ec.vector <=> CAST(:vector AS vector),e.chunk_id LIMIT :k"),
             {**params, "model": settings.embedding.model_id, "dim": len(vector),
@@ -294,25 +327,52 @@ def _rank(db: Session, principal: Principal, item_id, settings: Settings, query:
 
 
 def hydrate(db: Session, principal: Principal, item_id, ids: list[uuid.UUID],
-            collection_id: uuid.UUID | None = None) -> dict[uuid.UUID, dict]:
+            collection_id: uuid.UUID | None = None, *, include_common: bool = False) -> dict[uuid.UUID, dict]:
+    """Re-read chunks through the full audience gate; ``provider_ok``: the text may go to rerank."""
     if not ids:
         return {}
+    # A private chunk's owner confirmed provider processing at upload; a common chunk needs its live rights to.
+    provider_ok = (f"(i.visibility='private' OR (i.id, v.id, f.id, g.id) IN "
+                   f"({common_fulltext_sql(external_processing=True)}))" if include_common else "TRUE")
     stmt = text("""SELECT e.chunk_id, i.id item_id, v.id version_id, f.id file_id, i.title,
         v.coverage, i.rights_epoch, g.id generation_id, c.text, c.locator_kind,
         c.start_page, c.end_page, c.start_line, c.end_line, c.start_offset, c.end_offset,
-        c.locator_detail, s.kind section_kind
-        """ + BASE + " AND e.chunk_id IN :ids").bindparams(bindparam("ids", expanding=True))
+        c.locator_detail, s.kind section_kind, i.visibility, """ + provider_ok + """ provider_ok
+        """ + _base(include_common) + " AND e.chunk_id IN :ids").bindparams(bindparam("ids", expanding=True))
     rows = db.execute(stmt, {"owner": principal.user_id, "item": item_id,
                              "collection": collection_id, "ids": ids}).mappings().all()
     return {r["chunk_id"]: dict(r) for r in rows}
 
 
 def _hydrate_scope(db: Session, principal: Principal, item_id, ids: list[uuid.UUID],
-                   collection_id: uuid.UUID | None) -> dict[uuid.UUID, dict]:
-    # Preserve the M3b four-argument hydrate call for unscoped requests.
+                   collection_id: uuid.UUID | None, include_common: bool = False) -> dict[uuid.UUID, dict]:
+    # Preserve the M3b four-argument hydrate call for unscoped private-only requests.
+    extra = {"include_common": True} if include_common else {}
     if collection_id is None:
-        return hydrate(db, principal, item_id, ids)
-    return hydrate(db, principal, item_id, ids, collection_id)
+        return hydrate(db, principal, item_id, ids, **extra)
+    return hydrate(db, principal, item_id, ids, collection_id, **extra)
+
+
+def _unchanged(before: dict[uuid.UUID, dict], after: dict[uuid.UUID, dict], ids) -> bool:
+    return set(after) == set(ids) and not any(
+        after[i]["rights_epoch"] != before[i]["rights_epoch"] or after[i]["generation_id"] != before[i]["generation_id"]
+        or after[i]["text"] != before[i]["text"] or after[i]["provider_ok"] != before[i]["provider_ok"] for i in ids)
+
+
+def original_urls(db: Session, principal: Principal, file_ids) -> dict[uuid.UUID, str]:
+    """Download path of each file the caller may download now, from the download route's own gate.
+
+    Search rights do not open the original: a common file gets a URL only through
+    ``common_original_clause`` (rights that permit download), never because its text is searchable.
+    """
+    if not file_ids:
+        return {}
+    allowed = db.scalars(select(SourceFile.id).join(PaperVersion, PaperVersion.id == SourceFile.version_id)
+                         .join(LibraryItem, LibraryItem.id == SourceFile.item_id)
+                         .where(SourceFile.id.in_(set(file_ids)),
+                                or_(m2a_private_derivatives_clause(principal),
+                                    common_original_clause(principal)))).all()
+    return {file_id: f"/files/{file_id}/original" for file_id in allowed}
 
 
 def _lock_hits(db: Session, rows: dict[uuid.UUID, dict], collection_id: uuid.UUID | None) -> None:
@@ -327,17 +387,19 @@ def _lock_hits(db: Session, rows: dict[uuid.UUID, dict], collection_id: uuid.UUI
                    {"c": collection_id, "ids": item_ids}).all()
 
 
-def open_chunk(db: Session, principal: Principal, chunk_id: uuid.UUID) -> dict:
+def open_chunk(db: Session, principal: Principal, chunk_id: uuid.UUID, *, include_common: bool = False) -> dict:
     """Source-viewer read: reapply the full gate to this exact active chunk."""
-    row = hydrate(db, principal, None, [chunk_id]).get(chunk_id)
+    extra = {"include_common": True} if include_common else {}
+    row = hydrate(db, principal, None, [chunk_id], **extra).get(chunk_id)
     if row is None:
         raise ApiError(404, "not_found")
     if db.execute(text("SELECT id FROM library_items WHERE id=:i FOR SHARE"),
                   {"i": row["item_id"]}).first() is None:
         raise ApiError(404, "not_found")
-    fresh = hydrate(db, principal, None, [chunk_id]).get(chunk_id)
+    fresh = hydrate(db, principal, None, [chunk_id], **extra).get(chunk_id)
     if fresh is None or fresh["rights_epoch"] != row["rights_epoch"] or fresh["generation_id"] != row["generation_id"]:
         raise ApiError(404, "not_found")
+    original_url = original_urls(db, principal, [fresh["file_id"]]).get(fresh["file_id"])
     response = {"chunk_id": str(chunk_id), "item_id": str(fresh["item_id"]),
         "version_id": str(fresh["version_id"]), "source_file_id": str(fresh["file_id"]),
         "title": fresh["title"], "coverage": fresh["coverage"], "text": fresh["text"],
@@ -345,7 +407,8 @@ def open_chunk(db: Session, principal: Principal, chunk_id: uuid.UUID) -> dict:
         "end_page": fresh["end_page"], "start_line": fresh["start_line"],
         "end_line": fresh["end_line"], "start_offset": fresh["start_offset"],
         "end_offset": fresh["end_offset"], "locator_detail": fresh["locator_detail"],
-        "section_kind": fresh["section_kind"]}
+        "section_kind": fresh["section_kind"], "visibility": fresh["visibility"],
+        "original_url": original_url}
     db.commit()
     return response
 
@@ -418,12 +481,13 @@ def rerank(query: str, docs: list[str], settings: Settings) -> RerankResult:
 
 def search(db: Session, principal: Principal, settings: Settings, query: str,
            mode: str, item_id: uuid.UUID | None, use_rerank: bool,
-           collection_id: uuid.UUID | None = None) -> dict:
+           collection_id: uuid.UUID | None = None, *, include_common: bool = False) -> dict:
+    """Hybrid/keyword search of the caller's audience; ``include_common`` is the ``/search`` route's opt-in."""
     if len(query.encode("utf-8")) > settings.search.max_query_bytes:
         raise ApiError(422, "search_query_too_long")
     if "\x00" in query:  # PostgreSQL text cannot hold NUL; refuse before any query or provider
         raise ApiError(422, "search_query_invalid")
-    scopes = _scope(db, principal, item_id, collection_id)  # before any paid call
+    scopes = _scope(db, principal, item_id, collection_id, include_common=include_common)  # before any paid call
     limit_request(db, principal, settings)
     timings = {"keyword_ms": 0, "vector_ms": 0, "provider_ms": 0, "rerank_ms": 0}
     vector, embed_usage, rerank_usage = None, None, None
@@ -438,7 +502,7 @@ def search(db: Session, principal: Principal, settings: Settings, query: str,
             raise ApiError(503, "search_embedding_ceiling_unverified")
         embed_usage = reserve(db, principal, settings, "embed_query", ceiling)
         try:
-            if _scope(db, principal, item_id, collection_id) != scopes:
+            if _scope(db, principal, item_id, collection_id, include_common=include_common) != scopes:
                 settle(db, embed_usage, rejected=True)
                 raise ApiError(409, "search_scope_changed")
             start = time.perf_counter()
@@ -465,16 +529,21 @@ def search(db: Session, principal: Principal, settings: Settings, query: str,
                response_provider=result.response_provider)
         vector = result.vector
     keyword, semantic, timings["keyword_ms"], timings["vector_ms"], keyword_info = _rank(
-        db, principal, item_id, settings, query, vector, collection_id)
+        db, principal, item_id, settings, query, vector, collection_id, include_common=include_common)
     ids = fuse(keyword, semantic)[:settings.search.max_results]
-    hydrated = _hydrate_scope(db, principal, item_id, ids, collection_id)
+    hydrated = _hydrate_scope(db, principal, item_id, ids, collection_id, include_common)
     ids = [i for i in ids if i in hydrated]
     rerank_status = "not_requested"
-    if use_rerank and ids:
+    # Only candidates whose text may reach a provider are sent; the rest keep their fused rank after them.
+    permitted = [i for i in ids if hydrated[i]["provider_ok"]]
+    withheld = len(ids) - len(permitted) if use_rerank else 0
+    if use_rerank and ids and not permitted:
+        rerank_status = "degraded_not_permitted"
+    elif use_rerank and ids:
         rerank_status = "degraded_unavailable"
         policy = settings.rerank
         if policy.pricing_verified and settings.embedding.api_key is not None:
-            sent_ids = ids[:policy.max_candidates]
+            sent_ids = permitted[:policy.max_candidates]
             documents = [hydrated[i]["text"].encode("utf-8")[:policy.max_text_bytes].decode("utf-8", "ignore") for i in sent_ids]
             # Every byte is an upper bound on UTF-8 token count; include repeated query and envelope.
             ceiling = money(sum(len(d.encode("utf-8")) for d in documents) +
@@ -483,10 +552,8 @@ def search(db: Session, principal: Principal, settings: Settings, query: str,
             if ceiling <= Decimal(str(policy.max_request_usd)):
                 try:
                     rerank_usage = reserve(db, principal, settings, "rerank", ceiling)
-                    fresh = _hydrate_scope(db, principal, item_id, sent_ids, collection_id)
-                    if set(fresh) != set(sent_ids) or any(fresh[i]["rights_epoch"] != hydrated[i]["rights_epoch"]
-                                                         or fresh[i]["generation_id"] != hydrated[i]["generation_id"]
-                                                         or fresh[i]["text"] != hydrated[i]["text"] for i in sent_ids):
+                    fresh = _hydrate_scope(db, principal, item_id, sent_ids, collection_id, include_common)
+                    if not _unchanged(hydrated, fresh, sent_ids):
                         settle(db, rerank_usage, rejected=True)
                         raise ApiError(409, "search_scope_changed")
                     start = time.perf_counter()
@@ -523,21 +590,19 @@ def search(db: Session, principal: Principal, settings: Settings, query: str,
                                      else "degraded_budget")
             else:
                 rerank_status = "degraded_ceiling"
-    final = _hydrate_scope(db, principal, item_id, ids, collection_id)
-    if set(final) != set(ids) or any(final[i]["rights_epoch"] != hydrated[i]["rights_epoch"]
-                                    or final[i]["generation_id"] != hydrated[i]["generation_id"]
-                                    or final[i]["text"] != hydrated[i]["text"] for i in ids):
+    final = _hydrate_scope(db, principal, item_id, ids, collection_id, include_common)
+    if not _unchanged(hydrated, final, ids):
         raise ApiError(409, "search_scope_changed")
     # Hold a share lock through response materialization so a concurrent revoke cannot
     # commit between this last check and assembling the outgoing body.
     if ids:
         _lock_hits(db, final, collection_id)
-        locked = _hydrate_scope(db, principal, item_id, ids, collection_id)
-        if set(locked) != set(ids) or any(locked[i]["rights_epoch"] != final[i]["rights_epoch"]
-                                         or locked[i]["generation_id"] != final[i]["generation_id"]
-                                         or locked[i]["text"] != final[i]["text"] for i in ids):
+        locked = _hydrate_scope(db, principal, item_id, ids, collection_id, include_common)
+        if not _unchanged(final, locked, ids):
             raise ApiError(409, "search_scope_changed")
         final = locked
+    # Under the same share locks: the download gate is separate from the search gate.
+    downloads = original_urls(db, principal, [final[i]["file_id"] for i in ids])
     hits = [{"chunk_id": str(i), "item_id": str(final[i]["item_id"]),
         "version_id": str(final[i]["version_id"]), "source_file_id": str(final[i]["file_id"]),
         "title": final[i]["title"], "text": final[i]["text"],
@@ -545,7 +610,8 @@ def search(db: Session, principal: Principal, settings: Settings, query: str,
         "start_page": final[i]["start_page"], "end_page": final[i]["end_page"],
         "start_line": final[i]["start_line"], "end_line": final[i]["end_line"],
         "start_offset": final[i]["start_offset"], "end_offset": final[i]["end_offset"],
-        "locator_detail": final[i]["locator_detail"], "section_kind": final[i]["section_kind"]}
+        "locator_detail": final[i]["locator_detail"], "section_kind": final[i]["section_kind"],
+        "visibility": final[i]["visibility"], "original_url": downloads.get(final[i]["file_id"])}
         for i in ids]
     db.commit()
     usage = {task: db.get(SearchUsage, identifier) if identifier else None for task, identifier in
@@ -560,7 +626,8 @@ def search(db: Session, principal: Principal, settings: Settings, query: str,
              costs["rerank"]["estimated_usd"] if costs["rerank"] else None,
              costs["embed_query"]["warnings"] if costs["embed_query"] else [],
              costs["rerank"]["warnings"] if costs["rerank"] else [])
-    return {"mode": mode, "rerank_status": rerank_status, "count": len(hits), "hits": hits,
+    return {"mode": mode, "rerank_status": rerank_status, "rerank_withheld": withheld,
+            "count": len(hits), "hits": hits,
             "candidate_count": len(keyword) + len(semantic), "keyword_query": keyword_info,
             "timings": timings,
             "cost": costs}

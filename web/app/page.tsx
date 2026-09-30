@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, describeError } from "../lib/api";
+import { contentLabel } from "../lib/files";
 import { ErrorText, Shell, useSession } from "./components/session";
 import { Upload } from "./components/upload";
 
@@ -14,6 +15,10 @@ export type Item = {
   visibility: "common" | "private";
   owned_by_me: boolean;
   content_status: "metadata_only" | "indexed";
+  // From the API's own gates (M6b-2b3a): a common copy can be indexed without being searchable,
+  // and a searchable common copy is not a RAG scope yet.
+  fulltext_search_available: boolean;
+  rag_available: boolean;
   title: string | null;
   created_at: string;
   can_edit: boolean;
@@ -80,7 +85,7 @@ export default function LibraryPage() {
                     <Link href={`/items/${item.id}`}>{item.title ?? "(chưa có tiêu đề)"}</Link>
                   </td>
                   <td>{item.visibility === "common" ? "Chung" : "Riêng"}</td>
-                  <td>{item.content_status === "indexed" ? "Đã index" : "Chỉ metadata"}</td>
+                  <td>{contentLabel(item)}</td>
                 </tr>
               ))}
             </tbody>

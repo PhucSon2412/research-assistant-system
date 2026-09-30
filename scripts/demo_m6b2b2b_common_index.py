@@ -8,7 +8,7 @@ processing, publishes, and starts indexing twice (one job). The Compose worker
 extracts the common file and stops at ``awaiting_index`` (no key in the
 containers); the index step then runs on the host through the same
 ``process_job`` entry point with only the embedding transport replaced.
-Checks: indexed, not served (search, chunks, RAG), private rows untouched,
+Checks: indexed and searchable (search, chunks; RAG still 404, M6b-2b3a), private rows untouched,
 application-only accounting; then revoke and cleanup remove the common rows.
 
 Reads only ``POSTGRES_*``/``MINIO_ROOT_*`` names from ``.env`` (never the
@@ -226,14 +226,16 @@ def main() -> None:
     step("no User quota moved by common indexing",
          scalar("SELECT coalesce(sum(committed_usd + reserved_usd), 0) FROM embedding_user_budget_days") == user_budgets)
     for kind, (copy, _) in copies.items():
+        # Since M6b-2b3a an indexed copy under full-text rights is searchable; RAG still does not take it.
         detail = b.get(f"/library/items/{copy}").json()["item"]
-        closed = all(b.get(f"/library/items/{copy}/{p}").status_code == 404 for p in ("chunks", "references"))
-        hits = b.post("/search", {"query": f"Demo result {run} eleven units", "mode": "keyword"}).json()["hits"]
+        opened = all(b.get(f"/library/items/{copy}/{p}").status_code == 200 for p in ("chunks", "references"))
         rag = b.post("/rag/ask", {"item_id": copy, "question": "What is the demo result?", "mode": "keyword"})
         note = admin.get(f"/admin/common-copies/{copy}").json()["item"]["index"]["note"]
-        step(f"{kind}: indexed but not served to B (search 0 hits, chunks/RAG 404, note shown)",
-             detail["content_status"] == "indexed" and detail["fulltext_search_available"] is False and closed
-             and not hits and rag.status_code == 404 and "chưa mở tìm kiếm/hỏi đáp" in (note or ""))
+        step(f"{kind}: indexed and searchable for B (chunks/references 200), RAG 404, note shown",
+             detail["content_status"] == "indexed" and detail["fulltext_search_available"] is True and opened
+             and rag.status_code == 404 and "mở tìm kiếm toàn văn" in (note or ""))
+    hits = b.post("/search", {"query": f"Demo result {run} eleven units", "mode": "keyword"}).json()["hits"]
+    step("B's keyword search returns the Markdown common copy", copies["md"][0] in {h["item_id"] for h in hits})
     for kind, (copy, _) in copies.items():
         assert admin.post(f"/admin/common-copies/{copy}/revoke",
                           {"confirm_revoke": True, "reason_code": "rights_withdrawn"}).status_code == 200

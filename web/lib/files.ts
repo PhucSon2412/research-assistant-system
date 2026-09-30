@@ -15,15 +15,46 @@ export function originalDownloadHref(originalUrl: string | null | undefined): st
     ? `/api${originalUrl}` : null;
 }
 
-// A common item's note: indexed is said first (and is not searchable yet, M6b-2b2b);
-// otherwise it depends only on whether the API listed a downloadable file.
-export function commonItemNote(files: readonly ItemFile[], contentStatus = "metadata_only"): string {
+// Same-origin link to the original at a hit's location; null unless the API gave a download path
+// (search rights never imply download rights, M6b-2b3a).
+export function sourceOriginalHref(originalUrl: string | null | undefined, locatorKind: string,
+  startPage: number | null): string | null {
+  const href = originalDownloadHref(originalUrl);
+  if (!href) return null;
+  return locatorKind === "pdf" && typeof startPage === "number" ? `${href}#page=${startPage}` : href;
+}
+
+type ContentFlags = { visibility: string; content_status: string; fulltext_search_available?: boolean };
+
+// Library/collection label from the API's `fulltext_search_available` (its own SQL gate), never from
+// `content_status` alone: an indexed common copy is not searchable unless its live rights say so.
+export function contentLabel(item: ContentFlags): string {
+  if (item.fulltext_search_available === true) {
+    return item.visibility === "common" ? "Bản chung: tìm kiếm toàn văn (chưa hỏi đáp)" : "Đã index";
+  }
+  if (item.visibility === "common" && item.content_status === "indexed") return "Đã lập chỉ mục, chưa mở tìm kiếm";
+  return item.content_status === "indexed" ? "Đã index" : "Chỉ metadata";
+}
+
+// A common item's note: searchable (API gate) first, then indexed-but-closed; otherwise it depends
+// only on whether the API listed a downloadable file.
+export function commonItemNote(files: readonly ItemFile[], contentStatus = "metadata_only",
+  fulltextSearchAvailable = false): string {
+  if (fulltextSearchAvailable) return files.length > 0 ? COMMON_SEARCHABLE_DOWNLOAD_NOTE : COMMON_SEARCHABLE_NOTE;
   if (contentStatus === "indexed") return COMMON_INDEXED_NOTE;
   return files.length > 0 ? COMMON_DOWNLOAD_NOTE : COMMON_METADATA_ONLY_NOTE;
 }
 
-export const COMMON_INDEXED_NOTE = "Đã lập chỉ mục, chưa mở tìm kiếm/hỏi đáp: bản chung này có index toàn văn, "
-  + "nhưng chưa có tìm kiếm toàn văn, đoạn trích hay hỏi đáp nào phục vụ nó.";
+export const COMMON_SEARCHABLE_NOTE = "Tìm kiếm toàn văn khả dụng: mọi tài khoản tìm và mở được đoạn trích của bản "
+  + "chung này theo quyền Admin đã ghi (kiểm lại ở mỗi request). Hỏi đáp (RAG) chưa dùng bản chung. Quyền tìm kiếm "
+  + "không mở tải file gốc: không có file gốc được phép tải.";
+
+export const COMMON_SEARCHABLE_DOWNLOAD_NOTE = "Tìm kiếm toàn văn khả dụng: mọi tài khoản tìm và mở được đoạn trích "
+  + "của bản chung này theo quyền Admin đã ghi (kiểm lại ở mỗi request). Hỏi đáp (RAG) chưa dùng bản chung. File gốc "
+  + "dưới đây tải được theo quyền tải riêng của đúng file này; mỗi lần tải hệ thống kiểm lại quyền và SHA-256.";
+
+export const COMMON_INDEXED_NOTE = "Đã lập chỉ mục, chưa mở tìm kiếm: quyền, công bố hoặc index hiện tại không "
+  + "cho phục vụ toàn văn của bản chung này; chưa có đoạn trích hay hỏi đáp.";
 
 export const COMMON_METADATA_ONLY_NOTE = "Toàn văn chưa khả dụng: bản chung này hiện chỉ có metadata. Không có file "
   + "gốc được phép tải; chưa có tìm kiếm toàn văn, đoạn trích hay hỏi đáp cho bản này.";

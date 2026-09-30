@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { api, describeError } from "../../lib/api";
+import { contentLabel } from "../../lib/files";
 import { ErrorText, Shell, useSession } from "../components/session";
 
 type Collection = { id: string; name: string };
-type Item = { id: string; title: string | null; visibility: string; content_status: string };
+type Item = { id: string; title: string | null; visibility: string; content_status: string;
+  fulltext_search_available?: boolean };
 
 export default function CollectionsPage() {
   const user = useSession();
@@ -84,10 +86,10 @@ export default function CollectionsPage() {
     {selected && <section>
       <p><button onClick={rename} disabled={!name.trim()}>Đổi tên theo ô tên</button> <button onClick={remove}>Xóa collection</button></p>
       <form onSubmit={add}><label>Paper từ thư viện <input list="available-papers" value={itemId} onChange={(e) => setItemId(e.target.value)} required /></label>
-        <datalist id="available-papers">{available.map((item) => <option key={item.id} value={item.id}>{item.title || item.id} — {item.content_status === "metadata_only" ? "Chỉ metadata" : "Đã index"}</option>)}</datalist>
+        <datalist id="available-papers">{available.map((item) => <option key={item.id} value={item.id}>{item.title || item.id} — {contentLabel(item)}</option>)}</datalist>
         {" "}<button>Thêm paper</button></form>
       <ul>{items.map((item) => <li key={item.id}>
-        <Link href={`/items/${item.id}`}>{item.title || item.id}</Link> — {item.content_status === "metadata_only" ? "Chỉ metadata" : item.visibility === "common" ? "Paper chung; chưa mở full-text" : "Đã index"}
+        <Link href={`/items/${item.id}`}>{item.title || item.id}</Link> — {contentLabel(item)}
         {" "}<button onClick={() => removeItem(item.id)}>Bỏ khỏi collection</button>
       </li>)}</ul>
       <p>{total} paper · <button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 20))}>Trước</button> {" "}

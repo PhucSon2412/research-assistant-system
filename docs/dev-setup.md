@@ -853,3 +853,41 @@ Kết quả: **18/18 đạt**. Worker Celery trong container extract file privat
 **Sau review PR #23:** indexer không còn đọc object khi giữ khóa item/job; object được đọc toàn bộ + SHA-256 ngoài khóa trước mỗi lời gọi provider và luôn ngay trước công bố, kể cả khi job chỉ dùng lại call đã hoàn tất (n lời gọi mới → n + 1 lần đọc), HEAD chỉ từ chối sớm ([decisions](decisions.md#sửa-theo-review-pr-23-2026-09-30)). Kết quả kiểm chứng sau sửa ở các comment của PR #23.
 
 **Giới hạn chưa kiểm/đo:** không gọi OpenRouter thật, chưa đối soát charge; bước index trong demo chạy trên host với transport giả (container không được cấp key); chưa đo PDF 100 trang hay nhiều bản chung đồng thời; bản chung `indexed` chưa phục vụ search/RAG (PR sau); restore backup cũ vẫn cần áp tombstone journal thủ công.
+
+## Tìm kiếm toàn văn bản chung (M6b-2b3a)
+
+Không migration (`alembic current` vẫn `0025 (head)`), không biến môi trường mới. Quyết định và hợp đồng bàn giao RAG chung ở [decisions](decisions.md#quyết-định-triển-khai-m6b-2b3a-2026-09-30).
+
+| Ai | Route | Thay đổi |
+| --- | --- | --- |
+| Mọi tài khoản | `POST /search` | Thêm bản chung được phép vào keyword/hybrid (item, collection, all); hit có `visibility` và `original_url` (`null` khi quyền không cho tải); response có `rerank_withheld`, `rerank_status` có thể là `degraded_not_permitted`. Bản chung không searchable làm `item_id` → `404` |
+| Mọi tài khoản | `GET /search/chunks/{id}` | Mở chunk bản chung theo cùng gate; thêm `visibility`, `original_url` |
+| Mọi tài khoản | `GET /library/items/{id}/chunks\|coverage\|references\|metadata-candidates` | Bản chung searchable: chỉ hàng của active version/file theo rights; còn lại `404` |
+| Mọi tài khoản | `GET /library/items*`, `GET /collections/{id}/items` | `fulltext_search_available` theo gate search (collection: mới); `rag_available` (item: chỉ private `indexed`) |
+| Admin | `GET /admin/common-copies[/{id}]` | `fulltext_available` và `index.search_open` theo gate; `index.rag_open=false`; ghi chú mới |
+| Mọi tài khoản | `POST /rag/ask` | Không đổi: chỉ private của caller; `item_id` bản chung `404` |
+
+Web: thư viện, collection và trang item hiện nhãn theo `fulltext_search_available` (“Bản chung: tìm kiếm toàn văn (chưa hỏi đáp)”); trang item chung searchable có ghi chú quyền, link “Tìm trong paper này” (`/search?item_id=`) và danh mục tham khảo; khung hỏi đáp chỉ hiện khi `rag_available`. Trang search và viewer ghi “Bản chung”/“Paper riêng của bạn”; link file gốc chỉ khi API trả `original_url`.
+
+**Kiểm chứng ngày 2026-09-30 (Windows 11, Conda `ras`, Git Bash):**
+
+- `"$PY" -m pytest api -q`: **578 passed** trong 17 phút 24 giây (một cảnh báo deprecation Starlette), gồm `api/tests/test_common_search.py` (14 test, PostgreSQL/MinIO thật, provider giả, HTTP ra ngoài bị chặn) và ca M6b-2b2b đã đổi ở `test_common_index.py`. Không gọi OpenRouter; `pricing_verified` chỉ bật trên bản sao settings trong bộ nhớ của test.
+- Kiểm đối chứng (tạm sửa code rồi khôi phục): RAG truyền `include_common=True` cho `search`; bỏ `permits_fulltext_search` khỏi gate; bỏ điều kiện `index_version`; rerank gửi mọi hit bỏ qua `provider_ok`; `original_url` luôn có → **5/5** bị test bắt.
+- `npm test --prefix web` **33 passed**; `npm run typecheck --prefix web` và `npm run build --prefix web` đạt.
+- `EXPLAIN` truy vấn vector với gate trên DB smoke: gate là `hashed SubPlan` trong join filter, trước sort/`LIMIT` (không đo latency).
+- Stack dev: `docker compose up -d --build --wait` dựng lại api/worker/web, mọi service healthy, `alembic current` = `0025 (head)`; 5 item chung `listed` `metadata_only`, 29 item riêng, 55 chunk, 0 rights giữ nguyên; khách gọi `/api/search/chunks/{id}` qua web → `401`.
+
+**Smoke qua proxy web trên Compose cô lập** (không đụng DB/MinIO dev; script từ chối DB có tài khoản không do nó tạo, chỉ đọc `POSTGRES_*`/`MINIO_ROOT_*` từ `.env`, container không có key; mọi request kiểm tra đi qua origin web `/api/...` và trang `/search`, `/sources/{id}`, `/items/{id}`):
+
+```bash
+export POSTGRES_HOST_PORT=55432 API_HOST_PORT=58000 WEB_HOST_PORT=53000 MINIO_API_HOST_PORT=59000 MINIO_CONSOLE_HOST_PORT=59001 OPENROUTER_API_KEY= RAS_DISCOVERY__ENABLED=false
+docker compose -p ras-search-smoke up -d --build --wait
+"$USERPROFILE/.conda/envs/ras/python.exe" scripts/smoke_m6b2b3a_common_search.py
+docker compose -p ras-search-smoke down -v   # chỉ xóa volume của project smoke
+```
+
+Kết quả: **15/15 đạt**, 11 request embedding giả trên host, 0 lời gọi ra ngoài, `search_usage` 0 hàng. A và B upload Markdown qua route upload của web (B một file **cùng bytes** với file của A), worker Compose extract, host index bằng embedding giả; Admin duyệt file của A cho tìm kiếm + xử lý ngoài, **không** cho tải, công bố và index. Keyword search qua proxy: A, B, Admin mỗi người nhận đúng private của mình + bản chung, không canary của người kia; hit chung nhãn `common`, `original_url=null`; cả ba mở chunk chung qua `/api/search/chunks/{id}`; trang `/sources/{id}`, `/search`, `/items/{id}` trả `200`; `/api/files/{file chung}/original` `404` với cả ba; chunks/references/coverage/metadata-candidates của bản chung `200`. Chunk private của người kia (A↔B, Admin), chunks item của B với A, item scope private người khác → `404`. `POST /api/rag/ask` với `item_id` bản chung → `404`. Admin thu hồi → ngay sau commit (hàng index còn 3) search của cả ba không còn bản chung, chunk/chunks/item scope `404`. Log container 202 dòng: không traceback, không text fixture.
+
+Demo M6b-2b2b đã sửa (`scripts/demo_m6b2b2b_common_index.py`, bước “indexed and searchable for B, RAG 404”) chạy lại trên project cô lập mới: **19/19**.
+
+**Giới hạn chưa kiểm/đo:** hybrid/rerank chỉ kiểm trong test API với provider giả (container không có key nên hybrid qua web trả `503` như trước); chưa đo latency của gate trên workload 1.000 paper; smoke dùng HTTP qua proxy (không Chrome) với tài khoản tạo thẳng trong DB; RAG bản chung chưa mở; restore backup cũ vẫn cần áp tombstone journal thủ công.

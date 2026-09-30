@@ -119,19 +119,21 @@ def restore_object(w, item: str, original: bytes) -> None:
     w.storage.put(key, io.BytesIO(original), "application/octet-stream")
 
 
-def assert_not_served(w, item: str) -> None:
-    """Indexed is not opened: no chunk, search or RAG route serves the common copy to anyone."""
-    file_id = str(common_file(w, item))
+def assert_search_open_rag_closed(w, item: str) -> None:
+    """Indexed under full-text rights: search and its derived reads serve the copy to every account (M6b-2b3a;
+    the full matrix is in test_common_search), RAG does not."""
     for who, browser in (("a", w.a), ("b", w.b), ("admin", w.admin)):
         detail = browser.get(f"/library/items/{item}").json()["item"]
-        assert detail["fulltext_search_available"] is False and detail["jobs"] == [], who
+        assert (detail["fulltext_search_available"], detail["rag_available"], detail["jobs"]) == (True, False, []), who
         for path in ("chunks", "references", "coverage", "metadata-candidates"):
-            assert browser.get(f"/library/items/{item}/{path}").json() == MISSING, (who, path)
-        for query in ("Indexable result nine units", "measured observation sufficient text"):
-            found = write(browser, "POST", "/search", {"query": query, "mode": "keyword"})
-            assert found.status_code == 200 and item not in found.text and file_id not in found.text, (who, query)
-        assert write(browser, "POST", "/search", {"query": "Indexable", "mode": "keyword",
-                                                  "item_id": item}).json() == MISSING, who
+            assert browser.get(f"/library/items/{item}/{path}").status_code == 200, (who, path)
+        assert browser.get(f"/library/items/{item}/chunks").json()["chunks"], who
+        hits = [hit for query in ("Indexable result nine units", "measured observation sufficient text")
+                for hit in write(browser, "POST", "/search", {"query": query, "mode": "keyword"}).json()["hits"]]
+        assert any(hit["item_id"] == item and hit["visibility"] == "common" for hit in hits), who
+        scoped = write(browser, "POST", "/search", {"query": "Indexable result nine units measured observation",
+                                                    "mode": "keyword", "item_id": item})
+        assert scoped.status_code == 200 and {h["item_id"] for h in scoped.json()["hits"]} <= {item}, who
         assert write(browser, "POST", "/rag/ask", {"item_id": item, "question": "Indexable result?",
                                                    "mode": "keyword"}).json() == MISSING, who
 
@@ -152,7 +154,7 @@ def w(upload_api, monkeypatch):
 
 
 @pytest.mark.parametrize("kind", ["md", "pdf"])
-def test_published_copy_indexes_through_the_shared_pipeline_and_stays_closed(w, kind):
+def test_published_copy_indexes_through_the_shared_pipeline_and_opens_search_only(w, kind):
     body = MD_BODY if kind == "md" else PDF_BODY
     private_before = rows_of(w.api, w.private[kind]["item_id"])
     budgets_before = budgets(w)
@@ -229,15 +231,16 @@ def test_published_copy_indexes_through_the_shared_pipeline_and_stays_closed(w, 
     audit = w.api.scalar("SELECT details FROM audit_events WHERE action='common_copy.index.start' AND outcome='success'")
     assert set(audit) == {"job_id", "source_file_id"}
 
-    # Indexed is not opened: every normal route still refuses the copy's text.
-    assert_not_served(w, copy)
+    # Indexed under full-text rights opens search (M6b-2b3a), not RAG.
+    assert_search_open_rag_closed(w, copy)
     status = w.admin.get(f"/admin/common-copies/{copy}").json()["item"]
-    assert status["content_status"] == "indexed" and status["fulltext_available"] is False
-    assert "chưa mở tìm kiếm/hỏi đáp" in status["index"]["note"]
+    assert status["content_status"] == "indexed" and status["fulltext_available"] is True
+    assert (status["index"]["search_open"], status["index"]["rag_open"]) == (True, False)
+    assert "mở tìm kiếm toàn văn" in status["index"]["note"]
     assert start(w.admin, copy).json() == {"error": "already_indexed"}
     listed = w.b.get("/library/items?scope=common").json()["items"]
     assert [(i["content_status"], i["fulltext_search_available"]) for i in listed if i["id"] == copy] == [
-        ("indexed", False)]
+        ("indexed", True)]
 
 
 @pytest.mark.parametrize("scope, code", [

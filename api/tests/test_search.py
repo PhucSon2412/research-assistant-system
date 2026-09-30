@@ -180,12 +180,12 @@ def test_scope_changes_before_rerank_and_response(upload_api, monkeypatch):
     ids = indexed(api, storage, browser, b"## Methods\nSynthetic keyword body.\n", settings)
     configured(settings)
     payload = []
-    def revoke_before_hydrate(db, principal, item_id, chunk_ids):
+    def revoke_before_hydrate(db, principal, item_id, chunk_ids, **audience):
         if not payload:
             payload.append("first")
             with api.engine.begin() as conn:
                 conn.execute(text("UPDATE library_items SET rights_epoch=rights_epoch+1 WHERE id=:i"), {"i": uuid.UUID(ids["item_id"])})
-        return original(db, principal, item_id, chunk_ids)
+        return original(db, principal, item_id, chunk_ids, **audience)
     from app import search as module
     original = module.hydrate
     monkeypatch.setattr(module, "hydrate", revoke_before_hydrate)
