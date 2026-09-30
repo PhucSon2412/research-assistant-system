@@ -1,4 +1,4 @@
-"""Private two-step uploads and ACL-gated original downloads (M1c)."""
+"""Private two-step uploads (M1c) and ACL-gated original downloads (M1c private, M6b-2b1 common)."""
 
 from __future__ import annotations
 
@@ -15,13 +15,14 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_now, get_principal
 from app.api.errors import ApiError
 from app.audit import record_event
-from app.authz import Principal, m2a_private_derivatives_clause
+from app.authz import Principal, common_original_clause, m2a_private_derivatives_clause
+from app.common_original import prepare_common_original
 from app.config import Settings, get_settings
 from app.identity.tokens import generate_token, hash_token, plausible_token
 from app.models import IngestionJob, LibraryItem, PaperVersion, ProcessingAcknowledgement, SourceFile, UploadIntent
@@ -240,19 +241,42 @@ async def upload_original(
 
 @router.get("/files/{file_id}/original")
 def download_original(
-    file_id: uuid.UUID,
+    file_id: str,
     principal: Principal = Depends(get_principal),
     db: Session = Depends(get_db),
+    now: datetime = Depends(get_now),
+    settings: Settings = Depends(get_settings),
     storage: OriginalStorage = Depends(_storage),
 ) -> StreamingResponse:
+    """The owner's private original, or a published common original its AccessRights open (M6b-2b1).
+
+    Forbidden, pending, revoked, unrighted, wrong-file and missing IDs all answer
+    the same ``404``. The common branch verifies the bytes and re-checks rights
+    before the first byte (``app.common_original``); no object URL is issued.
+    """
+    try:
+        parsed = uuid.UUID(file_id)
+    except ValueError:
+        raise ApiError(404, "not_found") from None
     row = db.execute(
-        select(SourceFile, LibraryItem).join(PaperVersion, SourceFile.version_id == PaperVersion.id)
+        select(SourceFile, LibraryItem.visibility, LibraryItem.rights_epoch)
+        .join(PaperVersion, SourceFile.version_id == PaperVersion.id)
         .join(LibraryItem, PaperVersion.item_id == LibraryItem.id)
-        .where(SourceFile.id == file_id, m2a_private_derivatives_clause(principal))
+        .where(SourceFile.id == parsed,
+               or_(m2a_private_derivatives_clause(principal), common_original_clause(principal)))
     ).first()
     if row is None:
         raise ApiError(404, "not_found")
-    source, _item = row
+    source, visibility, rights_epoch = row
+    filename = quote(source.original_filename or "original", safe="")
+    headers = {
+        "Content-Disposition": f"attachment; filename*=UTF-8''{filename}",
+        "Content-Length": str(source.byte_size),
+        "Cache-Control": "no-store",
+    }
+    if visibility == Visibility.COMMON.value:
+        verified = prepare_common_original(db, principal, storage, source, rights_epoch, now=now, settings=settings)
+        return StreamingResponse(verified.chunks(), media_type=source.verified_mime, headers=headers)
     try:
         body = storage.open(source.storage_key)
     except Exception:
@@ -264,9 +288,4 @@ def download_original(
         finally:
             body.close()
 
-    filename = quote(source.original_filename or "original", safe="")
-    return StreamingResponse(chunks(), media_type=source.verified_mime, headers={
-        "Content-Disposition": f"attachment; filename*=UTF-8''{filename}",
-        "Content-Length": str(source.byte_size),
-        "Cache-Control": "no-store",
-    })
+    return StreamingResponse(chunks(), media_type=source.verified_mime, headers=headers)

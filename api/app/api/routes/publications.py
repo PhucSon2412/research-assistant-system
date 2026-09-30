@@ -3,8 +3,10 @@
 A ``pending`` common item is absent from every normal route (library, count,
 collections, files, search, chunks, RAG), for the Admin too; so is a
 ``revoked`` one. A ``listed`` (published) copy shows its *metadata* on the
-normal library routes and nothing else: ``content_status`` stays
-``metadata_only`` and file/chunk/search/RAG still refuse it.
+normal library routes; its original opens on ``/files/{id}/original`` only
+when its rights permit download without conditions (M6b-2b1,
+``original_download``). ``content_status`` stays ``metadata_only`` and
+chunk/search/RAG still refuse it.
 
 - ``/admin/pending-publications``: read-only view of pending copies (M6b-1).
 - ``/admin/common-copies``: every reviewed copy by state, with the recorded
@@ -43,8 +45,10 @@ copies_router = APIRouter(prefix="/admin/common-copies", tags=["review"])
 
 PENDING_NOTE = ("Bản chung đã có quyền do Admin ghi nhận nhưng chưa công bố: User khác không thấy metadata, "
                 "file, kết quả tìm kiếm, chunk hay RAG của bản này. Chưa có index; công bố là bước riêng.")
-LISTED_NOTE = ("Đã công bố metadata: mọi tài khoản thấy tiêu đề và version trong thư viện. Toàn văn chưa khả dụng: "
-               "chưa có file gốc, tìm kiếm toàn văn, chunk hay hỏi đáp cho bản này, kể cả khi quyền đã ghi cho phép.")
+LISTED_NOTE = ("Đã công bố metadata: mọi tài khoản thấy tiêu đề và version trong thư viện. File gốc chỉ tải được khi "
+               "quyền đã ghi cho phép tải và không có điều kiện sử dụng (hệ thống chưa thi hành được điều kiện dạng "
+               "text); mỗi lần tải đều kiểm lại quyền và SHA-256. Toàn văn chưa khả dụng: chưa có tìm kiếm toàn văn, "
+               "chunk hay hỏi đáp cho bản này, kể cả khi quyền đã ghi cho phép.")
 REVOKED_NOTE = ("Đã thu hồi: không route nào phục vụ bản này từ lúc thu hồi commit. Cleanup xóa object chung, dữ "
                 "liệu phát sinh và metadata (tiêu đề, URL nguồn, tên file, nguồn/giấy phép/bằng chứng/điều kiện) trừ "
                 "trường có căn cứ giữ riêng; bản riêng của User không đổi.")
@@ -109,6 +113,22 @@ def _rows(clause):
             .where(clause))
 
 
+def original_download_status(item: LibraryItem, rights: AccessRights) -> str:
+    """What ``common_original_clause`` decides for this copy's file, for the Admin page.
+
+    ``open`` still re-checks rights, epoch and the object's SHA-256 on every download.
+    """
+    if item.publication_state == PublicationState.PENDING.value:
+        return "not_published"
+    if item.publication_state == PublicationState.REVOKED.value or rights.revoked_at is not None:
+        return "revoked"
+    if not rights.permits_original_download:
+        return "not_permitted"
+    if rights.scope_conditions is not None:
+        return "blocked_by_conditions"
+    return "open"
+
+
 def _out(item: LibraryItem, version: PaperVersion, source: SourceFile, rights: AccessRights, reviewer: str) -> dict:
     return {
         "id": str(item.id), "title": item.title, "visibility": item.visibility,
@@ -116,6 +136,7 @@ def _out(item: LibraryItem, version: PaperVersion, source: SourceFile, rights: A
         "published": item.publication_state == PublicationState.LISTED.value,
         # Publication is metadata only; full text is a separate, later gate.
         "content_status": item.content_status, "fulltext_available": False,
+        "original_download": original_download_status(item, rights),
         "created_at": item.created_at.isoformat(), "note": NOTES[item.publication_state],
         "version": {"id": str(version.id), "source_url": version.source_url,
                     "received_at": version.received_at.isoformat()},

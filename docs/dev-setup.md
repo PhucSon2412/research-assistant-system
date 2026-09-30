@@ -2,7 +2,7 @@
 
 [Mục lục](README.md) · [Mô hình dữ liệu](data-model.md) · [Roadmap](roadmap.md)
 
-Tài liệu này mô tả phần **đã triển khai**: M1a (Compose dev, migration nền, bootstrap Admin), M1b (invite/session/CSRF/ACL), M1c (upload intent, lưu/tải original private — xem [mục M1c](#upload-intent-và-original-m1c)), M2a (worker Markdown, đã merge PR #4), M2b (PDF/coverage/references, đã merge PR #5), M3a và M3b (PR #7, merge `5911038`), M3c collection (PR #8, `6b0a96a`), M4a một paper riêng (PR #9, `6eaaf12`), M4b scope (PR #10, `2977142`), M4c bộ đánh giá (PR #11, `99e439d`), M4d (PR #12–#14 đã merge), M5a arXiv discovery (PR #15, `332a9b0`) và M5b-1 liên kết citation (PR #16, `a03c2c5`, [mục M5b-1](#m5b-1-liên-kết-citation-arxiv-chính-xác-pr-16-đã-merge)); sửa proxy web cho search/collections/RAG ở [mục proxy](#proxy-web-json-search-collections-và-rag) (PR #17, `8265c30`); M6a yêu cầu duyệt đúng version/file ở [mục M6a](#yêu-cầu-duyệt-paper-riêng-m6a), M6b-1 phê duyệt vào bản chung chờ công bố (PR #19, 5c0f28a) ở [mục M6b-1](#phê-duyệt-vào-bản-chung-chờ-công-bố-m6b-1) và M6b-2a công bố metadata/thu hồi ở [mục M6b-2a](#công-bố-metadata-và-thu-hồi-bản-chung-m6b-2a). Live smoke bằng dữ liệu tổng hợp đã qua adapter thật cho document embedding, query embedding và rerank; hai route OpenRouter trả `200`. Charge thực trên key chưa đối soát, nên `pricing_verified=false` tiếp tục chặn lời gọi trả phí trên dữ liệu riêng. Compose chỉ dành cho dev, không phải cấu hình production.
+Tài liệu này mô tả phần **đã triển khai**: M1a (Compose dev, migration nền, bootstrap Admin), M1b (invite/session/CSRF/ACL), M1c (upload intent, lưu/tải original private — xem [mục M1c](#upload-intent-và-original-m1c)), M2a (worker Markdown, đã merge PR #4), M2b (PDF/coverage/references, đã merge PR #5), M3a và M3b (PR #7, merge `5911038`), M3c collection (PR #8, `6b0a96a`), M4a một paper riêng (PR #9, `6eaaf12`), M4b scope (PR #10, `2977142`), M4c bộ đánh giá (PR #11, `99e439d`), M4d (PR #12–#14 đã merge), M5a arXiv discovery (PR #15, `332a9b0`) và M5b-1 liên kết citation (PR #16, `a03c2c5`, [mục M5b-1](#m5b-1-liên-kết-citation-arxiv-chính-xác-pr-16-đã-merge)); sửa proxy web cho search/collections/RAG ở [mục proxy](#proxy-web-json-search-collections-và-rag) (PR #17, `8265c30`); M6a yêu cầu duyệt đúng version/file ở [mục M6a](#yêu-cầu-duyệt-paper-riêng-m6a), M6b-1 phê duyệt vào bản chung chờ công bố (PR #19, 5c0f28a) ở [mục M6b-1](#phê-duyệt-vào-bản-chung-chờ-công-bố-m6b-1) M6b-2a công bố metadata/thu hồi (PR #20, `458b5dd`) ở [mục M6b-2a](#công-bố-metadata-và-thu-hồi-bản-chung-m6b-2a) và M6b-2b1 tải original bản chung theo quyền ở [mục M6b-2b1](#tải-original-bản-chung-theo-quyền-m6b-2b1). Live smoke bằng dữ liệu tổng hợp đã qua adapter thật cho document embedding, query embedding và rerank; hai route OpenRouter trả `200`. Charge thực trên key chưa đối soát, nên `pricing_verified=false` tiếp tục chặn lời gọi trả phí trên dữ liệu riêng. Compose chỉ dành cho dev, không phải cấu hình production.
 
 ## M3c — collection cá nhân (PR #8 đã merge)
 
@@ -698,7 +698,7 @@ Revision `0022` thêm trạng thái `revoked`, cột thu hồi của `access_rig
 | Admin | `POST /admin/common-copies/{item_id}/publish` | Session + CSRF + `Origin`. Body `confirm_publish=true`, `file_checksum_sha256`. Lỗi: `404`, `409 already_published` / `common_copy_revoked` / `rights_not_publishable` / `checksum_confirmation_mismatch` / `duplicate_published_checksum` / `common_file_integrity_failed`, `422`, `503 publication_storage_unavailable` / `publication_unavailable` |
 | Admin | `POST /admin/common-copies/{item_id}/revoke` | Body `confirm_revoke=true`, `reason_code` (`rights_recorded_in_error`, `rights_withdrawn`, `rights_expired`, `wrong_file_or_version`, `duplicate_copy`, `other`), tùy chọn `retain=[{field, policy_source, scope, reason}]` + `confirm_retention_basis=true` để giữ từng trường metadata sau cleanup (`field` ∈ `title`, `source_url`, `original_filename`, `verified_source`, `license_url`, `evidence_note`, `scope_conditions`). Dùng cho cả hủy bản chờ lẫn thu hồi bản đã công bố; cuối cùng. Lỗi: `404`, `409 common_copy_revoked`, `422` (gồm `retention_confirmation_required`, `retention_field_repeated`), `503 revocation_unavailable` |
 | Admin | `GET /admin/pending-publications[/{item_id}]` | Như M6b-1 (chỉ `GET`, chỉ bản chờ), thêm `fulltext_available=false` |
-| Mọi tài khoản | `GET /library/items[...]`, `/collections/{id}/items` | Bản `listed` hiện như item chung `metadata_only` (`files=[]`, `jobs=[]`); bản `pending`/`revoked` không hiện |
+| Mọi tài khoản | `GET /library/items[...]`, `/collections/{id}/items` | Bản `listed` hiện như item chung `metadata_only` (`jobs=[]`; `files=[]` trừ file rights cho tải từ M6b-2b1); bản `pending`/`revoked` không hiện |
 
 UI: `/admin/publications` có ba tab (chờ công bố / đã công bố metadata / đã thu hồi). Bản chờ có form công bố (ô xác nhận không chọn sẵn, nêu rõ toàn văn chưa mở; cảnh báo nếu trùng SHA-256 với bản đang công bố) và form hủy; bản đã công bố có form thu hồi (chọn lý do + ô xác nhận). Tab đã thu hồi hiện trạng thái cleanup, trường metadata đã xóa/giữ và căn cứ giữ; form thu hồi trên web không gửi căn cứ (luôn mặc định xóa). Trang `/items/{id}` của mọi item chung chưa `indexed` ghi “Toàn văn chưa khả dụng”.
 
@@ -759,3 +759,45 @@ Sau demo, trong container: `python -m app.cli.cleanup_revoked` (worker) → “n
 - Stack dev nâng từ `0022` lên `0023 (head)`: 34 item, 29 file giữ nguyên; 0 rights/tombstone/căn cứ.
 
 **Kiểm chứng sau sửa race publish/revoke (2026-09-30):** bỏ bước kiểm trước không khóa của publish (điểm đua: item và rights đọc bằng hai câu lệnh không khóa, revoke commit ở giữa làm API trả `409 rights_not_publishable`); mọi kiểm tra chạy sau khi khóa item rồi rights. Test cửa sổ đua `test_revoke_during_publish_checks_never_answers_rights_not_publishable` **fail trên code cũ** và pass sau sửa. Năm test race (hai thứ tự revoke thắng, một thứ tự publish thắng, cửa sổ đua cũ, race ngẫu nhiên 25 vòng) chạy lặp **20/20 lượt pass** (500 vòng race ngẫu nhiên, chỉ ra `200` hoặc `409 common_copy_revoked`). `& $py -m pytest api -q`: **518 passed**. `git diff --check` sạch.
+
+## Tải original bản chung theo quyền (M6b-2b1)
+
+Không có migration mới (vẫn `0023`). Quyết định, thứ tự kiểm và giới hạn ở [decisions](decisions.md#quyết-định-triển-khai-m6b-2b1-2026-09-30).
+
+| Ai | Route | Ghi chú |
+| --- | --- | --- |
+| Mọi tài khoản | `GET /files/{file_id}/original` | Private: chỉ owner (như M1c). Common: chỉ bản `listed` có publication + `AccessRights` còn hiệu lực đúng item/version/file/checksum/epoch, `permits_original_download=true`, không `scope_conditions`. Còn lại (kể cả ID sai định dạng) → `404 not_found`. Lỗi của nhánh common: `409 common_file_integrity_failed` (object thiếu/bị thay), `503 file_unavailable` (lỗi storage), `503 download_busy` (hết slot spool), `401 session_expired` (session hết trong lúc xác minh). Header `Cache-Control: no-store`, `attachment`; không Range, không URL object |
+| Mọi tài khoản | `GET /library/items/{id}` | `files` của item chung chỉ gồm file mà route trên mở cho caller, mỗi file có `original_url`; không được tải → `files=[]`, metadata vẫn hiện |
+| Admin | `GET /admin/common-copies[/{id}]` | Thêm `original_download`: `open`, `not_permitted`, `blocked_by_conditions`, `not_published`, `revoked` |
+
+Cấu hình: `RAS_FILES__VERIFIED_DOWNLOAD_MAX_CONCURRENT` (mặc định 4, 1–64): số file tạm xác minh đồng thời **mỗi process API**; đĩa tạm tối đa ≈ số slot × giới hạn file lớn nhất (`RAS_FILES__PDF_MAX_BYTES` 30 MiB). Web: nút tải ở `/items/{id}` chỉ hiện cho file API liệt kê, đi route streaming `/api/files/{id}/original` (không qua proxy JSON). Form approve ghi rằng nhập điều kiện sẽ chặn tải; `/admin/publications` hiện trạng thái tải file gốc do API tính.
+
+**Kiểm chứng ngày 2026-09-30 (Windows 11, Conda `ras`, Git Bash):**
+
+- `"$PY" -m pytest api -q` trên code cuối: **527 passed** (một cảnh báo deprecation Starlette), gồm `api/tests/test_common_original.py` (7 test, PostgreSQL/MinIO thật), hai ca config mới, test ORM/schema và migration không đổi. Không gọi provider; không bật `pricing_verified`.
+- Kiểm đối chứng thủ công (tạm sửa code rồi khôi phục): bỏ từng điều kiện gate (`scope_conditions`, epoch, `permits_original_download`, đúng file, `listed`), bỏ so checksum, bỏ chạy lại gate sau xác minh, bỏ khóa `FOR SHARE`, bỏ kiểm lại session, bỏ giới hạn slot — **10/10** bị test bắt.
+- `npm test --prefix web`: **28 passed** (thêm `web/tests/files.test.mjs`); `npm run typecheck --prefix web` và `npm run build --prefix web` đạt.
+- Stack dev: `docker compose up -d --build --wait` healthy, `alembic current` = `0023 (head)`, 34 item/29 file giữ nguyên, 0 rights; khách gọi `/api/files/{id}/original` qua web → `401`.
+
+**Browser smoke trên Compose cô lập** (Git Bash; không đụng DB/MinIO dev; dùng lại fixture `review-smoke-*` và từ chối DB có tài khoản khác; fixture có bytes cố định nên mỗi lần chạy cần project mới, vì lần trước để lại bản đã công bố cùng SHA-256):
+
+```bash
+export POSTGRES_HOST_PORT=55432 API_HOST_PORT=58000 WEB_HOST_PORT=53000 MINIO_API_HOST_PORT=59000 MINIO_CONSOLE_HOST_PORT=59001 OPENROUTER_API_KEY= RAS_DISCOVERY__ENABLED=false
+docker compose -p ras-download-smoke up -d --build --wait
+"$USERPROFILE/.conda/envs/ras/python.exe" scripts/smoke_m6b2b1_download_browser.py
+docker compose -p ras-download-smoke down -v   # chỉ xóa volume của project smoke
+```
+
+Kết quả (Chrome 154.0.8037.58 headless, Playwright 1.63.0, mỗi tài khoản một browser context): **7/7 đạt**, 0 lời gọi provider ngoài.
+
+1. A và B gửi yêu cầu trong UI; Admin approve (API) bản của A cho tải không điều kiện, bản của B cho tải **kèm điều kiện text**, và một bản chờ thứ hai của A; công bố hai bản đầu. `/admin/publications` hiện “mở cho mọi tài khoản” và “không mở (có điều kiện …)”.
+2. B mở `/items/{bản A}`: ghi chú “tải được theo quyền Admin đã ghi”, đúng một link `href=/api/files/{file chung}/original`; bấm link → file tải về có SHA-256 bằng bản đã duyệt. A và Admin cũng tải đúng SHA-256; `Cache-Control: no-store`.
+3. B mở `/items/{bản B}`: thấy metadata, “Không có file gốc được phép tải.”, không có link `/api/files/`. File bản B, file bản chờ, chunks và RAG của bản A → `404` với A/B/Admin; file private của người kia (và của A/B với Admin) → `404`; A vẫn tải file private của mình.
+4. Thay object chung của bản A bằng bytes khác **cùng kích thước** → `409 common_file_integrity_failed`, không header tải, không byte file; đặt lại → `200` đúng SHA-256.
+5. Bản chung Markdown 1.470.011 byte: B stream qua web, byte đầu sau **31 ms** (đã spool + xác minh; một quan sát dev, không phải SLO); đọc chunk đầu, Admin thu hồi (`200`), B gửi request mới ngay sau commit → `404`; response đang chạy **vẫn nhận đủ** 1.470.011 byte đúng SHA-256 — đúng giới hạn đã nêu.
+6. Admin thu hồi bản A trong UI (chọn lý do + tick) → link đã lưu `404` với A/B/Admin, trang B “Không tìm thấy”; file private của A vẫn tải được.
+7. 8 hàng audit `common_copy.original.download` (`success`/`failure`) chỉ có `item_id`/`reason_code`, không title, tên file, checksum hay text; `search_usage=0`, `rag_request_days=0`, 0 job cho item chung.
+
+Container API không có `OPENROUTER_API_KEY`/`RAS_EMBEDDING__API_KEY`. Log container (282 dòng) không chứa text paper, nguồn/bằng chứng Admin, title bản chung, tên file, cookie hay CSRF, không có traceback. Khách gọi route tải qua web → `401`.
+
+**Giới hạn chưa kiểm/đo:** mới đo byte đầu với Markdown 1,5 MB trên máy dev; chưa đo PDF 30 MB hay nhiều request đồng thời trên Compose (giới hạn slot chỉ được test ở API với slot = 1). Stream bị ngắt giữa chừng phía client và giải phóng slot khi đó chưa được thử trên Compose (chỉ có luồng đóng bình thường). Phép thử “revoke trong lúc stream” ở bước 5 chứng minh giới hạn, không chứng minh bảo đảm; không có cơ chế dừng response đang chạy. Restore backup cũ trước khi áp journal phục vụ lại cả file gốc ([giới hạn chưa đáp ứng](#cleanup-và-restore)). Smoke chỉ chạy Chrome headless trên Windows với tài khoản tạo thẳng trong DB. Không gọi OpenRouter, không bật `pricing_verified`.

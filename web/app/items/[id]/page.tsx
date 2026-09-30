@@ -6,7 +6,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { api, describeError } from "../../../lib/api";
 import { RELATION_NOTE, citationStatusText, referenceLocator, type Reference } from "../../../lib/citations";
 import { makeRagBody } from "../../../lib/rag";
-import { COMMON_METADATA_ONLY_NOTE } from "../../../lib/review";
+import { NO_DOWNLOADABLE_FILE, commonItemNote, originalDownloadHref, type ItemFile } from "../../../lib/files";
 import { ReviewRequests } from "../../components/review-request";
 import { ErrorText, Shell, useSession } from "../../components/session";
 import type { Item } from "../../page";
@@ -20,8 +20,7 @@ type Version = {
   received_at: string;
 };
 type Detail = Item & { versions: Version[] };
-type FileInfo = { id: string; version_id: string; filename: string | null; byte_size: number; verified_mime: string;
-  page_count: number | null };
+type FileInfo = ItemFile;
 type JobInfo = { id: string; state: string; origin: string; attempt_count: number;
   last_error_code: string | null; warnings: string[];
   extraction_finished_at: string | null; finished_at: string | null };
@@ -150,7 +149,7 @@ export default function ItemPage() {
             {item.content_status === "indexed" ? "đã index" : "chỉ metadata"}
           </p>
           {item.visibility === "common" && item.content_status !== "indexed" && (
-            <p style={{ background: "#f3f3f3", padding: "0.5rem" }}>{COMMON_METADATA_ONLY_NOTE}</p>
+            <p style={{ background: "#f3f3f3", padding: "0.5rem" }}>{commonItemNote(item.files)}</p>
           )}
           {item.can_edit && (
             <form onSubmit={save} style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
@@ -179,10 +178,15 @@ export default function ItemPage() {
             {j.warnings.length > 0 && ` · cảnh báo: ${j.warnings.map((w) => issueText[w] ?? w).join(", ")}`}
           </li>)}</ul>
           <h2>File gốc</h2>
-          <ul>{item.files.map((f) => <li key={f.id}>
-            <a href={`/api/files/${encodeURIComponent(f.id)}/original`}>{f.filename ?? "Original"}</a>
-            {` · ${f.byte_size} byte`}{f.page_count ? ` · ${f.page_count} trang` : ""}
-          </li>)}</ul>
+          {/* Only files the API listed after its own permission check; no list, no link. */}
+          {item.files.length === 0 && <p>{NO_DOWNLOADABLE_FILE}</p>}
+          <ul>{item.files.map((f) => {
+            const href = originalDownloadHref(f.original_url);
+            return <li key={f.id}>
+              {href ? <a href={href}>{f.filename ?? "Original"}</a> : (f.filename ?? "Original")}
+              {` · ${f.byte_size} byte`}{f.page_count ? ` · ${f.page_count} trang` : ""}
+            </li>;
+          })}</ul>
           {ownPrivate && user?.role !== "admin" && <ReviewRequests itemId={item.id} files={item.files}
             versions={item.versions} />}
           {ownPrivate && <section>
