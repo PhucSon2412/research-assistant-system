@@ -734,4 +734,3 @@ def test_the_object_is_hashed_twice_per_run_not_once_per_chunk(w):
     # each call compares against the hashed object (two more around each full read).
     assert len(reads) == 2
     assert len(heads) == 2 * len(calls) + 2 * len(reads)
-
