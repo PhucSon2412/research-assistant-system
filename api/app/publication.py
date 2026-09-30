@@ -6,15 +6,19 @@ stays ``metadata_only``; there is no job, chunk, index, search hit, RAG
 evidence or provider call, and the original stays behind the private-owner
 file gate whatever ``permits_original_download`` says. Order:
 
-1. Unlocked pre-check (state, exactly one live AccessRights at the item's
-   epoch, file/version/checksum, the Admin's confirmed checksum, no live
-   publication with the same checksum) so a refusal is cheap.
-2. Lock the item and its rights ``FOR UPDATE`` and repeat the check. A
-   revoke waits for this transaction, or has already won.
-3. Still under the lock, read the *common* object back and compare size and
+1. Lock the item, then its rights, ``FOR UPDATE`` (the order revoke and
+   tombstone replay use) and only then check state, exactly one live
+   AccessRights at the item's epoch, file/version/checksum, the Admin's
+   confirmed checksum and no live publication with the same checksum. Every
+   refusal is decided on this locked state: a revoke either committed before
+   the lock (-> ``common_copy_revoked``) or waits for this transaction. There
+   is deliberately no unlocked pre-check: it read the item and the rights in
+   two statements, so a revoke committing between them surfaced as
+   ``rights_not_publishable``.
+2. Still under the lock, read the *common* object back and compare size and
    SHA-256 with the common SourceFile and the rights (never the private
    file's). Missing or different bytes refuse; the item stays ``pending``.
-4. Insert ``common_publications`` and set ``listed``. Its partial unique
+3. Insert ``common_publications`` and set ``listed``. Its partial unique
    index lets one live publication per checksum commit, whatever the
    concurrency; the DB triggers re-check rights and epoch.
 
@@ -119,18 +123,16 @@ def live_duplicate(db: Session, checksum: str, item_id: uuid.UUID) -> uuid.UUID 
         CommonPublication.item_id != item_id))
 
 
-def _publishable(db: Session, admin: Principal, item: LibraryItem, confirmed_checksum: str, *,
-                 lock: bool) -> tuple[AccessRights, SourceFile]:
-    """Every DB condition for publishing, or a refusal. Run before and under the lock."""
+def _publishable(db: Session, admin: Principal, item: LibraryItem,
+                 confirmed_checksum: str) -> tuple[AccessRights, SourceFile]:
+    """Every DB condition for publishing, or a refusal. ``item`` must be locked ``FOR UPDATE``."""
     action = "common_copy.publish"
     if item.publication_state == PublicationState.LISTED.value:
         raise _refuse(db, admin, action, item.id, 409, "already_published", "already_published")
     if item.publication_state != PublicationState.PENDING.value:
         raise _refuse(db, admin, action, item.id, 409, "common_copy_revoked", "revoked")
-    stmt = select(AccessRights).where(AccessRights.item_id == item.id).order_by(AccessRights.id)
-    if lock:
-        stmt = stmt.with_for_update().execution_options(populate_existing=True)
-    rights = db.scalars(stmt).all()
+    rights = db.scalars(select(AccessRights).where(AccessRights.item_id == item.id).order_by(AccessRights.id)
+                        .with_for_update().execution_options(populate_existing=True)).all()
     if len(rights) != 1:
         raise _refuse(db, admin, action, item.id, 409, "rights_not_publishable", "rights_count")
     (recorded,) = rights
@@ -170,18 +172,11 @@ def _check_common_object(db: Session, admin: Principal, storage: OriginalStorage
 
 def publish(db: Session, admin: Principal, storage: OriginalStorage, item_id: uuid.UUID, confirmed_checksum: str,
             now: datetime) -> Published:
-    item = _copy(db, admin, item_id)
+    item = _copy(db, admin, item_id, lock=True)  # waits for a concurrent revoke, or makes it wait
     if item is None:
         db.rollback()
         raise ApiError(404, "not_found")
-    _publishable(db, admin, item, confirmed_checksum, lock=False)
-    db.rollback()
-
-    item = _copy(db, admin, item_id, lock=True)
-    if item is None:  # a reviewed copy is never deleted, so this is a race with nothing
-        db.rollback()
-        raise ApiError(404, "not_found")
-    recorded, source = _publishable(db, admin, item, confirmed_checksum, lock=True)
+    recorded, source = _publishable(db, admin, item, confirmed_checksum)
     # Under the lock: the bytes the common copy serves must still be the reviewed ones.
     _check_common_object(db, admin, storage, item.id, source, recorded.file_checksum_sha256)
     try:
@@ -198,7 +193,12 @@ def publish(db: Session, admin: Principal, storage: OriginalStorage, item_id: uu
         if "uq_common_publications_live_checksum" in str(exc.orig):
             raise _refuse(db, admin, "common_copy.publish", item_id, 409, "duplicate_published_checksum",
                           "duplicate_published_checksum") from None
-        # A DB gate (state/rights/epoch trigger) refused what the checks above allowed.
+        # A DB gate (state/rights/epoch trigger) refused what the locked checks allowed; this
+        # should not happen, but the answer still follows the committed state, not the guess.
+        db.rollback()
+        if db.scalar(select(LibraryItem.publication_state).where(LibraryItem.id == item_id)) == \
+                PublicationState.REVOKED.value:
+            raise _refuse(db, admin, "common_copy.publish", item_id, 409, "common_copy_revoked", "revoked") from None
         raise _refuse(db, admin, "common_copy.publish", item_id, 409, "rights_not_publishable",
                       "db_gate") from None
     _audit(db, admin, "common_copy.publish", AuditOutcome.SUCCESS, item.id, access_rights_id=str(recorded.id),

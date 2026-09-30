@@ -319,13 +319,168 @@ def test_concurrent_same_checksum_publishes_one_wins_by_the_db_constraint(upload
     assert live_publications(api) == 1
 
 
+RACE_ROUNDS = 25
+
+
+def admin_principal(api):
+    from app.authz import Principal
+    with api.engine.connect() as conn:
+        user_id, email = conn.execute(text("SELECT id, email FROM users WHERE role='admin'")).one()
+    return Principal(user_id=user_id, role="admin", session_id=uuid.uuid4(), email=email, display_name=None)
+
+
+def revoke_in_own_session(api, copy):
+    """A revoke committed from another session, as a second Admin request would."""
+    from sqlalchemy.orm import Session
+
+    from app.models.enums import RevocationReason
+    with Session(api.engine, expire_on_commit=False) as db:
+        publication.revoke(db, admin_principal(api), uuid.UUID(copy), RevocationReason.RIGHTS_WITHDRAWN,
+                           api.clock.now, timedelta(hours=24))
+
+
+def last_publish_audit(api) -> tuple[str, str | None]:
+    with api.engine.connect() as conn:
+        row = conn.execute(text("""SELECT outcome, details->>'reason_code' FROM audit_events
+            WHERE action='common_copy.publish' ORDER BY id DESC LIMIT 1""")).one()
+    return tuple(row)
+
+
+def assert_revoked_everywhere(api, copy, browsers, *, published: bool):
+    """Final DB state and access after any publish/revoke order: revoked, nothing live, nothing served."""
+    item = uuid.UUID(copy)
+    assert state(api, copy) == "revoked"
+    assert api.scalar("SELECT revoked_at IS NOT NULL FROM access_rights WHERE item_id=:i", i=item)
+    assert api.scalar("SELECT count(*) FROM common_publications WHERE item_id=:i AND revoked_at IS NULL", i=item) == 0
+    assert api.scalar("SELECT count(*) FROM common_publications WHERE item_id=:i", i=item) == (1 if published else 0)
+    assert api.scalar("SELECT count(*) FROM deletion_tombstones WHERE item_id=:i", i=item) == 1
+    for who, browser in browsers:
+        assert_hidden(browser, copy, common_file(api, copy), who)
+
+
+def test_revoke_committed_before_publish_locks_answers_common_copy_revoked(upload_api, monkeypatch):
+    """Revoke wins: it commits after the publish request started, before publish takes the item lock."""
+    api, storage = upload_api
+    a, b, admin, ids_a, _ = world(api, storage, monkeypatch)
+    copy = new_copy(api, a, admin, ids_a)
+    real_copy = publication._copy
+    fired = []
+
+    def revoke_then_copy(db, principal, item_id, *, lock=False):
+        if not fired:
+            fired.append(True)
+            revoke_in_own_session(api, copy)  # publish holds no row lock yet
+        return real_copy(db, principal, item_id, lock=lock)
+
+    monkeypatch.setattr(publication, "_copy", revoke_then_copy)
+    response = publish(admin, copy)
+    assert fired and (response.status_code, response.json()) == (409, {"error": "common_copy_revoked"})
+    assert last_publish_audit(api) == ("denied", "revoked")
+    assert_revoked_everywhere(api, copy, (("a", a), ("b", b), ("admin", admin)), published=False)
+
+
+def test_revoke_during_publish_checks_never_answers_rights_not_publishable(upload_api, monkeypatch):
+    """The window found in review: a revoke committing while publish checks state and rights.
+
+    Before the fix publish read the item and the rights in two unlocked statements, so a revoke
+    committed between them answered ``rights_not_publishable``. Now the checks run on the locked
+    item: the revoke either committed first (``common_copy_revoked``) or waits and revokes after.
+    """
+    api, storage = upload_api
+    a, b, admin, ids_a, _ = world(api, storage, monkeypatch)
+    copy = new_copy(api, a, admin, ids_a)
+    real_publishable = publication._publishable
+    outcome = {}
+
+    def revoke_between_reads(db, principal, item, confirmed_checksum, **kwargs):
+        if "thread" not in outcome:
+            outcome["thread"] = Thread(target=lambda: revoke_in_own_session(api, copy))
+            outcome["thread"].start()
+            outcome["thread"].join(2)
+            outcome["revoke_first"] = not outcome["thread"].is_alive()
+        return real_publishable(db, principal, item, confirmed_checksum, **kwargs)
+
+    monkeypatch.setattr(publication, "_publishable", revoke_between_reads)
+    response = publish(admin, copy)
+    outcome["thread"].join(30)
+    assert not outcome["thread"].is_alive()
+    if outcome["revoke_first"]:
+        assert (response.status_code, response.json()) == (409, {"error": "common_copy_revoked"})
+    else:  # the revoke waited on publish's lock: publish won, then the revoke applied
+        assert response.status_code == 200, response.text
+    assert last_publish_audit(api) != ("denied", "rights_revoked")
+    assert_revoked_everywhere(api, copy, (("a", a), ("b", b), ("admin", admin)),
+                              published=not outcome["revoke_first"])
+
+
+def test_publish_waiting_on_a_revoke_that_holds_the_lock_answers_common_copy_revoked(upload_api, monkeypatch):
+    api, storage = upload_api
+    a, b, admin, ids_a, _ = world(api, storage, monkeypatch)
+    admin2 = api.admin_browser()
+    admin2.csrf()
+    copy = new_copy(api, a, admin, ids_a)
+    real_cancel = publication._cancel_jobs
+    outcome = {}
+
+    def lock_waiters() -> int:
+        return api.scalar("""SELECT count(*) FROM pg_stat_activity
+            WHERE datname = current_database() AND wait_event_type = 'Lock'""")
+
+    def cancel_while_publish_waits(db, item_id, now):
+        # Revoke holds the item row lock here; start publish and wait until it blocks on that lock.
+        outcome["thread"] = Thread(target=lambda: outcome.update(publish=publish(admin2, copy)))
+        outcome["thread"].start()
+        for _ in range(200):
+            if lock_waiters():
+                outcome["waited"] = True
+                break
+            outcome["thread"].join(0.05)
+        return real_cancel(db, item_id, now)
+
+    monkeypatch.setattr(publication, "_cancel_jobs", cancel_while_publish_waits)
+    assert revoke(admin, copy).status_code == 200
+    outcome["thread"].join(30)
+    assert outcome.get("waited") is True
+    assert (outcome["publish"].status_code, outcome["publish"].json()) == (409, {"error": "common_copy_revoked"})
+    assert last_publish_audit(api) == ("denied", "revoked")
+    assert_revoked_everywhere(api, copy, (("a", a), ("b", b), ("admin", admin)), published=False)
+
+
+def test_publish_holding_the_lock_wins_and_revoke_then_revokes_it(upload_api, monkeypatch):
+    api, storage = upload_api
+    a, b, admin, ids_a, _ = world(api, storage, monkeypatch)
+    admin2 = api.admin_browser()
+    admin2.csrf()
+    copy = new_copy(api, a, admin, ids_a)
+    key = common_key(api, copy)
+    outcome = {}
+
+    class RevokeDuringCheck(Faulty):
+        def open(self, k):
+            if k == key and "thread" not in outcome:
+                outcome["thread"] = Thread(target=lambda: outcome.update(revoke=revoke(admin2, copy)))
+                outcome["thread"].start()
+                outcome["thread"].join(2)
+                outcome["blocked"] = outcome["thread"].is_alive()  # waiting on publish's row lock
+            return self.storage.open(k)
+
+    use_storage(RevokeDuringCheck(storage))
+    assert publish(admin, copy).status_code == 200
+    outcome["thread"].join(30)
+    assert outcome["blocked"] is True and outcome["revoke"].status_code == 200
+    assert last_publish_audit(api) == ("success", None)
+    assert_revoked_everywhere(api, copy, (("a", a), ("b", b), ("admin", admin)), published=True)
+    assert publish(admin, copy).json() == {"error": "common_copy_revoked"}  # and after it, refused
+
+
 def test_publish_racing_revoke_never_leaves_a_revoked_copy_listed(upload_api, monkeypatch):
     api, storage = upload_api
-    a, _, admin, ids_a, _ = world(api, storage, monkeypatch)
+    a, b, admin, ids_a, _ = world(api, storage, monkeypatch)
     admin2 = api.admin_browser()
     for browser in (admin, admin2):
         browser.csrf()
-    for _ in range(3):
+    seen = {}
+    for _ in range(RACE_ROUNDS):
         copy = new_copy(api, a, admin, ids_a)
         barrier = Barrier(2)
 
@@ -336,37 +491,16 @@ def test_publish_racing_revoke_never_leaves_a_revoked_copy_listed(upload_api, mo
         with ThreadPoolExecutor(2) as pool:
             published, revoked = pool.map(race, (lambda: publish(admin, copy), lambda: revoke(admin2, copy)))
         assert revoked.status_code == 200, revoked.text
-        assert published.status_code in (200, 409), published.text
-        if published.status_code == 409:
-            assert published.json() == {"error": "common_copy_revoked"}
+        outcome = (published.status_code, published.json().get("error"))
+        assert outcome in ((200, None), (409, "common_copy_revoked")), outcome
+        seen[outcome] = seen.get(outcome, 0) + 1
         assert state(api, copy) == "revoked" and live_publications(api) == 0
         had_publication = api.scalar("SELECT count(*) FROM common_publications WHERE item_id=:i", i=uuid.UUID(copy))
         assert had_publication == (1 if published.status_code == 200 else 0)
-
-    # Deterministic: a revoke arriving while publish verifies the object waits for it, then wins.
-    copy = new_copy(api, a, admin, ids_a)
-    key = common_key(api, copy)
-    outcome = {}
-
-    def revoke_now():
-        outcome["revoke"] = revoke(admin2, copy)
-
-    class RevokeDuringCheck(Faulty):
-        def open(self, k):
-            if k == key and "thread" not in outcome:
-                outcome["thread"] = Thread(target=revoke_now)
-                outcome["thread"].start()
-                outcome["thread"].join(2)
-                outcome["blocked"] = outcome["thread"].is_alive()  # waiting on publish's row lock
-            return self.storage.open(k)
-
-    use_storage(RevokeDuringCheck(storage))
-    assert publish(admin, copy).status_code == 200
-    outcome["thread"].join(30)
-    assert outcome["blocked"] is True and outcome["revoke"].status_code == 200
-    assert state(api, copy) == "revoked" and live_publications(api) == 0
-    # And after a committed revoke, publishing is refused.
-    assert publish(admin, copy).json() == {"error": "common_copy_revoked"}
+    assert sum(seen.values()) == RACE_ROUNDS
+    for who, browser in (("a", a), ("b", b), ("admin", admin)):
+        listed = browser.get("/library/items?scope=common&limit=100").json()
+        assert listed["total"] == 0, who  # every raced copy ended revoked and unserved
 
 
 def test_revoke_hides_the_copy_from_t_rev_and_touches_nothing_else(upload_api, monkeypatch, caplog):
