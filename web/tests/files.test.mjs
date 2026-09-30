@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
 import {
-  COMMON_DOWNLOAD_NOTE, COMMON_INDEXED_NOTE, COMMON_METADATA_ONLY_NOTE, NO_DOWNLOADABLE_FILE, commonItemNote,
-  originalDownloadHref,
+  COMMON_DOWNLOAD_NOTE, COMMON_INDEXED_NOTE, COMMON_METADATA_ONLY_NOTE, COMMON_SEARCHABLE_DOWNLOAD_NOTE,
+  COMMON_SEARCHABLE_NOTE, NO_DOWNLOADABLE_FILE, commonItemNote, contentLabel, originalDownloadHref,
+  sourceOriginalHref,
 } from "../lib/files.ts";
 import { CONDITIONS_BLOCK_NOTE, ORIGINAL_DOWNLOAD_TEXT } from "../lib/review.ts";
 import { streamFromApi } from "../lib/stream.ts";
@@ -37,11 +38,42 @@ test("a common item's note depends only on whether the API listed a file", () =>
     ["blocked_by_conditions", "not_permitted", "not_published", "open", "revoked", "rights_not_current"]);
 });
 
-test("an indexed common item says it is not searchable yet, whatever the files (M6b-2b2b)", () => {
+test("an indexed common item is searchable only when the API says so (M6b-2b3a)", () => {
+  // Indexed without the API's flag: closed, whatever the files.
   assert.equal(commonItemNote([], "indexed"), COMMON_INDEXED_NOTE);
-  assert.equal(commonItemNote([listed], "indexed"), COMMON_INDEXED_NOTE);
+  assert.equal(commonItemNote([listed], "indexed", false), COMMON_INDEXED_NOTE);
   assert.equal(commonItemNote([listed], "metadata_only"), COMMON_DOWNLOAD_NOTE);
-  assert.match(COMMON_INDEXED_NOTE, /^Đã lập chỉ mục, chưa mở tìm kiếm\/hỏi đáp/);
+  assert.match(COMMON_INDEXED_NOTE, /^Đã lập chỉ mục, chưa mở tìm kiếm/);
+  // Searchable: the download part still depends only on the files the API listed.
+  assert.equal(commonItemNote([], "indexed", true), COMMON_SEARCHABLE_NOTE);
+  assert.equal(commonItemNote([listed], "indexed", true), COMMON_SEARCHABLE_DOWNLOAD_NOTE);
+  assert.match(COMMON_SEARCHABLE_NOTE, /không mở tải file gốc/);
+  for (const note of [COMMON_SEARCHABLE_NOTE, COMMON_SEARCHABLE_DOWNLOAD_NOTE]) {
+    assert.match(note, /^Tìm kiếm toàn văn khả dụng/);
+    assert.match(note, /Hỏi đáp \(RAG\) chưa dùng bản chung/);
+  }
+});
+
+test("content labels come from the API's full-text flag, never from content_status alone", () => {
+  assert.equal(contentLabel({ visibility: "common", content_status: "indexed", fulltext_search_available: true }),
+    "Bản chung: tìm kiếm toàn văn (chưa hỏi đáp)");
+  // Indexed common copy the gate does not serve (e.g. rights no longer current): no full-text label.
+  assert.equal(contentLabel({ visibility: "common", content_status: "indexed", fulltext_search_available: false }),
+    "Đã lập chỉ mục, chưa mở tìm kiếm");
+  assert.equal(contentLabel({ visibility: "common", content_status: "indexed" }), "Đã lập chỉ mục, chưa mở tìm kiếm");
+  assert.equal(contentLabel({ visibility: "common", content_status: "metadata_only", fulltext_search_available: false }),
+    "Chỉ metadata");
+  assert.equal(contentLabel({ visibility: "private", content_status: "indexed", fulltext_search_available: true }),
+    "Đã index");
+  assert.equal(contentLabel({ visibility: "private", content_status: "metadata_only" }), "Chỉ metadata");
+});
+
+test("a hit's original link needs the API's download path; search rights never build one", () => {
+  assert.equal(sourceOriginalHref(null, "pdf", 3), null);
+  assert.equal(sourceOriginalHref(undefined, "markdown", null), null);
+  assert.equal(sourceOriginalHref(`https://minio.test/originals/${FID}`, "pdf", 1), null);
+  assert.equal(sourceOriginalHref(`/files/${FID}/original`, "pdf", 3), `/api/files/${FID}/original#page=3`);
+  assert.equal(sourceOriginalHref(`/files/${FID}/original`, "markdown", null), `/api/files/${FID}/original`);
 });
 
 async function upstream(handler) {

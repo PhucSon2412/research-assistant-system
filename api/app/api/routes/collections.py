@@ -11,8 +11,9 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_principal
 from app.api.errors import ApiError
-from app.authz import Principal, visible_items_clause
+from app.authz import Principal, common_fulltext_items_clause, visible_items_clause
 from app.models import Collection, CollectionItem, LibraryItem
+from app.models.enums import ContentStatus, Visibility
 
 router = APIRouter(prefix="/collections", tags=["collections"])
 
@@ -98,8 +99,14 @@ def list_collection_items(collection_id: uuid.UUID, limit: int = Query(20, ge=1,
     rows = db.execute(select(LibraryItem, CollectionItem.added_at).join(CollectionItem, CollectionItem.item_id == LibraryItem.id)
                       .where(*clause).order_by(CollectionItem.added_at, LibraryItem.id)
                       .limit(limit).offset(offset)).all()
+    # Whether search serves the item's text now: membership never decides it (same gate as /search).
+    common = [item.id for item, _ in rows if item.visibility == Visibility.COMMON.value]
+    searchable = set(db.scalars(select(LibraryItem.id).where(
+        LibraryItem.id.in_(common), common_fulltext_items_clause(principal))).all()) if common else set()
     return {"items": [{"id": str(item.id), "title": item.title, "visibility": item.visibility,
-                       "content_status": item.content_status, "added_at": added.isoformat()}
+                       "content_status": item.content_status, "added_at": added.isoformat(),
+                       "fulltext_search_available": (item.id in searchable if item.visibility == Visibility.COMMON.value
+                                                     else item.content_status == ContentStatus.INDEXED.value)}
                       for item, added in rows], "total": total, "limit": limit, "offset": offset}
 
 

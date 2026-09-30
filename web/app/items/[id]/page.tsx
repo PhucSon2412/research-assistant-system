@@ -6,7 +6,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { api, describeError } from "../../../lib/api";
 import { RELATION_NOTE, citationStatusText, referenceLocator, type Reference } from "../../../lib/citations";
 import { makeRagBody } from "../../../lib/rag";
-import { NO_DOWNLOADABLE_FILE, commonItemNote, originalDownloadHref, type ItemFile } from "../../../lib/files";
+import { NO_DOWNLOADABLE_FILE, commonItemNote, contentLabel, originalDownloadHref, type ItemFile } from "../../../lib/files";
 import { ReviewRequests } from "../../components/review-request";
 import { ErrorText, Shell, useSession } from "../../components/session";
 import type { Item } from "../../page";
@@ -74,6 +74,8 @@ export default function ItemPage() {
   const [references, setReferences] = useState<Reference[] | null>(null);
   const [referencesError, setReferencesError] = useState<string | null>(null);
   const ownPrivate = item?.visibility === "private" && item.owned_by_me;
+  // Derived reads (references) open for the owner's private item, or a common copy the API says is searchable.
+  const readsDerived = ownPrivate || (item?.visibility === "common" && item.fulltext_search_available);
 
   useEffect(() => {
     if (!user) return;
@@ -100,8 +102,8 @@ export default function ItemPage() {
   }
 
   useEffect(() => {
-    if (user && ownPrivate) loadReferences();
-  }, [user, id, ownPrivate]);
+    if (user && readsDerived) loadReferences();
+  }, [user, id, readsDerived]);
 
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -145,12 +147,14 @@ export default function ItemPage() {
         <>
           <h1>{item.title ?? "(chưa có tiêu đề)"}</h1>
           <p>
-            Kho: {item.visibility === "common" ? "chung" : "riêng của bạn"} · Nội dung:{" "}
-            {item.content_status !== "indexed" ? "chỉ metadata"
-              : item.visibility === "common" ? "đã lập chỉ mục, chưa mở tìm kiếm/hỏi đáp" : "đã index"}
+            Kho: {item.visibility === "common" ? "chung" : "riêng của bạn"} · Nội dung: {contentLabel(item)}
           </p>
           {item.visibility === "common" && (
-            <p style={{ background: "#f3f3f3", padding: "0.5rem" }}>{commonItemNote(item.files, item.content_status)}</p>
+            <p style={{ background: "#f3f3f3", padding: "0.5rem" }}>
+              {commonItemNote(item.files, item.content_status, item.fulltext_search_available)}</p>
+          )}
+          {item.fulltext_search_available && (
+            <p><Link href={`/search?item_id=${encodeURIComponent(item.id)}`}>Tìm trong paper này</Link></p>
           )}
           {item.can_edit && (
             <form onSubmit={save} style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
@@ -190,7 +194,7 @@ export default function ItemPage() {
           })}</ul>
           {ownPrivate && user?.role !== "admin" && <ReviewRequests itemId={item.id} files={item.files}
             versions={item.versions} />}
-          {ownPrivate && <section>
+          {readsDerived && <section>
             <h2>Tài liệu tham khảo được trích xuất</h2>
             <p>{RELATION_NOTE} Chỉ liên kết khi citation có đúng một arXiv ID; không đoán theo tiêu đề.
               Danh mục tham khảo không được dùng làm bằng chứng cho câu trả lời.</p>
@@ -215,13 +219,14 @@ export default function ItemPage() {
               </li>;
             })}</ol>}
           </section>}
-          {item.visibility === "private" && item.content_status === "indexed" && <section>
+          {item.rag_available && <section>
             <h2>Hỏi đáp có dẫn nguồn</h2>
-            <p>Câu hỏi và các đoạn được chọn sẽ gửi qua OpenRouter/provider để tạo câu trả lời.</p>
+            <p>Câu hỏi và các đoạn được chọn sẽ gửi qua OpenRouter/provider để tạo câu trả lời. Hỏi đáp chỉ dùng
+              paper riêng đã index của bạn, kể cả khi chọn collection; bản chung chưa được dùng làm bằng chứng.</p>
             <form onSubmit={ask}>
               <label>Phạm vi <select value={ragScope} onChange={(e) => { setRagScope(e.target.value); setRag(null); }}>
                 <option value="item">Paper này</option>
-                <option value="all">Tất cả paper đã index tôi có quyền</option>
+                <option value="all">Tất cả paper riêng đã index của tôi (bản chung chưa dùng cho hỏi đáp)</option>
                 {collections.map((collection) => <option key={collection.id} value={collection.id}>
                   Collection: {collection.name}</option>)}
               </select></label>{" "}
@@ -237,7 +242,7 @@ export default function ItemPage() {
             <ErrorText message={ragError} />
             {rag && <div aria-live="polite">
               <p>Phạm vi đã hỏi: {rag.scope.kind === "item" ? "paper này" : rag.scope.kind === "all"
-                ? "tất cả paper đã index có quyền" : `collection ${collections.find((c) => c.id === rag.scope.collection_id)?.name ?? rag.scope.collection_id}`}.</p>
+                ? "tất cả paper riêng đã index của bạn" : `collection ${collections.find((c) => c.id === rag.scope.collection_id)?.name ?? rag.scope.collection_id}`}.</p>
               <p>Trạng thái: {rag.status === "answered" ? "Có câu trả lời" : "Chưa đủ bằng chứng"}.
                 {rag.coverage === "partial" && " File chỉ được trích xuất một phần."}</p>
               {rag.reason === "comparison_requires_multiple_papers" &&

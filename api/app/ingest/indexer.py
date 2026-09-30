@@ -34,6 +34,7 @@ from decimal import Decimal, ROUND_UP
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from app.authz import COMMON_INDEX_VERSION
 from app.config import Settings
 from app.ingest import markdown, pdf
 from app.ingest.embedding import EmbeddingError, embed
@@ -46,7 +47,6 @@ from app.provider_capacity import LOCK, lease_deadline, reap_expired, reservatio
 from app.storage import OriginalStorage, is_missing_object
 
 INDEX_VERSION = "private-keyword-vector-v1"
-COMMON_INDEX_VERSION = "common-keyword-vector-v1"
 
 
 def index_version(job: IngestionJob) -> str:

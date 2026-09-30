@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, describeError } from "../../../lib/api";
+import { sourceOriginalHref } from "../../../lib/files";
+import { sourceKindLabel } from "../../../lib/search";
 import { ErrorText, Shell, useSession } from "../../components/session";
 
 type Source = {
@@ -12,6 +14,7 @@ type Source = {
   locator_kind: "pdf" | "markdown"; start_page: number | null;
   start_line: number | null; end_line: number | null;
   start_offset: number | null; end_offset: number | null;
+  visibility: "private" | "common"; original_url: string | null;
 };
 
 export default function SourcePage() {
@@ -25,17 +28,19 @@ export default function SourcePage() {
       .then((value) => { setSource(value); setError(null); })
       .catch((err) => { setSource(null); setError(describeError(err)); });
   }, [user, chunkId]);
+  const originalHref = source ? sourceOriginalHref(source.original_url, source.locator_kind, source.start_page) : null;
   return <Shell user={user}>
     <p><Link href="/search">← Kết quả tìm kiếm</Link></p>
     <ErrorText message={error} />
     {source && <>
-      <h1>{source.title || "Paper riêng"}</h1>
-      <p>Version {source.version_id} · File {source.source_file_id} · Chunk {source.chunk_id}</p>
+      <h1>{source.title || sourceKindLabel(source.visibility)}</h1>
+      <p>{sourceKindLabel(source.visibility)} · Version {source.version_id} · File {source.source_file_id} · Chunk {source.chunk_id}</p>
       <p>{source.locator_kind === "pdf" ? `Trang ${source.start_page}` :
         `Dòng ${source.start_line}–${source.end_line}, offset ${source.start_offset}–${source.end_offset}`}</p>
       {source.coverage === "partial" && <p>Paper này chỉ được trích xuất một phần.</p>}
       <p style={{ whiteSpace: "pre-wrap" }}>{source.text}</p>
-      <p><a href={`/api/files/${source.source_file_id}/original${source.locator_kind === "pdf" ? `#page=${source.start_page}` : ""}`}>Mở file gốc</a></p>
+      {/* Search rights never imply download: the link exists only when the API gave a download path. */}
+      {originalHref ? <p><a href={originalHref}>Mở file gốc</a></p> : <p>Không có file gốc được phép tải.</p>}
       <p><Link href={`/items/${source.item_id}`}>Xem paper</Link></p>
     </>}
   </Shell>;

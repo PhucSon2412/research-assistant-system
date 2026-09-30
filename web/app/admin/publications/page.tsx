@@ -4,8 +4,9 @@
 // state. Publishing lists a pending copy's METADATA for every account; its
 // original opens only where the recorded rights allow download without
 // conditions (M6b-2b1, decided by the API). A listed copy whose rights permit
-// full-text search and provider processing can be indexed (M6b-2b2b); indexed
-// still opens no search, chunk or RAG route. Revoking (pending or
+// full-text search and provider processing can be indexed (M6b-2b2b); search and
+// source chunks open for every account while those rights stay live (M6b-2b3a, the
+// API's `search_open`), RAG does not. Revoking (pending or
 // listed) is final and hides the copy from every page from its commit; cleanup
 // then removes the common object. The API enforces all of it.
 
@@ -51,8 +52,9 @@ function PublishForm({ copy, onDone }: { copy: CommonCopy; onDone: () => void })
         <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />{" "}
         Tôi xác nhận công bố <strong>metadata</strong> (tiêu đề, version, URL nguồn) của bản này cho mọi tài khoản.
         Sau khi công bố, file gốc chỉ tải được nếu quyền đã ghi cho phép tải và không kèm điều kiện (API quyết
-        định ở mỗi lần tải). Toàn văn, tìm kiếm, đoạn trích và hỏi đáp <strong>vẫn chưa mở</strong>; hệ thống đọc
-        lại object chung và kiểm SHA-256 trước khi công bố.
+        định ở mỗi lần tải). Công bố <strong>không</strong> mở toàn văn: tìm kiếm và đoạn trích chỉ mở sau khi lập
+        chỉ mục theo quyền đã ghi, hỏi đáp chưa dùng bản chung; hệ thống đọc lại object chung và kiểm SHA-256 trước
+        khi công bố.
       </label>{" "}
       <button type="submit" disabled={!body}>Công bố metadata</button>
     </form>
@@ -83,7 +85,8 @@ function IndexForm({ copy, onDone }: { copy: CommonCopy; onDone: () => void }) {
       <p>Lập chỉ mục: {INDEX_ELIGIBILITY_TEXT[index.eligibility] ?? index.eligibility}
         {index.job && <> · job {index.job.state}{index.job.last_error_code && ` (${index.job.last_error_code})`}
           {" "}· {index.job.attempt_count} lần thử</>}
-        {!index.provider_ready && " · provider chưa bật (chưa có key hoặc chưa xác minh giá): job dừng ở chờ index"}</p>
+        {!index.provider_ready && " · provider chưa bật (chưa có key hoặc chưa xác minh giá): job dừng ở chờ index"}
+        {" "}· tìm kiếm toàn văn: {index.search_open ? "đang mở" : "chưa mở"} · hỏi đáp: chưa dùng bản chung</p>
       {index.note && <p><strong>{index.note}</strong></p>}
       <ErrorText message={error} />
       {index.eligibility === "indexable" && copy.content_status !== "indexed" && (
@@ -164,8 +167,9 @@ export default function CommonCopiesPage() {
         Quyền dưới đây do Admin ghi nhận cho đúng file/checksum. <strong>Đã ghi nhận quyền chưa phải là đã công
         bố</strong>, và <strong>đã công bố (listed) chưa phải là có toàn văn (indexed)</strong>: công bố chỉ cho mọi
         tài khoản thấy metadata, và file gốc chỉ tải được khi quyền đã ghi cho phép tải mà không kèm điều kiện. Bản
-        đã công bố có thể được lập chỉ mục khi quyền cho tìm kiếm toàn văn và gửi qua provider; <strong>đã lập chỉ mục
-        vẫn chưa mở tìm kiếm/hỏi đáp</strong> ở bước này.
+        đã công bố có thể được lập chỉ mục khi quyền cho tìm kiếm toàn văn và gửi qua provider; khi đã lập chỉ mục,
+        <strong> mọi tài khoản tìm kiếm và mở được đoạn trích</strong> theo quyền còn hiệu lực (kiểm lại ở mỗi request).
+        <strong> Hỏi đáp (RAG) chưa dùng bản chung</strong>, và quyền tìm kiếm không mở tải file gốc.
       </p>
       <p style={{ display: "flex", gap: "0.5rem" }}>
         {STATES.map((s) => <button key={s} onClick={() => setState(s)} disabled={s === state}>
@@ -192,7 +196,8 @@ export default function CommonCopiesPage() {
             tìm kiếm toàn văn {yes(p.rights.scope.fulltext_search)} · gửi qua provider{" "}
             {yes(p.rights.scope.external_processing)}
             {p.rights.scope.conditions && ` · điều kiện: ${p.rights.scope.conditions}`}. Lập chỉ mục cần cả tìm
-            kiếm toàn văn và gửi qua provider; tìm kiếm/hỏi đáp trên bản chung chưa mở ở bước này.</li>
+            kiếm toàn văn và gửi qua provider; tìm kiếm mở theo quyền tìm kiếm toàn văn, rerank chỉ nhận đoạn khi quyền
+            cho gửi qua provider; hỏi đáp chưa dùng bản chung.</li>
           <li>Tải file gốc qua thư viện: {ORIGINAL_DOWNLOAD_TEXT[p.original_download] ?? p.original_download}</li>
           {p.publication && <li>Công bố {fmt(p.publication.published_at)} (object đã kiểm:{" "}
             {p.publication.verified_byte_size} byte){p.publication.revoked_at && ` · thu hồi ${fmt(p.publication.revoked_at)}`}</li>}

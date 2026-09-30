@@ -1,4 +1,8 @@
-"""Authenticated private full-text search."""
+"""Authenticated full-text search: the caller's private items and servable common copies (M6b-2b3a).
+
+This route is the only caller that opts in to common text (``include_common=True``);
+``POST /rag/ask`` reaches ``app.search`` without the flag and stays private-owner only.
+"""
 import uuid
 from typing import Literal
 
@@ -32,10 +36,11 @@ class SearchRequest(BaseModel):
 @router.post("/search")
 def search_route(body: SearchRequest, principal: Principal = Depends(get_principal),
                  db: Session = Depends(get_db), settings: Settings = Depends(get_settings)) -> dict:
-    return search(db, principal, settings, body.query, body.mode, body.item_id, body.rerank, body.collection_id)
+    return search(db, principal, settings, body.query, body.mode, body.item_id, body.rerank, body.collection_id,
+                  include_common=True)
 
 
 @router.get("/search/chunks/{chunk_id}")
 def open_source_chunk(chunk_id: uuid.UUID, principal: Principal = Depends(get_principal),
                       db: Session = Depends(get_db)) -> dict:
-    return open_chunk(db, principal, chunk_id)
+    return open_chunk(db, principal, chunk_id, include_common=True)

@@ -160,7 +160,7 @@ def _out(item: LibraryItem, version: PaperVersion, source: SourceFile, rights: A
         "id": str(item.id), "title": item.title, "visibility": item.visibility,
         "publication_state": item.publication_state,
         "published": item.publication_state == PublicationState.LISTED.value,
-        # Publication is metadata only; full text is a separate, later gate.
+        # Publication is metadata only; full text is a separate gate (set from the index status in _full_out).
         "content_status": item.content_status, "fulltext_available": False,
         "original_download": original_download_status(item, rights, gate_opens),
         "created_at": item.created_at.isoformat(), "note": NOTES[item.publication_state],
@@ -199,6 +199,7 @@ def _full_out(db: Session, admin: Principal, row: tuple, now: datetime) -> dict:
         duplicate = live_duplicate(db, out["file"]["checksum_sha256"], item.id)
         out["duplicate_published_item_id"] = str(duplicate) if duplicate else None
     out["index"] = common_index.status(db, item, get_settings())
+    out["fulltext_available"] = out["index"]["search_open"]
     tombstone = db.scalar(select(DeletionTombstone).where(DeletionTombstone.item_id == item.id))
     out["tombstone"] = None if tombstone is None else {
         "id": str(tombstone.id), "reason_code": tombstone.reason_code,

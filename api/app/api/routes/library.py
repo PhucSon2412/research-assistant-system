@@ -6,6 +6,9 @@ answers exactly like a missing one (404 ``not_found``). M1c includes
 ACL-filtered file/job metadata in item detail; file bytes have a separate route.
 A common item lists a file (with its download path) only when that file's
 live AccessRights open it for download (M6b-2b1, ``common_original_clause``).
+Its chunks, coverage, references and metadata candidates open only for the
+active version/file its live rights permit for full-text search (M6b-2b3a,
+``common_derivatives_clause``); the two gates are independent.
 """
 
 from __future__ import annotations
@@ -16,14 +19,14 @@ from enum import StrEnum
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import ColumnElement, and_, func, select
+from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_now, get_principal
 from app.api.errors import ApiError
 from app.audit import record_event
-from app.authz import (Principal, can_edit_item, common_original_clause, m2a_private_derivatives_clause,
-                       visible_items_clause)
+from app.authz import (Principal, can_edit_item, common_derivatives_clause, common_fulltext_items_clause,
+                       common_original_clause, m2a_private_derivatives_clause, visible_items_clause)
 from app.citations import RELATION_NOTE, citation_link_out, hidden_discovery_clause
 from app.models import (Chunk, DiscoveryPaper, IngestionJob, LibraryItem, MetadataCandidate, PaperVersion, PdfPage,
                         ReferenceCitationLink, ReferenceEntry, Section, SourceFile)
@@ -53,17 +56,29 @@ def _scope_clause(principal: Principal, scope: Scope) -> ColumnElement[bool]:
     return clause
 
 
-def _item_out(item: LibraryItem, principal: Principal) -> dict:
+def _searchable_common(db: Session, principal: Principal, items) -> set[uuid.UUID]:
+    """Common items among ``items`` whose indexed text search serves now (same gate as the search route)."""
+    ids = [i.id for i in items if i.visibility == Visibility.COMMON.value]
+    if not ids:
+        return set()
+    return set(db.scalars(select(LibraryItem.id).where(LibraryItem.id.in_(ids),
+                                                       common_fulltext_items_clause(principal))).all())
+
+
+def _item_out(item: LibraryItem, principal: Principal, searchable_common: set[uuid.UUID] = frozenset()) -> dict:
     return {
         "id": str(item.id),
         "visibility": item.visibility,
         # Owner identity is never exposed; only whether it is the caller.
         "owned_by_me": item.owner_user_id == principal.user_id,
         "content_status": item.content_status,
-        # Whether search/RAG serve this item's text. A common copy can be ``indexed`` (M6b-2b2b)
-        # while no route serves it yet: indexed is not opened.
-        "fulltext_search_available": (item.visibility == Visibility.PRIVATE.value
-                                      and item.content_status == ContentStatus.INDEXED.value),
+        # Whether full-text search serves this item's text: an owner's indexed private item, or a common
+        # copy under its live full-text rights (M6b-2b3a). ``indexed`` alone is not opened.
+        "fulltext_search_available": (item.id in searchable_common if item.visibility == Visibility.COMMON.value
+                                      else item.content_status == ContentStatus.INDEXED.value),
+        # RAG takes private-owner text only (M6b-2b3a): a searchable common copy is not asked.
+        "rag_available": (item.visibility == Visibility.PRIVATE.value
+                          and item.content_status == ContentStatus.INDEXED.value),
         "title": item.title,
         "active_version_id": str(item.active_version_id) if item.active_version_id else None,
         "created_at": item.created_at.isoformat(),
@@ -86,16 +101,25 @@ def _get_visible_item(db: Session, principal: Principal, item_id: str, *, for_up
     return item
 
 
-def _get_private_derivative_item(db: Session, principal: Principal, item_id: str) -> LibraryItem:
+def _get_derivative_item(db: Session, principal: Principal, item_id: str) -> LibraryItem:
+    """The caller's private item, or a common copy whose text may be served now; otherwise 404."""
     try:
         parsed = uuid.UUID(item_id)
     except ValueError:
         raise ApiError(404, "not_found") from None
     item = db.scalar(select(LibraryItem).where(
-        LibraryItem.id == parsed, m2a_private_derivatives_clause(principal)))
+        LibraryItem.id == parsed, or_(m2a_private_derivatives_clause(principal),
+                                      common_fulltext_items_clause(principal))))
     if item is None:
         raise ApiError(404, "not_found")
     return item
+
+
+def _derived_rows(principal: Principal, model) -> ColumnElement[bool]:
+    """Rows of ``model`` the caller may read: any of their own private item, or only the active version/file
+    of a servable common copy. The outer query must join ``LibraryItem`` on ``model.item_id``."""
+    return or_(m2a_private_derivatives_clause(principal),
+               common_derivatives_clause(principal, model.item_id, model.version_id, model.source_file_id))
 
 
 @router.get("/items")
@@ -115,8 +139,9 @@ def list_items(
         .limit(limit)
         .offset(offset)
     ).all()
+    searchable = _searchable_common(db, principal, items)
     return {
-        "items": [_item_out(i, principal) for i in items],
+        "items": [_item_out(i, principal, searchable) for i in items],
         "total": total,
         "limit": limit,
         "offset": offset,
@@ -150,8 +175,9 @@ def get_item(item_id: str, principal: Principal = Depends(get_principal), db: Se
     ).all()
     jobs = db.scalars(select(IngestionJob).where(IngestionJob.item_id == item.id)).all() \
         if item.visibility == Visibility.PRIVATE.value else []
+    searchable = _searchable_common(db, principal, [item])
     return {
-        "item": _item_out(item, principal)
+        "item": _item_out(item, principal, searchable)
         | {
             "versions": [
                 {
@@ -159,7 +185,9 @@ def get_item(item_id: str, principal: Principal = Depends(get_principal), db: Se
                     "version_label": v.version_label,
                     "source_identifier": v.source_identifier,
                     "source_url": v.source_url,
-                    "coverage": v.coverage if item.visibility == Visibility.PRIVATE.value else None,
+                    # A common copy's extraction coverage shows with its searchable (active) version only.
+                    "coverage": v.coverage if (item.visibility == Visibility.PRIVATE.value or (
+                        item.id in searchable and v.id == item.active_version_id)) else None,
                     "received_at": v.received_at.isoformat(),
                 }
                 for v in versions
@@ -194,10 +222,10 @@ def get_chunks(
     principal: Principal = Depends(get_principal),
     db: Session = Depends(get_db),
 ) -> dict:
-    item = _get_private_derivative_item(db, principal, item_id)
+    item = _get_derivative_item(db, principal, item_id)
     rows = db.execute(select(Chunk, Section.kind).join(Section, Chunk.section_id == Section.id)
         .join(LibraryItem, Chunk.item_id == LibraryItem.id)
-        .where(Chunk.item_id == item.id, m2a_private_derivatives_clause(principal))
+        .where(Chunk.item_id == item.id, _derived_rows(principal, Chunk))
         .order_by(Chunk.version_id, Chunk.source_file_id, Chunk.start_page, Chunk.start_offset, Chunk.id)
         .limit(limit).offset(offset)).all()
     return {"chunks": [{"id": str(c.id), "version_id": str(c.version_id),
@@ -217,9 +245,9 @@ def get_metadata_candidates(
     principal: Principal = Depends(get_principal),
     db: Session = Depends(get_db),
 ) -> dict:
-    item = _get_private_derivative_item(db, principal, item_id)
+    item = _get_derivative_item(db, principal, item_id)
     rows = db.scalars(select(MetadataCandidate).join(LibraryItem, MetadataCandidate.item_id == LibraryItem.id)
-        .where(MetadataCandidate.item_id == item.id, m2a_private_derivatives_clause(principal))).all()
+        .where(MetadataCandidate.item_id == item.id, _derived_rows(principal, MetadataCandidate))).all()
     return {"candidates": [{"field_name": r.field_name, "value": r.value,
             "version_id": str(r.version_id), "source_file_id": str(r.source_file_id),
             "locator_kind": r.locator_kind, "start_offset": r.start_offset,
@@ -230,9 +258,9 @@ def get_metadata_candidates(
 @router.get("/items/{item_id}/coverage")
 def get_coverage(item_id: str, principal: Principal = Depends(get_principal),
                  db: Session = Depends(get_db)) -> dict:
-    item = _get_private_derivative_item(db, principal, item_id)
+    item = _get_derivative_item(db, principal, item_id)
     rows = db.scalars(select(PdfPage).join(LibraryItem, PdfPage.item_id == LibraryItem.id)
-        .where(PdfPage.item_id == item.id, m2a_private_derivatives_clause(principal))
+        .where(PdfPage.item_id == item.id, _derived_rows(principal, PdfPage))
         .order_by(PdfPage.version_id, PdfPage.source_file_id, PdfPage.page_number)).all()
     summaries = {}
     for p in rows:
@@ -256,13 +284,13 @@ def get_coverage(item_id: str, principal: Principal = Depends(get_principal),
 @router.get("/items/{item_id}/references")
 def get_references(item_id: str, principal: Principal = Depends(get_principal),
                    db: Session = Depends(get_db)) -> dict:
-    item = _get_private_derivative_item(db, principal, item_id)
+    item = _get_derivative_item(db, principal, item_id)
     rows = db.execute(select(ReferenceEntry, ReferenceCitationLink, DiscoveryPaper,
                              hidden_discovery_clause().label("target_hidden"))
         .join(LibraryItem, ReferenceEntry.item_id == LibraryItem.id)
         .outerjoin(ReferenceCitationLink, ReferenceCitationLink.reference_id == ReferenceEntry.id)
         .outerjoin(DiscoveryPaper, DiscoveryPaper.id == ReferenceCitationLink.discovery_paper_id)
-        .where(ReferenceEntry.item_id == item.id, m2a_private_derivatives_clause(principal))
+        .where(ReferenceEntry.item_id == item.id, _derived_rows(principal, ReferenceEntry))
         .order_by(ReferenceEntry.version_id, ReferenceEntry.source_file_id, ReferenceEntry.ordinal)).all()
     return {"references": [{"id": str(r.id), "ordinal": r.ordinal,
         "version_id": str(r.version_id), "source_file_id": str(r.source_file_id),
@@ -302,4 +330,4 @@ def update_item(
         details={"fields": changed},
     )
     db.commit()
-    return {"item": _item_out(item, principal)}
+    return {"item": _item_out(item, principal, _searchable_common(db, principal, [item]))}

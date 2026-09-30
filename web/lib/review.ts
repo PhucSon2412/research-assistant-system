@@ -36,7 +36,8 @@ export type PublicationState = "pending" | "listed" | "revoked";
 // A common copy with Admin-recorded rights that is not published (M6b-1).
 export type PendingPublication = {
   id: string; title: string | null; publication_state: PublicationState; published: boolean; content_status: string;
-  fulltext_available: false; original_download: OriginalDownloadStatus; created_at: string; note: string;
+  // True only while the search gate serves the copy (M6b-2b3a); a pending copy is never searchable.
+  fulltext_available: boolean; original_download: OriginalDownloadStatus; created_at: string; note: string;
   version: { id: string; source_url: string | null; received_at: string };
   file: { id: string; filename: string | null; verified_mime: string; byte_size: number; page_count: number | null;
     checksum_sha256: string };
@@ -48,13 +49,14 @@ export type PendingPublication = {
     metadata_removed_at?: string | null };
 };
 
-// Index status of a reviewed copy (M6b-2b2b). IDs and codes only; `search_open` stays false in this step.
+// Index status of a reviewed copy (M6b-2b2b). IDs and codes only. `search_open` is the search route's own
+// gate now (M6b-2b3a); `rag_open` stays false: RAG does not use common copies yet.
 export type IndexEligibility = "indexable" | "revoked" | "not_published" | "rights_not_current"
   | "audience_not_supported" | "fulltext_not_permitted" | "external_processing_not_permitted"
   | "blocked_by_conditions" | "unsupported_file_kind";
 
 export type CopyIndexStatus = {
-  eligibility: IndexEligibility; content_status: string; search_open: false; note: string | null;
+  eligibility: IndexEligibility; content_status: string; search_open: boolean; rag_open: false; note: string | null;
   provider_ready: boolean;
   active_generation: { id: string; model_id: string; dimensions: number | null; index_version: string;
     expected_chunks: number; activated_at: string | null } | null;
@@ -140,8 +142,9 @@ export const INDEX_ELIGIBILITY_TEXT: Record<IndexEligibility, string> = {
 };
 
 export const INDEX_EXTERNAL_NOTICE = "Text trích xuất từ file chung (không phải file gốc) sẽ được gửi tới "
-  + "OpenRouter/provider để embedding; reference list không được gửi làm bằng chứng. Đã lập chỉ mục vẫn chưa mở "
-  + "tìm kiếm/hỏi đáp cho bản chung ở bước này.";
+  + "OpenRouter/provider để embedding; reference list không được gửi làm bằng chứng. Khi lập chỉ mục xong, mọi tài "
+  + "khoản tìm kiếm và mở được đoạn trích theo quyền đã ghi; khi bật rerank, câu tìm kiếm và đoạn trích được phép "
+  + "cũng được gửi tới provider. Hỏi đáp (RAG) chưa dùng bản chung.";
 
 // Revoking needs a listed reason code and the unticked box; no free text is sent.
 export function makeRevokeBody(confirmed: boolean, reason: string) {
