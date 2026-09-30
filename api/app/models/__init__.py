@@ -10,6 +10,7 @@ from app.models.identity import BootstrapState, Invitation, PasswordResetToken, 
 from app.models.index import EmbeddingBudgetDay, EmbeddingCall, EmbeddingUserBudgetDay, IndexEntry, IndexGeneration
 from app.models.ingest import Chunk, IngestionJob, IngestStepAttempt, MetadataCandidate, PdfPage, ReferenceEntry, Section
 from app.models.library import LibraryItem, PaperVersion, SourceFile
+from app.models.recovery import RecoveryRegistration, RevocationJournalRecord
 from app.models.review import ReviewRequest
 from app.models.rights import AccessRights, CommonPublication, DeletionTombstone, RevocationMetadataRetention
 from app.models.search import RagRequestDay, SearchRequestDay, SearchUsage
@@ -36,6 +37,7 @@ __all__ = [
     "LibraryItem",
     "PaperVersion",
     "PasswordResetToken",
+    "RecoveryRegistration", "RevocationJournalRecord",
     "SourceFile",
     "ReviewRequest", "RevocationMetadataRetention",
     "RagRequestDay", "SearchRequestDay", "SearchUsage",

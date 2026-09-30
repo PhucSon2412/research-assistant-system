@@ -14,7 +14,7 @@ RUN pip install .
 COPY alembic.ini ./
 COPY migrations ./migrations
 
-RUN useradd --system --uid 10001 --no-create-home ras
+RUN useradd --system --uid 10001 --no-create-home ras     && mkdir -p /var/lib/ras/journal && chown ras /var/lib/ras/journal
 USER ras
 
 EXPOSE 8000

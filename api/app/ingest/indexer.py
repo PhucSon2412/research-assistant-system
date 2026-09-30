@@ -34,6 +34,7 @@ from decimal import Decimal, ROUND_UP
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from app import recovery
 from app.authz import COMMON_INDEX_VERSION
 from app.config import Settings
 from app.ingest import markdown, pdf
@@ -339,6 +340,9 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
             _, _, _, source = _gate(db, job_id, token)
             db.commit()
             hashed_since_call = False
+            # M6c-1: the recovery gate, checked with no row lock held, right before text leaves.
+            if not recovery.gate_open(settings, db.get_bind(), "indexer"):
+                raise StepError("recovery_gate_closed", retryable=True)
             with reservation_heartbeat(db.get_bind(), EmbeddingCall, call_id,
                                        settings.embedding.reservation_lease_seconds):
                 result = embed(pending.text, settings)

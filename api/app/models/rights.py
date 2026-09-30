@@ -169,7 +169,8 @@ class DeletionTombstone(Base):
 
     Written in the revocation transaction, whose commit is ``t_rev``. No
     foreign keys: it outlives the rows it names and can be replayed into a
-    restored snapshot that predates them (``app.cli.tombstones``). Never
+    restored snapshot that predates them (``app.recovery``, from the
+    revocation journal; M6c-1 refuses one without its journal record). Never
     deleted; only the cleanup columns change (DB trigger), and ``purged_at``
     cannot be set while a ``RevokedMetadataField`` of the copy is still
     present without a retention basis (0023). It carries IDs, the object key,

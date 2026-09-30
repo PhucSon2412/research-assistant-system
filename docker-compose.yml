@@ -1,4 +1,4 @@
-# Development stack (M1a–M2a). Copy .env.example to .env and fill every secret
+# Development stack (M1a–M6c-1). Copy .env.example to .env and fill every secret
 # before `docker compose up`; required values have no fallback on purpose.
 # Host ports bind to 127.0.0.1 only.
 
@@ -12,6 +12,15 @@ x-db-env: &db-env
   RAS_DB__USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
   RAS_DB__PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
   RAS_DB__NAME: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+
+# M6c-1 revocation journal: kept OUT of the db-data and minio-data volumes (and
+# out of their backups), so restoring those does not roll it back. A separate
+# named volume is only a dev trial: `docker compose down -v` deletes it with
+# the rest, and one disk still loses all three together. RAS_JOURNAL_SOURCE may
+# name a host directory instead (smoke scripts that read it from the host).
+x-journal-env: &journal-env
+  RAS_RECOVERY__JOURNAL_PATH: /var/lib/ras/journal/revocations.jsonl
+x-journal-volume: &journal-volume ${RAS_JOURNAL_SOURCE:-revocation-journal}:/var/lib/ras/journal
 
 services:
   db:
@@ -79,10 +88,28 @@ services:
         condition: service_healthy
     restart: "no"
 
+  recovery-init:
+    # One-shot, after migrate: registers a NEW, empty database with a new
+    # journal. It changes nothing (exit 0) for a registered database, one with
+    # content, or when a journal already exists: a restored database is never
+    # taken for a new install. Until the database and the journal agree, the
+    # API serves only /healthz (/readyz is 503) and workers process nothing;
+    # see docs/dev-setup.md ("Cleanup và restore").
+    build: ./api
+    command: ["python", "-m", "app.cli.recovery", "init", "--if-new"]
+    environment:
+      <<: [*db-env, *journal-env]
+    volumes:
+      - *journal-volume
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
   api:
     build: ./api
     environment:
-      <<: *db-env
+      <<: [*db-env, *journal-env]
       # Development only: plain HTTP, non-Secure cookies and the in-memory dev
       # outbox are hardcoded here on purpose. This file is not a deployment
       # config and cannot be turned into one by setting variables; see
@@ -124,8 +151,10 @@ services:
       RAS_STORAGE__BUCKET: ras-originals
     ports:
       - "127.0.0.1:${API_HOST_PORT:-8000}:8000"
+    volumes:
+      - *journal-volume
     depends_on:
-      migrate:
+      recovery-init:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
@@ -142,7 +171,7 @@ services:
     build: ./api
     command: ["celery", "-A", "app.ingest.celery_app:celery_app", "worker", "--loglevel=WARNING", "--concurrency=2"]
     environment:
-      <<: *db-env
+      <<: [*db-env, *journal-env]
       RAS_REDIS_HOST: redis
       RAS_REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
       RAS_DISCOVERY__ENABLED: ${RAS_DISCOVERY__ENABLED:-true}
@@ -169,8 +198,10 @@ services:
       RAS_STORAGE__ACCESS_KEY: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}
       RAS_STORAGE__SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
       RAS_STORAGE__BUCKET: ras-originals
+    volumes:
+      - *journal-volume
     depends_on:
-      migrate:
+      recovery-init:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
@@ -182,7 +213,7 @@ services:
     build: ./api
     command: ["celery", "-A", "app.ingest.celery_app:celery_app", "beat", "--loglevel=WARNING", "--schedule=/tmp/celerybeat-schedule"]
     environment:
-      <<: *db-env
+      <<: [*db-env, *journal-env]
       RAS_REDIS_HOST: redis
       RAS_REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
       RAS_DISCOVERY__ENABLED: ${RAS_DISCOVERY__ENABLED:-true}
@@ -195,8 +226,10 @@ services:
       RAS_DISCOVERY__MIN_REQUEST_INTERVAL_SECONDS: ${RAS_DISCOVERY__MIN_REQUEST_INTERVAL_SECONDS:-3}
       RAS_EMBEDDING__API_KEY: ${OPENROUTER_API_KEY:-}
       RAS_EMBEDDING__PRICING_VERIFIED: ${RAS_EMBEDDING__PRICING_VERIFIED:-false}
+    volumes:
+      - *journal-volume
     depends_on:
-      migrate:
+      recovery-init:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
@@ -228,3 +261,4 @@ volumes:
   db-data:
   redis-data:
   minio-data:
+  revocation-journal:

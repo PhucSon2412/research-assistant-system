@@ -3,6 +3,10 @@
 .env.*
 !.env.example
 
+# Revocation journals (M6c-1): runtime data, never committed
+revocations.jsonl*
+.journal/
+
 # Python
 __pycache__/
 *.py[cod]

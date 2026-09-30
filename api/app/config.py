@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 from urllib.parse import quote
 
@@ -202,6 +203,35 @@ class Retention(BaseModel):
         # Several attempts must fit inside the deadline.
         if timedelta(seconds=self.cleanup_poll_seconds * 4) > self.deleted_cleanup_deadline:
             raise ValueError("cleanup_poll_seconds must allow at least four attempts before the deadline")
+        return self
+
+
+class RecoveryPolicy(BaseModel):
+    """Revocation journal and recovery gate (M6c-1).
+
+    ``journal_path`` is the journal file, which must live outside the
+    PostgreSQL data and the paper object store and outside their backups. With
+    no path, or a path the process cannot read, the gate stays closed: the API
+    serves only ``/healthz`` (and ``/readyz`` answers 503), workers process
+    nothing. ``gate_lock_timeout_ms`` bounds how long a gate check waits for a
+    revocation or recovery holding the journal lock before it counts as closed.
+    ``cleanup_passes`` is how many cleanup rounds ``recover`` runs before it
+    gives up and leaves the gate closed.
+    """
+
+    journal_path: Path | None = None
+    gate_lock_timeout_ms: int = Field(default=2000, ge=50, le=30_000)
+    cleanup_passes: int = Field(default=5, ge=1, le=100)
+
+    @field_validator("journal_path", mode="before")
+    @classmethod
+    def _empty_path_is_absent(cls, value):
+        return None if value == "" else value
+
+    @model_validator(mode="after")
+    def _check_path(self) -> "RecoveryPolicy":
+        if self.journal_path is not None and (not self.journal_path.is_absolute() or self.journal_path.name == ""):
+            raise ValueError("recovery journal_path must be an absolute file path")
         return self
 
 
@@ -405,6 +435,7 @@ class Settings(BaseSettings):
     discovery: DiscoveryPolicy = DiscoveryPolicy()
     citations: CitationPolicy = CitationPolicy()
     retention: Retention = Retention()
+    recovery: RecoveryPolicy = RecoveryPolicy()
     budget: ProviderBudget = ProviderBudget()
     embedding: EmbeddingPolicy = EmbeddingPolicy()
     search: SearchPolicy = SearchPolicy()

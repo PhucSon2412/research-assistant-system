@@ -18,6 +18,7 @@ from app.config import (
     ProviderBudget,
     RerankPolicy,
     GenerationPolicy,
+    RecoveryPolicy,
     Retention,
     Settings,
 )
@@ -226,3 +227,21 @@ def test_keyword_query_limits_defaults_environment_and_bounds(monkeypatch: pytes
                 {"keyword_min_term_chars": 10, "keyword_max_term_chars": 5}):
         with pytest.raises(ValidationError):
             Settings(database_url=URL, search=bad)
+
+
+def test_recovery_journal_is_required_absolute_and_bounded(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    s = Settings(database_url=URL)
+    # No journal configured: the recovery gate stays closed (app.recovery), nothing is served.
+    assert s.recovery.journal_path is None
+    assert (s.recovery.gate_lock_timeout_ms, s.recovery.cleanup_passes) == (2000, 5)
+    monkeypatch.setenv("RAS_RECOVERY__JOURNAL_PATH", str(tmp_path / "revocations.jsonl"))
+    monkeypatch.setenv("RAS_RECOVERY__GATE_LOCK_TIMEOUT_MS", "50")
+    monkeypatch.setenv("RAS_RECOVERY__CLEANUP_PASSES", "100")
+    s = Settings(database_url=URL)
+    assert s.recovery.journal_path == tmp_path / "revocations.jsonl"
+    assert (s.recovery.gate_lock_timeout_ms, s.recovery.cleanup_passes) == (50, 100)
+    assert RecoveryPolicy(journal_path="").journal_path is None
+    for bad in ({"journal_path": "relative/revocations.jsonl"}, {"gate_lock_timeout_ms": 49},
+                {"gate_lock_timeout_ms": 30_001}, {"cleanup_passes": 0}, {"cleanup_passes": 101}):
+        with pytest.raises(ValidationError):
+            RecoveryPolicy(**bad)
