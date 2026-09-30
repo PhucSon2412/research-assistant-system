@@ -4,9 +4,16 @@ Private uploads (M3a) and, since M6b-2b2b, published reviewed common copies
 (``promotion`` jobs) use the same steps. For a common copy the rights gate of
 ``app.common_index`` replaces the upload acknowledgement and runs, with the
 item locked, before every reservation, immediately before each provider call,
-after each response and in the publishing transaction; the object's size and
-SHA-256 are checked before and after each call (without holding a DB lock) and
-again inside the publishing transaction. A common copy's calls are charged to
+after each response and in the publishing transaction.
+
+No storage I/O happens while the item and job are locked (review PR #23): a
+revoke never waits on a slow object read. The object's size and SHA-256 are
+checked by a full read before the first provider call of a run and again
+before the publishing transaction, both with no lock held; before and after
+each call a HEAD compares the object's size/ETag/Last-Modified with those of
+the SHA-256-verified read, so the file is not re-read once per chunk. Then the
+rights, epoch, cancel flag and lease are checked under the lock and committed
+before the call (no lock is held while the provider works). A common copy's calls are charged to
 the application and embedding buckets only (``owner_user_id`` NULL), never to a
 User's quota. Publishing makes the copy ``indexed``, which opens nothing yet:
 chunk, search and RAG routes keep the private-owner gate.
@@ -16,6 +23,8 @@ from __future__ import annotations
 
 import hashlib
 import uuid
+from dataclasses import dataclass
+from datetime import timedelta
 from decimal import Decimal, ROUND_UP
 
 from sqlalchemy import func, select, text
@@ -30,7 +39,7 @@ from app.models import (Chunk, EmbeddingBudgetDay, EmbeddingCall, EmbeddingUserB
                         SearchUsage, Section, SourceFile, UploadIntent)
 from app.models.enums import JobOrigin, JobState, VerifiedMime
 from app.provider_capacity import LOCK, lease_deadline, reap_expired, reservation_heartbeat
-from app.storage import OriginalStorage
+from app.storage import OriginalStorage, is_missing_object
 
 INDEX_VERSION = "private-keyword-vector-v1"
 COMMON_INDEX_VERSION = "common-keyword-vector-v1"
@@ -67,15 +76,55 @@ def _gate(db: Session, job_id: uuid.UUID, token: uuid.UUID):
     return job, item, version, source
 
 
+@dataclass(frozen=True)
+class VerifiedObject:
+    """The stored object as last hashed: its fingerprint, and the decoded text of a Markdown file."""
+
+    fingerprint: tuple
+    text: str | None
+
+
+def _fingerprint(storage: OriginalStorage, source: SourceFile) -> tuple:
+    try:
+        return storage.fingerprint(source.storage_key)
+    except Exception as exc:
+        if is_missing_object(exc):
+            raise StepError("checksum_mismatch") from None
+        raise StepError("storage_unavailable", retryable=True) from None
+
+
+def _verify_object(source: SourceFile, storage: OriginalStorage, settings: Settings) -> VerifiedObject:
+    """Full size + SHA-256 of the stored object, including same-sized replacements.
+
+    Called with no DB lock held. The fingerprint is taken before and after the read, so an
+    overwrite during the read is refused too.
+    """
+    before = _fingerprint(storage, source)
+    if source.verified_mime == VerifiedMime.PDF.value:
+        _read_pdf(source, storage, settings)
+        text_value = None
+    else:
+        text_value = _read_markdown(source, storage, settings)
+    if _fingerprint(storage, source) != before:
+        raise StepError("checksum_mismatch")
+    return VerifiedObject(before, text_value)
+
+
+def _check_unchanged(source: SourceFile, storage: OriginalStorage, verified: VerifiedObject) -> None:
+    """HEAD only: the object is still the one whose SHA-256 was verified. No DB lock held."""
+    if _fingerprint(storage, source) != verified.fingerprint:
+        raise StepError("checksum_mismatch")
+
+
 def _eligible_chunks(db: Session, source: SourceFile, version: PaperVersion,
-                     storage: OriginalStorage, settings: Settings) -> tuple[str, list[Chunk]]:
+                     verified: VerifiedObject, settings: Settings) -> tuple[str, list[Chunk]]:
+    """Chunks to index, checked against the extracted pages or the verified Markdown text. No storage I/O."""
     pipeline = pdf.PIPELINE_VERSION if source.verified_mime == VerifiedMime.PDF.value else markdown.PIPELINE_VERSION
     chunks = db.scalars(select(Chunk).where(Chunk.source_file_id == source.id,
         Chunk.pipeline_version == pipeline).order_by(Chunk.section_id, Chunk.ordinal)).all()
     if not chunks or not any(db.get(Section, c.section_id).kind == "body" for c in chunks):
         raise StepError("index_body_missing")
     if source.verified_mime == VerifiedMime.PDF.value:
-        _read_pdf(source, storage, settings)  # full SHA-256, including same-sized replacements
         pages = db.scalars(select(PdfPage).where(PdfPage.source_file_id == source.id,
             PdfPage.pipeline_version == pipeline)).all()
         if len(pages) != source.page_count or any(p.pipeline_version != pipeline for p in pages):
@@ -87,7 +136,9 @@ def _eligible_chunks(db: Session, source: SourceFile, version: PaperVersion,
         source_text = {p.page_number: p.text for p in pages}
         page_by_number = {p.page_number: p for p in pages}
     else:
-        source_text = _read_markdown(source, storage, settings)
+        source_text = verified.text
+        if source_text is None:
+            raise StepError("index_object_unverified")
     eligible = []
     for chunk in chunks:
         section = db.get(Section, chunk.section_id)
@@ -123,14 +174,6 @@ def _eligible_chunks(db: Session, source: SourceFile, version: PaperVersion,
     if not eligible:
         raise StepError("index_chunks_missing")
     return pipeline, eligible
-
-
-def _verify_object(source: SourceFile, storage: OriginalStorage, settings: Settings) -> None:
-    """Full size + SHA-256 of the stored object, including same-sized replacements. No DB lock held."""
-    if source.verified_mime == VerifiedMime.PDF.value:
-        _read_pdf(source, storage, settings)
-    else:
-        _read_markdown(source, storage, settings)
 
 
 def _user_budget(db: Session, day, user_id: uuid.UUID | None) -> EmbeddingUserBudgetDay | None:
@@ -225,13 +268,25 @@ def _reserve(db: Session, job: IngestionJob, item: LibraryItem, source: SourceFi
     return existing
 
 
+def _verified_unlocked(db: Session, job_id: uuid.UUID, token: uuid.UUID, storage: OriginalStorage,
+                       settings: Settings) -> VerifiedObject:
+    """Check the gate, commit (releasing item and job), then read and hash the object with no lock held."""
+    job, _, _, source = _gate(db, job_id, token)
+    job.lease_until = utcnow() + timedelta(seconds=settings.ingest.lease_seconds)
+    db.commit()
+    return _verify_object(source, storage, settings)
+
+
 def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
                   storage: OriginalStorage, settings: Settings) -> str:
+    # One full read for the run, before any provider call; the loop below never reads the object
+    # while holding the item/job locks.
+    verified = _verified_unlocked(db, job_id, token, storage, settings)
+    hashed_for_publish = False
     while True:
         job, item, version, source = _gate(db, job_id, token)
-        from datetime import timedelta
         job.lease_until = utcnow() + timedelta(seconds=settings.ingest.lease_seconds)
-        pipeline, chunks = _eligible_chunks(db, source, version, storage, settings)
+        pipeline, chunks = _eligible_chunks(db, source, version, verified, settings)
         generation = db.scalar(select(IndexGeneration).where(IndexGeneration.job_id == job.id,
             IndexGeneration.model_id == settings.embedding.model_id,
             IndexGeneration.index_version == index_version(job)).with_for_update())
@@ -247,6 +302,13 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
             raise StepError("index_generation_changed")
         done = set(db.scalars(select(IndexEntry.chunk_id).where(IndexEntry.generation_id == generation.id)).all())
         pending = next((c for c in chunks if c.id not in done), None)
+        if pending is None and not hashed_for_publish:
+            # Hash the object again before publishing, outside the lock; a revoke meanwhile wins
+            # at the next gate. The publishing transaction itself does no storage I/O.
+            db.commit()
+            verified = _verified_unlocked(db, job_id, token, storage, settings)
+            hashed_for_publish = True
+            continue
         if pending is None:
             _publish(db, job, item, generation, chunks, settings)
             db.commit()
@@ -261,10 +323,10 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
         call_id = call.id
         db.commit()  # durable reservation before any external request
         try:
-            # The stored bytes are still the reviewed ones (read with no DB lock held), then a fresh
+            # The stored object is still the SHA-256-verified one (HEAD, no DB lock held), then a fresh
             # rights/lease/ack check under the item lock, committed before the call: no lock is held
             # while the provider works.
-            _verify_object(source, storage, settings)
+            _check_unchanged(source, storage, verified)
             _, _, _, source = _gate(db, job_id, token)
             db.commit()
             with reservation_heartbeat(db.get_bind(), EmbeddingCall, call_id,
@@ -277,7 +339,7 @@ def process_index(db: Session, job_id: uuid.UUID, token: uuid.UUID,
             _provider_failure(db, call_id, EmbeddingError("pre_call_guard_rejected", definitely_rejected=True))
             raise
         try:
-            _verify_object(source, storage, settings)
+            _check_unchanged(source, storage, verified)
             job, item, version, source = _gate(db, job_id, token)
             generation = db.get(IndexGeneration, generation.id)
             call = db.scalar(select(EmbeddingCall).where(EmbeddingCall.id == call_id).with_for_update())

@@ -51,6 +51,16 @@ class OriginalStorage:
     def size(self, key: str) -> int:
         return int(self.client.head_object(Bucket=self.bucket, Key=key)["ContentLength"])
 
+    def fingerprint(self, key: str) -> tuple[int, str, str]:
+        """Size, ETag and Last-Modified of the stored object (a HEAD request, no body).
+
+        Any overwrite, even with same-sized bytes, changes the ETag (content digest) and
+        Last-Modified, so an unchanged fingerprint means the object whose bytes were last
+        hashed is still the one stored.
+        """
+        head = self.client.head_object(Bucket=self.bucket, Key=key)
+        return int(head["ContentLength"]), str(head.get("ETag")), str(head.get("LastModified"))
+
     def orphan_keys(self, prefix: str = "originals/") -> Iterator[tuple[str, object]]:
         paginator = self.client.get_paginator("list_objects_v2")
         for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):

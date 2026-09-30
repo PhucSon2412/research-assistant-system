@@ -339,19 +339,19 @@ def test_rate_limit_retry_and_a_new_job_reuse_completed_embeddings_and_extractio
     other = copy_of(w, upload(w.a, other_body), other_body)
     first = started(w, other)
     assert process_job(first, storage=w.storage) == "awaiting_index"
-    real, seen = indexer._verify_object, []
+    real, seen = indexer._check_unchanged, []
 
-    def fails_third(source, storage, settings):
+    def fails_third(source, storage, verified):
         seen.append(1)
-        if len(seen) == 3:  # the check before the second chunk's call
+        if len(seen) == 3:  # the object check before the second chunk's call
             raise worker.StepError("checksum_mismatch")
-        return real(source, storage, settings)
+        return real(source, storage, verified)
 
-    w.monkeypatch.setattr(indexer, "_verify_object", fails_third)
+    w.monkeypatch.setattr(indexer, "_check_unchanged", fails_third)
     calls = fake_provider(w.monkeypatch)
     assert process_job(first, w.settings, w.storage) == "checksum_mismatch"
     assert len(calls) == 1
-    w.monkeypatch.setattr(indexer, "_verify_object", real)
+    w.monkeypatch.setattr(indexer, "_check_unchanged", real)
     rows = {t: rows_of(w.api, other)[t] for t in ("sections", "chunks", "metadata_candidates", "reference_entries")}
     second = started(w, other)
     assert second != first and [KEY.match(j[2]) is not None for j in jobs_of(w, other)] == [True, True]
@@ -663,3 +663,75 @@ def test_schema_pins_promotion_jobs_and_gates_the_indexed_state(w):
     fails("indexed only while listed", "UPDATE library_items SET content_status='indexed', active_version_id="
           "(SELECT id FROM paper_versions WHERE item_id=:pending) WHERE id=:pending")
     assert item_row(w, copy).content_status == "indexed"
+
+
+# --- review PR #23: no object read while the item is locked ------------------------------------------
+
+MULTI_BODY = (b"## Abstract\nBlocked read abstract text.\n\n## Methods\nBlocked read method body one.\n\n"
+              b"## Results\nBlocked read result body two.\n")
+
+
+def _blocking_reads(w, block_at: int):
+    """Wrap the indexer's full object read: the ``block_at``-th read waits until released."""
+    real, reads, reading, release = indexer._read_markdown, [], Event(), Event()
+
+    def read(source, storage, settings):
+        reads.append(1)
+        if len(reads) == block_at:
+            reading.set()
+            assert release.wait(20)
+        return real(source, storage, settings)
+
+    w.monkeypatch.setattr(indexer, "_read_markdown", read)
+    return reads, reading, release
+
+
+@pytest.mark.parametrize("block_at, phase", [(1, "before_any_call"), (2, "before_publish")])
+def test_revoke_commits_while_the_index_step_reads_the_object(w, block_at, phase):
+    """A slow object read holds no DB lock: the revoke commits during it, and the worker then stops."""
+    copy = copy_of(w, upload(w.a, MULTI_BODY), MULTI_BODY)
+    job = started(w, copy)
+    assert process_job(job, storage=w.storage) == "awaiting_index"
+    reads, reading, release = _blocking_reads(w, block_at)
+    calls = fake_provider(w.monkeypatch)
+    result, outcome = {}, {}
+    runner = Thread(target=lambda: result.setdefault("worker", process_job(job, w.settings, w.storage)))
+    runner.start()
+    assert reading.wait(20)
+    revoker = _revoke_in_thread(w, copy, outcome)
+    revoker.join(10)
+    # Committed while the worker is still inside the read (with the old code the revoke waited for it).
+    assert not revoker.is_alive() and outcome == {"revoked": True}, "revoke waited on the object read"
+    assert runner.is_alive()
+    release.set()
+    runner.join(20)
+    assert result == {"worker": "cancelled"}
+    assert len(calls) == (0 if phase == "before_any_call" else distinct_texts(w, copy))
+    row = item_row(w, copy)
+    assert (row.publication_state, row.content_status, row.active_index_generation_id) == (
+        "revoked", "metadata_only", None)
+    assert w.api.scalar("SELECT count(*) FROM index_generations WHERE item_id=:i AND state='active'",
+                        i=uuid.UUID(copy)) == 0
+    assert jobs_of(w, copy)[0][1] == "cancelled"
+
+
+def test_the_object_is_hashed_twice_per_run_not_once_per_chunk(w):
+    copy = copy_of(w, upload(w.a, MULTI_BODY), MULTI_BODY)
+    job = started(w, copy)
+    assert process_job(job, storage=w.storage) == "awaiting_index"
+    reads, _, _ = _blocking_reads(w, block_at=0)
+    heads, real_fingerprint = [], w.storage.fingerprint
+
+    def counted(key):
+        heads.append(1)
+        return real_fingerprint(key)
+
+    w.monkeypatch.setattr(w.storage, "fingerprint", counted)
+    calls = fake_provider(w.monkeypatch)
+    assert process_job(job, w.settings, w.storage) == "ready"
+    assert len(calls) == distinct_texts(w, copy) >= 3
+    # One full SHA-256 read before the first call and one before publishing; a HEAD before and after
+    # each call compares against the hashed object (two more around each full read).
+    assert len(reads) == 2
+    assert len(heads) == 2 * len(calls) + 2 * len(reads)
+
