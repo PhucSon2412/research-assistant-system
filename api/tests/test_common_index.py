@@ -805,4 +805,3 @@ def test_a_job_reusing_every_completed_call_still_hashes_before_publishing(w):
     assert w.api.scalar("SELECT count(*) FROM index_generations WHERE item_id=:i AND state='active'",
                         i=uuid.UUID(copy)) == 0
     assert [j[1] for j in jobs_of(w, copy)] == ["terminal_failed", "terminal_failed"]
-
