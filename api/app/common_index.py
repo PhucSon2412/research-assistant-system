@@ -54,8 +54,12 @@ EXTRACTION_REJECTED = (JobState.FULLTEXT_REJECTED.value, JobState.NEEDS_REVIEW.v
 JOB_LABEL = "admin_index"
 NOT_OPEN_NOTE = ("Đã lập chỉ mục nhưng không mở tìm kiếm: quyền, công bố hoặc generation hiện tại không còn cho "
                  "phục vụ toàn văn của bản chung này.")
-SEARCH_OPEN_NOTE = ("Đã lập chỉ mục, mở tìm kiếm toàn văn cho mọi tài khoản theo quyền đã ghi; hỏi đáp (RAG) chưa "
-                    "dùng bản chung. Quyền tìm kiếm không mở tải file gốc.")
+SEARCH_OPEN_NOTE = ("Đã lập chỉ mục, mở tìm kiếm toàn văn và hỏi đáp (RAG) cho mọi tài khoản theo quyền đã ghi; "
+                    "đoạn được chọn làm bằng chứng được gửi tới OpenRouter/provider để tạo câu trả lời. Quyền "
+                    "tìm kiếm/hỏi đáp không mở tải file gốc.")
+# Searchable, but rights do not permit external processing (only reachable out of band: indexing needs it).
+SEARCH_ONLY_NOTE = ("Đã lập chỉ mục, mở tìm kiếm toàn văn theo quyền đã ghi; hỏi đáp (RAG) không dùng bản này vì "
+                    "quyền không cho gửi đoạn trích tới provider. Quyền tìm kiếm không mở tải file gốc.")
 # 409 code for each refusal; "revoked" keeps the code publish/revoke already use.
 REFUSAL_CODES = {"revoked": "common_copy_revoked", "not_published": "common_copy_not_published",
                  "rights_not_current": "rights_not_current", "audience_not_supported": "audience_not_supported",
@@ -194,15 +198,17 @@ def status(db: Session, item: LibraryItem, settings: Settings) -> dict:
     generation = (db.get(IndexGeneration, item.active_index_generation_id)
                   if item.active_index_generation_id else None)
     indexed = item.content_status == ContentStatus.INDEXED.value
-    # The search route's own gate, now: indexed alone does not open search, and RAG stays closed.
-    search_open = db.scalar(select(LibraryItem.id).where(
-        LibraryItem.id == item.id, common_fulltext_items_clause(None))) is not None
+    # The search and RAG routes' own gates, now: indexed alone opens neither.
+    search_open, rag_open = (db.scalar(select(LibraryItem.id).where(
+        LibraryItem.id == item.id, common_fulltext_items_clause(None, external_processing=provider))) is not None
+        for provider in (False, True))
     return {
         "eligibility": reason or INDEXABLE,
         "content_status": item.content_status,
         "search_open": search_open,
-        "rag_open": False,
-        "note": SEARCH_OPEN_NOTE if search_open else NOT_OPEN_NOTE if indexed else None,
+        "rag_open": rag_open,
+        "note": (SEARCH_OPEN_NOTE if rag_open else SEARCH_ONLY_NOTE if search_open
+                 else NOT_OPEN_NOTE if indexed else None),
         "provider_ready": provider_ready(settings),
         "active_generation": None if generation is None else {
             "id": str(generation.id), "model_id": generation.model_id, "dimensions": generation.dimensions,

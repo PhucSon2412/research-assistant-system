@@ -79,6 +79,7 @@ const MESSAGES: Record<string, string> = {
   invalid_markdown: "Markdown không hợp lệ.",
   upload_unavailable: "Chưa thể lưu file. Hãy thử lại.",
   rag_generation_unavailable_unverified_pricing: "Hỏi đáp hiện chưa khả dụng vì chi phí và provider chưa được xác minh.",
+  rag_scope_changed: "Quyền hoặc phạm vi của nguồn đã thay đổi trong lúc xử lý; câu trả lời không được hiển thị. Hãy hỏi lại.",
   api_timeout: "Máy chủ không phản hồi kịp. Thử lại sau.",
   api_unreachable: "Không kết nối được tới máy chủ.",
   api_response_incomplete: "Phản hồi từ máy chủ bị gián đoạn. Thử lại sau.",

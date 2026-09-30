@@ -1,0 +1,16 @@
+# Smoke-only override (M6b-2b3b): a second web container whose same-origin proxy
+# talks to an API process the smoke script runs on the host with *fake*
+# providers (no key, no outbound call). The regular `web` -> `api` pair of the
+# isolated project is left as is. Never use this file for the dev stack:
+#   docker compose -p ras-rag-smoke -f docker-compose.yml -f scripts/compose.smoke-host-api.yml up -d --build --wait
+services:
+  web-host-api:
+    build: ./web
+    environment:
+      API_INTERNAL_URL: http://host.docker.internal:${SMOKE_HOST_API_PORT:-58100}
+      WEB_PROXY_TIMEOUT_SECONDS: 15
+      WEB_PROXY_PROVIDER_TIMEOUT_SECONDS: 120
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:${SMOKE_HOST_WEB_PORT:-53100}:3000"

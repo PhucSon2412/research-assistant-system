@@ -8,12 +8,13 @@ test("rerank starts off and notice names both outbound inputs", () => {
   assert.match(SEARCH_NOTICE, /OpenRouter\/provider/);
 });
 
-test("notice scopes common copies to their rights and keeps RAG private (M6b-2b3a)", () => {
+test("notice scopes common copies to their rights, for search and RAG (M6b-2b3a, M6b-2b3b)", () => {
   assert.match(SEARCH_NOTICE, /bản chung mà quyền Admin đã ghi cho phép tìm kiếm toàn văn/);
   assert.match(SEARCH_NOTICE, /collection chỉ thu hẹp phạm vi/);
   assert.match(SEARCH_NOTICE, /chỉ có metadata hoặc đã thu hồi không vào tìm kiếm/);
   assert.match(SEARCH_NOTICE, /chỉ được gửi khi quyền cho phép xử lý qua provider/);
-  assert.match(SEARCH_NOTICE, /Hỏi đáp \(RAG\) chưa dùng bản chung/);
+  assert.match(SEARCH_NOTICE, /Hỏi đáp \(RAG\) dùng cùng phạm vi/);
+  assert.match(SEARCH_NOTICE, /khi quyền cũng cho phép xử lý qua provider/);
   assert.equal(sourceKindLabel("common"), "Bản chung");
   assert.equal(sourceKindLabel("private"), "Paper riêng của bạn");
 });

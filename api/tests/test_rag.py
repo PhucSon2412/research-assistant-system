@@ -318,8 +318,8 @@ def test_collection_and_all_scope_multi_paper_citations_and_acl(upload_api, monk
     for item in (first["item_id"], second["item_id"], str(unindexed), str(common)):
         assert a.post(f"/collections/{collection}/items", {"item_id": item}).status_code == 201
     from app.search import search as real_search
-    monkeypatch.setattr("app.rag.search", lambda db, principal, cfg, query, mode, item_id, rerank, collection_id:
-                        real_search(db, principal, cfg, "Sharedword", mode, item_id, rerank, collection_id))
+    monkeypatch.setattr("app.rag.search", lambda db, principal, cfg, query, mode, item_id, rerank, collection_id, **kw:
+                        real_search(db, principal, cfg, "Sharedword", mode, item_id, rerank, collection_id, **kw))
     sent = []
     def compare(messages, cfg):
         evidence = json.loads(messages[1]["content"])["evidence"]
@@ -525,8 +525,8 @@ def test_comparison_resolves_full_titles_before_rank_and_abstains_on_equal_pairs
                          {"title": title, "item": uuid.UUID(item["item_id"])})
     app.dependency_overrides[get_settings] = lambda: settings
     from app.search import search as real_search
-    def ranked_search(db, principal, cfg, query, mode, item_id, rerank, collection_id):
-        found = real_search(db, principal, cfg, "Sharedword", "keyword", item_id, rerank, collection_id)
+    def ranked_search(db, principal, cfg, query, mode, item_id, rerank, collection_id, **kw):
+        found = real_search(db, principal, cfg, "Sharedword", "keyword", item_id, rerank, collection_id, **kw)
         order = {item["item_id"]: rank for rank, item in enumerate(ids)}
         found["hits"].sort(key=lambda hit: order[hit["item_id"]])
         assert len(found["hits"]) == 3
@@ -589,10 +589,10 @@ def test_two_paper_scope_requires_context_or_resolved_names(upload_api, monkeypa
             assert a.post(f"/collections/{collection}/items", {"item_id": item["item_id"]}).status_code == 201
         scopes.append(collection)
     from app.search import search as real_search
-    def scoped_hits(db, principal, cfg, query, mode, item_id, rerank, collection_id):
+    def scoped_hits(db, principal, cfg, query, mode, item_id, rerank, collection_id, **kw):
         # Keep the real ACL and membership gate; use a shared fixture term so
         # name resolution, rather than keyword retrieval, is under test.
-        return real_search(db, principal, cfg, "Sharedword", "keyword", item_id, rerank, collection_id)
+        return real_search(db, principal, cfg, "Sharedword", "keyword", item_id, rerank, collection_id, **kw)
     monkeypatch.setattr("app.rag.search", scoped_hits)
     calls = []
     def compare(messages, cfg):
@@ -738,12 +738,12 @@ def _two_paper_collection(api, storage, monkeypatch):
     queries = []
     from app import rag
     original = rag.search
-    def recorded(db, principal, cfg, query, mode, *args):
+    def recorded(db, principal, cfg, query, mode, *args, **kw):
         queries.append((query, mode))
         fixture_query = ("How do Sharedword and codeswitch   in their behaviour on code-switched input?"
                          if mode == "keyword" else
                          "How do Sharedword and codeswitch differ in their behaviour on code-switched input?")
-        return original(db, principal, cfg, fixture_query, mode, *args)
+        return original(db, principal, cfg, fixture_query, mode, *args, **kw)
     monkeypatch.setattr("app.rag.search", recorded)
     return a, b, admin, first, second, b_items, common, collection, queries
 

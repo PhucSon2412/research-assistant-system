@@ -5,8 +5,10 @@ import { useParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { api, describeError } from "../../../lib/api";
 import { RELATION_NOTE, citationStatusText, referenceLocator, type Reference } from "../../../lib/citations";
-import { makeRagBody } from "../../../lib/rag";
-import { NO_DOWNLOADABLE_FILE, commonItemNote, contentLabel, originalDownloadHref, type ItemFile } from "../../../lib/files";
+import { RAG_ALL_SCOPE_OPTION, RAG_NOTICE, makeRagBody, ragReasonText, ragScopeText, ragWithheldText } from "../../../lib/rag";
+import { NO_DOWNLOADABLE_FILE, commonItemNote, contentLabel, originalDownloadHref, sourceOriginalHref,
+  type ItemFile } from "../../../lib/files";
+import { sourceKindLabel } from "../../../lib/search";
 import { ReviewRequests } from "../../components/review-request";
 import { ErrorText, Shell, useSession } from "../../components/session";
 import type { Item } from "../../page";
@@ -24,11 +26,13 @@ type FileInfo = ItemFile;
 type JobInfo = { id: string; state: string; origin: string; attempt_count: number;
   last_error_code: string | null; warnings: string[];
   extraction_finished_at: string | null; finished_at: string | null };
+// `original_url` is set only when the download route's own gate allows it (RAG rights never do).
 type RagCitation = { chunk_id: string; quote: string; url: string;
   item_id: string; title: string | null; version_id: string; source_file_id: string;
-  locator_kind: string; start_page: number | null; start_line: number | null };
+  locator_kind: string; start_page: number | null; start_line: number | null;
+  visibility: "private" | "common"; original_url: string | null };
 type RagAnswer = { status: "answered" | "insufficient_evidence"; coverage: string | null;
-  reason?: "comparison_requires_multiple_papers" | "keyword_query_without_terms";
+  reason?: string; evidence_withheld?: number;
   scope: { kind: "item" | "collection" | "all"; item_id?: string; collection_id?: string };
   claims: { text: string; citations: RagCitation[] }[] };
 type Collection = { id: string; name: string };
@@ -151,7 +155,7 @@ export default function ItemPage() {
           </p>
           {item.visibility === "common" && (
             <p style={{ background: "#f3f3f3", padding: "0.5rem" }}>
-              {commonItemNote(item.files, item.content_status, item.fulltext_search_available)}</p>
+              {commonItemNote(item.files, item.content_status, item.fulltext_search_available, item.rag_available)}</p>
           )}
           {item.fulltext_search_available && (
             <p><Link href={`/search?item_id=${encodeURIComponent(item.id)}`}>Tìm trong paper này</Link></p>
@@ -219,14 +223,14 @@ export default function ItemPage() {
               </li>;
             })}</ol>}
           </section>}
+          {/* The API's RAG gate for this item; the server still checks rights (and pricing) on every request. */}
           {item.rag_available && <section>
             <h2>Hỏi đáp có dẫn nguồn</h2>
-            <p>Câu hỏi và các đoạn được chọn sẽ gửi qua OpenRouter/provider để tạo câu trả lời. Hỏi đáp chỉ dùng
-              paper riêng đã index của bạn, kể cả khi chọn collection; bản chung chưa được dùng làm bằng chứng.</p>
+            <p>{RAG_NOTICE}</p>
             <form onSubmit={ask}>
               <label>Phạm vi <select value={ragScope} onChange={(e) => { setRagScope(e.target.value); setRag(null); }}>
                 <option value="item">Paper này</option>
-                <option value="all">Tất cả paper riêng đã index của tôi (bản chung chưa dùng cho hỏi đáp)</option>
+                <option value="all">{RAG_ALL_SCOPE_OPTION}</option>
                 {collections.map((collection) => <option key={collection.id} value={collection.id}>
                   Collection: {collection.name}</option>)}
               </select></label>{" "}
@@ -241,21 +245,23 @@ export default function ItemPage() {
             </form>
             <ErrorText message={ragError} />
             {rag && <div aria-live="polite">
-              <p>Phạm vi đã hỏi: {rag.scope.kind === "item" ? "paper này" : rag.scope.kind === "all"
-                ? "tất cả paper riêng đã index của bạn" : `collection ${collections.find((c) => c.id === rag.scope.collection_id)?.name ?? rag.scope.collection_id}`}.</p>
+              <p>Phạm vi đã hỏi: {ragScopeText(rag.scope.kind, rag.scope.kind === "collection"
+                ? collections.find((c) => c.id === rag.scope.collection_id)?.name ?? rag.scope.collection_id : undefined)}.</p>
               <p>Trạng thái: {rag.status === "answered" ? "Có câu trả lời" : "Chưa đủ bằng chứng"}.
                 {rag.coverage === "partial" && " File chỉ được trích xuất một phần."}</p>
-              {rag.reason === "comparison_requires_multiple_papers" &&
-                <p>Chưa có nguồn từ ít nhất hai paper để so sánh.</p>}
-              {rag.reason === "keyword_query_without_terms" &&
-                <p>Câu hỏi chỉ gồm từ phổ biến nên chế độ từ khóa không có thuật ngữ để tìm; hãy thêm thuật ngữ cụ thể.</p>}
+              {ragReasonText(rag.reason) && <p>{ragReasonText(rag.reason)}</p>}
+              {ragWithheldText(rag.evidence_withheld) && <p><small>{ragWithheldText(rag.evidence_withheld)}</small></p>}
               {rag.claims.map((claim, index) => <p key={index}>
                 {claim.text}{" "}
-                {claim.citations.map((citation) => <span key={citation.chunk_id}>
-                  <Link href={citation.url}>[{citation.title || citation.item_id} · {citation.locator_kind === "pdf" ? `trang ${citation.start_page}` : `dòng ${citation.start_line}`}]</Link>{" "}
-                  <q>{citation.quote}</q>{" "}
-                  <small>Version {citation.version_id} · File {citation.source_file_id}</small>{" "}
-                </span>)}
+                {claim.citations.map((citation) => {
+                  const originalHref = sourceOriginalHref(citation.original_url, citation.locator_kind, citation.start_page);
+                  return <span key={citation.chunk_id}>
+                    <Link href={citation.url}>[{citation.title || citation.item_id} · {citation.locator_kind === "pdf" ? `trang ${citation.start_page}` : `dòng ${citation.start_line}`}]</Link>{" "}
+                    <q>{citation.quote}</q>{" "}
+                    <small>{sourceKindLabel(citation.visibility)} · Version {citation.version_id} · File {citation.source_file_id}
+                      {originalHref && <> · <a href={originalHref}>file gốc</a></>}</small>{" "}
+                  </span>;
+                })}
               </p>)}
             </div>}
           </section>}

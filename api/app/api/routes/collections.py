@@ -99,14 +99,22 @@ def list_collection_items(collection_id: uuid.UUID, limit: int = Query(20, ge=1,
     rows = db.execute(select(LibraryItem, CollectionItem.added_at).join(CollectionItem, CollectionItem.item_id == LibraryItem.id)
                       .where(*clause).order_by(CollectionItem.added_at, LibraryItem.id)
                       .limit(limit).offset(offset)).all()
-    # Whether search serves the item's text now: membership never decides it (same gate as /search).
+    # Whether search (and RAG) serve the item's text now: membership never decides it (same gates as
+    # /search and /rag/ask).
     common = [item.id for item, _ in rows if item.visibility == Visibility.COMMON.value]
-    searchable = set(db.scalars(select(LibraryItem.id).where(
-        LibraryItem.id.in_(common), common_fulltext_items_clause(principal))).all()) if common else set()
+
+    def gated(external_processing: bool) -> set[uuid.UUID]:
+        return set(db.scalars(select(LibraryItem.id).where(LibraryItem.id.in_(common), common_fulltext_items_clause(
+            principal, external_processing=external_processing))).all()) if common else set()
+    searchable, ragable = gated(False), gated(True)
+
+    def available(item: LibraryItem, common_ok: set[uuid.UUID]) -> bool:
+        return (item.id in common_ok if item.visibility == Visibility.COMMON.value
+                else item.content_status == ContentStatus.INDEXED.value)
     return {"items": [{"id": str(item.id), "title": item.title, "visibility": item.visibility,
                        "content_status": item.content_status, "added_at": added.isoformat(),
-                       "fulltext_search_available": (item.id in searchable if item.visibility == Visibility.COMMON.value
-                                                     else item.content_status == ContentStatus.INDEXED.value)}
+                       "fulltext_search_available": available(item, searchable),
+                       "rag_available": available(item, ragable)}
                       for item, added in rows], "total": total, "limit": limit, "offset": offset}
 
 

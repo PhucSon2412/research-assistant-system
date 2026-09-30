@@ -20,7 +20,7 @@ type Result = { mode: "keyword" | "hybrid"; rerank_status: string; rerank_withhe
   keyword_query?: { status: "ok" | "no_terms"; terms: number; min_match: number; dropped_terms: number } };
 type Collection = { id: string; name: string };
 type CollectionItem = { id: string; title: string | null; content_status: string; visibility: string;
-  fulltext_search_available?: boolean };
+  fulltext_search_available?: boolean; rag_available?: boolean };
 
 export default function SearchPage() {
   const user = useSession();
