@@ -30,14 +30,20 @@ list/count/detail, collections) drops the item in SQL; file, chunk, search
 and RAG never served it. Private items and other common copies are untouched.
 
 **Cleanup** works from unpurged tombstones, each in its own transaction, and
-is safe to repeat: it refuses while derived full-text rows exist (none can in
-this PR), removes collection memberships, deletes the common object unless a
-row that is not revoked names the same key, and **removes the copy's
+is safe to repeat: it locks the tombstone, then the item; deletes the copy's
+derived full-text rows in foreign-key order (active pointer, citation links,
+references, index entries, generations, chunks, sections, PDF pages, metadata
+candidates) and nulls the vector and chunk hash of its embedding calls while
+keeping their cost columns (M6b-2b2a); finishes its unfinished jobs as
+``cancelled``; removes collection memberships; deletes the common object
+unless a row that is not revoked names the same key; and **removes the copy's
 metadata** (``RevokedMetadataField``: title, source URL, file name, the rights'
 source text, licence URL, evidence note and conditions) unless a retention
 basis recorded at revocation names that field. Having been publishable is
-not such a basis. The DB refuses ``purged_at`` while a field without basis
-is left. Only the common copy's rows are touched, never the private item.
+not such a basis. The DB refuses ``purged_at`` while a derived row, embedding
+content or a field without basis is left, and refuses derived writes to a
+revoked copy from ``t_rev`` on (0024). Only the common copy's rows are
+touched, never the private item, even with the same checksum.
 
 Tombstones are never deleted; ``export_tombstones``/``apply_tombstones`` are
 a *manual* recovery step after a restore. Until the journal is applied, a
@@ -53,18 +59,19 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from sqlalchemy import Engine, delete, func, select, text, update
+from sqlalchemy import Engine, delete, func, or_, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.errors import ApiError
 from app.audit import record_event
 from app.authz import Principal, review_copy_admin_clause
-from app.models import (AccessRights, Chunk, CollectionItem, CommonPublication, DeletionTombstone, IndexGeneration,
-                        IngestionJob, LibraryItem, MetadataCandidate, PaperVersion, PdfPage, ReferenceEntry,
-                        RevocationMetadataRetention, Section, SourceFile, User)
-from app.models.enums import (AuditActorType, AuditOutcome, CleanupObjectOutcome, ContentStatus, PublicationState,
-                              RevocationReason, RevokedMetadataField, TombstoneKind, UserRole)
+from app.models import (AccessRights, Chunk, CollectionItem, CommonPublication, DeletionTombstone, EmbeddingCall,
+                        IndexEntry, IndexGeneration, IngestionJob, IngestStepAttempt, LibraryItem, MetadataCandidate,
+                        PaperVersion, PdfPage, ReferenceCitationLink, ReferenceEntry, RevocationMetadataRetention,
+                        Section, SourceFile, User)
+from app.models.enums import (AuditActorType, AuditOutcome, CleanupObjectOutcome, ContentStatus, JobState,
+                              PublicationState, RevocationReason, RevokedMetadataField, TombstoneKind, UserRole)
 from app.promotion import verified_read
 from app.storage import OriginalStorage, is_missing_object
 
@@ -278,15 +285,63 @@ def revoke(db: Session, admin: Principal, item_id: uuid.UUID, reason: Revocation
 
 # --- cleanup ------------------------------------------------------------------
 
-# Full-text derivatives a later PR may create for a common copy. This PR creates
-# none; cleanup refuses rather than leave them behind or guess their order.
-DERIVED_TABLES = (Chunk, Section, PdfPage, ReferenceEntry, MetadataCandidate, IndexGeneration)
-
-
 class CleanupError(Exception):
     def __init__(self, code: str):
         super().__init__(code)
         self.code = code
+
+
+def _gone(db: Session, stmt) -> int:
+    return db.execute(stmt.execution_options(synchronize_session=False)).rowcount
+
+
+def _remove_derived(db: Session, item_id: uuid.UUID, now: datetime) -> tuple[dict[str, int], int]:
+    """Delete the copy's full-text derivatives in foreign-key order and scrub its embedding ledger.
+
+    Every row removed names this item, directly or through its generation,
+    reference or source file; a private copy with the same checksum has its own
+    rows and files and is not touched. Embedding calls keep model, provider,
+    tokens, cost, status and day, and lose the vector and chunk hash. Returns
+    counts per table and the number of calls scrubbed. The item is locked.
+    """
+    files = select(SourceFile.id).where(SourceFile.item_id == item_id)
+    generations = select(IndexGeneration.id).where(IndexGeneration.item_id == item_id)
+    calls = select(EmbeddingCall.id).where(EmbeddingCall.source_file_id.in_(files))
+    # An entry of another item's generation naming this copy's chunk or vector cannot come from
+    # the pipeline; removing it would break that other index, so stop and leave it to an operator.
+    if db.scalar(select(func.count()).select_from(IndexEntry).where(
+            IndexEntry.generation_id.not_in(generations),
+            or_(IndexEntry.chunk_id.in_(select(Chunk.id).where(Chunk.item_id == item_id)),
+                IndexEntry.embedding_call_id.in_(calls)))):
+        raise CleanupError("derived_rows_shared")
+    db.execute(update(LibraryItem).where(
+        LibraryItem.id == item_id, or_(LibraryItem.active_index_generation_id.is_not(None),
+                                       LibraryItem.content_status != ContentStatus.METADATA_ONLY.value))
+        .values(active_index_generation_id=None, content_status=ContentStatus.METADATA_ONLY.value))
+    removed = {
+        "reference_citation_links": _gone(db, delete(ReferenceCitationLink).where(
+            ReferenceCitationLink.reference_id.in_(select(ReferenceEntry.id).where(ReferenceEntry.item_id == item_id)))),
+        "reference_entries": _gone(db, delete(ReferenceEntry).where(ReferenceEntry.item_id == item_id)),
+        "index_entries": _gone(db, delete(IndexEntry).where(IndexEntry.generation_id.in_(generations))),
+    }
+    scrubbed = _gone(db, update(EmbeddingCall).where(
+        EmbeddingCall.source_file_id.in_(files), EmbeddingCall.content_removed_at.is_(None))
+        .values(vector=None, chunk_hash=None, content_removed_at=now))
+    for model in (IndexGeneration, Chunk, Section, PdfPage, MetadataCandidate):
+        removed[model.__tablename__] = _gone(db, delete(model).where(model.item_id == item_id))
+    return removed, scrubbed
+
+
+def _finish_jobs(db: Session, item_id: uuid.UUID, now: datetime) -> int:
+    """End the copy's unfinished jobs: a worker still holding a lease loses it, beat never reclaims them."""
+    jobs = select(IngestionJob.id).where(IngestionJob.item_id == item_id, IngestionJob.finished_at.is_(None))
+    _gone(db, update(IngestStepAttempt).where(IngestStepAttempt.job_id.in_(jobs),
+                                              IngestStepAttempt.outcome == "running")
+          .values(outcome="cancelled", error_code="cancelled", finished_at=now))
+    return _gone(db, update(IngestionJob).where(IngestionJob.id.in_(jobs)).values(
+        state=JobState.CANCELLED.value, finished_at=now, updated_at=now, last_error_code="cancelled",
+        cancel_requested=True, cancel_requested_at=func.coalesce(IngestionJob.cancel_requested_at, now),
+        lease_token=None, lease_until=None, next_attempt_at=None))
 
 
 def _object_in_use(db: Session, key: str, source_file_id: uuid.UUID | None) -> bool:
@@ -347,12 +402,14 @@ def _purge_one(db: Session, storage: OriginalStorage, tombstone_id: uuid.UUID, n
     if tomb is None or tomb.purged_at is not None:
         db.rollback()
         return None
-    item = db.get(LibraryItem, tomb.item_id)
+    # Tombstone, then item: revoke and replay lock the item and insert (never lock) a tombstone.
+    item = db.scalar(select(LibraryItem).where(LibraryItem.id == tomb.item_id).with_for_update()
+                     .execution_options(populate_existing=True))
     if item is not None and item.publication_state != PublicationState.REVOKED.value:
         raise CleanupError("target_not_revoked")
-    for model in DERIVED_TABLES:
-        if db.scalar(select(func.count()).select_from(model).where(model.item_id == tomb.item_id)):
-            raise CleanupError("derived_rows_present")
+    # From t_rev the DB refuses new derived rows (0024), so every row to remove is committed and visible.
+    derived, scrubbed = _remove_derived(db, tomb.item_id, now) if item is not None else ({}, 0)
+    jobs = _finish_jobs(db, tomb.item_id, now) if item is not None else 0
     removed = db.execute(delete(CollectionItem).where(CollectionItem.item_id == tomb.item_id)).rowcount
     if tomb.storage_key is None:
         outcome = CleanupObjectOutcome.NO_OBJECT
@@ -360,10 +417,10 @@ def _purge_one(db: Session, storage: OriginalStorage, tombstone_id: uuid.UUID, n
         outcome = CleanupObjectOutcome.SHARED_KEPT
     else:
         outcome = _remove_object(storage, tomb.storage_key)
-    scrubbed, kept = _remove_metadata(db, tomb.item_id, now) if item is not None else ([], [])
-    tomb.scrubbed_fields = scrubbed
+    scrubbed_fields, kept = _remove_metadata(db, tomb.item_id, now) if item is not None else ([], [])
+    tomb.scrubbed_fields = scrubbed_fields
     tomb.retained_fields = kept
-    tomb.purged_at = now  # the DB refuses this while a field without basis is left
+    tomb.purged_at = now  # the DB refuses this while a derived row or a field without basis is left
     tomb.object_outcome = outcome.value
     tomb.cleanup_attempts += 1
     tomb.last_cleanup_at = now
@@ -371,7 +428,8 @@ def _purge_one(db: Session, storage: OriginalStorage, tombstone_id: uuid.UUID, n
     record_event(db, action="common_copy.cleanup", outcome=AuditOutcome.SUCCESS, actor_type=AuditActorType.SYSTEM,
                  target_type="deletion_tombstone", target_id=str(tomb.id),
                  details={"object_outcome": outcome.value, "memberships_removed": removed,
-                          "scrubbed_fields": scrubbed, "retained_fields": kept})
+                          "derived_rows_removed": derived, "embedding_calls_scrubbed": scrubbed,
+                          "jobs_cancelled": jobs, "scrubbed_fields": scrubbed_fields, "retained_fields": kept})
     db.commit()
     return outcome.value
 

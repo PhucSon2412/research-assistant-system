@@ -14,6 +14,10 @@ transaction advisory lock while they read discovery state; the discovery page
 writer holds it *exclusive* while it re-targets links. Under READ COMMITTED,
 whichever side acquires second sees the other's committed rows, so a reference
 and its discovery record arriving together cannot both miss each other.
+
+References of a revoked common copy are skipped by the backfill and the
+discovery re-target: the DB refuses link writes for such a copy from ``t_rev``
+until cleanup deletes its references (0024).
 """
 from __future__ import annotations
 
@@ -32,7 +36,9 @@ from sqlalchemy.orm import Session
 from app.config import CitationPolicy
 from app.models.citation import ReferenceCitationLink
 from app.models.discovery import DiscoveryDeletedRecord, DiscoveryPaper
+from app.models.enums import PublicationState
 from app.models.ingest import ReferenceEntry
+from app.models.library import LibraryItem
 
 MATCHER_VERSION = "arxiv-exact-v2"
 METHOD = "arxiv_id_exact"
@@ -236,6 +242,12 @@ def reconcile_references(db: Session, *, reference_ids: Iterable[uuid.UUID] | No
     return len(parsed)
 
 
+def not_revoked_reference_clause():
+    """References whose item may still get links: not a revoked common copy (awaiting cleanup)."""
+    return ReferenceEntry.item_id.not_in(select(LibraryItem.id).where(
+        LibraryItem.publication_state == PublicationState.REVOKED.value))
+
+
 def reconcile_arxiv_ids(db: Session, arxiv_ids: Iterable[str], now: datetime | None = None) -> int:
     """Re-target existing exact links after discovery rows or tombstones change."""
     ids = set(arxiv_ids)
@@ -245,8 +257,10 @@ def reconcile_arxiv_ids(db: Session, arxiv_ids: Iterable[str], now: datetime | N
     _lock(db, exclusive=True)
     targets = _targets(db, ids)
     changed = 0
-    for link in db.scalars(select(ReferenceCitationLink).where(
-            ReferenceCitationLink.arxiv_id.in_(ids), ReferenceCitationLink.match_status.in_(EXACT))
+    for link in db.scalars(select(ReferenceCitationLink).join(
+            ReferenceEntry, ReferenceEntry.id == ReferenceCitationLink.reference_id).where(
+            ReferenceCitationLink.arxiv_id.in_(ids), ReferenceCitationLink.match_status.in_(EXACT),
+            not_revoked_reference_clause())
             .order_by(ReferenceCitationLink.reference_id)).all():
         status, paper_id = targets[link.arxiv_id]
         if (link.match_status, link.discovery_paper_id) != (status, paper_id):
@@ -311,7 +325,7 @@ def reconcile_pending(engine: Engine, policy: CitationPolicy, now: datetime | No
         with Session(engine) as db:
             ids = db.scalars(select(ReferenceEntry.id).outerjoin(
                 ReferenceCitationLink, ReferenceCitationLink.reference_id == ReferenceEntry.id)
-                .where(pending_references_clause()).order_by(ReferenceEntry.id)
+                .where(pending_references_clause(), not_revoked_reference_clause()).order_by(ReferenceEntry.id)
                 .limit(policy.reconcile_batch_size)).all()
             if not ids:
                 break
