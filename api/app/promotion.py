@@ -95,7 +95,7 @@ def _granted(admin: Principal, rid: uuid.UUID):
             .where(ReviewRequest.id == rid, review_grant_clause(admin)))
 
 
-def _verified_read(storage: OriginalStorage, key: str, size: int, checksum: str, spool: IO[bytes] | None) -> bool:
+def verified_read(storage: OriginalStorage, key: str, size: int, checksum: str, spool: IO[bytes] | None) -> bool:
     body = storage.open(key)
     digest, seen = hashlib.sha256(), 0
     try:
@@ -133,7 +133,7 @@ def _copy_original(db: Session, admin: Principal, storage: OriginalStorage, rid:
     key = f"originals/{uuid.uuid4().hex}"
     with tempfile.TemporaryFile() as spool:
         try:
-            intact = _verified_read(storage, original.storage_key, original.byte_size, original.checksum, spool)
+            intact = verified_read(storage, original.storage_key, original.byte_size, original.checksum, spool)
         except Exception:
             raise _refuse(db, admin, rid, 503, "approval_storage_unavailable", "source_unavailable",
                           AuditOutcome.FAILURE) from None
@@ -142,7 +142,7 @@ def _copy_original(db: Session, admin: Principal, storage: OriginalStorage, rid:
                           AuditOutcome.FAILURE)
         try:
             storage.put(key, spool, original.mime)
-            copied = _verified_read(storage, key, original.byte_size, original.checksum, None)
+            copied = verified_read(storage, key, original.byte_size, original.checksum, None)
         except Exception:
             _discard(storage, key)
             raise _refuse(db, admin, rid, 503, "approval_storage_unavailable", "copy_failed",

@@ -56,6 +56,7 @@ def test_defaults_match_documented_mvp_values() -> None:
     )
     assert s.retention.deleted_cleanup_deadline == timedelta(hours=24)
     assert s.retention.backup_retention == timedelta(days=30)
+    assert (s.retention.cleanup_poll_seconds, s.retention.cleanup_batch_size) == (900, 50)
     assert s.budget.app_daily_usd == 10.0
     assert s.budget.key_spending_cap_daily_usd == 50.0
     assert s.budget.embedding_daily_usd == 3.0
@@ -115,6 +116,8 @@ def test_redis_broker_password_is_url_escaped() -> None:
         lambda: PdfBodyThreshold(min_body_page_ratio=1.01),
         lambda: PdfBodyThreshold(min_body_page_ratio=0),
         lambda: Retention(backup_retention=timedelta(0)),
+        lambda: Retention(cleanup_poll_seconds=6 * 3600 + 1),  # fewer than four tries in 24 h
+        lambda: Retention(cleanup_batch_size=0),
         lambda: ProviderBudget(generation_daily_usd=6.0),  # 3 + 2 + 6 > 10
         lambda: ProviderBudget(app_daily_usd=60.0),  # above the key cap
         lambda: ProviderBudget(user_embedding_daily_usd=4.0),

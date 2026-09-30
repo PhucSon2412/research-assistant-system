@@ -32,7 +32,7 @@ def test_m5a_discovery_routes_registered() -> None:
     assert "/library/items/{item_id}/references" in paths
 
 
-def test_review_routes_registered_without_publication() -> None:
+def test_review_routes_registered_with_publish_and_revoke_only_on_common_copies() -> None:
     spec = app.openapi()["paths"]
     paths = set(spec)
     assert {"/review-requests", "/review-requests/notice", "/review-requests/{request_id}",
@@ -40,8 +40,15 @@ def test_review_routes_registered_without_publication() -> None:
             "/admin/review-requests/{request_id}", "/admin/review-requests/{request_id}/reject",
             "/admin/review-requests/{request_id}/files/{file_id}/original",
             "/admin/review-requests/{request_id}/approve",
-            "/admin/pending-publications", "/admin/pending-publications/{item_id}"} <= paths
-    # M6b-1 approves into a pending copy; nothing publishes it or edits/opens its rights or file.
+            "/admin/pending-publications", "/admin/pending-publications/{item_id}",
+            "/admin/common-copies", "/admin/common-copies/{item_id}",
+            "/admin/common-copies/{item_id}/publish", "/admin/common-copies/{item_id}/revoke"} <= paths
+    # The pending view stays read-only; M6b-2a actions live on /admin/common-copies.
     assert set(spec["/admin/pending-publications"]) == set(spec["/admin/pending-publications/{item_id}"]) == {"get"}
-    assert not [p for p in paths if any(word in p for word in ("/publish", "promot", "access-rights"))
-                or (p.startswith("/admin/pending-publications") and p.count("/") > 3)]
+    assert set(spec["/admin/common-copies/{item_id}/publish"]) == set(spec["/admin/common-copies/{item_id}/revoke"])         == {"post"}
+    # Nothing opens or edits a common copy's rights or file (full text is a later PR).
+    assert not [p for p in paths if any(word in p for word in ("promot", "access-rights"))
+                or (p.startswith("/admin/pending-publications") and p.count("/") > 3)
+                or (p.startswith("/admin/common-copies") and p.count("/") > 3
+                    and not p.endswith(("/publish", "/revoke")))]
+    assert [p for p in paths if "/publish" in p] == ["/admin/common-copies/{item_id}/publish"]

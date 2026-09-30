@@ -9,6 +9,11 @@ Decisions depend on item ownership, not on role alone (docs/access-and-data.md):
 - a ``pending`` common copy (M6b-1: rights recorded, not published) is absent
   from every normal route for everyone; only ``pending_publication_clause``
   lets an Admin read its metadata and rights on a dedicated route;
+- a published (``listed``) reviewed copy is visible as *metadata only*
+  (M6b-2a): file, chunks, search and RAG still go through the private-owner
+  gates, so nothing of its content opens; a ``revoked`` copy is absent from
+  every normal route. ``review_copy_admin_clause`` is the Admin-only view of
+  reviewed copies in any state, used by ``/admin/common-copies``;
 - ``common`` metadata is edited by Admins, ``private`` metadata by its owner.
 
 List/count queries embed ``visible_items_clause`` in SQL *before* ordering,
@@ -21,9 +26,9 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import ColumnElement, and_, false, or_
+from sqlalchemy import ColumnElement, and_, false, or_, select
 
-from app.models import LibraryItem, PaperVersion, ReviewRequest, SourceFile
+from app.models import AccessRights, LibraryItem, PaperVersion, ReviewRequest, SourceFile
 from app.models.enums import PublicationState, ReviewStatus, UserRole, Visibility
 
 
@@ -103,6 +108,22 @@ def pending_publication_clause(principal: Principal) -> ColumnElement[bool]:
     return and_(
         LibraryItem.visibility == Visibility.COMMON.value,
         LibraryItem.publication_state == PublicationState.PENDING.value,
+    )
+
+
+def review_copy_admin_clause(principal: Principal) -> ColumnElement[bool]:
+    """Admin-only view of common copies created from a review, in any state.
+
+    Used solely by ``/admin/common-copies`` (publish, revoke, cleanup status).
+    It opens metadata and recorded rights, never file bytes, chunks or index.
+    Common items without AccessRights (pre-M6b-1 ``listed``) never match.
+    """
+    if not principal.is_admin:
+        return false()
+    return and_(
+        LibraryItem.visibility == Visibility.COMMON.value,
+        # Correlate only the item: callers may also join AccessRights in the outer query.
+        select(AccessRights.id).where(AccessRights.item_id == LibraryItem.id).correlate_except(AccessRights).exists(),
     )
 
 

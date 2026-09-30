@@ -6,6 +6,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { api, describeError } from "../../../lib/api";
 import { RELATION_NOTE, citationStatusText, referenceLocator, type Reference } from "../../../lib/citations";
 import { makeRagBody } from "../../../lib/rag";
+import { COMMON_METADATA_ONLY_NOTE } from "../../../lib/review";
 import { ReviewRequests } from "../../components/review-request";
 import { ErrorText, Shell, useSession } from "../../components/session";
 import type { Item } from "../../page";
@@ -148,6 +149,9 @@ export default function ItemPage() {
             Kho: {item.visibility === "common" ? "chung" : "riêng của bạn"} · Nội dung:{" "}
             {item.content_status === "indexed" ? "đã index" : "chỉ metadata"}
           </p>
+          {item.visibility === "common" && item.content_status !== "indexed" && (
+            <p style={{ background: "#f3f3f3", padding: "0.5rem" }}>{COMMON_METADATA_ONLY_NOTE}</p>
+          )}
           {item.can_edit && (
             <form onSubmit={save} style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
               <input name="title" defaultValue={item.title ?? ""} maxLength={1000} style={{ flex: 1, minWidth: 200 }} />

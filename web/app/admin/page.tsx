@@ -71,7 +71,7 @@ export default function AdminPage() {
     <Shell user={user}>
       <h1>Quản trị</h1>
       <p><Link href="/admin/reviews">Yêu cầu duyệt paper riêng</Link> (chỉ xem đúng version/file User gửi) ·{" "}
-        <Link href="/admin/publications">Bản chung chờ công bố</Link></p>
+        <Link href="/admin/publications">Bản chung (chờ công bố / đã công bố / đã thu hồi)</Link></p>
       <ErrorText message={error} />
       {notice && <p role="status">{notice}</p>}
 

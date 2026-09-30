@@ -60,3 +60,10 @@ class OriginalStorage:
 
 def get_storage(settings: Settings) -> OriginalStorage:
     return OriginalStorage(settings)
+
+
+def is_missing_object(exc: BaseException) -> bool:
+    """True when S3 says the key does not exist (as opposed to being unreachable)."""
+    if not isinstance(exc, ClientError):
+        return False
+    return exc.response.get("Error", {}).get("Code") in ("NoSuchKey", "404", "NotFound")

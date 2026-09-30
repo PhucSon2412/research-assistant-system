@@ -1,6 +1,7 @@
-// M6a review requests and M6b-1 approval: shapes and pure helpers shared by the
-// owner and Admin screens. The API decides who may submit, withdraw, reject,
-// approve or open a file; approval creates a pending (unpublished) common copy.
+// M6a review requests, M6b-1 approval and M6b-2a publish/revoke: shapes and pure
+// helpers shared by the owner and Admin screens. The API decides who may submit,
+// withdraw, reject, approve, publish, revoke or open a file. Approval creates a
+// pending common copy; publishing lists its metadata only (full text stays closed).
 
 export type ReviewStatus = "open" | "withdrawn" | "rejected" | "approved";
 
@@ -29,18 +30,88 @@ export type AdminReviewRequest = Closure & { review_available: boolean; publicat
 export type RightsScope = { audience: "instance_users"; original_download: boolean; fulltext_search: boolean;
   external_processing: boolean; conditions: string | null };
 
+export type PublicationState = "pending" | "listed" | "revoked";
+
 // A common copy with Admin-recorded rights that is not published (M6b-1).
 export type PendingPublication = {
-  id: string; title: string | null; publication_state: "pending"; published: false; content_status: string;
-  created_at: string; note: string;
+  id: string; title: string | null; publication_state: PublicationState; published: boolean; content_status: string;
+  fulltext_available: false; created_at: string; note: string;
   version: { id: string; source_url: string | null; received_at: string };
   file: { id: string; filename: string | null; verified_mime: string; byte_size: number; page_count: number | null;
     checksum_sha256: string };
+  // verified_source is null once cleanup removed a revoked copy's metadata (M6b-2a).
   rights: { id: string; origin_kind: string; origin_review_request_id: string; file_checksum_sha256: string;
-    verified_source: string; verified_source_url: string | null; license_url: string | null;
+    verified_source: string | null; verified_source_url: string | null; license_url: string | null;
     evidence_note: string | null; checked_on: string; recorded_at: string; reviewer_email: string;
-    scope: RightsScope };
+    scope: RightsScope; revoked_at?: string | null; revocation_reason_code?: string | null;
+    metadata_removed_at?: string | null };
 };
+
+// Any reviewed common copy, as /admin/common-copies returns it (M6b-2a).
+export type CommonCopy = PendingPublication & {
+  publication: { published_at: string; revoked_at: string | null; verified_byte_size: number } | null;
+  duplicate_published_item_id?: string | null;
+  tombstone: { id: string; reason_code: string; prior_publication_state: "pending" | "listed"; recorded_at: string;
+    purge_due_at: string; purged_at: string | null; object_outcome: string | null; cleanup_attempts: number;
+    last_cleanup_error: string | null; overdue: boolean; removed_fields: string[] | null;
+    retained_fields: string[] | null } | null;
+  retention_bases: { field: string; policy_source: string; scope: string; reason: string;
+    confirmed_by_email: string; recorded_at: string }[];
+};
+
+// Metadata cleanup removes from a revoked copy unless a per-field basis keeps it.
+export const REVOKED_METADATA_FIELDS: Record<string, string> = {
+  title: "tiêu đề",
+  source_url: "URL nguồn",
+  original_filename: "tên file",
+  verified_source: "nguồn đã kiểm",
+  license_url: "URL giấy phép",
+  evidence_note: "ghi chú bằng chứng",
+  scope_conditions: "điều kiện sử dụng",
+};
+
+export function fieldList(fields: string[] | null): string {
+  if (!fields || fields.length === 0) return "không";
+  return fields.map((f) => REVOKED_METADATA_FIELDS[f] ?? f).join(", ");
+}
+
+export const PUBLICATION_STATE_TEXT: Record<PublicationState, string> = {
+  pending: "Chờ công bố",
+  listed: "Đã công bố metadata (toàn văn chưa khả dụng)",
+  revoked: "Đã thu hồi",
+};
+
+export const REVOCATION_REASONS: Record<string, string> = {
+  rights_recorded_in_error: "Quyền đã ghi bị sai",
+  rights_withdrawn: "Bên giữ quyền đã thu hồi",
+  rights_expired: "Quyền hết hạn",
+  wrong_file_or_version: "Sai file hoặc version",
+  duplicate_copy: "Bản trùng",
+  other: "Lý do khác",
+};
+
+export const OBJECT_OUTCOME_TEXT: Record<string, string> = {
+  deleted: "đã xóa object chung",
+  already_absent: "object chung đã không còn",
+  shared_kept: "giữ object vì bản hợp lệ khác còn dùng",
+  no_object: "không có object",
+};
+
+// Publishing names the exact bytes shown on the page; null until the unticked box is ticked.
+export function makePublishBody(confirmed: boolean, checksum: string) {
+  if (!confirmed || !/^[0-9a-f]{64}$/.test(checksum)) return null;
+  return { confirm_publish: true as const, file_checksum_sha256: checksum };
+}
+
+// Revoking needs a listed reason code and the unticked box; no free text is sent.
+export function makeRevokeBody(confirmed: boolean, reason: string) {
+  if (!confirmed || !Object.hasOwn(REVOCATION_REASONS, reason)) return null;
+  return { confirm_revoke: true as const, reason_code: reason };
+}
+
+// The library item page shows this for any common item that is not indexed.
+export const COMMON_METADATA_ONLY_NOTE = "Toàn văn chưa khả dụng: bản chung này hiện chỉ có metadata. Chưa có file "
+  + "gốc, tìm kiếm toàn văn, đoạn trích hay hỏi đáp cho bản này.";
 
 export type FileChoice = { id: string; version_id: string; filename: string | null };
 export type VersionInfo = { id: string; version_label: string | null };
