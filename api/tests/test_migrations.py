@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 import hashlib
 import io
 from decimal import Decimal
@@ -652,6 +654,55 @@ def test_0026_leaves_registration_to_the_operator_and_imports_existing_tombstone
     eng.dispose()
     with pytest.raises(Exception, match="registered with a revocation journal"):
         command.downgrade(alembic_config(empty_db_url), "0025")
+
+
+def test_0027_backfills_revoke_records_unconfirmed_so_recover_must_confirm_them(empty_db_url: str,
+                                                                                tmp_path) -> None:
+    from types import SimpleNamespace
+
+    from app import journal, recovery
+    from app.clock import utcnow
+    from app.identity.passwords import hash_password
+
+    upgrade(empty_db_url, "0026")
+    eng = create_engine(empty_db_url)
+    path = tmp_path / "revocations.jsonl"
+    genesis = journal.genesis(uuid.uuid4(), utcnow(), "new_install")
+    with eng.begin() as conn:
+        admin = conn.scalar(text("INSERT INTO users(email,password_verifier,role) VALUES('a@x.test',:p,'admin')"
+                                 " RETURNING id"), {"p": hash_password("m6c1-migration-password")})
+        body = {"id": str(uuid.uuid4()), "target_kind": "common_copy", "item_id": str(uuid.uuid4()),
+                "version_id": None, "source_file_id": None, "storage_key": None, "access_rights_id": None,
+                "reason_code": "other", "prior_publication_state": "listed", "rights_epoch": 1,
+                "recorded_at": utcnow().isoformat(), "recorded_by_user_id": str(admin),
+                "purge_due_at": utcnow().isoformat(), "retentions": []}
+        revocation = journal.next_record(genesis, journal.REVOCATION, body)
+        conn.execute(text("INSERT INTO recovery_registrations(id,journal_id,genesis_hash,mode,registered_at)"
+                          " VALUES(1,:j,:h,'new_install',now())"), {"j": genesis.body["journal_id"], "h": genesis.hash})
+        for record, via, tomb in ((genesis, "genesis", None), (revocation, "revoke", body["id"])):
+            conn.execute(text("""INSERT INTO revocation_journal_records(seq,kind,record_hash,line,tombstone_id,
+                applied_via,result) VALUES(:s,:k,:h,:l,:t,:v,'x')"""),
+                         {"s": record.seq, "k": record.kind, "h": record.hash, "l": record.line, "t": tomb, "v": via})
+        conn.execute(text("""INSERT INTO deletion_tombstones(id,target_kind,item_id,reason_code,prior_publication_state,
+            rights_epoch,recorded_at,recorded_by_user_id,purge_due_at)
+            VALUES(:t,'common_copy',:i,'other','listed',1,now(),:a,now()+interval '1 day')"""),
+                     {"t": body["id"], "i": body["item_id"], "a": admin})
+    journal.create(path, [genesis, revocation])
+    upgrade(empty_db_url)
+    with eng.connect() as conn:
+        assert conn.execute(text("SELECT seq, journal_confirmed FROM revocation_journal_records ORDER BY seq")).all() \
+            == [(1, True), (2, False)]
+    settings = SimpleNamespace(recovery=SimpleNamespace(journal_path=path, gate_lock_timeout_ms=2000,
+                                                        cleanup_passes=1),
+                               retention=SimpleNamespace(cleanup_batch_size=10))
+    # A 0026 revocation may have been the complete-line-but-fsync-failed case: closed until recover confirms.
+    assert recovery.evaluate(settings, eng).reason == "journal_unconfirmed"
+    with pytest.raises(Exception, match="not confirmed durable"):
+        command.downgrade(alembic_config(empty_db_url), "0026")
+    report = recovery.recover(eng, None, settings, utcnow())
+    assert report.journal_confirmed == 1 and report.gate == "open"
+    eng.dispose()
+    command.downgrade(alembic_config(empty_db_url), "0026")  # all confirmed: allowed
 
 
 def test_collection_membership_foreign_keys_restrict(migrated_db_url: str) -> None:

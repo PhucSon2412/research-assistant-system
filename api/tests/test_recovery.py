@@ -319,6 +319,79 @@ def test_journal_write_failure_still_closes_the_copy_and_keeps_the_gate_shut_unt
     assert not key_present(w.storage, common_key(w.api, w.copy))  # recover also ran cleanup
 
 
+def fsync_fails(monkeypatch):
+    """Every os.fsync raises (the line itself is written in full); returns a function that restores it."""
+    import os
+
+    real = os.fsync
+
+    def refuse(fd):
+        raise OSError("fsync: I/O error")
+    monkeypatch.setattr(os, "fsync", refuse)
+    return lambda: monkeypatch.setattr(os, "fsync", real)
+
+
+def unconfirmed(engine) -> list[int]:
+    with engine.connect() as conn:
+        return list(conn.scalars(text("SELECT seq FROM revocation_journal_records WHERE NOT journal_confirmed"
+                                      " ORDER BY seq")).all())
+
+
+def test_complete_line_whose_fsync_fails_keeps_the_gate_shut_until_recover_confirms_it(upload_api, monkeypatch):
+    """PR #26 review: the whole line is in the file and matches the DB copy, but fsync raised, so it was
+    never confirmed durable. The revocation still commits (fail closed), the API answers an error and the
+    gate must stay closed; only recover, after its own successful fsync, confirms the record."""
+    w = listed(upload_api, monkeypatch, copies=2)  # the second copy stays pending
+    restore = fsync_fails(monkeypatch)
+    response = revoke(w.admin, w.copy)
+    restore()
+    assert (response.status_code, response.json()) == (503, {"error": "revocation_journal_unavailable"})
+    assert state(w.api, w.copy) == "revoked"
+    # The complete line is in the file and identical to the DB copy: the case the gate used to open on.
+    (rec,) = records("revocation")
+    assert rec.body["item_id"] == w.copy
+    assert [(r.seq, r.kind, r.hash, r.line) for r in records()] == mirror(w.api.engine)
+    assert unconfirmed(w.api.engine) == [rec.seq]
+    assert gate(w.api.engine) == "journal_unconfirmed"
+    assert TestClient(app).get("/readyz").status_code == 503
+    assert_recovering(w.browsers, [("GET", "/library/items"), ("GET", f"/library/items/{w.ids_a['item_id']}"),
+                                   ("GET", f"/files/{w.ids_a['file_id']}/original")])
+    # No further revocation is journaled behind the unconfirmed line.
+    with Session(w.api.engine) as db, pytest.raises(ApiError) as caught:
+        publication.revoke(db, admin_principal(w.api), uuid.UUID(w.copies[1]), RevocationReason.OTHER,
+                           w.api.clock.now, timedelta(hours=24))
+    assert (caught.value.status_code, caught.value.code) == (503, "service_recovering")
+    assert state(w.api, w.copies[1]) == "pending" and len(records()) == 2
+    # recover cannot confirm while fsync still fails: the gate stays closed.
+    restore = fsync_fails(monkeypatch)
+    with pytest.raises(RecoveryError, match="journal_sync_failed"):
+        do_recover(w.api.engine, w.storage, w.api.clock.now)
+    restore()
+    assert unconfirmed(w.api.engine) == [rec.seq] and gate(w.api.engine) == "journal_unconfirmed"
+    # Once the file syncs, recover confirms the record (no --confirm-db-is-current: the line is in the file).
+    report = do_recover(w.api.engine, w.storage, w.api.clock.now)
+    assert report.journal_confirmed == 1 and report.journal_repaired == 0 and report.gate == "open"
+    assert unconfirmed(w.api.engine) == []
+    assert w.b.get(f"/library/items/{w.copy}").json() == MISSING
+
+
+def test_only_confirmation_may_change_a_journal_record(api):
+    """The mirror stays append-only except journal_confirmed false -> true, every other column unchanged."""
+    statements = ("UPDATE revocation_journal_records SET journal_confirmed=false",
+                  "UPDATE revocation_journal_records SET journal_confirmed=true, result='x'",
+                  "UPDATE revocation_journal_records SET result='x'")
+    for statement in statements:
+        with pytest.raises(IntegrityError, match="append-only"), api.engine.begin() as conn:
+            conn.execute(text(statement))
+    with api.engine.begin() as conn:  # an unconfirmed row may be confirmed, and nothing else
+        conn.execute(text("SET LOCAL session_replication_role = replica"))
+        conn.execute(text("UPDATE revocation_journal_records SET journal_confirmed=false"))
+    assert gate(api.engine) == "journal_unconfirmed"
+    with api.engine.begin() as conn:
+        conn.execute(text("UPDATE revocation_journal_records SET journal_confirmed=true"))
+    assert gate(api.engine) == "open"
+
+
 def test_torn_journal_line_is_moved_aside_and_the_record_restored_from_the_database(upload_api, monkeypatch):
     w = listed(upload_api, monkeypatch)
     real = journal.append

@@ -357,6 +357,16 @@ def append(path: Path, state: JournalState, records: list[Record]) -> JournalSta
     return JournalState(state.records + tuple(records), state.size + sum(len(r.line) + 1 for r in records), None)
 
 
+def sync(path: Path) -> None:
+    """``fsync`` the journal as it is now: after it returns, every complete line in it is durable.
+
+    Raises ``OSError`` when the file cannot be opened or synced.
+    """
+    with open(path, "ab") as handle:
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
 def drop_torn_tail(path: Path, state: JournalState, stamp: str) -> JournalState:
     """Move an unfinished last line aside (``<file>.torn-<stamp>``) and cut the file back to its records."""
     if state.torn is None:

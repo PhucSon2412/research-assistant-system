@@ -11,7 +11,9 @@ and their backups:
   ``revocation_journal_records`` in that transaction;
 - the gate is open only when the file verifies, belongs to this database's
   registration, the database holds exactly its records (same count, head seq
-  and head hash, which covers the whole chain) and no recovery is open.
+  and head hash, which covers the whole chain), every one of them is
+  ``journal_confirmed`` (written *and* ``fsync`` returned) and no recovery is
+  open.
 
 A restored database is behind the journal, a lost or older journal is behind
 the database, another journal does not match the registration: all close the
@@ -24,11 +26,15 @@ A journal line is a decision: once written, the copy it names ends revoked.
 If the database commit then fails or its outcome is unknown, the revoking
 request replays the line at once; if that fails too the gate stays closed
 (journal ahead of the database) until ``recover`` replays it. If the journal
-write fails, the revocation still commits (closing the copy at ``t_rev``) and
-the request answers 503: the database is then ahead of the journal and the
-gate stays closed until an operator repairs the journal
-(``recover --confirm-db-is-current``). Only when neither the file nor the
-database took the revocation does nothing change (the Admin gets 503).
+write fails in any way, the revocation still commits (closing the copy at
+``t_rev``) with its record ``journal_confirmed = false``, and the request
+answers 503. That covers a complete line whose ``fsync`` raised: the file and
+the database then agree, but the line was never confirmed durable, so the
+gate stays closed (``journal_unconfirmed``) until ``recover`` syncs the file
+itself and confirms the record. If the line is missing or torn, the database
+is ahead of the journal and repairing it needs ``recover
+--confirm-db-is-current``. Only when neither the file nor the database took
+the revocation does nothing change (the Admin gets 503).
 
 Locks: the journal advisory lock (``JOURNAL_LOCK``) is exclusive for every
 writer (revoke, replay, init, recover) and shared for gate checks, and is
@@ -45,7 +51,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from sqlalchemy import Engine, func, select, text
+from sqlalchemy import Engine, func, select, text, update
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
@@ -84,7 +90,8 @@ class GateStatus:
 
 def _db_view(conn) -> tuple:
     return tuple(conn.execute(text("""
-        SELECT r.journal_id, r.genesis_hash, (SELECT count(*) FROM revocation_journal_records), h.seq, h.record_hash
+        SELECT r.journal_id, r.genesis_hash, (SELECT count(*) FROM revocation_journal_records), h.seq, h.record_hash,
+               (SELECT count(*) FROM revocation_journal_records WHERE NOT journal_confirmed)
         FROM (SELECT 1) one
         LEFT JOIN recovery_registrations r ON r.id = 1
         LEFT JOIN LATERAL (SELECT seq, record_hash FROM revocation_journal_records ORDER BY seq DESC LIMIT 1) h
@@ -92,7 +99,7 @@ def _db_view(conn) -> tuple:
 
 
 def compare(state: JournalState, view: tuple) -> GateStatus:
-    journal_id, genesis_hash, count, db_seq, db_hash = view
+    journal_id, genesis_hash, count, db_seq, db_hash, unconfirmed = view
     head = state.head
     closed = lambda reason: GateStatus(False, reason, head.seq, db_seq)  # noqa: E731
     if state.torn is not None:
@@ -109,6 +116,9 @@ def compare(state: JournalState, view: tuple) -> GateStatus:
         return closed("journal_behind_db")
     if db_hash != head.hash:
         return closed("journal_diverged")
+    if unconfirmed:
+        # File and database agree, but a write was never confirmed durable (e.g. fsync raised).
+        return closed("journal_unconfirmed")
     if state.open_recovery is not None:
         return closed("recovery_in_progress")
     return GateStatus(True, "open", head.seq, db_seq)
@@ -182,28 +192,43 @@ def _lock_journal(db: Session) -> None:
     db.execute(select(func.pg_advisory_xact_lock(JOURNAL_LOCK)))
 
 
-def _mirror(record: Record, via: str, result: str, tombstone_id: uuid.UUID | None) -> RevocationJournalRecord:
+def _mirror(record: Record, via: str, result: str, tombstone_id: uuid.UUID | None, *,
+            confirmed: bool) -> RevocationJournalRecord:
+    """``confirmed``: this line is in the file and an ``fsync`` of it has returned."""
     return RevocationJournalRecord(seq=record.seq, kind=record.kind, record_hash=record.hash, line=record.line,
-                                   tombstone_id=tombstone_id, applied_via=via, result=result)
+                                   tombstone_id=tombstone_id, applied_via=via, result=result,
+                                   journal_confirmed=confirmed)
+
+
+def _unconfirmed(db: Session) -> int:
+    return db.scalar(select(func.count()).select_from(RevocationJournalRecord)
+                     .where(RevocationJournalRecord.journal_confirmed.is_(False)))
 
 
 @dataclass(frozen=True)
 class Journaled:
     record: Record
-    written: bool  # False: the line may be absent or torn; the database will be ahead of the journal
+    # False: the line may be absent, torn, or complete but not confirmed durable (fsync raised). The
+    # record then commits unconfirmed and the gate stays closed until `recover` confirms it.
+    written: bool
 
 
 def record_revocation(db: Session, path: Path | None, tombstone: DeletionTombstone,
                       retentions: list[RevocationMetadataRetention]) -> Journaled:
     """In the revoking transaction, after its row locks: mirror the record, then append and fsync it.
 
+    The mirror row is inserted ``journal_confirmed = false`` and set ``true``
+    only after ``journal.append`` returned (line written and ``fsync`` done).
     Raises ``RecoveryError`` (nothing written anywhere) when the database and the
-    journal do not agree right now: the gate is closed and ``recover`` comes first.
+    journal do not agree right now, or an earlier write is still unconfirmed:
+    the gate is closed and ``recover`` comes first.
     """
     _lock_journal(db)
     head = _db_head(db)
     if head is None:
         raise RecoveryError("not_registered")
+    if _unconfirmed(db):
+        raise RecoveryError("journal_unconfirmed")
     state = None
     if path is not None:
         try:
@@ -215,14 +240,18 @@ def record_revocation(db: Session, path: Path | None, tombstone: DeletionTombsto
     if state is not None and state.torn is not None:
         state = None
     record = journal.make_record(head.seq + 1, REVOCATION, revocation_body(tombstone, retentions), head.record_hash)
-    db.add(_mirror(record, "revoke", "revoked", tombstone.id))
+    row = _mirror(record, "revoke", "revoked", tombstone.id, confirmed=False)
+    db.add(row)
     db.flush()
     if state is None:
         return Journaled(record, False)
     try:
         journal.append(path, state, [record])
     except (OSError, JournalError):
+        # Absent, torn, or complete but unsynced: none of them is a confirmed durable line.
         return Journaled(record, False)
+    row.journal_confirmed = True  # written and fsynced; the only update the DB allows on a record
+    db.flush()
     return Journaled(record, True)
 
 
@@ -302,7 +331,10 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
     """Bring one journal record into the database, in seq order; safe to repeat.
 
     Locks the named item and its rights first (as revoke does), then the
-    journal. Returns the result code and the number of jobs flagged.
+    journal. Returns the result code and the number of jobs flagged. The
+    mirror row is ``journal_confirmed``: callers only replay lines whose file
+    was fsynced (the revoke that just appended it, or ``recover`` after its
+    own ``journal.sync``).
     """
     item, rights = None, []
     if record.kind == REVOCATION:
@@ -327,7 +359,7 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
         result, tombstone_id, cancelled = _apply_revocation(db, record.body, item, rights, now)
     else:
         result = record.kind
-    db.add(_mirror(record, via, result, tombstone_id))
+    db.add(_mirror(record, via, result, tombstone_id, confirmed=True))
     db.flush()
     record_event(db, action="recovery.journal_replay", outcome=AuditOutcome.SUCCESS,
                  actor_type=AuditActorType.SYSTEM, target_type="revocation_journal_record", target_id=str(record.seq),
@@ -388,7 +420,7 @@ def init_new(engine: Engine, settings: Settings, now: datetime) -> Record:
         record = journal.genesis(uuid.uuid4(), now, "new_install")
         db.add(RecoveryRegistration(id=1, journal_id=uuid.UUID(record.body["journal_id"]), genesis_hash=record.hash,
                                     mode="new_install", registered_at=now))
-        db.add(_mirror(record, "genesis", "new_install", None))
+        db.add(_mirror(record, "genesis", "new_install", None, confirmed=True))  # create fsyncs before commit
         db.flush()
         try:
             journal.create(path, [record])
@@ -416,10 +448,10 @@ def register_existing(engine: Engine, settings: Settings, now: datetime) -> tupl
         records = [journal.genesis(uuid.uuid4(), now, "existing_db")]
         db.add(RecoveryRegistration(id=1, journal_id=uuid.UUID(records[0].body["journal_id"]),
                                     genesis_hash=records[0].hash, mode="existing_db", registered_at=now))
-        db.add(_mirror(records[0], "genesis", "existing_db", None))
+        db.add(_mirror(records[0], "genesis", "existing_db", None, confirmed=True))  # create fsyncs before commit
         for tombstone in _unjournaled(db):
             records.append(journal.next_record(records[-1], REVOCATION, _body_of(db, tombstone)))
-            db.add(_mirror(records[-1], "import", "imported", tombstone.id))
+            db.add(_mirror(records[-1], "import", "imported", tombstone.id, confirmed=True))
         db.flush()
         try:
             journal.create(path, records)
@@ -436,6 +468,7 @@ class RecoveryReport:
     adopted: bool = False
     journal_rebuilt: int = 0
     journal_repaired: int = 0
+    journal_confirmed: int = 0
     torn_tail_dropped: bool = False
     replayed: dict[str, int] = field(default_factory=dict)
     cleanup: dict[str, int] = field(default_factory=dict)
@@ -522,6 +555,17 @@ def _repair_journal(engine: Engine, path: Path, now: datetime, confirm_db_curren
                 added.append(journal.next_record(added[-1] if added else state.head, REVOCATION, _body_of(db, tombstone)))
             state = journal.append(path, state, added)
             report.journal_repaired += len(added)
+        # Every DB record is now in the file and matches it. Sync the file ourselves: once this returns,
+        # each complete line is durable, so records whose write was never confirmed (fsync raised) are
+        # confirmed now, and the lines replayed afterwards are mirrored confirmed.
+        try:
+            journal.sync(path)
+        except OSError:
+            raise RecoveryError("journal_sync_failed") from None
+        report.journal_confirmed = db.execute(
+            update(RevocationJournalRecord).where(RevocationJournalRecord.journal_confirmed.is_(False),
+                                                  RevocationJournalRecord.seq <= state.head.seq)
+            .values(journal_confirmed=True)).rowcount
         db.commit()
 
 
@@ -592,6 +636,8 @@ def _verify(engine: Engine, path: Path) -> None:
     with Session(engine) as db:
         if _unjournaled(db):
             raise RecoveryError("tombstone_not_journaled")
+        if _unconfirmed(db):
+            raise RecoveryError("journal_unconfirmed")
         for record in _revocations(path):
             item_id = uuid.UUID(record.body["item_id"])
             tombstone = db.scalar(select(DeletionTombstone).where(DeletionTombstone.item_id == item_id))
@@ -662,6 +708,7 @@ def status(engine: Engine, settings: Settings) -> dict:
             out["unpurged_tombstones"] = db.scalar(select(func.count()).select_from(DeletionTombstone)
                                                    .where(DeletionTombstone.purged_at.is_(None)))
             out["unjournaled_tombstones"] = len(_unjournaled(db))
+            out["unconfirmed_records"] = _unconfirmed(db)
     except Exception:  # noqa: BLE001
         out["database"] = "unavailable"
     if settings.recovery.journal_path is not None:

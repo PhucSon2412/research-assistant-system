@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, SmallInteger, Text, UniqueConstraint, text
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, Index, SmallInteger, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -46,6 +46,12 @@ class RevocationJournalRecord(Base):
     writes the record it applied. ``line`` holds only what the journal holds
     (IDs, codes, times, retention bases). Append-only; a tombstone cannot be
     committed without the record naming it (deferred trigger).
+
+    ``journal_confirmed`` (0027) says the line was written **and** ``fsync``
+    returned. A revocation whose write failed, even after a complete line,
+    commits with ``false`` and keeps the recovery gate closed; the only change
+    the DB allows on a row is ``false -> true``, made by ``recover`` after its
+    own successful ``fsync`` of the file. No default: every writer states it.
     """
 
     __tablename__ = "revocation_journal_records"
@@ -62,6 +68,7 @@ class RevocationJournalRecord(Base):
         CheckConstraint("kind <> 'revocation' OR tombstone_id IS NOT NULL OR result = 'superseded'",
                         name="revocation_names_tombstone"),
         CheckConstraint("(kind = 'genesis') = (seq = 1)", name="genesis_first"),
+        Index("ix_revocation_journal_records_unconfirmed", "seq", postgresql_where=text("NOT journal_confirmed")),
     )
 
     seq: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
@@ -71,4 +78,5 @@ class RevocationJournalRecord(Base):
     tombstone_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     applied_via: Mapped[str] = mapped_column(Text)
     result: Mapped[str] = mapped_column(Text)
+    journal_confirmed: Mapped[bool] = mapped_column(Boolean)
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
