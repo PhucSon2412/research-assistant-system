@@ -9,8 +9,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
 
-JOURNAL_KINDS = "'genesis', 'revocation', 'recovery_begin', 'recovery_end'"
-APPLIED_VIA = "'genesis', 'revoke', 'replay', 'import'"
+JOURNAL_KINDS = "'genesis', 'revocation', 'recovery_begin', 'recovery_end', 'review_closure'"
+APPLIED_VIA = "'genesis', 'revoke', 'close', 'replay', 'import'"
 REGISTRATION_MODES = "'new_install', 'existing_db', 'adopted', 'rebuilt_from_db'"
 
 
@@ -52,12 +52,20 @@ class RevocationJournalRecord(Base):
     commits with ``false`` and keeps the recovery gate closed; the only change
     the DB allows on a row is ``false -> true``, made by ``recover`` after its
     own successful ``fsync`` of the file. No default: every writer states it.
+
+    ``review_closure`` (0028, M6c-2b1) records that a review request's
+    temporary Admin grant ended (withdraw, reject, approve), written by the
+    closing transaction (``applied_via='close'``) like a revocation.
+    ``review_request_id`` names the request (no FK: a restored snapshot may
+    lack it); the closing ``UPDATE`` cannot commit without this row (deferred
+    trigger on ``review_requests``).
     """
 
     __tablename__ = "revocation_journal_records"
     __table_args__ = (
         UniqueConstraint("record_hash", name="uq_revocation_journal_records_record_hash"),
         UniqueConstraint("tombstone_id", name="uq_revocation_journal_records_tombstone_id"),
+        UniqueConstraint("review_request_id", name="uq_revocation_journal_records_review_request_id"),
         CheckConstraint("seq > 0", name="seq_positive"),
         CheckConstraint(f"kind IN ({JOURNAL_KINDS})", name="kind_valid"),
         CheckConstraint("record_hash ~ '^[0-9a-f]{64}$'", name="record_hash_hex"),
@@ -68,6 +76,9 @@ class RevocationJournalRecord(Base):
         CheckConstraint("kind <> 'revocation' OR tombstone_id IS NOT NULL OR result = 'superseded'",
                         name="revocation_names_tombstone"),
         CheckConstraint("(kind = 'genesis') = (seq = 1)", name="genesis_first"),
+        CheckConstraint("kind = 'review_closure' OR review_request_id IS NULL", name="request_only_for_closure"),
+        CheckConstraint("kind <> 'review_closure' OR review_request_id IS NOT NULL OR result = 'superseded'",
+                        name="closure_names_request"),
         Index("ix_revocation_journal_records_unconfirmed", "seq", postgresql_where=text("NOT journal_confirmed")),
     )
 
@@ -76,6 +87,7 @@ class RevocationJournalRecord(Base):
     record_hash: Mapped[str] = mapped_column(Text)
     line: Mapped[str] = mapped_column(Text)
     tombstone_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    review_request_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     applied_via: Mapped[str] = mapped_column(Text)
     result: Mapped[str] = mapped_column(Text)
     journal_confirmed: Mapped[bool] = mapped_column(Boolean)

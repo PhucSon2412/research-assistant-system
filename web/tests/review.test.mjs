@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import test from "node:test";
 import { loadProxyConfig, proxyRequest } from "../lib/proxy.ts";
 import {
-  EMPTY_APPROVE_FORM, PUBLICATION_STATE_TEXT, REVOCATION_REASONS, closeReasonText,
+  EMPTY_APPROVE_FORM, PUBLICATION_STATE_TEXT, REVOCATION_REASONS, STATUS_TEXT, closeReasonText,
   INDEX_ELIGIBILITY_TEXT, INDEX_EXTERNAL_NOTICE, makeIndexBody,
   fieldList, fileChoiceLabel, makeApproveBody, makePublishBody, makeReviewBody, makeRevokeBody, reviewDownloadHref,
 } from "../lib/review.ts";
@@ -178,4 +178,12 @@ test("index needs the unticked provider box and explains every refusal the API c
   assert.match(INDEX_EXTERNAL_NOTICE, /rerank/);
   assert.match(INDEX_EXTERNAL_NOTICE, /Hỏi đáp \(RAG\) cũng dùng bản chung theo cùng quyền/);
   assert.match(INDEX_EXTERNAL_NOTICE, /được gửi tới provider để tạo câu trả lời/);
+});
+
+test("a close replayed after a restore keeps its decision code and never reads as a pending approval", () => {
+  assert.equal(STATUS_TEXT.closed_by_recovery, "Đã đóng khi khôi phục dữ liệu");
+  assert.match(closeReasonText("approved_by_admin", "closed_by_recovery"), /không có trong dữ liệu khôi phục/);
+  assert.doesNotMatch(closeReasonText("approved_by_admin", "closed_by_recovery"), /đang chờ công bố/);
+  assert.equal(closeReasonText("withdrawn_by_requester", "closed_by_recovery"), "User đã rút yêu cầu");
+  assert.equal(closeReasonText("rights_not_established", "closed_by_recovery"), "Chưa xác lập được quyền phân phối");
 });

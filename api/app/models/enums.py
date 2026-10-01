@@ -98,6 +98,9 @@ class ReviewStatus(StrEnum):
     REJECTED = "rejected"
     # Rights recorded and a pending common copy created; not a publication.
     APPROVED = "approved"
+    # M6c-2b1: closed by replaying a journal record into a restored database that still had the
+    # request open. ``close_reason_code`` keeps the original decision's code; never an approval.
+    CLOSED_BY_RECOVERY = "closed_by_recovery"
 
 
 class ReviewRejectReason(StrEnum):

@@ -17,8 +17,8 @@ from app.api.routes import reviews
 from app.cli import reconcile_originals
 from app.main import app
 from app.models.enums import AuditOutcome
-from tests.test_review_requests import (A_BODY, DECLARED_RIGHTS, DECLARED_SOURCE, _fixture_rows, original_url,
-                                        submit, world, write)
+from tests.test_review_requests import (A_BODY, DECLARED_RIGHTS, DECLARED_SOURCE, _fixture_rows, close_journaled,
+                                        journal_sql_close, original_url, submit, world, write)
 from tests.test_uploads import upload_api  # noqa: F401  (fixture)
 
 A_SHA = hashlib.sha256(A_BODY).hexdigest()
@@ -371,18 +371,13 @@ def test_close_committed_during_copy_wins(upload_api, monkeypatch, closing):
     a, _, admin, ids_a, _ = world(api, storage, monkeypatch)
     rid = submit(a, ids_a).json()["request"]["id"]
     keys = object_keys(storage)
-    statements = {
-        "withdraw": """UPDATE review_requests SET status='withdrawn', closed_at=submitted_at,
-            closed_by_user_id=requester_user_id, close_reason_code='withdrawn_by_requester' WHERE id=:r""",
-        "reject": """UPDATE review_requests SET status='rejected', closed_at=submitted_at, close_reason_code='other',
-            closed_by_user_id=(SELECT id FROM users WHERE role='admin') WHERE id=:r""",
-        "epoch": """UPDATE library_items SET rights_epoch=rights_epoch+1
-            WHERE id=(SELECT item_id FROM review_requests WHERE id=:r)""",
-    }
-
     def close():
+        if closing != "epoch":  # withdraw/reject as the routes commit them: journaled (M6c-2b1)
+            close_journaled(api.engine, rid, closing)
+            return
         with api.engine.begin() as conn:
-            conn.execute(text(statements[closing]), {"r": uuid.UUID(rid)})
+            conn.execute(text("""UPDATE library_items SET rights_epoch=rights_epoch+1
+                WHERE id=(SELECT item_id FROM review_requests WHERE id=:r)"""), {"r": uuid.UUID(rid)})
 
     fake = Faulty(storage, before_put=close)
     use_storage(fake)
@@ -587,8 +582,10 @@ def test_schema_binds_rights_to_exact_common_file_and_approved_request(api):
         conn.execute(RIGHTS, params(item, version, file))
     fails(rights_without_approval, "approved")
 
+    fails(full, "needs its revocation journal record")  # complete, but the close is not journaled (0028)
     with api.engine.begin() as conn:
         common = full(conn)
+        journal_sql_close(conn, rr)
 
     def second_rights(conn):  # a second publication candidate from the same request
         item, version, file = _common(conn, key="second-copy")

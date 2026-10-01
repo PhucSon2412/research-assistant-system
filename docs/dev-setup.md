@@ -1036,3 +1036,35 @@ RPO/RTO ≤ 24 giờ ở [phi chức năng](nonfunctional.md) vẫn là **mục 
 - Diễn tập `--filler 100 --down` chạy lại từ đầu: **41/41**. Hai bước mới trên project thật `ras-drill-foreign` (port 47432/47800/47300/47900/47901, chỉ `db`, không marker): `restore` → `target_not_restore_owned`, tập container, trạng thái và `StartedAt` (`docker inspect`) giữ nguyên, không container `minio` nào được tạo; sau khi tự dừng `db` → `target_db_not_running`, `db` vẫn `exited`, không gì được khởi động. Số đo lần này: backup 3,05 s; restore 18,91 s (gồm kiểm sở hữu 0,22 s); `recover` 2,58 s; sẵn sàng sau 3,55 s; thao tác restore 25,0 s; restore lần hai 13,72 s; khoảng mất dữ liệu quan sát được 9,4 s (1 upload).
 
 **Giới hạn chưa kiểm/đo:** chỉ một lần diễn tập trên Windows + Docker Desktop, dữ liệu tổng hợp ~1,9 MB; artifact, journal nguồn, bản sao journal và hai project cùng một máy/đĩa (không chứng minh gì về mất máy/đĩa); `copy-journal --from-file` chỉ kiểm trong test; dạng lệnh PowerShell chưa chạy riêng; chưa có lịch backup, retention 30 ngày, mã hóa hay kho backup ngoài máy; backup cần dừng writer.
+
+## Journal đóng review request (M6c-2b1)
+
+Revision `0028`. Thiết kế, cửa sổ lỗi, lựa chọn `closed_by_recovery`, mâu thuẫn docs/code và giới hạn ở [decisions](decisions.md#quyết-định-triển-khai-m6c-2b1-2026-10-01).
+
+| Mục | Giá trị / lệnh |
+| --- | --- |
+| Bản ghi | Mỗi lần User rút, Admin từ chối hoặc phê duyệt ghi một dòng `review_closure` vào journal M6c-1 (`RAS_RECOVERY__JOURNAL_PATH`) trước commit: ID request/item/version/file, quyết định, mã lý do, thời điểm |
+| Khi nâng cấp DB có request đã đóng | `migrate` lên `0028` → gate đóng `review_closures_not_journaled` (API `503 service_recovering`); dừng `api`/`web`/`worker`/`beat`, chạy `docker compose run --rm --no-deps api python -m app.cli.recovery recover` (báo `closures_imported=N`, `gate=open`); `recovery status` phải có `unjournaled_review_closures=0` |
+| Sau restore | Như M6c-1/M6c-2a: `restore` (gate giữ đóng bằng `hold`) rồi `recover`; replay đóng request còn `open` thành `closed_by_recovery` |
+| Lỗi mới cho web | `review_journal_unavailable`, `review_closure_pending_recovery`, `review_closure_unavailable` (`web/lib/api.ts`); trạng thái `closed_by_recovery` hiện “Đã đóng khi khôi phục dữ liệu” |
+| SQL fixture | Đóng request bằng SQL thẳng bị DB từ chối nếu thiếu bản ghi journal; test dùng `close_journaled` / `journal_sql_close` (`api/tests/test_review_requests.py`) |
+
+**Diễn tập** (hai project cô lập dựng mới như M6c-2a, `ras-drill-src` / `ras-drill-restore`, port như mục trên; không index, không provider):
+
+```bash
+export DRILL_WORK_DIR="<thư mục tuyệt đối ngoài repo, trống>"
+PYTHONIOENCODING=utf-8 "$USERPROFILE/.conda/envs/ras/python.exe" scripts/drill_review_closure_restore.py --down
+```
+
+`--down` gỡ volume của hai project drill ở cuối; `DRILL_WORK_DIR` (artifact, journal nguồn, bản sao) giữ lại để xem.
+
+**Kiểm chứng ngày 2026-10-01 (Windows 11 10.0.26200, Docker Desktop, Conda `ras`):**
+
+- `"$PY" -m pytest api -q` (Git Bash): **659 passed** trong 27 phút 46 giây (một cảnh báo deprecation Starlette; chạy song song với hai lần diễn tập), gồm `api/tests/test_review_closure_journal.py` (**26 test**). Các fail khi chạy test cũ trên code mới đều do hành vi mới và đã sửa test: test đóng request bằng SQL thẳng (nay bị trigger `0028` từ chối; chuyển sang helper có journal), 10 test M6c-1 so đúng chuỗi bản ghi journal (approve trong fixture nay thêm một bản ghi `review_closure`), và test `0027` kiểm revision sau downgrade bị chặn (nay là head `0028`). Crash chỉ được **mô phỏng** (bước ghi journal/`fsync`/commit/replay ném lỗi).
+- Kiểm đối chứng (script tạm đưa lại từng lỗi, chạy test mục tiêu, khôi phục file): replay để request mở; replay không làm gì và `recover` bỏ kiểm request còn mở; gate bỏ qua đóng thiếu bản ghi; đánh dấu xác nhận trước append; không replay sau commit lỗi; journal lỗi thì rollback (grant còn mở); `hold` đọc cả hàng mirror (vỡ trên snapshot `0027`); import đóng cũ đòi `--confirm-db-is-current`; `register-existing` bỏ đóng; replay nhận bản ghi nêu file khác; withdraw commit không có bản ghi; bản ghi mang ghi chú từ chối → **12/12** bị bắt.
+- `npm test --prefix web` **41 passed**; `npm run typecheck --prefix web` và `npm run build --prefix web` đạt.
+- Diễn tập `scripts/drill_review_closure_restore.py --down`: **34/34 đạt** ở lần chạy đầu, 0 lời gọi provider. A upload 3 file, B 1 file qua web; 4 request mở; Admin mở chi tiết và tải đúng SHA-256 cả 4. Backup khi writer dừng (4 object, dump 227.003 byte, `verify` đạt). Sau backup: A rút R1, Admin từ chối R2 (có ghi chú) và phê duyệt R3 thành bản chung rồi công bố; URL tải đã lưu của R1–R3 → `404`, R4 → `200`; journal nguồn có đúng 3 bản ghi `review_closure` (quyết định + mã), không title, ghi chú, lời khai, email, checksum hay bằng chứng. `copy-journal`; `restore` vào `ras-drill-restore` → `gate=db_behind_journal`; DB restore có R1–R3 `open` và 0 item chung. **Trước `recover`:** 11/11 request (URL chi tiết + tải đã lưu của 4 request, danh sách Admin, danh sách của A và B) qua web và 11/11 thẳng API đều `503 service_recovering`. `status` → `gate=db_behind_journal journal_seq=5 db_seq=1 … unjournaled_review_closures=0 open_recovery=True`; `recover` → `replayed={'closed': 3, 'recovery_begin': 1, 'recovery_end': 1} gate=open`. **Sau `recover`:** danh sách mở của Admin chỉ còn R4; URL tải đã lưu của R1–R3 `404` qua web và API; chi tiết R1–R3 không có item/file/email/lời khai/URL; Admin vẫn tải đúng file của R4; A thấy R1–R3 `closed_by_recovery` với mã gốc, `publication=false`; ba file của A tải đúng SHA-256, B không thấy request của A; bản chung phê duyệt sau backup `404` với Admin và B, 0 item chung; A gửi lại file R3 và Admin phê duyệt thành bản chờ mới theo luồng thường. Journal nguồn không đổi byte, bản sao chỉ dài thêm. `restore` lần hai + `recover` hai lần: cùng kết quả. Log container hai project: không traceback, title, ghi chú, lời khai hay bằng chứng. Số đo một lần (không phải SLO): backup 1,48 s, restore 17,75 s (`hold` 2,27 s), `recover` 2,28 s.
+- Diễn tập M6c-2a `scripts/drill_backup_restore.py --down` chạy lại trên code mới (approve nay ghi bản ghi đóng trước backup): **41/41**, `status` → `journal_seq=4 db_seq=2`, `recover` → `replayed={'revoked': 1, 'recovery_begin': 1, 'recovery_end': 1}`.
+- **Stack dev chưa được nâng lên `0028`** trong PR này: downgrade bị chặn khi DB đã đăng ký journal, và revision có thể còn đổi trong review. Khi nâng: `docker compose up -d --build --wait`; nếu `recovery status` báo `review_closures_not_journaled`, dừng `api web worker beat` rồi chạy `recover` như bảng trên.
+
+**Giới hạn chưa kiểm/đo:** crash chỉ mô phỏng; độ bền `fsync` trên Docker Desktop/Windows chưa kiểm trước mất điện; journal, DB và artifact cùng một máy; độ trễ thêm của anti-join trong gate chưa đo; dạng lệnh PowerShell chưa chạy riêng. Restore **chưa** an toàn cho triển khai thật (nơi lưu journal, lịch backup, retention, mã hóa còn mở; session/reset token/membership chưa có journal).

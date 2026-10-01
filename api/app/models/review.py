@@ -16,6 +16,18 @@ APPROVED_BY_ADMIN = "approved_by_admin"
 DECLARED_TEXT_MAX_CHARS = 2000
 DECLARED_URL_MAX_CHARS = 2048
 REJECTION_NOTE_MAX_CHARS = 500
+# Every code a closure can carry; the code alone tells which decision it was.
+CLOSE_REASON_CODES = f"'{WITHDRAWN_BY_REQUESTER}', '{APPROVED_BY_ADMIN}', {sql_in(ReviewRejectReason)}"
+
+
+def closed_status_of(reason_code: str) -> str:
+    """The decision a close reason code stands for: withdrawn, approved or rejected."""
+    if reason_code == WITHDRAWN_BY_REQUESTER:
+        return ReviewStatus.WITHDRAWN.value
+    if reason_code == APPROVED_BY_ADMIN:
+        return ReviewStatus.APPROVED.value
+    ReviewRejectReason(reason_code)  # ValueError for anything else
+    return ReviewStatus.REJECTED.value
 
 
 class ReviewRequest(Base):
@@ -26,6 +38,13 @@ class ReviewRequest(Base):
     the ``declared_*`` fields are the User's own claim, not verified rights.
     ``approved`` (M6b-1) always comes with one ``AccessRights`` row and a
     pending common copy, checked at commit by deferred DB triggers.
+
+    M6c-2b1: closing (``open`` -> any other state) commits only together with
+    the revocation-journal record naming this request, its item/version/file
+    and close reason (deferred DB trigger), so a restore of an older snapshot
+    cannot reopen the grant. ``closed_by_recovery`` is what a replay of such a
+    record writes into a snapshot that still had the request open: the
+    original code and time, no actor, no note, and never an approval.
     """
 
     __tablename__ = "review_requests"
@@ -58,6 +77,10 @@ class ReviewRequest(Base):
         CheckConstraint(f"status <> 'rejected' OR close_reason_code IN ({sql_in(ReviewRejectReason)})",
                         name="rejected_reason"),
         CheckConstraint(f"status <> 'approved' OR close_reason_code = '{APPROVED_BY_ADMIN}'", name="approved"),
+        # M6c-2b1: a replayed closure keeps the original decision's code and time, no actor and no note.
+        CheckConstraint(f"status <> 'closed_by_recovery' OR (closed_at IS NOT NULL AND closed_by_user_id IS NULL"
+                        f" AND rejection_note IS NULL AND close_reason_code IN ({CLOSE_REASON_CODES}))",
+                        name="closed_by_recovery"),
         # Target for access_rights: rights carry the checksum the owner submitted.
         UniqueConstraint("id", "file_checksum_sha256", name="uq_review_requests_id_file_checksum_sha256"),
         CheckConstraint("rejection_note IS NULL OR (status = 'rejected'"

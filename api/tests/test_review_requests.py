@@ -82,6 +82,46 @@ def original_url(request_id, file_id) -> str:
     return f"/admin/review-requests/{request_id}/files/{file_id}/original"
 
 
+def close_journaled(engine, request_id, how: str = "withdraw", *, code: str = "other", note: str | None = None):
+    """Close a request from another session the way the routes do: locked, journaled, committed (M6c-2b1)."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from app.models import ReviewRequest, User
+    from app.review_closing import commit_close
+
+    with Session(engine) as db:
+        admin = db.scalar(select(User.id).where(User.role == "admin").limit(1))
+        rr = db.scalar(select(ReviewRequest).where(ReviewRequest.id == uuid.UUID(str(request_id))).with_for_update())
+        rr.closed_at = rr.submitted_at
+        if how == "withdraw":
+            rr.status, rr.closed_by_user_id, rr.close_reason_code = ("withdrawn", rr.requester_user_id,
+                                                                     "withdrawn_by_requester")
+        else:
+            rr.status, rr.close_reason_code, rr.rejection_note, rr.closed_by_user_id = "rejected", code, note, admin
+        commit_close(db, rr)
+
+
+def journal_sql_close(conn, request_id) -> None:
+    """For a SQL fixture closing a request in ``conn``'s transaction: the journal record the DB requires
+    (0028), mirrored and appended to the test's journal file so the gate stays open."""
+    from types import SimpleNamespace
+
+    from app import journal, recovery
+    from app.config import get_settings
+
+    row = conn.execute(text("SELECT id, item_id, version_id, source_file_id, status, close_reason_code, closed_at"
+                            " FROM review_requests WHERE id=:r"), {"r": request_id}).one()
+    body = recovery.closure_body(SimpleNamespace(**row._mapping))
+    path = get_settings().recovery.journal_path
+    state = journal.read(path)
+    record = journal.next_record(state.head, journal.REVIEW_CLOSURE, body)
+    conn.execute(text("""INSERT INTO revocation_journal_records(seq, kind, record_hash, line, review_request_id,
+        applied_via, result, journal_confirmed) VALUES(:s, 'review_closure', :h, :l, :r, 'close', 'closed', true)"""),
+                 {"s": record.seq, "h": record.hash, "l": record.line, "r": request_id})
+    journal.append(path, state, [record])
+
+
 def test_owner_submits_exact_file_and_admin_reviews_only_that_file(upload_api, monkeypatch):
     api, storage = upload_api
     a, b, admin, ids_a, ids_b = world(api, storage, monkeypatch, index_a=True)
@@ -218,10 +258,7 @@ def test_rights_epoch_change_and_close_during_verification_block_review(upload_a
     # A close committed after the first grant check but before any byte is sent wins.
     class ClosingStorage:
         def open(self, key):
-            with api.engine.begin() as conn:
-                conn.execute(text("""UPDATE review_requests SET status='withdrawn', closed_at=submitted_at,
-                    closed_by_user_id=requester_user_id, close_reason_code='withdrawn_by_requester'
-                    WHERE id=:r"""), {"r": uuid.UUID(rid)})
+            close_journaled(api.engine, rid)  # the owner's withdraw, from another session
             return storage.open(key)
 
     app.dependency_overrides[reviews._storage] = lambda: ClosingStorage()
@@ -412,9 +449,14 @@ def test_schema_binds_item_version_file_owner_and_final_states(api):
         conn.execute(text("UPDATE review_requests SET source_file_id=:f WHERE id=:r"), {"f": a["f2"], "r": first})
     with pytest.raises(IntegrityError), api.engine.begin() as conn:
         conn.execute(text("UPDATE review_requests SET declared_rights='changed' WHERE id=:r"), {"r": first})
+    with pytest.raises(IntegrityError, match="needs its revocation journal record"), api.engine.begin() as conn:
+        # Valid, but not journaled (0028).
+        conn.execute(text(close + ", rejection_note='Thiếu giấy phép' WHERE id=:r"),
+                     {"s": "rejected", "by": ids["admin"], "c": "rights_not_established", "r": first})
     with api.engine.begin() as conn:
         conn.execute(text(close + ", rejection_note='Thiếu giấy phép' WHERE id=:r"),
                      {"s": "rejected", "by": ids["admin"], "c": "rights_not_established", "r": first})
+        journal_sql_close(conn, first)
     for statement in ("UPDATE review_requests SET status='open', closed_at=NULL, closed_by_user_id=NULL,"
                       " close_reason_code=NULL, rejection_note=NULL WHERE id=:r",
                       "UPDATE review_requests SET rejection_note='edited' WHERE id=:r"):

@@ -147,7 +147,7 @@ export default function ReviewDetailPage() {
         <h1>{request.item?.title ?? "Yêu cầu duyệt"}</h1>
         <p><strong>{STATUS_TEXT[request.status]}</strong> · gửi {fmt(request.submitted_at)}
           {request.closed_at && ` · đóng ${fmt(request.closed_at)}`}
-          {closeReasonText(request.close_reason_code) && ` · ${closeReasonText(request.close_reason_code)}`}</p>
+          {closeReasonText(request.close_reason_code, request.status) && ` · ${closeReasonText(request.close_reason_code, request.status)}`}</p>
         <p>{request.pending_note}</p>
         {request.pending_publication_id && <p role="status">
           Quyền đã được ghi nhận nhưng <strong>chưa công bố</strong>.{" "}

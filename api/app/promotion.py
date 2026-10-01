@@ -13,6 +13,15 @@ Order, so that no step can leave a servable or half-recorded common copy:
    close the request as ``approved``. Deferred DB triggers refuse a commit
    that lacks any of these.
 
+Closing the request ends the Admin's review grant, so the transaction also
+journals a ``review_closure`` record (M6c-2b1, ``app.recovery``) after its
+row locks and before the commit, as withdraw/reject do
+(``app.review_closing``). If the journal write fails but the commit lands,
+the approval stands and the gate stays closed until ``recover`` (``503
+review_journal_unavailable``). If the line is durable but the commit fails,
+the line is replayed at once: into a database without the approval that
+closes the request as ``closed_by_recovery`` (no copy, nothing approved).
+
 If that transaction fails, the new object is deleted only when no SourceFile
 references it; when the database cannot tell (commit outcome unknown), the
 object stays for ``app.cli.reconcile_originals``. An unreferenced object is
@@ -27,14 +36,17 @@ import tempfile
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime
+from pathlib import Path
 from typing import IO
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import recovery
 from app.api.errors import ApiError
 from app.audit import record_event
 from app.authz import Principal, review_grant_clause
+from app.config import get_settings
 from app.models import AccessRights, LibraryItem, PaperVersion, ReviewRequest, SourceFile
 from app.models.enums import (AuditActorType, AuditOutcome, PublicationState, ReviewStatus, RightsAudience,
                               RightsOrigin, Visibility)
@@ -167,7 +179,10 @@ def _cleanup_after_failed_commit(db: Session, storage: OriginalStorage, key: str
 
 
 def approve(db: Session, admin: Principal, storage: OriginalStorage, rid: uuid.UUID, confirmed_checksum: str,
-            rights: RecordedRights, now: datetime) -> Approved:
+            rights: RecordedRights, now: datetime, *, journal_path: Path | None = None) -> Approved:
+    """``journal_path`` defaults to the configured revocation journal."""
+    if journal_path is None:
+        journal_path = get_settings().recovery.journal_path
     row = db.execute(_granted(admin, rid)).first()
     if row is None:
         rr = db.get(ReviewRequest, rid)
@@ -185,6 +200,7 @@ def approve(db: Session, admin: Principal, storage: OriginalStorage, rid: uuid.U
     db.rollback()  # no lock or snapshot held while copying the object
 
     key = _copy_original(db, admin, storage, rid, original)
+    journaled = None
     try:
         locked = db.scalar(select(ReviewRequest).where(ReviewRequest.id == rid).with_for_update())
         if locked is None or locked.status != ReviewStatus.OPEN.value:
@@ -234,12 +250,30 @@ def approve(db: Session, admin: Principal, storage: OriginalStorage, rid: uuid.U
         db.flush()
         _audit(db, admin, AuditOutcome.SUCCESS, rid, common_item_id=str(item.id),
                source_file_id=str(common_file.id), access_rights_id=str(recorded.id))
+        try:
+            # Journal lock after the request and item row locks; the line is fsynced before the commit.
+            journaled = recovery.record_review_closure(db, journal_path, rr)
+        except recovery.RecoveryError:
+            db.rollback()
+            _discard(storage, key)  # nothing committed: the copy is unreferenced
+            raise ApiError(503, "service_recovering") from None
         # From this commit the review grant is over (the request is no longer open).
         db.commit()
     except ApiError:
         raise
     except Exception:
+        if journaled is not None and journaled.written:
+            # The close is durable in the journal, so the grant must end: replay it now. Into a
+            # database without the approval this writes closed_by_recovery, never an approval.
+            try:
+                db.rollback()
+                recovery.replay_record(db.get_bind(), journaled.record, now)
+            except Exception:
+                raise ApiError(503, "review_closure_pending_recovery") from None
         if _cleanup_after_failed_commit(db, storage, key):
             raise ApiError(503, "approval_unavailable") from None
         raise ApiError(503, "approval_outcome_uncertain") from None
+    if not journaled.written:
+        # Approved and committed (the grant is over), but the journal lacks it: the gate stays closed.
+        raise ApiError(503, "review_journal_unavailable")
     return Approved(rr, item, version, common_file, recorded)
