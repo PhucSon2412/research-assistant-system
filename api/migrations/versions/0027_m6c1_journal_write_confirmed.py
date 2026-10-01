@@ -20,7 +20,10 @@ and confirms the row.
   from ``false`` to ``true`` with every other column unchanged.
 
 Not folded into 0026: that revision has already run on the dev database of
-this branch. Downgrade is refused while a row is unconfirmed.
+this branch. Downgrade is refused on any database registered with a journal
+(as 0026 does): below 0027 the gate has no confirmation check, so the next
+revocation whose fsync fails would open it again, confirmed rows or not. Only
+a database never registered (no registration, no journal record) goes down.
 """
 from alembic import op
 import sqlalchemy as sa
@@ -62,8 +65,9 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute("""
         DO $$ BEGIN
-            IF EXISTS (SELECT 1 FROM revocation_journal_records WHERE NOT journal_confirmed) THEN
-                RAISE EXCEPTION 'a revocation journal record is not confirmed durable; downgrade below 0027 would open the gate on it';
+            -- Not only unconfirmed rows: 0026 code would open the gate after the next failed fsync.
+            IF EXISTS (SELECT 1 FROM recovery_registrations) OR EXISTS (SELECT 1 FROM revocation_journal_records) THEN
+                RAISE EXCEPTION 'the database is registered with a revocation journal; downgrade below 0027 would let the gate open on a journal line never confirmed durable';
             END IF;
         END $$;
         DROP TRIGGER trg_revocation_journal_records_append_only ON revocation_journal_records;

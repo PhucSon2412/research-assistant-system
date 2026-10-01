@@ -697,12 +697,29 @@ def test_0027_backfills_revoke_records_unconfirmed_so_recover_must_confirm_them(
                                retention=SimpleNamespace(cleanup_batch_size=10))
     # A 0026 revocation may have been the complete-line-but-fsync-failed case: closed until recover confirms.
     assert recovery.evaluate(settings, eng).reason == "journal_unconfirmed"
-    with pytest.raises(Exception, match="not confirmed durable"):
+    with pytest.raises(Exception, match="registered with a revocation journal"):
         command.downgrade(alembic_config(empty_db_url), "0026")
     report = recovery.recover(eng, None, settings, utcnow())
     assert report.journal_confirmed == 1 and report.gate == "open"
+    # Confirmed or not, a registered database never goes below 0027: 0026 code would open the gate again
+    # after the next revocation whose fsync fails (PR #26 review).
+    with pytest.raises(Exception, match="registered with a revocation journal"):
+        command.downgrade(alembic_config(empty_db_url), "0026")
+    with eng.connect() as conn:
+        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == "0027"
+        assert conn.scalar(text("SELECT count(*) FROM revocation_journal_records WHERE NOT journal_confirmed")) == 0
     eng.dispose()
-    command.downgrade(alembic_config(empty_db_url), "0026")  # all confirmed: allowed
+
+
+def test_0027_downgrades_only_a_database_never_registered(empty_db_url: str) -> None:
+    upgrade(empty_db_url)
+    command.downgrade(alembic_config(empty_db_url), "0026")  # no registration, no journal record
+    eng = create_engine(empty_db_url)
+    with eng.connect() as conn:
+        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == "0026"
+        assert "journal_confirmed" not in {c["name"] for c in inspect(conn).get_columns("revocation_journal_records")}
+    eng.dispose()
+    upgrade(empty_db_url)
 
 
 def test_collection_membership_foreign_keys_restrict(migrated_db_url: str) -> None:
