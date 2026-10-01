@@ -28,7 +28,10 @@ bump ``rights_epoch``, set ``revoked`` (and, for a copy indexed by
 revoke the rights and publication, flag the item's unfinished jobs
 ``cancel_requested`` and write a ``deletion_tombstones`` row. It locks the
 item, then rights, publication and jobs; the index worker locks the item
-before its job too, so the two cannot deadlock. From that commit every normal
+before its job too, so the two cannot deadlock. Last, under the journal lock,
+it appends the tombstone's record to the revocation journal file (``fsync``)
+and mirrors it in the same transaction (M6c-1, ``app.recovery``); the
+failure paths of that step are described there. From that commit every normal
 route (library list/count/detail, collections) drops the item in SQL; file,
 chunk, search and RAG never served it. Private items and other common copies
 are untouched.
@@ -49,9 +52,9 @@ content or a field without basis is left, and refuses derived writes to a
 revoked copy from ``t_rev`` on (0024). Only the common copy's rows are
 touched, never the private item, even with the same checksum.
 
-Tombstones are never deleted; ``export_tombstones``/``apply_tombstones`` are
-a *manual* recovery step after a restore. Until the journal is applied, a
-restored backup that predates the revocation serves the copy again.
+Tombstones are never deleted. After a restore, ``app.recovery`` replays the
+journal records the restored database lacks; until then its recovery gate
+keeps the API and workers from serving or processing anything.
 
 Audit rows carry IDs and codes only: no title, source, URL, evidence,
 checksum, bytes or secrets.
@@ -62,6 +65,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from sqlalchemy import Engine, delete, func, or_, select, text, update
 from sqlalchemy.exc import IntegrityError
@@ -70,12 +74,13 @@ from sqlalchemy.orm import Session
 from app.api.errors import ApiError
 from app.audit import record_event
 from app.authz import Principal, review_copy_admin_clause
+from app.config import get_settings
 from app.models import (AccessRights, Chunk, CollectionItem, CommonPublication, DeletionTombstone, EmbeddingCall,
                         IndexEntry, IndexGeneration, IngestionJob, IngestStepAttempt, LibraryItem, MetadataCandidate,
                         PaperVersion, PdfPage, ReferenceCitationLink, ReferenceEntry, RevocationMetadataRetention,
-                        Section, SourceFile, User)
+                        Section, SourceFile)
 from app.models.enums import (AuditActorType, AuditOutcome, CleanupObjectOutcome, ContentStatus, JobState,
-                              PublicationState, RevocationReason, RevokedMetadataField, TombstoneKind, UserRole)
+                              PublicationState, RevocationReason, RevokedMetadataField, TombstoneKind)
 from app.promotion import verified_read
 from app.storage import OriginalStorage, is_missing_object
 
@@ -255,7 +260,13 @@ def _revoke_rows(db: Session, item: LibraryItem, rights: list[AccessRights], rev
 
 
 def revoke(db: Session, admin: Principal, item_id: uuid.UUID, reason: RevocationReason, now: datetime,
-           cleanup_deadline: timedelta, retain: tuple[RetentionBasis, ...] = ()) -> Revoked:
+           cleanup_deadline: timedelta, retain: tuple[RetentionBasis, ...] = (), *,
+           journal_path: Path | None = None) -> Revoked:
+    """``journal_path`` defaults to the configured revocation journal."""
+    from app import recovery
+
+    if journal_path is None:
+        journal_path = get_settings().recovery.journal_path
     item = _copy(db, admin, item_id, lock=True)
     if item is None:
         db.rollback()
@@ -277,19 +288,45 @@ def revoke(db: Session, admin: Principal, item_id: uuid.UUID, reason: Revocation
         purge_due_at=now + cleanup_deadline)
     db.add(tombstone)
     db.flush()
-    for basis in retain:
-        db.add(RevocationMetadataRetention(
-            tombstone_id=tombstone.id, item_id=item.id, field=basis.field.value, policy_source=basis.policy_source,
-            scope=basis.scope, reason=basis.reason, confirmed_by_user_id=admin.user_id, recorded_at=now))
+    bases = [RevocationMetadataRetention(
+        tombstone_id=tombstone.id, item_id=item.id, field=basis.field.value, policy_source=basis.policy_source,
+        scope=basis.scope, reason=basis.reason, confirmed_by_user_id=admin.user_id, recorded_at=now)
+        for basis in retain]
+    db.add_all(bases)
     db.flush()
     _audit(db, admin, "common_copy.revoke", AuditOutcome.SUCCESS, item.id, reason_code=reason.value,
            from_state=prior, tombstone_id=str(tombstone.id), cancelled_jobs=cancelled,
            retained_fields=sorted(b.field.value for b in retain))
     try:
-        db.commit()  # t_rev
+        # Journal lock after every row lock; the line is fsynced before the commit below.
+        journaled = recovery.record_revocation(db, journal_path, tombstone, bases)
+    except recovery.RecoveryError:
+        db.rollback()
+        raise ApiError(503, "service_recovering") from None
     except Exception:
         db.rollback()
         raise ApiError(503, "revocation_unavailable") from None
+    tombstone_id = tombstone.id
+    try:
+        db.commit()  # t_rev
+    except Exception:
+        db.rollback()
+        if not journaled.written:  # neither the journal nor the database took it
+            raise ApiError(503, "revocation_unavailable") from None
+        # The journal line is durable, so the revocation must happen: replay it now (a no-op if the
+        # commit did land). If that fails too, the gate stays closed until `recover` replays it.
+        try:
+            _, cancelled = recovery.replay_record(db.get_bind(), journaled.record, now)
+        except Exception:
+            raise ApiError(503, "revocation_pending_recovery") from None
+        item = db.get(LibraryItem, item_id, populate_existing=True)
+        tombstone = db.get(DeletionTombstone, tombstone_id)
+        if item is None or tombstone is None or item.publication_state != PublicationState.REVOKED.value:
+            raise ApiError(503, "revocation_pending_recovery")
+    if not journaled.written:
+        # Committed, so the copy is closed from t_rev, but the journal lacks it: the database is now
+        # ahead of the journal and the gate stays closed until the journal is repaired.
+        raise ApiError(503, "revocation_journal_unavailable")
     return Revoked(item, tombstone, cancelled)
 
 
@@ -465,89 +502,4 @@ def cleanup_revoked(engine: Engine, storage: OriginalStorage, now: datetime, bat
                 outcome = f"error:{code}"
         if outcome is not None:
             counts[outcome] = counts.get(outcome, 0) + 1
-    return counts
-
-
-# --- tombstone journal (restore) ----------------------------------------------
-
-JOURNAL_FIELDS = ("id", "target_kind", "item_id", "version_id", "source_file_id", "storage_key",
-                  "access_rights_id", "reason_code", "prior_publication_state", "rights_epoch", "recorded_at",
-                  "recorded_by_user_id", "purge_due_at")
-
-
-RETENTION_FIELDS = ("field", "policy_source", "scope", "reason", "confirmed_by_user_id", "recorded_at")
-
-
-def _plain(value):
-    return value.isoformat() if isinstance(value, datetime) else (str(value) if isinstance(value, uuid.UUID) else value)
-
-
-def export_tombstones(db: Session) -> list[dict]:
-    """Identity fields of every tombstone and its retention bases: IDs, object key,
-    codes, epoch, times and the recorded justification; no paper metadata or content."""
-    rows = db.scalars(select(DeletionTombstone).order_by(DeletionTombstone.recorded_at, DeletionTombstone.id)).all()
-    out = []
-    for row in rows:
-        entry = {name: _plain(getattr(row, name)) for name in JOURNAL_FIELDS}
-        bases = db.scalars(select(RevocationMetadataRetention).where(RevocationMetadataRetention.tombstone_id == row.id)
-                           .order_by(RevocationMetadataRetention.field)).all()
-        entry["retentions"] = [{name: _plain(getattr(b, name)) for name in RETENTION_FIELDS} for b in bases]
-        out.append(entry)
-    return out
-
-
-def _uuid(value: str | None) -> uuid.UUID | None:
-    return uuid.UUID(value) if value else None
-
-
-def apply_tombstone(db: Session, entry: dict) -> str:
-    """Re-apply one exported tombstone to a (restored) database; safe to repeat."""
-    tombstone_id = uuid.UUID(entry["id"])
-    if db.get(DeletionTombstone, tombstone_id) is not None:
-        db.rollback()
-        return "present"
-    item_id = uuid.UUID(entry["item_id"])
-    recorded_at = datetime.fromisoformat(entry["recorded_at"])
-    revoked_by = uuid.UUID(entry["recorded_by_user_id"])
-    epoch = int(entry["rights_epoch"])
-    item = db.scalar(select(LibraryItem).where(LibraryItem.id == item_id).with_for_update())
-    applied = "recorded"
-    if item is not None and item.publication_state != PublicationState.REVOKED.value:
-        if db.scalar(select(User.id).where(User.id == revoked_by, User.role == UserRole.ADMIN.value)) is None:
-            raise ValueError("the revoking Admin is missing from this database")
-        rights = list(db.scalars(select(AccessRights).where(AccessRights.item_id == item.id)
-                                 .order_by(AccessRights.id).with_for_update()).all())
-        if not rights:
-            raise ValueError("tombstone names an item that is not a reviewed common copy")
-        _revoke_rows(db, item, rights, revoked_by, entry["reason_code"], recorded_at,
-                     max(item.rights_epoch + 1, epoch))
-        _cancel_jobs(db, item.id, recorded_at)
-        applied = "revoked"
-    db.add(DeletionTombstone(
-        id=tombstone_id, target_kind=entry["target_kind"], item_id=item_id, version_id=_uuid(entry["version_id"]),
-        source_file_id=_uuid(entry["source_file_id"]), storage_key=entry["storage_key"],
-        access_rights_id=_uuid(entry["access_rights_id"]), reason_code=entry["reason_code"],
-        prior_publication_state=entry["prior_publication_state"],
-        rights_epoch=item.rights_epoch if item is not None else epoch, recorded_at=recorded_at,
-        recorded_by_user_id=revoked_by, purge_due_at=datetime.fromisoformat(entry["purge_due_at"])))
-    db.flush()
-    for basis in entry.get("retentions", []):
-        db.add(RevocationMetadataRetention(
-            tombstone_id=tombstone_id, item_id=item_id, field=basis["field"], policy_source=basis["policy_source"],
-            scope=basis["scope"], reason=basis["reason"], confirmed_by_user_id=uuid.UUID(basis["confirmed_by_user_id"]),
-            recorded_at=datetime.fromisoformat(basis["recorded_at"])))
-    db.flush()
-    record_event(db, action="common_copy.tombstone_replay", outcome=AuditOutcome.SUCCESS,
-                 actor_type=AuditActorType.SYSTEM, target_type="deletion_tombstone", target_id=str(tombstone_id),
-                 details={"result": applied})
-    db.commit()
-    return applied
-
-
-def apply_tombstones(engine: Engine, entries: list[dict]) -> dict[str, int]:
-    counts: dict[str, int] = {}
-    for entry in entries:
-        with Session(engine) as db:
-            result = apply_tombstone(db, entry)
-        counts[result] = counts.get(result, 0) + 1
     return counts

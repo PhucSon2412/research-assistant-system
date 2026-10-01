@@ -1,4 +1,4 @@
-"""M6b-2a publication (metadata only), revocation, cleanup and tombstone replay (PostgreSQL + MinIO).
+"""M6b-2a publication (metadata only), revocation, cleanup and restore replay (PostgreSQL + MinIO).
 
 ``world(index_a=True)`` indexes A's private copy with the fake embedding provider
 of ``test_private_index`` (in-memory settings copy, no network); nothing here
@@ -706,10 +706,22 @@ def test_cleanup_removes_only_the_common_object_and_is_safe_to_repeat(upload_api
     no_secrets_in(api, caplog)
 
 
-def test_restored_backup_serves_the_copy_until_the_journal_is_applied(upload_api, monkeypatch, admin_engine,
-                                                                     app_env):
-    """Shows the gap, not a guarantee: an old backup serves the copy again until the
-    manual ``tombstones apply`` step runs. Nothing enforces that order at startup."""
+def journal_revocations() -> list[dict]:
+    """Bodies of the revocation records in this test's journal file (M6c-1)."""
+    from app import journal
+    from app.config import get_settings
+
+    return [r.body for r in journal.read(get_settings().recovery.journal_path).records if r.kind == "revocation"]
+
+
+def test_restored_backup_is_gated_until_recover_replays_the_journal(upload_api, monkeypatch, admin_engine, app_env):
+    """The M6b-2a gap, closed by M6c-1: a backup older than a revocation serves nothing until
+    ``recover`` has replayed the journal (kept outside the database) and cleaned up."""
+    from fastapi.testclient import TestClient
+
+    from app import recovery
+    from app.config import get_settings
+
     api, storage = upload_api
     a, b, admin, ids_a, _ = world(api, storage, monkeypatch)
     copy = new_copy(api, a, admin, ids_a)
@@ -730,30 +742,42 @@ def test_restored_backup_serves_the_copy_until_the_journal_is_applied(upload_api
     try:
         assert revoke(admin, copy, "rights_withdrawn").status_code == 200
         assert publication.cleanup_revoked(api.engine, storage, api.clock.now, 50) == {"deleted": 1}
-        with app_db.get_sessionmaker()() as db:
-            journal = publication.export_tombstones(db)
+        journal = journal_revocations()
         assert [e["item_id"] for e in journal] == [copy]
         for secret in FORBIDDEN_IN_LOGS:
             assert secret not in str(journal)
 
-        # Restore the old database and the object store backup: the copy would be served again...
+        # Restore the old database and the object store backup; the journal is kept.
         app_env(snapshot_url)
         storage.put(key, io.BytesIO(A_BODY), "text/markdown")
-        assert copy in listed_ids(b)
-        # ...so the journal is applied before traffic, and then cleanup runs on the restored store.
-        assert publication.apply_tombstones(snapshot, journal) == {"revoked": 1}
+        with snapshot.connect() as conn:  # the snapshot itself still says listed...
+            assert conn.scalar(text("SELECT publication_state FROM library_items WHERE id=:i"),
+                               {"i": uuid.UUID(copy)}) == "listed"
+        # ...but nothing is served, to anyone, before the replay.
+        for browser in (a, b, admin):
+            for path in ("/library/items?limit=100", f"/library/items/{copy}", f"/files/{common_file(api, copy)}/original",
+                         "/auth/session"):
+                response = browser.get(path)
+                assert (response.status_code, response.json()) == (503, {"error": "service_recovering"}), path
+        assert TestClient(app).get("/readyz").status_code == 503
+        assert TestClient(app).get("/healthz").json() == {"status": "ok"}
+        assert recovery.evaluate(get_settings(), snapshot).reason == "db_behind_journal"
+
+        report = recovery.recover(snapshot, storage, get_settings(), api.clock.now)
+        assert report.replayed == {"recovery_begin": 1, "revoked": 1, "recovery_end": 1}
+        assert report.cleanup == {"deleted": 1} and report.gate == "open"
         assert copy not in listed_ids(b) and b.get(f"/library/items/{copy}").json() == MISSING
         with snapshot.connect() as conn:
             row = conn.execute(text("SELECT i.publication_state, i.rights_epoch, r.revocation_reason_code,"
                                     " p.revoked_at IS NOT NULL FROM library_items i JOIN access_rights r"
                                     " ON r.item_id=i.id JOIN common_publications p ON p.item_id=i.id WHERE i.id=:i"),
                                {"i": uuid.UUID(copy)}).one()
-        assert tuple(row) == ("revoked", 1, "rights_withdrawn", True)
-        assert publication.cleanup_revoked(snapshot, storage, api.clock.now, 50) == {"deleted": 1}
-        assert not key_present(storage, key)
-        with snapshot.connect() as conn:  # the restored metadata is removed again too
+            assert tuple(row) == ("revoked", 1, "rights_withdrawn", True)
+            # the restored metadata is removed again too
             assert conn.scalar(text("SELECT title FROM library_items WHERE id=:i"), {"i": uuid.UUID(copy)}) is None
-        assert publication.apply_tombstones(snapshot, journal) == {"present": 1}  # safe to repeat
+        assert not key_present(storage, key)
+        again = recovery.recover(snapshot, storage, get_settings(), api.clock.now)  # safe to repeat
+        assert again.replayed == {"recovery_begin": 1, "recovery_end": 1} and again.cleanup == {}
         assert storage.open(api.scalar("SELECT storage_key FROM source_files WHERE id=:f",
                                        f=uuid.UUID(ids_a["file_id"]))).read() == A_BODY
     finally:
@@ -813,10 +837,10 @@ def test_schema_keeps_publication_and_revocation_consistent(upload_api, monkeypa
     # Legacy listed common items have no rights and no transition.
     legacy = api.add_item(owner=None, title="Legacy")
     fails("only a common copy with recorded rights", (revoke_item, {"i": legacy, "bump": 1}))
-    with api.engine.begin() as conn:
-        for statement in (revoke_item, revoke_rights, revoke_pub, tombstone):
-            conn.execute(text(statement), p)
-    assert state(api, copies[0]) == "revoked" and live_publications(api) == 0
+    # A complete revocation by SQL still lacks its journal record (M6c-1): only `publication.revoke` revokes.
+    fails("needs its revocation journal record",
+          *((statement, p) for statement in (revoke_item, revoke_rights, revoke_pub, tombstone)))
+    assert state(api, copies[0]) == "listed" and live_publications(api) == 1
 
 
 # --- metadata after revocation (M6b-2a review) -----------------------------------------------------
@@ -852,9 +876,7 @@ def other_reference_paths(admin, a, b, copy, rid) -> str:
                  admin.get("/admin/pending-publications"), a.get(f"/review-requests/{rid}"), a.get("/review-requests")]
     for browser in (a, b, admin):
         responses += [browser.get("/library/items?limit=100"), browser.get(f"/library/items/{copy}")]
-    with app_db.get_sessionmaker()() as db:
-        journal = publication.export_tombstones(db)
-    return " ".join(r.text for r in responses) + str(journal)
+    return " ".join(r.text for r in responses) + str(journal_revocations())
 
 
 def test_cleanup_removes_revoked_metadata_by_default(upload_api, monkeypatch):
@@ -963,8 +985,7 @@ def test_revocation_keeps_only_fields_with_a_recorded_basis(upload_api, monkeypa
         with pytest.raises(IntegrityError, match=message), api.engine.begin() as conn:
             conn.execute(text(statement), {"t": tomb_id, "i": uuid.UUID(copy), "a": admin_id})
     # The journal carries the bases so a replay keeps the same decision.
-    with app_db.get_sessionmaker()() as db:
-        (entry,) = publication.export_tombstones(db)
+    (entry,) = journal_revocations()
     assert [r["field"] for r in entry["retentions"]] == ["evidence_note", "title"]
 
 

@@ -312,5 +312,5 @@ def revoke_copy(
         raise ApiError(422, "retention_confirmation_required")
     retain = tuple(RetentionBasis(r.field, r.policy_source, r.scope, r.reason) for r in body.retain)
     done = revoke(db, admin, _parse_id(item_id), body.reason_code, now, settings.retention.deleted_cleanup_deadline,
-                  retain)
+                  retain, journal_path=settings.recovery.journal_path)
     return {"item": _copy_out(db, admin, done.item.id, now), "cancelled_jobs": done.cancelled_jobs}

@@ -146,20 +146,28 @@ def _subprocess_env(url: URL) -> dict[str, str]:
     return env
 
 
-def _run(args: list[str], url: URL, stdin: str = "") -> subprocess.CompletedProcess[str]:
+def _run(args: list[str], url: URL, stdin: str = "",
+         extra: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, *args], input=stdin, capture_output=True, text=True, encoding="utf-8",
-        cwd=API_DIR, env=_subprocess_env(url), timeout=120,
+        cwd=API_DIR, env=_subprocess_env(url) | (extra or {}), timeout=120,
     )
 
 
-def test_special_password_works_for_migration_api_and_bootstrap(tricky_role_db: URL, app_env) -> None:
+def test_special_password_works_for_migration_api_and_bootstrap(tricky_role_db: URL, app_env,
+                                                                  journal_path) -> None:
     password = tricky_role_db.password
     assert "@" in password and ":" in password and "/" in password
 
     # 1. Alembic, exactly as the Compose `migrate` service runs it.
     migrate = _run(["-m", "alembic", "upgrade", "head"], tricky_role_db)
     assert migrate.returncode == 0, migrate.stderr[-2000:].replace(password, "<pw>")
+
+    # 1b. New-install registration, exactly as the Compose `recovery-init` service runs it (M6c-1).
+    init = _run(["-m", "app.cli.recovery", "init", "--if-new"], tricky_role_db,
+                extra={"RAS_RECOVERY__JOURNAL_PATH": str(journal_path)})
+    assert init.returncode == 0 and "Registered a new install" in init.stdout, \
+        init.stderr[-2000:].replace(password, "<pw>")
 
     # 2. API readiness through RAS_DB__* settings.
     app_env(tricky_role_db)

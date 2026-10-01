@@ -25,9 +25,10 @@ from types import SimpleNamespace
 from sqlalchemy import and_, or_, select, text, true, update
 from sqlalchemy.orm import Session
 
+from app import recovery
 from app.citations import reconcile_references
 from app.config import Settings, get_settings
-from app.db import get_sessionmaker
+from app.db import get_engine, get_sessionmaker
 from app.ingest.markdown import PIPELINE_VERSION, chunk_hash, chunk_section, extract, has_body_text
 from app.ingest import pdf
 from app.models import Chunk, EmbeddingCall, IngestionJob, IngestStepAttempt, LibraryItem, MetadataCandidate, PaperVersion, PdfPage, ReferenceEntry, Section, SourceFile
@@ -521,6 +522,10 @@ def _chunk_pdf(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceF
 def process_job(job_id: uuid.UUID, settings: Settings | None = None,
                 storage: OriginalStorage | None = None) -> str:
     settings = settings or get_settings()
+    # M6c-1: nothing is read, extracted or sent while the recovery gate is closed (a restored
+    # database may still hold a revoked copy as listed). The job stays as it is for later.
+    if not recovery.gate_open(settings, get_engine(), "worker"):
+        return "recovery_gate_closed"
     # Leave extracted jobs durable until a key and live price check are configured.
     if settings.embedding.api_key is None or not settings.embedding.pricing_verified:
         with get_sessionmaker()() as check_db:

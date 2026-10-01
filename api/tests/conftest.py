@@ -13,6 +13,7 @@ import os
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from alembic import command
@@ -25,7 +26,7 @@ from app import db as app_db
 
 API_DIR = Path(__file__).resolve().parents[1]
 # Latest Alembic revision; bump when a migration is added.
-HEAD_REVISION = "0025"
+HEAD_REVISION = "0027"
 REPO_DIR = API_DIR.parent
 
 
@@ -115,8 +116,30 @@ def empty_db_url(admin_engine: Engine) -> Iterator[URL]:
 
 
 @pytest.fixture
-def migrated_db_url(empty_db_url: URL) -> URL:
+def journal_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """This test's revocation journal (M6c-1): a file outside the database, as in a deployment."""
+    path = tmp_path / "journal" / "revocations.jsonl"
+    monkeypatch.setenv("RAS_RECOVERY__JOURNAL_PATH", str(path))
+    app_config.get_settings.cache_clear()
+    return path
+
+
+def register_new_install(url: URL, path: Path) -> None:
+    """Genesis + registration for a freshly migrated database, like `recovery init` on a new install."""
+    from app.clock import utcnow
+    from app.recovery import init_new
+
+    eng = app_db.make_engine(url)
+    try:
+        init_new(eng, SimpleNamespace(recovery=SimpleNamespace(journal_path=path)), utcnow())
+    finally:
+        eng.dispose()
+
+
+@pytest.fixture
+def migrated_db_url(empty_db_url: URL, journal_path: Path) -> URL:
     upgrade(empty_db_url)
+    register_new_install(empty_db_url, journal_path)
     return empty_db_url
 
 

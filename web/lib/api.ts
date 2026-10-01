@@ -103,6 +103,11 @@ const MESSAGES: Record<string, string> = {
   publication_storage_unavailable: "Không đọc được object của bản chung; chưa công bố. Thử lại sau.",
   publication_unavailable: "Không ghi được việc công bố; bản vẫn ở trạng thái chờ. Thử lại sau.",
   revocation_unavailable: "Không ghi được việc thu hồi; bản chưa bị thu hồi. Thử lại ngay.",
+  revocation_journal_unavailable:
+    "Bản đã bị thu hồi nhưng không ghi được nhật ký thu hồi; hệ thống tạm ngừng phục vụ tới khi quản trị viên sửa nhật ký.",
+  revocation_pending_recovery:
+    "Nhật ký đã ghi việc thu hồi nhưng database chưa áp dụng; hệ thống tạm ngừng phục vụ tới khi quản trị viên chạy phục hồi.",
+  service_recovering: "Hệ thống đang tạm ngừng phục vụ để kiểm tra/phục hồi dữ liệu thu hồi. Thử lại sau.",
   file_unavailable: "Chưa đọc được file gốc. Thử lại sau.",
 };
 

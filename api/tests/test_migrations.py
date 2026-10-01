@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 import hashlib
 import io
 from decimal import Decimal
@@ -46,6 +48,7 @@ EXPECTED_TABLES = {
     "review_requests",
     "access_rights",
     "common_publications", "deletion_tombstones", "revocation_metadata_retentions",
+    "recovery_registrations", "revocation_journal_records",
 }
 
 
@@ -79,16 +82,18 @@ def test_rerunning_upgrade_is_a_noop(migrated_db_url: str) -> None:
     assert _tables(migrated_db_url) == EXPECTED_TABLES
 
 
-def test_downgrade_to_base_and_upgrade_again(migrated_db_url: str) -> None:
-    command.downgrade(alembic_config(migrated_db_url), "base")
-    assert _tables(migrated_db_url) == {"alembic_version"}
-    eng = create_engine(migrated_db_url)
+def test_downgrade_to_base_and_upgrade_again(empty_db_url: str) -> None:
+    # Not registered: once a database has a revocation journal, 0026 refuses the downgrade.
+    upgrade(empty_db_url)
+    command.downgrade(alembic_config(empty_db_url), "base")
+    assert _tables(empty_db_url) == {"alembic_version"}
+    eng = create_engine(empty_db_url)
     with eng.connect() as conn:
         assert conn.scalar(text("SELECT count(*) FROM pg_proc WHERE proname LIKE 'ras\\_%'")) == 0
     eng.dispose()
 
-    upgrade(migrated_db_url)
-    assert _tables(migrated_db_url) == EXPECTED_TABLES
+    upgrade(empty_db_url)
+    assert _tables(empty_db_url) == EXPECTED_TABLES
 
 
 def test_orm_models_match_migrated_schema(migrated_db_url: str) -> None:
@@ -612,6 +617,109 @@ def test_0025_refuses_a_promotion_job_it_cannot_pin(empty_db_url: str) -> None:
     eng.dispose()
     with pytest.raises(Exception, match="promotion jobs without a reviewed common file"):
         upgrade(empty_db_url)
+
+
+def test_0026_leaves_registration_to_the_operator_and_imports_existing_tombstones(empty_db_url: str,
+                                                                                   tmp_path) -> None:
+    from types import SimpleNamespace
+
+    from app import journal, recovery
+    from app.clock import utcnow
+    from app.identity.passwords import hash_password
+
+    upgrade(empty_db_url, "0025")
+    eng = create_engine(empty_db_url)
+    with eng.begin() as conn:
+        admin = conn.scalar(text("INSERT INTO users(email,password_verifier,role) VALUES('a@x.test',:p,'admin')"
+                                 " RETURNING id"), {"p": hash_password("m6c1-migration-password")})
+        # A tombstone written before M6c-1 (its copy is not in this database, as after a restore).
+        tomb = conn.scalar(text("""INSERT INTO deletion_tombstones(target_kind,item_id,reason_code,
+            prior_publication_state,rights_epoch,recorded_at,recorded_by_user_id,purge_due_at,storage_key)
+            VALUES('common_copy',gen_random_uuid(),'rights_withdrawn','listed',1,now(),:a,now()+interval '1 day',
+            'originals/0123456789abcdef0123456789abcdef') RETURNING id"""), {"a": admin})
+    upgrade(empty_db_url)
+    command.downgrade(alembic_config(empty_db_url), "0025")  # nothing registered yet: allowed
+    upgrade(empty_db_url)
+    settings = SimpleNamespace(recovery=SimpleNamespace(journal_path=tmp_path / "revocations.jsonl",
+                                                        gate_lock_timeout_ms=2000))
+    assert recovery.evaluate(settings, eng).reason == "journal_missing"  # the migration registers nothing
+    with pytest.raises(recovery.RecoveryError, match="database_not_new"):
+        recovery.init_new(eng, settings, utcnow())
+    _, imported = recovery.register_existing(eng, settings, utcnow())
+    assert imported == 1 and recovery.evaluate(settings, eng).reason == "open"
+    (genesis, record) = journal.read(settings.recovery.journal_path).records
+    assert genesis.body["mode"] == "existing_db" and record.body["id"] == str(tomb)
+    with eng.connect() as conn:
+        assert conn.scalar(text("SELECT tombstone_id FROM revocation_journal_records WHERE seq=2")) == tomb
+    eng.dispose()
+    with pytest.raises(Exception, match="registered with a revocation journal"):
+        command.downgrade(alembic_config(empty_db_url), "0025")
+
+
+def test_0027_backfills_revoke_records_unconfirmed_so_recover_must_confirm_them(empty_db_url: str,
+                                                                                tmp_path) -> None:
+    from types import SimpleNamespace
+
+    from app import journal, recovery
+    from app.clock import utcnow
+    from app.identity.passwords import hash_password
+
+    upgrade(empty_db_url, "0026")
+    eng = create_engine(empty_db_url)
+    path = tmp_path / "revocations.jsonl"
+    genesis = journal.genesis(uuid.uuid4(), utcnow(), "new_install")
+    with eng.begin() as conn:
+        admin = conn.scalar(text("INSERT INTO users(email,password_verifier,role) VALUES('a@x.test',:p,'admin')"
+                                 " RETURNING id"), {"p": hash_password("m6c1-migration-password")})
+        body = {"id": str(uuid.uuid4()), "target_kind": "common_copy", "item_id": str(uuid.uuid4()),
+                "version_id": None, "source_file_id": None, "storage_key": None, "access_rights_id": None,
+                "reason_code": "other", "prior_publication_state": "listed", "rights_epoch": 1,
+                "recorded_at": utcnow().isoformat(), "recorded_by_user_id": str(admin),
+                "purge_due_at": utcnow().isoformat(), "retentions": []}
+        revocation = journal.next_record(genesis, journal.REVOCATION, body)
+        conn.execute(text("INSERT INTO recovery_registrations(id,journal_id,genesis_hash,mode,registered_at)"
+                          " VALUES(1,:j,:h,'new_install',now())"), {"j": genesis.body["journal_id"], "h": genesis.hash})
+        for record, via, tomb in ((genesis, "genesis", None), (revocation, "revoke", body["id"])):
+            conn.execute(text("""INSERT INTO revocation_journal_records(seq,kind,record_hash,line,tombstone_id,
+                applied_via,result) VALUES(:s,:k,:h,:l,:t,:v,'x')"""),
+                         {"s": record.seq, "k": record.kind, "h": record.hash, "l": record.line, "t": tomb, "v": via})
+        conn.execute(text("""INSERT INTO deletion_tombstones(id,target_kind,item_id,reason_code,prior_publication_state,
+            rights_epoch,recorded_at,recorded_by_user_id,purge_due_at)
+            VALUES(:t,'common_copy',:i,'other','listed',1,now(),:a,now()+interval '1 day')"""),
+                     {"t": body["id"], "i": body["item_id"], "a": admin})
+    journal.create(path, [genesis, revocation])
+    upgrade(empty_db_url)
+    with eng.connect() as conn:
+        assert conn.execute(text("SELECT seq, journal_confirmed FROM revocation_journal_records ORDER BY seq")).all() \
+            == [(1, True), (2, False)]
+    settings = SimpleNamespace(recovery=SimpleNamespace(journal_path=path, gate_lock_timeout_ms=2000,
+                                                        cleanup_passes=1),
+                               retention=SimpleNamespace(cleanup_batch_size=10))
+    # A 0026 revocation may have been the complete-line-but-fsync-failed case: closed until recover confirms.
+    assert recovery.evaluate(settings, eng).reason == "journal_unconfirmed"
+    with pytest.raises(Exception, match="registered with a revocation journal"):
+        command.downgrade(alembic_config(empty_db_url), "0026")
+    report = recovery.recover(eng, None, settings, utcnow())
+    assert report.journal_confirmed == 1 and report.gate == "open"
+    # Confirmed or not, a registered database never goes below 0027: 0026 code would open the gate again
+    # after the next revocation whose fsync fails (PR #26 review).
+    with pytest.raises(Exception, match="registered with a revocation journal"):
+        command.downgrade(alembic_config(empty_db_url), "0026")
+    with eng.connect() as conn:
+        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == "0027"
+        assert conn.scalar(text("SELECT count(*) FROM revocation_journal_records WHERE NOT journal_confirmed")) == 0
+    eng.dispose()
+
+
+def test_0027_downgrades_only_a_database_never_registered(empty_db_url: str) -> None:
+    upgrade(empty_db_url)
+    command.downgrade(alembic_config(empty_db_url), "0026")  # no registration, no journal record
+    eng = create_engine(empty_db_url)
+    with eng.connect() as conn:
+        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == "0026"
+        assert "journal_confirmed" not in {c["name"] for c in inspect(conn).get_columns("revocation_journal_records")}
+    eng.dispose()
+    upgrade(empty_db_url)
 
 
 def test_collection_membership_foreign_keys_restrict(migrated_db_url: str) -> None:
