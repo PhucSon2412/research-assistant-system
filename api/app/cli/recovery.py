@@ -12,6 +12,11 @@
 ``register-existing --confirm-db-is-current``
     A database that already has content, **and is the live one, not a
     restored backup**: writes a new journal holding every existing tombstone.
+``hold``
+    Right after a restore, before anything starts (M6c-2a): open a recovery
+    in the journal so the gate stays closed until ``recover`` finishes, even
+    when nothing was revoked after the backup. Refuses, writing nothing, when
+    the journal is missing, torn, another install's, or behind the database.
 ``recover [--confirm-db-is-current]``
     After a restore, with API/web/worker/beat stopped: verify the journal,
     replay what the database lacks, run cleanup until every tombstone is
@@ -40,6 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("status")
     sub.add_parser("init").add_argument("--if-new", action="store_true")
     sub.add_parser("register-existing").add_argument("--confirm-db-is-current", action="store_true")
+    sub.add_parser("hold")
     sub.add_parser("recover").add_argument("--confirm-db-is-current", action="store_true")
     args = parser.parse_args(argv)
     settings = get_settings()
@@ -66,6 +72,10 @@ def main(argv: list[str] | None = None) -> int:
                 return 2
             _, imported = recovery.register_existing(engine, settings, utcnow())
             print(f"Registered the existing database: {imported} tombstones journaled")
+            return 0
+        if args.command == "hold":
+            recovery_id = recovery.hold(engine, settings, utcnow())
+            print(f"Recovery held open: {recovery_id}; gate={recovery.evaluate(settings, engine).reason}")
             return 0
         report = recovery.recover(engine, get_storage(settings), settings, utcnow(),
                                   confirm_db_current=args.confirm_db_is_current)

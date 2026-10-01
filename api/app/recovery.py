@@ -21,6 +21,8 @@ gate. While closed, the API answers only ``/healthz`` (``/readyz`` is 503),
 and Celery tasks, ``process_job`` and each embedding call of the indexer stop
 before reading or sending text. ``recover`` (``app.cli.recovery``) replays the
 missing records, cleans up, verifies and only then closes its recovery.
+``hold`` (M6c-2a) opens that recovery right after a restore, so the gate is shut
+even when the restored database happens to match the journal.
 
 A journal line is a decision: once written, the copy it names ends revoked.
 If the database commit then fails or its outcome is unknown, the revoking
@@ -652,6 +654,59 @@ def _verify(engine: Engine, path: Path) -> None:
                 raise RecoveryError("copy_not_revoked")
             if db.scalar(text("SELECT ras_common_copy_derived_left(:i)"), {"i": item_id}):
                 raise RecoveryError("derived_rows_left")
+
+
+def hold(engine: Engine, settings: Settings, now: datetime) -> str:
+    """Open a recovery right after a restore, so the gate stays shut until ``recover`` closes it (M6c-2a).
+
+    Without it, a database restored from a backup taken after the last revocation would
+    match the journal and open the gate before anyone ran ``recover``. Appends a
+    ``recovery_begin`` to the journal only (``recover`` mirrors it and continues this same
+    recovery); returns its ID, or the ID of a recovery already open. Refuses, writing nothing,
+    when the journal cannot be read, has a torn tail, is not this database's, or lacks a
+    record the database holds: appending then would turn a repairable journal into a
+    diverged one. The gate is shut in every refused case too.
+    """
+    path = _path(settings)
+    with engine.connect() as mutex:
+        if not mutex.scalar(text("SELECT pg_try_advisory_lock(:k)"), {"k": RECOVER_LOCK}):
+            raise RecoveryError("recovery_already_running")
+        mutex.commit()
+        try:
+            with Session(engine) as db:
+                _lock_journal(db)
+                try:
+                    state = journal.read(path)
+                except JournalError as exc:
+                    raise RecoveryError(exc.code) from None
+                if state.torn is not None:
+                    raise RecoveryError("journal_torn")
+                registration = _registration(db)
+                if registration is not None and (registration.journal_id != state.journal_id
+                                                 or registration.genesis_hash != state.genesis_hash):
+                    raise RecoveryError("journal_mismatch")
+                head = _db_head(db)
+                if head is not None:
+                    if head.seq > state.head.seq:
+                        raise RecoveryError("journal_behind_db")
+                    if state.records[head.seq - 1].hash != head.record_hash:
+                        raise RecoveryError("journal_diverged")
+                if state.open_recovery is not None:
+                    return state.open_recovery
+                recovery_id = str(uuid.uuid4())
+                record = journal.next_record(state.head, RECOVERY_BEGIN, {
+                    "recovery_id": recovery_id, "started_at": now.isoformat(), "db_head_seq": head.seq if head else 0})
+                try:
+                    journal.append(path, state, [record])
+                except JournalError as exc:
+                    raise RecoveryError(exc.code) from None
+                except OSError:
+                    raise RecoveryError("journal_write_failed") from None
+                db.commit()
+                return recovery_id
+        finally:
+            mutex.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": RECOVER_LOCK})
+            mutex.commit()
 
 
 def recover(engine: Engine, storage, settings: Settings, now: datetime, *,
