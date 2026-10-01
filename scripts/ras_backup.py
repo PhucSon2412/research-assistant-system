@@ -15,7 +15,8 @@ renames the artifact into place (``app.backup``). The revocation journal is neve
 them into TARGET only: never the dev project ``ras`` nor the artifact's source project, its
 own volumes (a project that already has volumes must carry this tool's marker database) and
 ports (POSTGRES/API/WEB/MINIO host ports must be set to non-default values, and the
-published ports are checked). It mounts the journal copy as TARGET's journal
+published ports are checked). Ownership is checked read-only (``target_is_fresh``) before any
+``stop`` or ``up``: a project this tool did not create is never touched. It mounts the journal copy as TARGET's journal
 (``RAS_JOURNAL_SOURCE``), loads the dump in one transaction, runs ``recovery hold`` (gate shut
 until ``recover``), puts the bucket back to exactly the artifact's objects and migrates. It
 never starts api/web/worker/beat; the operator runs ``recovery recover`` next. Running it
@@ -222,15 +223,39 @@ def do_copy_journal(args, env: dict) -> int:
 
 # --- restore ------------------------------------------------------------------
 
-def psql(project: str, sql: str, extra_env: dict, database: str = "postgres") -> str:
+def psql(project: str, sql: str, extra_env: dict, database: str = "postgres", read_only: bool = False) -> str:
+    # read_only: the session refuses any write (default_transaction_read_only), for checks on a project
+    # this tool may not own.
+    prefix = 'PGOPTIONS="-c default_transaction_read_only=on" ' if read_only else ""
     result = subprocess.run(
         ["docker", "compose", "-p", project, "exec", "-T", "db", "sh", "-c",
-         'exec psql -X -q -At -v ON_ERROR_STOP=1 -v app_db="$POSTGRES_DB" -U "$POSTGRES_USER" -d "$1"', "sh",
-         database], cwd=ROOT, input=sql, capture_output=True, encoding="utf-8", errors="replace",
+         f'exec env {prefix}psql -X -q -At -v ON_ERROR_STOP=1 -v app_db="$POSTGRES_DB" -U "$POSTGRES_USER" -d "$1"',
+         "sh", database], cwd=ROOT, input=sql, capture_output=True, encoding="utf-8", errors="replace",
         env={**os.environ, **extra_env})
     if result.returncode != 0:
         raise BackupError("psql_failed", f"exit {result.returncode}")
     return result.stdout
+
+
+def target_is_fresh(target: str, extra: dict) -> bool:
+    """Read-only: True for a project with no volume and no container; else it must carry the marker.
+
+    Runs only ``docker volume ls``, ``compose ps`` and one read-only ``SELECT`` in a db container
+    that is already running: never ``stop``, ``up``, ``run`` or any write, so a project this tool
+    did not create is left exactly as it was. A project with volumes whose db is not running is
+    refused rather than started.
+    """
+    volumes = subprocess.run(["docker", "volume", "ls", "-q", "--filter", f"label=com.docker.compose.project={target}"],
+                             capture_output=True, text=True, check=True).stdout.split()
+    containers = compose_text(target, "ps", "-a", "-q", extra_env=extra).split()
+    if not volumes and not containers:
+        return True
+    if "db" not in set(compose_text(target, "ps", "--status", "running", "--services", extra_env=extra).split()):
+        raise BackupError("target_db_not_running", target)
+    marker = psql(target, f"SELECT 1 FROM pg_database WHERE datname = '{MARKER_DB}';", extra, read_only=True)
+    if marker.strip() != "1":
+        raise BackupError("target_not_restore_owned", target)
+    return False
 
 
 def do_restore(args, env: dict) -> int:
@@ -255,9 +280,8 @@ def do_restore(args, env: dict) -> int:
             raise BackupError(exc.code) from None
         backup.check_journal_for_backup(state, manifest)
     extra = {"RAS_JOURNAL_SOURCE": str(journal_dir)}
-    fresh = not subprocess.run(["docker", "volume", "ls", "-q", "--filter",
-                                f"label=com.docker.compose.project={target}"],
-                               capture_output=True, text=True, check=True).stdout.split()
+    with timed(timings, "target_check"):
+        fresh = target_is_fresh(target, extra)  # read-only; before any stop/up on the target
     with timed(timings, "start_db_minio"):
         if not fresh:
             compose(target, "stop", *WRITERS, extra_env=extra)
@@ -267,9 +291,6 @@ def do_restore(args, env: dict) -> int:
             raise BackupError("target_ports_not_isolated", "published")
         if minio_port in (published(source, "minio", 9000), published(DEV_PROJECT, "minio", 9000)):
             raise BackupError("target_ports_not_isolated", "minio")
-        owned = psql(target, f"SELECT 1 FROM pg_database WHERE datname = '{MARKER_DB}'", extra).strip() == "1"
-        if not fresh and not owned:
-            raise BackupError("target_not_restore_owned", target)  # nothing destructive has run yet
     backup_id = manifest["backup_id"]
     with timed(timings, "database"):
         psql(target, f"""

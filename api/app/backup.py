@@ -371,7 +371,9 @@ def check_journal_for_backup(state: JournalState, manifest: dict) -> None:
 def restore_objects(storage, artifact: Path, manifest: dict) -> dict:
     """Make the bucket hold exactly the artifact's objects: put missing or different ones, delete the rest.
 
-    Running it again changes nothing. Each file is hashed again as it is read for upload.
+    Running it again changes nothing. Each file is hashed again as it is read for upload, and
+    afterwards every object is read back from the store and must have the artifact's SHA-256
+    (same-size wrong bytes included): otherwise ``objects_restore_mismatch``.
     """
     storage.ensure_bucket()
     wanted = {e["key"]: e for e in manifest["objects"]["entries"]}
@@ -381,13 +383,9 @@ def restore_objects(storage, artifact: Path, manifest: dict) -> dict:
         storage.delete(key)
         counts["deleted"] += 1
     for key, entry in wanted.items():
-        if key in present and present[key][0] == entry["bytes"]:
-            digest = hashlib.sha256()
-            for block in _body_chunks(storage.open(key)):
-                digest.update(block)
-            if digest.hexdigest() == entry["sha256"]:
-                counts["unchanged"] += 1
-                continue
+        if key in present and present[key][0] == entry["bytes"] and stored_digest(storage, key) == entry["sha256"]:
+            counts["unchanged"] += 1
+            continue
         data = (artifact / entry["path"]).read_bytes()
         if hashlib.sha256(data).hexdigest() != entry["sha256"]:
             raise BackupError("file_checksum_mismatch", entry["path"])
@@ -396,4 +394,15 @@ def restore_objects(storage, artifact: Path, manifest: dict) -> dict:
     after = listing(storage)
     if set(after) != set(wanted) or any(after[k][0] != wanted[k]["bytes"] for k in wanted):
         raise BackupError("objects_restore_incomplete")
+    for key, entry in wanted.items():  # read back: size alone does not prove the bytes
+        if stored_digest(storage, key) != entry["sha256"]:
+            raise BackupError("objects_restore_mismatch")
     return counts
+
+
+def stored_digest(storage, key: str) -> str:
+    """SHA-256 of an object as the store returns it now."""
+    digest = hashlib.sha256()
+    for block in _body_chunks(storage.open(key)):
+        digest.update(block)
+    return digest.hexdigest()

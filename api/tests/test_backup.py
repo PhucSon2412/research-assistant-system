@@ -382,3 +382,107 @@ def test_restore_and_recover_run_again_safely(upload_api, monkeypatch, admin_eng
                 assert TestClient(app).get(f"/library/items/{w.copy}").json() == RECOVERING[1]
                 assert do_recover(engine, w.storage, w.api.clock.now).objects_removed == 1
                 assert gate(engine) == "open" and not key_present(w.storage, key)
+
+
+# --- review PR #27 ------------------------------------------------------------
+
+def ras_backup_tool():
+    import sys
+
+    from tests.conftest import REPO_DIR
+    sys.path.insert(0, str(REPO_DIR / "scripts"))
+    import ras_backup
+    return ras_backup
+
+
+class Touched(Exception):
+    """The fake docker CLI reached a command that changes a project."""
+
+
+def fake_docker(monkeypatch, *, db_running: bool, marker: bool):
+    """Record every docker command ``restore`` issues; refuse (raise) at the first one that changes a project."""
+    import subprocess
+    calls: list[tuple[list[str], str | None]] = []
+
+    def run(argv, **kwargs):
+        calls.append((list(argv), kwargs.get("input")))
+        out = ""
+        if argv[:3] == ["docker", "volume", "ls"]:
+            out = "foreign_db-data\nforeign_minio-data\n"
+        elif argv[:2] == ["docker", "compose"] and argv[4:6] == ["ps", "-a"]:
+            out = "0123456789ab\n"
+        elif argv[:2] == ["docker", "compose"] and argv[4:6] == ["ps", "--status"]:
+            out = "db\nminio\nredis\n" if db_running else "minio\n"
+        elif argv[:2] == ["docker", "compose"] and argv[4] == "exec":
+            out = "1\n" if marker else ""
+        else:
+            raise Touched(" ".join(argv[4:6]))
+        return subprocess.CompletedProcess(argv, 0, stdout=out, stderr="")
+    monkeypatch.setattr(subprocess, "run", run)
+    return calls
+
+
+@pytest.mark.parametrize("db_running", [True, False], ids=["db_running", "db_stopped"])
+def test_restore_leaves_a_project_without_the_marker_completely_untouched(upload_api, monkeypatch, tmp_path,
+                                                                          db_running):
+    """Review PR #27: ownership is checked read-only before any stop/up/run on the target."""
+    from types import SimpleNamespace
+
+    tool = ras_backup_tool()
+    w = listed(upload_api, monkeypatch)
+    artifact = make_artifact(tmp_path / "backups", w.storage, w.api.engine)
+    bk.copy_journal(journal_file(), tmp_path / "journal-copy", utcnow())
+    for name, port in zip(tool.PORTS, ("46432", "46800", "46300", "46900", "46901")):
+        monkeypatch.setenv(name, port)
+    args = SimpleNamespace(project="foreign", artifact=str(artifact), journal_dir=str(tmp_path / "journal-copy"))
+
+    calls = fake_docker(monkeypatch, db_running=db_running, marker=False)
+    with pytest.raises(BackupError) as caught:
+        tool.do_restore(args, {})
+    assert caught.value.code == ("target_not_restore_owned" if db_running else "target_db_not_running")
+    commands = [argv for argv, _ in calls]
+    assert all(argv[:3] == ["docker", "volume", "ls"] or argv[4] in ("ps", "exec") for argv in commands), commands
+    for argv, sql in calls:
+        if argv[:2] == ["docker", "compose"] and argv[4] == "exec":  # only the marker SELECT, in a read-only session
+            assert "default_transaction_read_only=on" in argv[-3] and sql.strip().upper().startswith("SELECT")
+            assert all(word not in sql.upper() for word in ("DROP", "CREATE", "COMMENT", "INSERT", "UPDATE"))
+    assert any(argv[4] == "exec" for argv in commands) is db_running  # a stopped db is never started to ask
+
+    # Control: the same project *with* the marker goes on, and its first change comes after the read-only check.
+    calls = fake_docker(monkeypatch, db_running=True, marker=True)
+    with pytest.raises(Touched, match="stop"):
+        tool.do_restore(args, {})
+    assert [argv[4] for argv, _ in calls if argv[:2] == ["docker", "compose"]][-2:] == ["exec", "stop"]
+
+
+def test_restore_refuses_an_object_read_back_with_other_bytes_of_the_same_size_and_the_gate_stays_shut(
+        upload_api, monkeypatch, admin_engine, app_env, tmp_path):
+    """Review PR #27: after putting objects, every one is read back and compared by SHA-256, not by size."""
+    w = listed(upload_api, monkeypatch)
+    settings = get_settings()
+    artifact = make_artifact(tmp_path / "backups", w.storage, w.api.engine)
+    manifest = bk.verify_artifact(artifact)
+    key = common_key(w.api, w.copy)
+    with backup(w.api, admin_engine) as snap:
+        assert revoke(w.admin, w.copy).status_code == 200
+        assert publication.cleanup_revoked(w.api.engine, w.storage, w.api.clock.now, 50) == {"deleted": 1}
+        app_env(snap.url)
+        recovery.hold(snap.engine, settings, w.api.clock.now)  # the tool holds before restoring objects
+        real_put = w.storage.put
+
+        def faulty_put(k, file, mime):  # the store keeps other bytes of the same length
+            data = file.read()
+            return real_put(k, io.BytesIO(bytes(b ^ 0xFF for b in data) if k == key else data), mime)
+        monkeypatch.setattr(w.storage, "put", faulty_put)
+        refused("objects_restore_mismatch", bk.restore_objects, w.storage, artifact, manifest)
+        assert w.storage.size(key) == next(e["bytes"] for e in manifest["objects"]["entries"] if e["key"] == key)
+        assert gate(snap.engine) == "db_behind_journal"
+        assert_recovering(w.browsers, routes(w))
+        assert TestClient(app).get("/readyz").status_code == 503
+
+        monkeypatch.setattr(w.storage, "put", real_put)  # rerun once the store behaves
+        assert bk.restore_objects(w.storage, artifact, manifest)["put"] == 1
+        assert do_recover(snap.engine, w.storage, w.api.clock.now).gate == "open"
+        assert w.a.get(f"/files/{w.ids_a['file_id']}/original").content == A_BODY
+        for browser in w.browsers.values():
+            assert browser.get(f"/library/items/{w.copy}").json() == MISSING

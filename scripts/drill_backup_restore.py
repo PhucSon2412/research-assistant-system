@@ -55,10 +55,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "api"))
 sys.path.insert(0, str(ROOT / "scripts"))
 BASE_ENV = dict(os.environ)  # for subprocesses: taken before the RAS_* variables below are set for host code
-SRC, DST = "ras-drill-src", "ras-drill-restore"
+SRC, DST, FOREIGN = "ras-drill-src", "ras-drill-restore", "ras-drill-foreign"
 PORTS = {
     SRC: {"POSTGRES_HOST_PORT": "45432", "API_HOST_PORT": "48000", "WEB_HOST_PORT": "43000",
           "MINIO_API_HOST_PORT": "49000", "MINIO_CONSOLE_HOST_PORT": "49001"},
+    FOREIGN: {"POSTGRES_HOST_PORT": "47432", "API_HOST_PORT": "47800", "WEB_HOST_PORT": "47300",
+              "MINIO_API_HOST_PORT": "47900", "MINIO_CONSOLE_HOST_PORT": "47901"},
     DST: {"POSTGRES_HOST_PORT": "46432", "API_HOST_PORT": "46800", "WEB_HOST_PORT": "46300",
           "MINIO_API_HOST_PORT": "46900", "MINIO_CONSOLE_HOST_PORT": "46901"},
 }
@@ -68,7 +70,7 @@ if not WORK.is_absolute() or WORK.resolve() == ROOT or ROOT in WORK.resolve().pa
 WORK = WORK.resolve()
 SOURCE_JOURNAL, COPY = WORK / "source-journal", WORK / "journal-copy"
 BACKUPS = WORK / "backups"
-JOURNAL_SOURCE = {SRC: SOURCE_JOURNAL, DST: COPY}
+JOURNAL_SOURCE = {SRC: SOURCE_JOURNAL, DST: COPY, FOREIGN: COPY}
 PREFIX = "m6c2a-drill-"
 WRITERS = ("api", "web", "worker", "beat")
 
@@ -272,7 +274,7 @@ def main() -> None:
     args = parser.parse_args()
     if WORK.exists() and any(WORK.iterdir()):
         raise SystemExit("DRILL_WORK_DIR must be absent or empty")
-    if volumes(SRC) or volumes(DST):
+    if volumes(SRC) or volumes(DST) or volumes(FOREIGN):
         raise SystemExit(f"{SRC} / {DST} already have volumes; remove them first (docker compose -p <name> down -v)")
     SOURCE_JOURNAL.mkdir(parents=True)
 
@@ -412,6 +414,27 @@ def main() -> None:
          all(outcomes[n][0] == 1 and code_ in outcomes[n][2] for n, (_, code_) in refusals.items())
          and not volumes(DST))
     shutil.rmtree(WORK / "damaged")
+
+    # A project this tool did not create (only its db, no marker) is refused and left exactly as it was.
+    dc(FOREIGN, "up", "-d", "--wait", "db")
+
+    def foreign_state() -> list[tuple]:
+        ids = dc(FOREIGN, "ps", "-a", "-q").stdout.split()
+        out = subprocess.run(["docker", "inspect", "--format", "{{.Name}} {{.State.Status}} {{.State.StartedAt}}", *ids],
+                             capture_output=True, text=True, check=True).stdout
+        return sorted(tuple(line.split()) for line in out.splitlines())
+    restore_foreign = ["--artifact", str(artifact), "--project", FOREIGN, "--journal-dir", str(COPY)]
+    before = foreign_state()
+    code, _, err = tool(DST, "restore", *restore_foreign)
+    step("restore refuses a running project without the marker (target_not_restore_owned) and leaves its"
+         " containers exactly as they were (same set, state, start time)",
+         code == 1 and "target_not_restore_owned" in err and foreign_state() == before and len(before) == 1)
+    dc(FOREIGN, "stop", "db")
+    before = foreign_state()
+    code, _, err = tool(DST, "restore", *restore_foreign)
+    step("with its db stopped: refused (target_db_not_running), nothing started or created",
+         code == 1 and "target_db_not_running" in err and foreign_state() == before and before[0][1] == "exited")
+    dc(FOREIGN, "down", "-v")
 
     # 5. Restore into the isolated project; before recover nothing is served or processed.
     started = time.monotonic()
