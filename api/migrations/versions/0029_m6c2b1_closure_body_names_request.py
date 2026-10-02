@@ -8,7 +8,10 @@ would act on the request the line names, not on R.
 
 - CHECK ``ck_revocation_journal_records_closure_request_matches_body``: a
   ``review_closure`` row with a ``review_request_id`` holds exactly that ID
-  as ``body.request_id`` of its line. It is checked when the row is inserted,
+  as ``body.request_id`` of its line. ``IS NOT DISTINCT FROM``, not ``=``: a
+  line whose ``body.request_id`` is missing or JSON ``null`` gives ``NULL``
+  with ``=``, and a CHECK lets ``NULL`` through (PR #28 review, second round).
+  Only a ``TRUE`` result is accepted. It is checked when the row is inserted,
   which every writer does *before* appending the line to the journal file
   (``app.recovery._journal_decision``), so a wrong row stops the write with
   nothing appended. A ``superseded`` row (no ``review_request_id``) is
@@ -30,7 +33,8 @@ branch_labels = None
 depends_on = None
 
 MATCHES_BODY = ("CASE WHEN kind = 'review_closure' AND review_request_id IS NOT NULL"
-                " THEN review_request_id::text = (line::jsonb #>> '{body,request_id}') ELSE true END")
+                " THEN review_request_id::text IS NOT DISTINCT FROM (line::jsonb #>> '{body,request_id}')"
+                " ELSE true END")
 
 TRIGGER = """
     CREATE OR REPLACE FUNCTION ras_review_requests_closure_journaled() RETURNS trigger

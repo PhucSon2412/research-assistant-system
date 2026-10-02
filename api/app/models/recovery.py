@@ -80,9 +80,11 @@ class RevocationJournalRecord(Base):
         CheckConstraint("kind = 'review_closure' OR review_request_id IS NULL", name="request_only_for_closure"),
         CheckConstraint("kind <> 'review_closure' OR review_request_id IS NOT NULL OR result = 'superseded'",
                         name="closure_names_request"),
-        # 0029: the row is filed under the request its own line names (checked at insert, before the append).
+        # 0029: the row is filed under the request its own line names (checked at insert, before the append);
+        # IS NOT DISTINCT FROM so a missing or null body.request_id is FALSE, never NULL (a CHECK passes NULL).
         CheckConstraint("CASE WHEN kind = 'review_closure' AND review_request_id IS NOT NULL"
-                        " THEN review_request_id::text = (line::jsonb #>> '{body,request_id}') ELSE true END",
+                        " THEN review_request_id::text IS NOT DISTINCT FROM (line::jsonb #>> '{body,request_id}')"
+                        " ELSE true END",
                         name="closure_request_matches_body"),
         Index("ix_revocation_journal_records_unconfirmed", "seq", postgresql_where=text("NOT journal_confirmed")),
     )

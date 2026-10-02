@@ -10,6 +10,7 @@ exact step raise. No provider is called (nothing here indexes).
 from __future__ import annotations
 
 import hashlib
+import json
 import tempfile
 import uuid
 from threading import Barrier, Thread
@@ -334,6 +335,35 @@ def test_db_refuses_at_insert_a_mirror_row_whose_line_names_another_or_no_reques
                      {"r": uuid.UUID(w.rid)})
     assert w.api.scalar("SELECT count(*) FROM pg_constraint"
                         " WHERE conname='ck_revocation_journal_records_closure_request_matches_body'") == 1
+    assert status_in(w.api.engine, w.rid)[0] == "open" and closures() == [] and gate(w.api.engine) == "open"
+    assert w.admin.get(w.file_url).content == A_BODY
+
+
+@pytest.mark.parametrize("shape", ["missing", "json_null"])
+def test_db_refuses_at_insert_a_mirror_row_whose_line_has_no_request_id(upload_api, monkeypatch, shape):
+    """PR #28 review, second round: ``=`` gave NULL for a missing or null body.request_id, and a CHECK lets
+    NULL through; the comparison must be TRUE for the row to be accepted."""
+    w = review_world(upload_api, monkeypatch)
+    head = journal.read(journal_file()).head
+    value = json.loads(journal.next_record(head, journal.REVIEW_CLOSURE, closure_of(w, w.rid)).line)
+    if shape == "missing":
+        del value["body"]["request_id"]
+    else:
+        value["body"]["request_id"] = None
+    line = journal.canonical(value)
+    params = {"s": head.seq + 1, "h": "e" * 64, "l": line, "r": uuid.UUID(w.rid)}
+    with w.api.engine.connect() as conn:
+        with pytest.raises(IntegrityError, match="closure_request_matches_body"):
+            conn.execute(MIRROR_INSERT, params)  # refused by the INSERT itself
+        conn.rollback()
+    with pytest.raises(IntegrityError, match="closure_request_matches_body"), w.api.engine.begin() as conn:
+        conn.execute(text("""UPDATE review_requests SET status='withdrawn', closed_at=now(),
+            closed_by_user_id=requester_user_id, close_reason_code='withdrawn_by_requester' WHERE id=:r"""),
+                     {"r": uuid.UUID(w.rid)})
+        conn.execute(MIRROR_INSERT, params)
+    # The other layers refuse it too: the reader never accepts such a line.
+    with pytest.raises(journal.JournalError, match="journal_corrupt"):
+        journal.parse_line(line.encode("ascii"), head.seq + 1, head.hash)
     assert status_in(w.api.engine, w.rid)[0] == "open" and closures() == [] and gate(w.api.engine) == "open"
     assert w.admin.get(w.file_url).content == A_BODY
 
