@@ -20,6 +20,7 @@ from app.identity.emails import EmailFormatError, normalise_email
 from app.identity.errors import InvalidToken
 from app.identity.passwords import hash_password, validate_password
 from app.identity.sessions import revoke_user_sessions
+from app.identity.session_commit import commit_auth
 from app.identity.tokens import generate_token, hash_token, plausible_token
 from app.models import PasswordResetToken, User
 from app.models.enums import AuditActorType, AuditOutcome, SessionRevokeReason, UserStatus
@@ -57,7 +58,7 @@ def request_reset(db: Session, *, email: str, now: datetime, lifetime: timedelta
     except EmailFormatError:
         return None
     user = db.scalar(
-        select(User).where(User.email == normalised, User.status == UserStatus.ACTIVE.value).with_for_update()
+        select(User).where(User.email == normalised, User.status == UserStatus.ACTIVE.value).with_for_update(key_share=True)
     )
     if user is None:
         db.rollback()
@@ -108,7 +109,7 @@ def confirm_reset(
     user = db.scalar(
         select(User)
         .where(User.id == user_id, User.status == UserStatus.ACTIVE.value)
-        .with_for_update()
+        .with_for_update(key_share=True)
         .execution_options(populate_existing=True)
     )
     token = db.scalar(
@@ -137,5 +138,5 @@ def confirm_reset(
         target_id=str(user_id),
         details={"sessions_revoked": revoked},
     )
-    db.commit()
+    commit_auth(db)
     return user_id

@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.config import AuthLifetimes
 from app.identity.tokens import generate_token, hash_token, plausible_token
+from app.identity.session_commit import PENDING
 from app.models import User, UserSession
 from app.models.enums import SessionRevokeReason, UserStatus
 
@@ -46,6 +47,9 @@ class SessionContext:
 
 def issue_session(db: Session, *, user_id: uuid.UUID, now: datetime, lifetimes: AuthLifetimes) -> IssuedSession:
     """Add a session row to the caller's transaction (caller commits)."""
+    # key_share=True means FOR NO KEY UPDATE on PostgreSQL: serialises auth,
+    # but remains compatible with audit/token FKs' KEY SHARE. Sort multiple users first.
+    db.scalar(select(User.id).where(User.id == user_id).with_for_update(key_share=True))
     token, token_hash = generate_token()
     csrf_token, csrf_hash = generate_token()
     row = UserSession(
@@ -142,17 +146,14 @@ def revoke_session(
     db: Session, *, session_id: uuid.UUID, user_id: uuid.UUID, reason: SessionRevokeReason, now: datetime
 ) -> bool:
     """Revoke one of ``user_id``'s own sessions. False if not theirs/not live."""
-    result = db.execute(
-        update(UserSession)
-        .where(
-            UserSession.id == session_id,
-            UserSession.user_id == user_id,
-            UserSession.revoked_at.is_(None),
-        )
-        .values(revoked_at=now, revoked_reason=reason.value)
-        .execution_options(synchronize_session=False)
-    )
-    return result.rowcount == 1
+    db.scalar(select(User.id).where(User.id == user_id).with_for_update(key_share=True))
+    row = db.scalar(select(UserSession).where(UserSession.id == session_id, UserSession.user_id == user_id,
+                    UserSession.revoked_at.is_(None)).with_for_update().execution_options(populate_existing=True))
+    if row is None:
+        return False
+    row.revoked_at, row.revoked_reason = now, reason.value
+    db.info.setdefault(PENDING, []).append(row)
+    return True
 
 
 def revoke_user_sessions(
@@ -163,13 +164,15 @@ def revoke_user_sessions(
     now: datetime,
     keep_session_id: uuid.UUID | None = None,
 ) -> int:
-    stmt = update(UserSession).where(UserSession.user_id == user_id, UserSession.revoked_at.is_(None))
+    db.scalar(select(User.id).where(User.id == user_id).with_for_update(key_share=True))
+    stmt = select(UserSession).where(UserSession.user_id == user_id, UserSession.revoked_at.is_(None))
     if keep_session_id is not None:
         stmt = stmt.where(UserSession.id != keep_session_id)
-    result = db.execute(
-        stmt.values(revoked_at=now, revoked_reason=reason.value).execution_options(synchronize_session=False)
-    )
-    return result.rowcount
+    rows = list(db.scalars(stmt.order_by(UserSession.id).with_for_update().execution_options(populate_existing=True)))
+    for row in rows:
+        row.revoked_at, row.revoked_reason = now, reason.value
+    db.info.setdefault(PENDING, []).extend(rows)
+    return len(rows)
 
 
 def list_live_sessions(

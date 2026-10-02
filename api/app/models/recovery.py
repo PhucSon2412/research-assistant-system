@@ -9,7 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
 
-JOURNAL_KINDS = "'genesis', 'revocation', 'recovery_begin', 'recovery_end', 'review_closure'"
+JOURNAL_KINDS = "'genesis', 'revocation', 'recovery_begin', 'recovery_end', 'review_closure', 'session_revocation'"
 APPLIED_VIA = "'genesis', 'revoke', 'close', 'replay', 'import'"
 REGISTRATION_MODES = "'new_install', 'existing_db', 'adopted', 'rebuilt_from_db'"
 
@@ -67,6 +67,7 @@ class RevocationJournalRecord(Base):
         UniqueConstraint("record_hash", name="uq_revocation_journal_records_record_hash"),
         UniqueConstraint("tombstone_id", name="uq_revocation_journal_records_tombstone_id"),
         UniqueConstraint("review_request_id", name="uq_revocation_journal_records_review_request_id"),
+        UniqueConstraint("session_id", name="uq_revocation_journal_records_session_id"),
         CheckConstraint("seq > 0", name="seq_positive"),
         CheckConstraint(f"kind IN ({JOURNAL_KINDS})", name="kind_valid"),
         CheckConstraint("record_hash ~ '^[0-9a-f]{64}$'", name="record_hash_hex"),
@@ -87,6 +88,17 @@ class RevocationJournalRecord(Base):
                         " ELSE true END",
                         name="closure_request_matches_body"),
         Index("ix_revocation_journal_records_unconfirmed", "seq", postgresql_where=text("NOT journal_confirmed")),
+        CheckConstraint("CASE WHEN kind = 'session_revocation' THEN session_id IS NOT NULL"
+                        " AND session_user_id IS NOT NULL ELSE session_id IS NULL AND session_user_id IS NULL END",
+                        name="session_ids_required"),
+        CheckConstraint("CASE WHEN kind = 'session_revocation' THEN"
+                        " (session_id::text IS NOT DISTINCT FROM (line::jsonb #>> '{body,session_id}'))"
+                        " AND (session_user_id::text IS NOT DISTINCT FROM (line::jsonb #>> '{body,user_id}'))"
+                        " AND (line::jsonb ->> 'kind' IS NOT DISTINCT FROM kind)"
+                        " AND COALESCE((line::jsonb #>> '{body,reason_code}') IN"
+                        " ('logout', 'replaced', 'user_revoked', 'password_reset', 'user_disabled'), false)"
+                        " AND COALESCE(length(line::jsonb #>> '{body,revoked_at}') > 0, false)"
+                        " ELSE true END", name="session_matches_body"),
     )
 
     seq: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
@@ -95,6 +107,9 @@ class RevocationJournalRecord(Base):
     line: Mapped[str] = mapped_column(Text)
     tombstone_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     review_request_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # No FKs: the snapshot may lack the session and even its user.
+    session_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    session_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     applied_via: Mapped[str] = mapped_column(Text)
     result: Mapped[str] = mapped_column(Text)
     journal_confirmed: Mapped[bool] = mapped_column(Boolean)

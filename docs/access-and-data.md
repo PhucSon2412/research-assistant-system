@@ -4,6 +4,8 @@
 
 ## Nguyên tắc
 
+**M6c-2b2a, revision `0030`:** logout, thu hồi một/các session khác, thay session bằng login mới, reset mật khẩu và disable đều journal từng session trước commit trong cùng transaction auth. Restore với journal độc lập **hiện hành** giữ gate đóng tới `recover`; cookie/CSRF cũ bị từ chối do thu hồi dù còn trong idle/absolute timeout. Revoke-others giữ đúng session được miễn; User khác không bị thu hồi. Session/User vắng trong snapshot không được tạo lại. Session đã thu hồi không mở lại. Backfill chỉ bảo vệ thu hồi cũ còn trong DB đã được journal nhận; lịch sử mất khỏi DB trước import không thể dựng lại. **Chỉ bảo vệ session:** reset token/invitation, credential và account status còn có thể rollback, cho phép login mới bằng mật khẩu cũ. Chi tiết cửa sổ lỗi và bàn giao ở [decisions](decisions.md#quyết-định-triển-khai-m6c-2b2a-2026-10-02).
+
 **Đã xác nhận:** Có kho chung do Admin quản lý và kho riêng từ upload của User. Upload mặc định riêng tư. User hỏi đáp được trên kho chung và kho riêng của mình. MVP có Admin và User; Curator/quyền nhóm để sau. Đưa paper riêng vào kho chung cần quy trình rõ ràng.
 
 **Đã xác nhận ngày 2026-09-24:** Tài khoản nội bộ cấp bằng lời mời; API kiểm session và quyền ở từng request. Admin đầu tiên chỉ được tạo bằng lệnh bootstrap chạy một lần với mật khẩu nhập an toàn, không có tài khoản mặc định hardcode. **Đề xuất:** Tách ba lớp: xác thực kiểm danh tính/mật khẩu, quản lý phiên cấp/thu hồi session, phân quyền tính ACL theo item/version/action. UI Next.js chỉ hiển thị trạng thái, FastAPI là nơi quyết định quyền.

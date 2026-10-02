@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.audit import record_event
 from app.identity.errors import Forbidden, NotFound
 from app.identity.sessions import revoke_user_sessions
+from app.identity.session_commit import commit_auth
 from app.models import PasswordResetToken, User
 from app.models.enums import AuditActorType, AuditOutcome, SessionRevokeReason, UserStatus
 
@@ -30,14 +31,13 @@ def set_user_status(
     if user_id == actor_id:
         # Avoid an Admin locking themselves (possibly the only Admin) out.
         raise Forbidden()
-    user = db.scalar(select(User).where(User.id == user_id).with_for_update())
+    user = db.scalar(select(User).where(User.id == user_id).with_for_update(key_share=True))
     if user is None:
         db.rollback()
         raise NotFound()
     user.status = status.value
     user.updated_at = now
     if status is UserStatus.DISABLED:
-        revoke_user_sessions(db, user_id=user_id, reason=SessionRevokeReason.USER_DISABLED, now=now)
         db.execute(
             update(PasswordResetToken)
             .where(
@@ -48,6 +48,7 @@ def set_user_status(
             .values(revoked_at=now)
             .execution_options(synchronize_session=False)
         )
+        revoke_user_sessions(db, user_id=user_id, reason=SessionRevokeReason.USER_DISABLED, now=now)
     record_event(
         db,
         action="user.disable" if status is UserStatus.DISABLED else "user.enable",
@@ -57,5 +58,5 @@ def set_user_status(
         target_type="user",
         target_id=str(user_id),
     )
-    db.commit()
+    commit_auth(db)
     return user

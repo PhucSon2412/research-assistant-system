@@ -308,8 +308,15 @@ def test_epoch_change_or_session_end_during_verification_blocks_the_response(upl
                 return storage.open(key)
         use_storage(Hook())
 
-    during_read(lambda conn: conn.execute(text(
-        "UPDATE sessions SET revoked_at=now(), revoked_reason='logout' WHERE user_id=:u"), {"u": b_id}))
+    def end_b_sessions(conn):
+        from app.identity.sessions import revoke_user_sessions
+        from app.identity.session_commit import commit_auth
+        from app.models.enums import SessionRevokeReason
+        from sqlalchemy.orm import Session
+        with Session(api.engine) as db:
+            revoke_user_sessions(db, user_id=b_id, reason=SessionRevokeReason.LOGOUT, now=api.clock.now)
+            commit_auth(db)
+    during_read(end_b_sessions)
     response = b.get(url(file_id))
     assert (response.status_code, response.json()["error"]) == (401, "session_expired")
     assert b"Reviewable" not in response.content
