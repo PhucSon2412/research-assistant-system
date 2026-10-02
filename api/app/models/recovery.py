@@ -58,7 +58,8 @@ class RevocationJournalRecord(Base):
     closing transaction (``applied_via='close'``) like a revocation.
     ``review_request_id`` names the request (no FK: a restored snapshot may
     lack it); the closing ``UPDATE`` cannot commit without this row (deferred
-    trigger on ``review_requests``).
+    trigger on ``review_requests``). 0029: ``review_request_id`` must equal the
+    line's ``body.request_id`` (CHECK, at insert, so before the line is appended).
     """
 
     __tablename__ = "revocation_journal_records"
@@ -79,6 +80,10 @@ class RevocationJournalRecord(Base):
         CheckConstraint("kind = 'review_closure' OR review_request_id IS NULL", name="request_only_for_closure"),
         CheckConstraint("kind <> 'review_closure' OR review_request_id IS NOT NULL OR result = 'superseded'",
                         name="closure_names_request"),
+        # 0029: the row is filed under the request its own line names (checked at insert, before the append).
+        CheckConstraint("CASE WHEN kind = 'review_closure' AND review_request_id IS NOT NULL"
+                        " THEN review_request_id::text = (line::jsonb #>> '{body,request_id}') ELSE true END",
+                        name="closure_request_matches_body"),
         Index("ix_revocation_journal_records_unconfirmed", "seq", postgresql_where=text("NOT journal_confirmed")),
     )
 

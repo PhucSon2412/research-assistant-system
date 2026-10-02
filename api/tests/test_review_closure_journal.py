@@ -290,6 +290,104 @@ def test_a_record_naming_another_target_is_refused_and_the_gate_stays_shut(uploa
     assert_recovering(w.browsers, [("GET", w.file_url)])
 
 
+# --- a record names the request it is filed under (PR #28 review, revision 0029) -----------------
+
+MIRROR_INSERT = text("""INSERT INTO revocation_journal_records(seq, kind, record_hash, line, review_request_id,
+    applied_via, result, journal_confirmed) VALUES(:s, 'review_closure', :h, :l, :r, 'close', 'closed', true)""")
+
+
+def closure_of(w, request_id, *, status="withdrawn", code="withdrawn_by_requester") -> dict:
+    """A well-formed closure body for A's file whose ``request_id`` may name any request."""
+    return {"request_id": str(request_id), "item_id": w.ids_a["item_id"], "version_id": w.ids_a["version_id"],
+            "source_file_id": w.ids_a["file_id"], "status": status, "reason_code": code,
+            "closed_at": utcnow().isoformat()}
+
+
+def test_db_refuses_at_insert_a_mirror_row_whose_line_names_another_or_no_request(upload_api, monkeypatch):
+    w = review_world(upload_api, monkeypatch)
+    head = journal.read(journal_file()).head
+    absent = str(uuid.uuid4())
+    for filed_under, named in ((w.rid, w.rid_b), (w.rid, absent), (absent, w.rid)):
+        record = journal.next_record(head, journal.REVIEW_CLOSURE, closure_of(w, named))
+        with w.api.engine.connect() as conn:
+            # Refused by the INSERT itself (not at commit), so a writer stops before appending the line.
+            with pytest.raises(IntegrityError, match="closure_request_matches_body"):
+                conn.execute(MIRROR_INSERT, {"s": record.seq, "h": record.hash, "l": record.line,
+                                             "r": uuid.UUID(filed_under)})
+            conn.rollback()
+    # A request the database does not hold is a valid record when it is filed under that same ID
+    # (a restored snapshot may lack a request the journal names).
+    record = journal.next_record(head, journal.REVIEW_CLOSURE, closure_of(w, absent))
+    with w.api.engine.connect() as conn:
+        conn.execute(MIRROR_INSERT, {"s": record.seq, "h": record.hash, "l": record.line, "r": uuid.UUID(absent)})
+        conn.rollback()
+    # The closing trigger compares body.request_id with the request on its own too: with the CHECK
+    # dropped (inside the transaction, rolled back), a row filed under A's request whose line names B's
+    # does not let A's request close.
+    record = journal.next_record(head, journal.REVIEW_CLOSURE, closure_of(w, w.rid_b))
+    with pytest.raises(IntegrityError, match="needs its revocation journal record"), w.api.engine.begin() as conn:
+        conn.execute(text("ALTER TABLE revocation_journal_records"
+                          " DROP CONSTRAINT ck_revocation_journal_records_closure_request_matches_body"))
+        conn.execute(MIRROR_INSERT, {"s": record.seq, "h": record.hash, "l": record.line, "r": uuid.UUID(w.rid)})
+        conn.execute(text("""UPDATE review_requests SET status='withdrawn', closed_at=now(),
+            closed_by_user_id=requester_user_id, close_reason_code='withdrawn_by_requester' WHERE id=:r"""),
+                     {"r": uuid.UUID(w.rid)})
+    assert w.api.scalar("SELECT count(*) FROM pg_constraint"
+                        " WHERE conname='ck_revocation_journal_records_closure_request_matches_body'") == 1
+    assert status_in(w.api.engine, w.rid)[0] == "open" and closures() == [] and gate(w.api.engine) == "open"
+    assert w.admin.get(w.file_url).content == A_BODY
+
+
+@pytest.mark.parametrize("named", ["other_request", "no_request"])
+@pytest.mark.parametrize("how", ["withdraw", "reject", "approve"])
+def test_a_close_whose_record_names_another_request_writes_nothing_and_the_grant_stays_open(
+        upload_api, monkeypatch, how, named):
+    w = review_world(upload_api, monkeypatch)
+    real = recovery.closure_body
+    wrong = w.rid_b if named == "other_request" else str(uuid.uuid4())
+    monkeypatch.setattr(recovery, "closure_body", lambda rr: real(rr) | {"request_id": wrong})
+    journal_before, mirror_before, keys = journal_file().read_bytes(), mirror(w.api.engine), object_keys(w.storage)
+    response = close(w, how)
+    expected = "approval_unavailable" if how == "approve" else "review_closure_unavailable"
+    assert (response.status_code, response.json()) == (503, {"error": expected})
+    # The DB refused the mirror row before the append: the journal file and the mirror are unchanged.
+    assert journal_file().read_bytes() == journal_before and mirror(w.api.engine) == mirror_before
+    assert status_in(w.api.engine, w.rid)[0] == "open" and status_in(w.api.engine, w.rid_b)[0] == "open"
+    assert w.api.scalar("SELECT count(*) FROM library_items WHERE visibility='common'") == 0
+    assert object_keys(w.storage) == keys  # approve's copy, unreferenced, was removed
+    assert gate(w.api.engine) == "open"
+    assert w.admin.get(w.file_url).content == A_BODY  # never reported closed, so still open
+    monkeypatch.setattr(recovery, "closure_body", real)
+    assert close(w, how).status_code == 200
+    (record,) = closures()
+    assert record.body["request_id"] == w.rid
+    assert_grant_closed_for_admin(w)
+    assert w.admin.get(original_url(w.rid_b, w.ids_b["file_id"])).content == B_BODY
+
+
+def test_a_request_journaled_after_the_backup_stays_absent_and_its_record_is_valid(upload_api, monkeypatch,
+                                                                                   admin_engine, app_env):
+    w = review_world(upload_api, monkeypatch)
+    with backup(w.api, admin_engine) as snap:
+        assert close(w, "withdraw").status_code == 200
+        later = submit(w.a, w.ids_a).json()["request"]["id"]  # sent and withdrawn after the backup
+        assert write(w.a, "POST", f"/review-requests/{later}/withdraw").status_code == 200
+        app_env(snap.url)
+        recovery.hold(snap.engine, get_settings(), utcnow())
+        report = do_recover(snap.engine, w.storage, w.api.clock.now)
+        assert report.replayed == {"recovery_begin": 1, "closed": 1, "recorded_request_absent": 1,
+                                   "recovery_end": 1} and report.gate == "open"
+        with snap.engine.connect() as conn:
+            assert conn.scalar(text("SELECT count(*) FROM review_requests WHERE id=:r"), {"r": uuid.UUID(later)}) == 0
+            filed = conn.execute(text("SELECT review_request_id::text, line::jsonb #>> '{body,request_id}', result"
+                                      " FROM revocation_journal_records WHERE review_request_id=:r"),
+                                 {"r": uuid.UUID(later)}).one()
+        assert tuple(filed) == (later, later, "recorded_request_absent")
+        assert w.admin.get(original_url(later, w.ids_a["file_id"])).json() == MISSING
+        assert status_in(snap.engine, w.rid)[0] == "closed_by_recovery"
+        assert_grant_closed_for_admin(w)
+
+
 # --- failure windows of the close itself ----------------------------------------
 
 def failing_close_commit(monkeypatch, *, lands: bool):
@@ -681,3 +779,32 @@ def test_0028_downgrades_only_a_database_never_registered(empty_db_url):
         assert conn.scalar(text("SELECT version_num FROM alembic_version")) == "0027"
     eng.dispose()
     upgrade(empty_db_url)
+
+
+def _closure_row_at_0028(conn, filed_under: uuid.UUID, named: uuid.UUID) -> None:
+    genesis = journal.genesis(uuid.uuid4(), utcnow(), "new_install")
+    body = {"request_id": str(named), "item_id": str(uuid.uuid4()), "version_id": str(uuid.uuid4()),
+            "source_file_id": str(uuid.uuid4()), "status": "withdrawn", "reason_code": "withdrawn_by_requester",
+            "closed_at": utcnow().isoformat()}
+    record = journal.next_record(genesis, journal.REVIEW_CLOSURE, body)
+    conn.execute(text("""INSERT INTO revocation_journal_records(seq, kind, record_hash, line, applied_via, result,
+        journal_confirmed) VALUES(1, 'genesis', :h, :l, 'genesis', 'new_install', true)"""),
+                 {"h": genesis.hash, "l": genesis.line})
+    conn.execute(MIRROR_INSERT, {"s": record.seq, "h": record.hash, "l": record.line, "r": filed_under})
+
+
+@pytest.mark.parametrize("matching", [True, False], ids=["record_names_its_request", "record_names_another"])
+def test_0029_upgrades_matching_closure_rows_and_refuses_a_mismatched_one(empty_db_url, matching):
+    upgrade(empty_db_url, "0028")
+    eng = create_engine(empty_db_url)
+    filed = uuid.uuid4()
+    with eng.begin() as conn:  # 0028 accepted either row
+        _closure_row_at_0028(conn, filed, filed if matching else uuid.uuid4())
+    if matching:
+        upgrade(empty_db_url)
+    else:
+        with pytest.raises(Exception, match="filed under another request than its line names"):
+            upgrade(empty_db_url)
+    with eng.connect() as conn:
+        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == ("0029" if matching else "0028")
+    eng.dispose()
