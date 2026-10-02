@@ -86,11 +86,11 @@ export function ReviewRequests({ itemId, files, versions }: { itemId: string; fi
       {requests && requests.length > 0 && <ul>{requests.map((r) => <li key={r.id} style={{ marginBottom: "0.6rem" }}>
         <strong>{STATUS_TEXT[r.status]}</strong> · gửi {fmt(r.submitted_at)}
         {r.closed_at && ` · đóng ${fmt(r.closed_at)}`}
-        {closeReasonText(r.close_reason_code) && ` · ${closeReasonText(r.close_reason_code)}`}
+        {closeReasonText(r.close_reason_code, r.status) && ` · ${closeReasonText(r.close_reason_code, r.status)}`}
         <br /><small>Version {r.version.version_label ?? "(không nhãn)"} ({r.version.id}) · File {r.file.filename ?? ""}
           {" "}({r.file.id}) · SHA-256 {r.file.checksum_sha256}</small>
         {r.rejection_note && <><br /><small>Ghi chú của Admin: {r.rejection_note}</small></>}
-        {r.status === "approved" && <><br /><small>{r.pending_note}</small></>}
+        {(r.status === "approved" || r.status === "closed_by_recovery") && <><br /><small>{r.pending_note}</small></>}
         {r.status === "open" && <> <button type="button" onClick={() => withdraw(r.id)}>Rút yêu cầu</button></>}
       </li>)}</ul>}
       {files.length === 0 ? <p>Item chưa có file gốc để gửi duyệt.</p> : (

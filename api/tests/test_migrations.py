@@ -706,7 +706,7 @@ def test_0027_backfills_revoke_records_unconfirmed_so_recover_must_confirm_them(
     with pytest.raises(Exception, match="registered with a revocation journal"):
         command.downgrade(alembic_config(empty_db_url), "0026")
     with eng.connect() as conn:
-        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == "0027"
+        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == HEAD_REVISION
         assert conn.scalar(text("SELECT count(*) FROM revocation_journal_records WHERE NOT journal_confirmed")) == 0
     eng.dispose()
 

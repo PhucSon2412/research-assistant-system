@@ -477,34 +477,59 @@ def test_verified_original_frees_slot_and_file_on_every_exit():
     assert slot_free() and spool.closed
 
 
-def _asgi_download(api, file_id, session_token, *, spec_version, disconnect_at_start):
-    """Drive the ASGI app directly as a client that goes away before the first body chunk."""
+ASGI_TIMEOUT_S = 30
+
+
+def _asgi_download(api, file_id, session_token, *, spec_version, leave):
+    """Drive the ASGI app directly as a client that goes away at an exact point; returns what it received.
+
+    ``leave``: ``start_error`` (ASGI 2.4: the send of the response start fails), ``after_headers`` (ASGI 2.3:
+    the disconnect is delivered once the headers arrive), ``after_first_chunk`` (once one body chunk
+    arrived). The disconnect is held back by an event until that point, and whatever the app sends after
+    it is dropped, as an ASGI 2.3 server drops sends to a closed connection. So what reaches the client
+    does not depend on how the stream task, the disconnect listener, the gate middleware's inner task and
+    the thread pool are scheduled (the cause of the earlier intermittent failure). A download that does not
+    end after the client left fails the test after ``ASGI_TIMEOUT_S``.
+    """
     scope = {"type": "http", "asgi": {"version": "3.0", "spec_version": spec_version}, "http_version": "1.1",
              "method": "GET", "scheme": "http", "path": url(file_id), "raw_path": url(file_id).encode(),
              "query_string": b"", "root_path": "", "client": ("127.0.0.1", 50000), "server": ("testserver", 80),
              "headers": [(b"host", b"testserver"), (b"cookie", f"ras_session={session_token}".encode())]}
-    sent: list[dict] = []
+    received: list[dict] = []
     requested = {"done": False}
 
-    async def receive():
-        if not requested["done"]:
-            requested["done"] = True
-            return {"type": "http.request", "body": b"", "more_body": False}
-        return {"type": "http.disconnect"}  # the client is gone
-
-    async def send(message):
-        if disconnect_at_start and message["type"] == "http.response.start":
-            raise OSError("synthetic: client closed the connection")
-        sent.append(message)
-
     async def run():
+        gone = asyncio.Event()  # set at the point the client leaves
+
+        async def receive():
+            if not requested["done"]:
+                requested["done"] = True
+                return {"type": "http.request", "body": b"", "more_body": False}
+            await gone.wait()
+            return {"type": "http.disconnect"}
+
+        async def send(message):
+            if message["type"] == "http.response.start":
+                if leave == "start_error":
+                    raise OSError("synthetic: client closed the connection")
+                received.append(message)
+                if leave == "after_headers":
+                    gone.set()
+                return
+            if gone.is_set():
+                return  # the connection is closed: dropped, never delivered
+            received.append(message)
+            gone.set()  # after_first_chunk: the client leaves once this chunk has arrived
+
         try:
-            await app(scope, receive, send)
+            await asyncio.wait_for(app(scope, receive, send), ASGI_TIMEOUT_S)
+        except TimeoutError:
+            raise AssertionError("the download did not end after the client left") from None
         except Exception:  # ClientDisconnect or a cancelled stream: what matters is what was released
             pass
 
     asyncio.run(run())
-    return sent
+    return received
 
 
 def test_early_disconnect_or_spool_failure_gives_the_slot_back(upload_api, monkeypatch):
@@ -523,13 +548,21 @@ def test_early_disconnect_or_spool_failure_gives_the_slot_back(upload_api, monke
 
     monkeypatch.setattr(common_original.tempfile, "TemporaryFile", recording)
     token = b.session_token()
+
+    def bodies(received) -> bytes:
+        return b"".join(m.get("body", b"") for m in received if m["type"] == "http.response.body")
+
     # ASGI 2.4: the first send fails (ClientDisconnect, Starlette skips background tasks).
-    _asgi_download(api, file_id, token, spec_version="2.4", disconnect_at_start=True)
-    # ASGI 2.3: the disconnect message cancels the stream, possibly before any body chunk.
-    sent = _asgi_download(api, file_id, token, spec_version="2.3", disconnect_at_start=False)
-    assert not any(m.get("body") for m in sent if m["type"] == "http.response.body"), "no body was expected"
-    assert len(spools) == 2 and all(spool.closed for spool in spools)
-    # With one slot, a leak from either disconnect would make this 503 download_busy.
+    received = _asgi_download(api, file_id, token, spec_version="2.4", leave="start_error")
+    assert received == [] and spools[-1].closed
+    # ASGI 2.3, the client leaves right after the headers: no byte of the body reaches it.
+    received = _asgi_download(api, file_id, token, spec_version="2.3", leave="after_headers")
+    assert [m["type"] for m in received] == ["http.response.start"] and spools[-1].closed
+    # ASGI 2.3, the client leaves after one chunk: it has that chunk (bytes already sent are not recalled).
+    received = _asgi_download(api, file_id, token, spec_version="2.3", leave="after_first_chunk")
+    assert bodies(received) == A_BODY[:common_original.STREAM_CHUNK_BYTES] and spools[-1].closed
+    assert len(spools) == 3 and all(spool.closed for spool in spools)
+    # With one slot, a leak from any of these disconnects would make this 503 download_busy.
     assert b.get(url(file_id)).content == A_BODY
     assert all(spool.closed for spool in spools)
 

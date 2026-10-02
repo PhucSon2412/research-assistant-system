@@ -93,7 +93,8 @@ const MESSAGES: Record<string, string> = {
   rights_scope_inconsistent: "Xử lý qua provider (embedding/RAG) cần cả quyền tìm kiếm toàn văn.",
   checked_on_in_future: "Ngày kiểm không được ở tương lai.",
   approval_storage_unavailable: "Không sao chép/kiểm được file gốc sang bản chung; chưa có gì được ghi nhận. Thử lại sau.",
-  approval_unavailable: "Không ghi được quyết định; chưa có gì được ghi nhận. Thử lại sau.",
+  // M6c-2b1: the journaled close may still have ended the request (closed_by_recovery) without any copy.
+  approval_unavailable: "Không ghi được phê duyệt; không có bản chung nào được tạo. Tải lại trang để xem yêu cầu còn mở hay đã đóng.",
   approval_outcome_uncertain: "Không chắc quyết định đã được ghi; tải lại trang để xem trạng thái trước khi thử lại.",
   already_published: "Bản này đã được công bố.",
   common_copy_revoked: "Bản này đã bị thu hồi; không thể công bố hay thu hồi lại.",
@@ -108,6 +109,11 @@ const MESSAGES: Record<string, string> = {
   revocation_pending_recovery:
     "Nhật ký đã ghi việc thu hồi nhưng database chưa áp dụng; hệ thống tạm ngừng phục vụ tới khi quản trị viên chạy phục hồi.",
   service_recovering: "Hệ thống đang tạm ngừng phục vụ để kiểm tra/phục hồi dữ liệu thu hồi. Thử lại sau.",
+  review_closure_unavailable: "Không ghi được việc đóng yêu cầu; yêu cầu vẫn đang mở. Thử lại ngay.",
+  review_journal_unavailable:
+    "Yêu cầu đã đóng nhưng không ghi được nhật ký; hệ thống tạm ngừng phục vụ tới khi quản trị viên sửa nhật ký.",
+  review_closure_pending_recovery:
+    "Nhật ký đã ghi việc đóng yêu cầu nhưng database chưa áp dụng; hệ thống tạm ngừng phục vụ tới khi quản trị viên chạy phục hồi.",
   file_unavailable: "Chưa đọc được file gốc. Thử lại sau.",
 };
 

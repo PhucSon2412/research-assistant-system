@@ -4,7 +4,9 @@
 // pending common copy; publishing lists its metadata, and its original opens only
 // where the recorded rights allow (M6b-2b1); full text stays closed.
 
-export type ReviewStatus = "open" | "withdrawn" | "rejected" | "approved";
+// closed_by_recovery (M6c-2b1): closed by replaying the journal into a restored database; the reason
+// code keeps the original decision, and it is never an approval.
+export type ReviewStatus = "open" | "withdrawn" | "rejected" | "approved" | "closed_by_recovery";
 
 export type ReviewTarget = {
   item: { id: string; title: string | null };
@@ -180,6 +182,7 @@ export const STATUS_TEXT: Record<ReviewStatus, string> = {
   withdrawn: "Đã rút",
   rejected: "Admin đã từ chối",
   approved: "Admin đã ghi nhận quyền (bản chung chờ công bố)",
+  closed_by_recovery: "Đã đóng khi khôi phục dữ liệu",
 };
 
 export const REJECT_REASONS: Record<string, string> = {
@@ -190,9 +193,13 @@ export const REJECT_REASONS: Record<string, string> = {
   other: "Lý do khác",
 };
 
-export function closeReasonText(code: string | null): string | null {
+export function closeReasonText(code: string | null, status?: ReviewStatus): string | null {
   if (!code) return null;
   if (code === "withdrawn_by_requester") return "User đã rút yêu cầu";
+  // A replayed approval created no copy in the restored data; never say one is waiting.
+  if (code === "approved_by_admin" && status === "closed_by_recovery") {
+    return "Admin đã phê duyệt trước khi khôi phục; bản chung lúc đó không có trong dữ liệu khôi phục";
+  }
   if (code === "approved_by_admin") return "Admin đã phê duyệt; bản chung riêng đang chờ công bố";
   return REJECT_REASONS[code] ?? code;
 }

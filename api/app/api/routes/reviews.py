@@ -10,6 +10,10 @@ Approval (M6b-1, ``app.promotion``) records the Admin's own rights findings and
 creates a separate *pending* common copy; it publishes nothing, builds no
 index and calls no provider.
 
+Every close also appends a ``review_closure`` record (IDs, decision, code,
+time) to the revocation journal before its commit (M6c-2b1,
+``app.review_closing``), so restoring an older backup cannot reopen the grant.
+
 Audit rows carry IDs and reason codes only: never declared rights text, the
 rejection note, recorded evidence, titles, file bytes or tokens.
 """
@@ -41,6 +45,7 @@ from app.models.review import (DECLARED_TEXT_MAX_CHARS, DECLARED_URL_MAX_CHARS, 
                                WITHDRAWN_BY_REQUESTER)
 from app.models.rights import RIGHTS_TEXT_MAX_CHARS, RIGHTS_URL_MAX_CHARS, SCOPE_CONDITIONS_MAX_CHARS
 from app.promotion import RecordedRights, approve
+from app.review_closing import commit_close
 from app.storage import OriginalStorage, get_storage
 
 router = APIRouter(prefix="/review-requests", tags=["review"])
@@ -58,6 +63,9 @@ DECLARATION_NOTE = "Lời khai của User; chưa được Admin xác minh, khôn
 PENDING_NOTE = "Yêu cầu đang chờ duyệt chưa phải là công bố; paper vẫn chỉ ở kho riêng của User."
 APPROVED_NOTE = ("Admin đã tự kiểm và ghi nhận quyền cho một bản chung riêng, đang chờ công bố; User khác chưa "
                  "thấy bản này. Bản riêng, version và collection của User không đổi.")
+RECOVERED_NOTE = ("Yêu cầu đã được đóng khi khôi phục dữ liệu từ nhật ký: quyết định gốc (mã lý do) được giữ, "
+                  "quyền xem tạm của Admin đã kết thúc. Nếu quyết định gốc là phê duyệt, bản chung tạo lúc đó không "
+                  "có trong dữ liệu khôi phục và không được tạo lại; User có thể gửi yêu cầu mới.")
 RIGHTS_NOTE = ("Quyền do Admin tự kiểm với đúng file/checksum này. Lời khai của User, việc User upload hay việc "
                "paper đọc miễn phí trên arXiv/Hugging Face không tự cấp quyền phân phối.")
 STREAM_CHUNK_BYTES = 64 * 1024
@@ -201,6 +209,8 @@ def _target_out(rr: ReviewRequest, item: LibraryItem, version: PaperVersion, sou
 
 
 def _pending_note(rr: ReviewRequest) -> str:
+    if rr.status == ReviewStatus.CLOSED_BY_RECOVERY.value:
+        return RECOVERED_NOTE
     return APPROVED_NOTE if rr.status == ReviewStatus.APPROVED.value else PENDING_NOTE
 
 
@@ -324,8 +334,8 @@ def withdraw(
     rr.closed_by_user_id = principal.user_id
     rr.close_reason_code = WITHDRAWN_BY_REQUESTER
     _audit(db, principal, "review.request.withdraw", AuditOutcome.SUCCESS, rr.id, reason_code=WITHDRAWN_BY_REQUESTER)
-    # From this commit every new Admin review read of the file is refused.
-    db.commit()
+    # Journaled, then committed: from this commit every new Admin review read of the file is refused.
+    rr = commit_close(db, rr)
     return {"request": _owner_out(rr, item, version, source)}
 
 
@@ -494,7 +504,7 @@ def admin_reject(
     rr.rejection_note = body.note
     # The note stays on the request for the owner; audit keeps only the code.
     _audit(db, admin, "review.request.reject", AuditOutcome.SUCCESS, rr.id, reason_code=body.reason_code.value)
-    db.commit()
+    rr = commit_close(db, rr)  # journaled, then committed
     return {"request": _admin_out(rr, None)}
 
 

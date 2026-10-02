@@ -284,11 +284,12 @@ def test_db_refuses_tombstones_without_journal_record_and_edits_to_the_mirror(ap
 def test_revocation_is_journaled_and_mirrored_before_it_reports_success(upload_api, monkeypatch):
     w = listed(upload_api, monkeypatch)
     assert revoke(w.admin, w.copy).status_code == 200
-    genesis, rec = records()
-    assert rec.kind == "revocation" and rec.body["item_id"] == w.copy and rec.prev == genesis.hash
+    genesis, approval, rec = records()  # the copy's approval closed its review grant first (M6c-2b1)
+    assert approval.kind == "review_closure" and approval.body["status"] == "approved"
+    assert rec.kind == "revocation" and rec.body["item_id"] == w.copy and rec.prev == approval.hash
     assert set(rec.body) == set(journal.REVOCATION_FIELDS) | {"retentions"}
     assert rec.body["storage_key"] == common_key(w.api, w.copy)
-    assert mirror(w.api.engine) == [(r.seq, r.kind, r.hash, r.line) for r in (genesis, rec)]
+    assert mirror(w.api.engine) == [(r.seq, r.kind, r.hash, r.line) for r in (genesis, approval, rec)]
     tomb = w.api.scalar("SELECT id FROM deletion_tombstones WHERE item_id=:i", i=uuid.UUID(w.copy))
     assert rec.body["id"] == str(tomb)
     assert gate(w.api.engine) == "open"
@@ -306,7 +307,7 @@ def test_journal_write_failure_still_closes_the_copy_and_keeps_the_gate_shut_unt
     monkeypatch.setattr(journal, "append", real)
     assert (response.status_code, response.json()) == (503, {"error": "revocation_journal_unavailable"})
     assert state(w.api, w.copy) == "revoked"  # t_rev happened: fail closed
-    assert [r.kind for r in records()] == ["genesis"]
+    assert [r.kind for r in records()] == ["genesis", "review_closure"]
     assert gate(w.api.engine) == "journal_behind_db"
     assert_recovering(w.browsers, [("GET", "/library/items"), ("GET", f"/library/items/{w.ids_a['item_id']}")])
     with pytest.raises(RecoveryError, match="journal_behind_db"):
@@ -361,7 +362,7 @@ def test_complete_line_whose_fsync_fails_keeps_the_gate_shut_until_recover_confi
         publication.revoke(db, admin_principal(w.api), uuid.UUID(w.copies[1]), RevocationReason.OTHER,
                            w.api.clock.now, timedelta(hours=24))
     assert (caught.value.status_code, caught.value.code) == (503, "service_recovering")
-    assert state(w.api, w.copies[1]) == "pending" and len(records()) == 2
+    assert state(w.api, w.copies[1]) == "pending" and len(records()) == 4  # genesis, 2 approvals, 1 revocation
     # recover cannot confirm while fsync still fails: the gate stays closed.
     restore = fsync_fails(monkeypatch)
     with pytest.raises(RecoveryError, match="journal_sync_failed"):
@@ -497,8 +498,8 @@ def test_when_neither_journal_nor_database_take_the_revocation_nothing_changes(u
     restore()
     monkeypatch.setattr(journal, "append", real)
     assert (response.status_code, response.json()) == (503, {"error": "revocation_unavailable"})
-    assert state(w.api, w.copy) == "listed" and [r.kind for r in records()] == ["genesis"]
-    assert len(mirror(w.api.engine)) == 1 and gate(w.api.engine) == "open"
+    assert state(w.api, w.copy) == "listed" and [r.kind for r in records()] == ["genesis", "review_closure"]
+    assert len(mirror(w.api.engine)) == 2 and gate(w.api.engine) == "open"
     assert revoke(w.admin, w.copy).status_code == 200  # a retry revokes it
 
 
@@ -513,7 +514,7 @@ def test_revocation_while_the_journal_is_ahead_writes_nothing(upload_api, monkey
         publication.revoke(db, admin_principal(w.api), uuid.UUID(w.copy), RevocationReason.OTHER, w.api.clock.now,
                            timedelta(hours=24))
     assert (caught.value.status_code, caught.value.code) == (503, "service_recovering")
-    assert state(w.api, w.copy) == "listed" and len(mirror(w.api.engine)) == 1 and len(records()) == 2
+    assert state(w.api, w.copy) == "listed" and len(mirror(w.api.engine)) == 2 and len(records()) == 3
 
 
 def test_concurrent_revocations_get_consecutive_journal_records(upload_api, monkeypatch):
@@ -541,7 +542,7 @@ def test_concurrent_revocations_get_consecutive_journal_records(upload_api, monk
     assert sorted(o for o in outcomes if o[0] != w.copies[2]) == sorted([(w.copies[0], 200), (w.copies[1], 200)])
     assert sorted(o[1:] for o in outcomes if o[0] == w.copies[2]) == [(200,), (409, "common_copy_revoked")]
     revocations = records("revocation")
-    assert [r.seq for r in records()] == [1, 2, 3, 4]
+    assert [r.seq for r in records()] == [1, 2, 3, 4, 5, 6, 7]  # genesis, 3 approvals, 3 revocations
     assert sorted(r.body["item_id"] for r in revocations) == sorted(w.copies)
     assert mirror(w.api.engine) == [(r.seq, r.kind, r.hash, r.line) for r in records()]
     assert gate(w.api.engine) == "open"
@@ -578,7 +579,7 @@ def test_lost_older_or_corrupt_journal_closes_the_gate_and_is_rebuilt_only_on_co
     with pytest.raises(RecoveryError, match="journal_missing"):
         do_recover(w.api.engine, w.storage, w.api.clock.now)
     report = do_recover(w.api.engine, w.storage, w.api.clock.now, confirm_db_current=True)
-    assert report.journal_rebuilt == 2 and report.gate == "open"
+    assert report.journal_rebuilt == 3 and report.gate == "open"  # genesis, approval, revocation
     assert path.read_bytes().startswith(good)  # the same lines, then this recovery's begin/end
 
     older = path.read_bytes().split(b"\n")
@@ -587,11 +588,11 @@ def test_lost_older_or_corrupt_journal_closes_the_gate_and_is_rebuilt_only_on_co
     assert_recovering(w.browsers, routes)
     with pytest.raises(RecoveryError, match="journal_behind_db"):
         do_recover(w.api.engine, w.storage, w.api.clock.now)
-    assert do_recover(w.api.engine, w.storage, w.api.clock.now, confirm_db_current=True).journal_repaired == 3
+    assert do_recover(w.api.engine, w.storage, w.api.clock.now, confirm_db_current=True).journal_repaired == 4
 
     current = path.read_bytes()
     lines = current.split(b"\n")
-    lines[1] = lines[1].replace(b'"rights_withdrawn"', b'"rights_expired"').replace(
+    lines[2] = lines[2].replace(b'"rights_withdrawn"', b'"rights_expired"').replace(  # the revocation record
         b'"rights_recorded_in_error"', b'"rights_expired"')
     path.write_bytes(b"\n".join(lines))  # edited in place
     assert gate(w.api.engine) == "journal_corrupt"
@@ -701,7 +702,9 @@ def test_restore_replays_revocations_of_copies_the_snapshot_never_had(upload_api
         put_back(w.storage, saved)
         assert gate(snap.engine) == "db_behind_journal"
         report = do_recover(snap.engine, w.storage, w.api.clock.now)
-        assert report.replayed == {"recovery_begin": 1, "revoked": 1, "recorded_item_absent": 1, "recovery_end": 1}
+        # The later copy's approval closed a request the snapshot never had: only its mirror row is added.
+        assert report.replayed == {"recovery_begin": 1, "revoked": 1, "recorded_item_absent": 1, "recovery_end": 1,
+                                   "recorded_request_absent": 1}
         assert report.gate == "open"
         with snap.engine.connect() as conn:
             assert conn.scalar(text("SELECT count(*) FROM library_items WHERE id=:i"), {"i": uuid.UUID(later)}) == 0
@@ -730,7 +733,8 @@ def test_adopts_a_database_older_than_its_registration(upload_api, monkeypatch, 
         assert_recovering(w.browsers, [("GET", "/library/items")])
         report = do_recover(old, w.storage, w.api.clock.now)
         assert report.adopted and report.gate == "open"
-        assert report.replayed == {"genesis": 1, "recorded_item_absent": 1, "recovery_begin": 1, "recovery_end": 1}
+        assert report.replayed == {"genesis": 1, "recorded_item_absent": 1, "recovery_begin": 1, "recovery_end": 1,
+                                   "recorded_request_absent": 1}
         assert mirror(old) == [(r.seq, r.kind, r.hash, r.line) for r in records()]
     finally:
         app_db.get_engine().dispose()
@@ -759,7 +763,8 @@ def test_cleanup_failure_during_recovery_keeps_the_gate_shut_until_a_rerun_succe
         report = do_recover(snap.engine, w.storage, w.api.clock.now)
         assert report.gate == "open" and not key_present(w.storage, key)
         kinds = [r.kind for r in records()]
-        assert kinds == ["genesis", "revocation", "recovery_begin", "recovery_end"]  # the rerun closed the same run
+        assert kinds == ["genesis", "review_closure", "revocation", "recovery_begin",
+                         "recovery_end"]  # the rerun closed the same run
         # And again: idempotent, a fresh begin/end pair, nothing replayed.
         assert do_recover(snap.engine, w.storage, w.api.clock.now).replayed == {"recovery_begin": 1,
                                                                                  "recovery_end": 1}

@@ -48,7 +48,7 @@ export default function ReviewListPage() {
         {r.requester_email && ` · ${r.requester_email}`}
         {r.file && ` · ${r.file.filename ?? "file gốc"}`}
         {r.closed_at && ` · đóng ${fmt(r.closed_at)}`}
-        {closeReasonText(r.close_reason_code) && ` · ${closeReasonText(r.close_reason_code)}`}
+        {closeReasonText(r.close_reason_code, r.status) && ` · ${closeReasonText(r.close_reason_code, r.status)}`}
         {r.status === "open" && !r.review_available && " · không còn quyền xem (quyền của item đã thay đổi)"}
       </li>)}</ul>}
     </Shell>

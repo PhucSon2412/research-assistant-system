@@ -17,6 +17,10 @@ removed or reordered record breaks the chain. Kinds:
   refuses a record carrying any other field.
 - ``recovery_begin`` / ``recovery_end``: a recovery run; while one is open
   the recovery gate stays closed.
+- ``review_closure`` (M6c-2b1): a review request's temporary Admin grant
+  ended. Request, item, version and file IDs, the decision (``withdrawn``,
+  ``rejected``, ``approved``), its reason code and time. Never the declared
+  text, rejection note, title, email, URL, checksum or the Admin's evidence.
 
 Only this module reads or writes the file. Writers hold the journal advisory
 lock in PostgreSQL (``app.recovery``), so there is one appender at a time;
@@ -37,23 +41,28 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from app.models.enums import RevocationReason, RevokedMetadataField, TombstoneKind
+from app.models.enums import RevocationReason, ReviewStatus, RevokedMetadataField, TombstoneKind
+from app.models.review import closed_status_of
 
 ZERO_HASH = "0" * 64
 MAX_LINE_BYTES = 64 * 1024
 
 GENESIS, REVOCATION, RECOVERY_BEGIN, RECOVERY_END = "genesis", "revocation", "recovery_begin", "recovery_end"
-KINDS = (GENESIS, REVOCATION, RECOVERY_BEGIN, RECOVERY_END)
+REVIEW_CLOSURE = "review_closure"
+KINDS = (GENESIS, REVOCATION, RECOVERY_BEGIN, RECOVERY_END, REVIEW_CLOSURE)
 GENESIS_MODES = ("new_install", "existing_db", "rebuilt_from_db")
 REVOCATION_FIELDS = ("id", "target_kind", "item_id", "version_id", "source_file_id", "storage_key",
                      "access_rights_id", "reason_code", "prior_publication_state", "rights_epoch", "recorded_at",
                      "recorded_by_user_id", "purge_due_at")
 RETENTION_FIELDS = ("field", "policy_source", "scope", "reason", "confirmed_by_user_id", "recorded_at")
+CLOSURE_FIELDS = ("request_id", "item_id", "version_id", "source_file_id", "status", "reason_code", "closed_at")
+CLOSED_STATUSES = (ReviewStatus.WITHDRAWN.value, ReviewStatus.REJECTED.value, ReviewStatus.APPROVED.value)
 BODY_FIELDS = {
     GENESIS: frozenset({"journal_id", "created_at", "mode"}),
     REVOCATION: frozenset(REVOCATION_FIELDS) | {"retentions"},
     RECOVERY_BEGIN: frozenset({"recovery_id", "started_at", "db_head_seq"}),
     RECOVERY_END: frozenset({"recovery_id", "finished_at", "replayed", "tombstones_purged", "objects_removed"}),
+    REVIEW_CLOSURE: frozenset(CLOSURE_FIELDS),
 }
 _KEY = re.compile(r"originals/[0-9a-f]{32}")
 _HASH = re.compile(r"[0-9a-f]{64}")
@@ -197,6 +206,14 @@ def _check_body(kind: str, body) -> None:
                 _text(basis["reason"], 1000)
                 _uuid(basis["confirmed_by_user_id"])
                 _time(basis["recorded_at"])
+        elif kind == REVIEW_CLOSURE:
+            for name in ("request_id", "item_id", "version_id", "source_file_id"):
+                _uuid(body[name])
+            # The decision and its code must agree: a code stands for exactly one decision.
+            if (body["status"] not in CLOSED_STATUSES or not isinstance(body["reason_code"], str)
+                    or closed_status_of(body["reason_code"]) != body["status"]):
+                raise ValueError("closure")
+            _time(body["closed_at"])
         else:
             _uuid(body["recovery_id"])
             if kind == RECOVERY_BEGIN:
