@@ -211,13 +211,27 @@ def test_epoch_or_generation_change_before_send_and_answer(upload_api, monkeypat
 def test_provider_errors_and_reservation(upload_api, monkeypatch):
     api, storage = upload_api
     _, a, _, _, ids, _, settings = setup(api, storage, monkeypatch)
+    from app import rag
+    original = rag.reserve
+    reservations = []
+    def capture_reservation(*args, **kwargs):
+        usage_id = original(*args, **kwargs)
+        reservations.append(usage_id)
+        # A wall clock is not a request sequence; equal timestamps must be safe.
+        with api.engine.begin() as conn:
+            conn.execute(text("UPDATE search_usage SET created_at=:at WHERE id=:id"),
+                         {"at": api.clock.now, "id": usage_id})
+        return usage_id
+    monkeypatch.setattr(rag, "reserve", capture_reservation)
     for failure, status in ((GenerationError("rag_provider_rate_limited", rejected=True), "rejected"),
                             (GenerationError("rag_provider_outcome_uncertain"), "uncertain"),
                             (GenerationError("rag_provider_response_invalid"), "uncertain")):
         monkeypatch.setattr("app.rag.generate", lambda *args, f=failure: (_ for _ in ()).throw(f))
         response = a.post("/rag/ask", {"item_id": ids["item_id"], "question": "Synthetic?", "mode": "keyword"})
         assert response.status_code == 503 and response.json()["error"] == failure.code
-        assert api.scalar("SELECT status FROM search_usage WHERE task_type='generation' ORDER BY created_at DESC LIMIT 1") == status
+        assert api.scalar("SELECT status FROM search_usage WHERE id=:id AND task_type='generation'",
+                          id=reservations[-1]) == status
+    assert len(set(reservations)) == 3
 
 
 def test_generation_reservation_concurrent(upload_api, monkeypatch):

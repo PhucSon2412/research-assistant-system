@@ -1,4 +1,4 @@
-# Môi trường phát triển và schema (M1a–M6c-2a)
+# Môi trường phát triển và schema (M1a–M6c-2b2a)
 
 [Mục lục](README.md) · [Mô hình dữ liệu](data-model.md) · [Roadmap](roadmap.md)
 
@@ -1039,6 +1039,8 @@ RPO/RTO ≤ 24 giờ ở [phi chức năng](nonfunctional.md) vẫn là **mục 
 
 ## Journal đóng review request (M6c-2b1)
 
+PR #28 đã merge ở `47a1aab` ngày 2026-10-02; các kết quả theo từng lượt dưới đây là lịch sử của PR đó. Session được bổ sung riêng ở [M6c-2b2a](#journal-thu-hồi-session-m6c-2b2a).
+
 Revision `0028`, và `0029` (sửa theo review PR #28: bản ghi phải nêu đúng request nó được gắn). Thiết kế, cửa sổ lỗi, lựa chọn `closed_by_recovery`, mâu thuẫn docs/code và giới hạn ở [decisions](decisions.md#quyết-định-triển-khai-m6c-2b1-2026-10-01).
 
 | Mục | Giá trị / lệnh |
@@ -1082,3 +1084,40 @@ PYTHONIOENCODING=utf-8 "$USERPROFILE/.conda/envs/ras/python.exe" scripts/drill_r
 - `"$PY" -m pytest api -q`: **671 passed** trong 28 phút 10 giây, 0 fail (một cảnh báo deprecation Starlette); gồm `test_review_closure_journal.py` **38 passed** (thêm hai ca `body.request_id` thiếu / JSON `null`). Ca ASGI trước đây fail một lần dưới tải nay đạt trong lượt này, và **25/25** khi chạy riêng lặp lại.
 - Kiểm đối chứng: đưa lại `=` → hai ca mới fail; bốn ca đối chứng `0029` trước chạy lại trên biểu thức mới **4/4**; bỏ `close()` trong `VerifiedFileResponse` → test ASGI fail; disconnect nhận trễ 0,2 s → test ASGI vẫn đạt (bản cũ gửi 1 chunk và fail ở điều kiện này, đã tái hiện bằng test tạm rồi xóa).
 - Không đổi code ứng dụng; không đổi web; diễn tập Compose không chạy lại. Stack dev vẫn `0028`.
+
+## Journal thu hồi session (M6c-2b2a)
+
+Nhánh review sau PR #28 merge `47a1aab`, revision `0030`. Schema, batch, khóa và cửa sổ lỗi ở [decisions](decisions.md#quyết-định-triển-khai-m6c-2b2a-2026-10-02). Không nâng DB dev trong PR này; test tạo/xóa DB riêng và diễn tập chỉ dùng hai project cô lập.
+
+**Nâng cấp DB có lịch sử session:** dừng `api web worker beat`, migrate `0030`. Nếu còn session đã thu hồi trước migration, status báo `sessions_not_journaled`, `unjournaled_sessions=N`. Chạy `recover` (không cần xác nhận DB live cho việc import thu hồi cũ), phải có `sessions_imported=N`, `gate=open` và `unjournaled_sessions=0`, rồi mới start writer. Migration không đọc journal. Lịch sử đã mất khỏi DB trước import không thể khôi phục.
+
+```powershell
+docker compose build
+docker compose stop api web worker beat
+docker compose run --rm migrate
+docker compose run --rm --no-deps api python -m app.cli.recovery status
+docker compose run --rm --no-deps api python -m app.cli.recovery recover
+docker compose run --rm --no-deps api python -m app.cli.recovery status
+```
+
+**Sau restore:** luôn dùng journal hiện hành nằm ngoài artifact, `ras_backup.py restore` → `hold` (trước migrate) → `recover` với writer dừng. Session sống trong snapshot bị thu hồi trước khi gate mở; session/User vắng không tạo lại. `journal_confirmed=false` cho cả batch khi append/fsync lỗi. Dòng hoàn tất nhưng fsync lỗi: `recover` tự sync và xác nhận. Journal thiếu/torn mà DB giữ phần còn lại: sửa từ **DB live** bằng `recover --confirm-db-is-current` theo runbook M6c-1; không dùng cờ đó trên snapshot để suy lịch sử đã mất.
+
+**Diễn tập** (PostgreSQL/MinIO thật, dữ liệu tổng hợp, proxy Next.js, cookie/CSRF đã lưu; không provider):
+
+```powershell
+$env:PYTHONIOENCODING = 'utf-8'
+$env:DRILL_WORK_DIR = '<thư mục tuyệt đối ngoài repo, trống>'
+& "$env:USERPROFILE\.conda\envs\ras\python.exe" scripts/drill_session_revocation_restore.py --down
+```
+
+Hai project mới `ras-drill-src` / `ras-drill-restore` dùng port như M6c-2a, từ chối nếu đã có volume/container; `--down` chỉ gỡ volume của chúng, artifact/journal giữ ngoài repo để xem. Journal nguồn không bị restore/recover sửa; project đích chỉ ghi bản sao. Script kiểm session vẫn trong thời hạn idle/absolute cấu hình để không nhầm hết hạn với thu hồi. Lần đầu đã chứng minh chuỗi chính nhưng dừng ở kiểm lần restore thứ hai vì pool DB của script giữ connection bị pg_restore chấm dứt; script đã `dispose()` trước lượt restore sau.
+
+**Kiểm chứng 2026-10-02, Windows/Docker Desktop, Conda `ras`:**
+
+- Suite đầy đủ cuối: **721 passed**, 0 fail trong **29 phút 48 giây** (1788,71 s), một cảnh báo Starlette deprecation. Gồm 50 test session mới và ORM/schema xanh; hash **229 file source không đổi** trong cả lượt chạy. Chỉ cập nhật docs trong lúc chờ, không sửa code hay chạy mutant trong lúc suite chạy.
+- Suite đầy đủ đầu tiên: **720 passed, 1 failed** trong 29 phút 39 giây; kiểm hash 229 file source không đổi trong lượt chạy. Ca fail `test_rag.py::test_provider_errors_and_reservation` chọn reservation bằng timestamp; chạy riêng đạt, và test tạm ép timestamp bằng nhau tái hiện cùng lỗi (`rejected` thay vì `uncertain`). Sửa **test** để dùng đúng ID reservation trả về, cố ý giữ timestamp bằng nhau; không đổi ứng dụng RAG. Riêng file RAG sau sửa: **24 passed** trong 111,46 s. DB của lượt fail đã dọn nên không có timestamp để kết luận nguyên nhân cụ thể của lượt đầu.
+- Baseline cuối **82 passed** trong 166,39 s: 50 test session mới, auth/reset cũ, ORM/schema và upgrade `0029` mục tiêu. Hai lượt tập trung trước đạt 80/81 (fixture backfill thiếu env DB), 112/113 (test `0029` dùng head nhưng so revision cố định); đã sửa fixture/test và chạy lại. Web **42 passed**, typecheck/build đạt. Một cảnh báo Starlette deprecation; Node cảnh báo module type như trước.
+- Kiểm đối chứng **10/10**: gate bỏ thu hồi cũ; replay để session sống; xác nhận mirror dù fsync lỗi; CHECK nhận ID lệch; trigger bỏ so reason; bỏ fence mở lại; replay báo reset thành công; reset bỏ thu hồi; init quên DB có lịch sử session; khóa User `FOR UPDATE` gây chu trình với FK audit của writer journal. Mỗi mutant được đưa vào trước test con, test bắt lỗi rồi khôi phục **đúng byte** trước mutant tiếp theo; hoàn tất trước suite đầy đủ. Không chạy đối chứng trong lúc suite đầy đủ chạy.
+- Diễn tập Compose `scripts/drill_session_revocation_restore.py --down`: **35/35**, **0 provider call**. A có ba session, B một session, Admin; lưu cookie và CSRF; B upload một Markdown tổng hợp 65 byte. Backup writer dừng (1 object, dump **227.037 byte**, journal DB head 1). Sau backup: A1 logout; A0 revoke-others thu hồi A2, giữ A0; session mới của A tạo rồi logout (snapshot không có). Journal hiện hành có ba dòng chỉ ID/mã/thời điểm. Copy riêng, restore → gate `db_behind_journal`; snapshot có ba session A sống. Trước recover: **20/20** request (5 bộ cookie × GET/POST × web/API) `503 service_recovering`. Recover → `session_revoked=2`, `recorded_session_absent=1`, gate mở. Sau recover: cookie **và CSRF cũ** của A1/A2 → `401 session_expired` qua web/API; A0/B → `200`, file B đúng SHA-256; session sau backup vẫn không tồn tại. Session snapshot còn trong idle/absolute; tuổi lớn nhất quan sát **75,03 s**, so với lifetimes từ config (không sửa timeout để test). Recover lặp, restore lần hai + recover cho cùng kết quả. Journal nguồn không đổi byte; logs container không traceback/token. `--down` đã gỡ hai project/volume; dev không bị nâng schema hay restart. Một lần đo nhỏ, không SLO: backup **1,44 s**, restore **14,98 s**, recover **2,30 s**; dữ liệu/journal/artifact cùng máy.
+
+**Giới hạn:** chỉ session; reset token/invitation, mật khẩu và account status có thể trở về snapshot cũ. Credential cũ có thể tạo **session mới** sau restore. Backfill không cứu lịch sử đã mất, journal cũ/cùng rollback với DB không phát hiện được. Crash/fsync/commit lỗi chỉ tiêm lỗi, chưa kiểm mất điện thật; journal/DB/artifact cùng máy trong diễn tập. Hợp đồng task token/credential tiếp theo ở decisions. Không thay `.env`/key hoặc `pricing_verified`.

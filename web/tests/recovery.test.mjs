@@ -2,6 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ApiError, api, describeError } from "../lib/api.ts";
 
+test("uncertain auth transaction never claims password reset or disable succeeded", () => {
+  assert.match(describeError(new ApiError(503, "auth_outcome_uncertain")), /Chưa xác định.*Kiểm tra/);
+  assert.match(describeError(new ApiError(503, "session_journal_unavailable")), /Phiên đã bị thu hồi/);
+  for (const code of ["auth_outcome_uncertain", "session_revocation_pending_recovery"]) {
+    assert.doesNotMatch(describeError(new ApiError(503, code)), /đổi mật khẩu thành công|vô hiệu hóa thành công/);
+  }
+});
+
 test("recovery gate and journal errors have plain messages (M6c-1)", () => {
   assert.match(describeError(new ApiError(503, "service_recovering")), /tạm ngừng phục vụ/);
   assert.match(describeError(new ApiError(503, "revocation_journal_unavailable")), /đã bị thu hồi.*nhật ký/);

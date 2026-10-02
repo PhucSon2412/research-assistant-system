@@ -114,6 +114,10 @@ const MESSAGES: Record<string, string> = {
     "Yêu cầu đã đóng nhưng không ghi được nhật ký; hệ thống tạm ngừng phục vụ tới khi quản trị viên sửa nhật ký.",
   review_closure_pending_recovery:
     "Nhật ký đã ghi việc đóng yêu cầu nhưng database chưa áp dụng; hệ thống tạm ngừng phục vụ tới khi quản trị viên chạy phục hồi.",
+  session_journal_unavailable: "Phiên đã bị thu hồi; hệ thống đang tạm ngừng phục vụ để khôi phục nhật ký.",
+  session_revocation_pending_recovery: "Hệ thống đang khôi phục việc thu hồi phiên. Thử lại sau.",
+  auth_outcome_uncertain: "Chưa xác định được kết quả thao tác tài khoản. Kiểm tra trạng thái trước khi thử lại.",
+  auth_unavailable: "Chưa hoàn tất thao tác tài khoản. Thử lại sau.",
   file_unavailable: "Chưa đọc được file gốc. Thử lại sau.",
 };
 

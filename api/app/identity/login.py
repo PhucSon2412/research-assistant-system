@@ -18,9 +18,11 @@ from app.config import Settings
 from app.identity.emails import EmailFormatError, normalise_email
 from app.identity.errors import InvalidCredentials
 from app.identity.passwords import hash_password, needs_rehash, verify_password
-from app.identity.sessions import IssuedSession, issue_session
-from app.models import User
-from app.models.enums import AuditActorType, AuditOutcome, UserStatus
+from app.identity.sessions import IssuedSession, issue_session, revoke_session
+from app.identity.session_commit import commit_auth
+from app.identity.tokens import hash_token, plausible_token
+from app.models import User, UserSession
+from app.models.enums import AuditActorType, AuditOutcome, SessionRevokeReason, UserStatus
 
 AUDIT_ACTION = "auth.login"
 
@@ -31,7 +33,8 @@ def _dummy_verifier() -> str:
     return hash_password("dummy-password-for-timing-only")
 
 
-def login(db: Session, *, email: str, password: str, now: datetime, settings: Settings) -> tuple[User, IssuedSession]:
+def login(db: Session, *, email: str, password: str, now: datetime, settings: Settings,
+          previous_token: str | None = None) -> tuple[User, IssuedSession]:
     try:
         normalised = normalise_email(email)
     except EmailFormatError:
@@ -57,9 +60,13 @@ def login(db: Session, *, email: str, password: str, now: datetime, settings: Se
     # first (we see the new verifier/status and refuse) or waits for us and
     # then revokes the session we are about to create.
     user_id = user.id
-    locked = db.scalar(
-        select(User).where(User.id == user_id).with_for_update().execution_options(populate_existing=True)
-    )
+    previous = db.execute(select(UserSession.id, UserSession.user_id).where(
+        UserSession.token_hash == hash_token(previous_token))).first() if plausible_token(previous_token) else None
+    owners = {user_id} | ({previous.user_id} if previous else set())
+    db.rollback()
+    locked_users = list(db.scalars(select(User).where(User.id.in_(owners)).order_by(User.id)
+                                  .with_for_update(key_share=True).execution_options(populate_existing=True)))
+    locked = next((row for row in locked_users if row.id == user_id), None)
     if locked is None or locked.password_verifier != seen_verifier or locked.status != UserStatus.ACTIVE.value:
         db.rollback()
         _deny(db, user=user, reason="changed_concurrently")
@@ -68,6 +75,13 @@ def login(db: Session, *, email: str, password: str, now: datetime, settings: Se
         locked.password_verifier = new_verifier
         locked.updated_at = now
     issued = issue_session(db, user_id=locked.id, now=now, lifetimes=settings.auth)
+    if previous is not None:
+        # All users are locked before either session. Identity is immutable in the DB.
+        old = db.scalar(select(UserSession).where(UserSession.id == previous.id).with_for_update()
+                        .execution_options(populate_existing=True))
+        if old is not None and old.revoked_at is None and old.absolute_expires_at > now \
+                and old.last_activity_at > now - settings.auth.session_idle:
+            revoke_session(db, session_id=old.id, user_id=old.user_id, reason=SessionRevokeReason.REPLACED, now=now)
     record_event(
         db,
         action=AUDIT_ACTION,
@@ -77,7 +91,7 @@ def login(db: Session, *, email: str, password: str, now: datetime, settings: Se
         target_type="session",
         target_id=str(issued.session_id),
     )
-    db.commit()
+    commit_auth(db)
     return locked, issued
 
 

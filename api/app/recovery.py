@@ -70,10 +70,10 @@ from sqlalchemy.orm import Session
 from app import journal
 from app.audit import record_event
 from app.config import Settings
-from app.journal import (GENESIS, RECOVERY_BEGIN, RECOVERY_END, REVIEW_CLOSURE, REVOCATION, JournalError,
+from app.journal import (GENESIS, RECOVERY_BEGIN, RECOVERY_END, REVIEW_CLOSURE, REVOCATION, SESSION_REVOCATION, JournalError,
                          JournalState, Record)
 from app.models import (AccessRights, DeletionTombstone, LibraryItem, PaperVersion, RecoveryRegistration,
-                        ReviewRequest, RevocationJournalRecord, RevocationMetadataRetention, SourceFile, User)
+                        ReviewRequest, RevocationJournalRecord, RevocationMetadataRetention, SourceFile, User, UserSession)
 from app.models.enums import AuditActorType, AuditOutcome, PublicationState, ReviewStatus, UserRole, Visibility
 from app.models.review import closed_status_of
 
@@ -105,13 +105,15 @@ class GateStatus:
 # Closed review requests the journal does not know about (only closes committed before 0028 can be).
 UNJOURNALED_CLOSURES_SQL = """SELECT count(*) FROM review_requests rr WHERE rr.status <> 'open' AND NOT EXISTS
     (SELECT 1 FROM revocation_journal_records j WHERE j.review_request_id = rr.id)"""
+UNJOURNALED_SESSIONS_SQL = """SELECT count(*) FROM sessions s WHERE s.revoked_at IS NOT NULL AND NOT EXISTS
+    (SELECT 1 FROM revocation_journal_records j WHERE j.session_id = s.id)"""
 
 
 def _db_view(conn) -> tuple:
     return tuple(conn.execute(text(f"""
         SELECT r.journal_id, r.genesis_hash, (SELECT count(*) FROM revocation_journal_records), h.seq, h.record_hash,
                (SELECT count(*) FROM revocation_journal_records WHERE NOT journal_confirmed),
-               ({UNJOURNALED_CLOSURES_SQL})
+               ({UNJOURNALED_CLOSURES_SQL}), ({UNJOURNALED_SESSIONS_SQL})
         FROM (SELECT 1) one
         LEFT JOIN recovery_registrations r ON r.id = 1
         LEFT JOIN LATERAL (SELECT seq, record_hash FROM revocation_journal_records ORDER BY seq DESC LIMIT 1) h
@@ -119,7 +121,7 @@ def _db_view(conn) -> tuple:
 
 
 def compare(state: JournalState, view: tuple) -> GateStatus:
-    journal_id, genesis_hash, count, db_seq, db_hash, unconfirmed, unjournaled_closures = view
+    journal_id, genesis_hash, count, db_seq, db_hash, unconfirmed, unjournaled_closures, unjournaled_sessions = view
     head = state.head
     closed = lambda reason: GateStatus(False, reason, head.seq, db_seq)  # noqa: E731
     if state.torn is not None:
@@ -142,6 +144,8 @@ def compare(state: JournalState, view: tuple) -> GateStatus:
     if unjournaled_closures:
         # Closed before 0028: a restore of an older snapshot would reopen those grants until they are journaled.
         return closed("review_closures_not_journaled")
+    if unjournaled_sessions:
+        return closed("sessions_not_journaled")
     if state.open_recovery is not None:
         return closed("recovery_in_progress")
     return GateStatus(True, "open", head.seq, db_seq)
@@ -227,10 +231,12 @@ def _lock_journal(db: Session) -> None:
 
 
 def _mirror(record: Record, via: str, result: str, tombstone_id: uuid.UUID | None, *,
-            confirmed: bool, review_request_id: uuid.UUID | None = None) -> RevocationJournalRecord:
+            confirmed: bool, review_request_id: uuid.UUID | None = None,
+            session_id: uuid.UUID | None = None, session_user_id: uuid.UUID | None = None) -> RevocationJournalRecord:
     """``confirmed``: this line is in the file and an ``fsync`` of it has returned."""
     return RevocationJournalRecord(seq=record.seq, kind=record.kind, record_hash=record.hash, line=record.line,
                                    tombstone_id=tombstone_id, review_request_id=review_request_id, applied_via=via,
+                                   session_id=session_id, session_user_id=session_user_id,
                                    result=result, journal_confirmed=confirmed)
 
 
@@ -304,6 +310,58 @@ def record_review_closure(db: Session, path: Path | None, rr: ReviewRequest) -> 
     """
     return _journal_decision(db, path, REVIEW_CLOSURE, closure_body(rr), "close", "closed",
                              review_request_id=rr.id)
+
+
+def session_body(row: UserSession) -> dict:
+    return {"session_id": str(row.id), "user_id": str(row.user_id), "reason_code": row.revoked_reason,
+            "revoked_at": row.revoked_at.isoformat()}
+
+
+def record_session_revocations(db: Session, path: Path | None, rows: list[UserSession]) -> list[Journaled]:
+    """One batch after ALL user/token/session locks. Mirror all lines before one append/fsync.
+
+    A failed append leaves ALL rows unconfirmed, including any complete prefix.
+    Commit still revokes the whole batch atomically; recover repairs missing
+    lines from the live DB (confirmation required) or replays a durable prefix
+    after rollback. No further auth row locks may be taken after this call.
+    """
+    if not rows:
+        return []
+    _lock_journal(db)
+    head = _db_head(db)
+    if head is None or _unconfirmed(db):
+        raise RecoveryError("journal_unconfirmed" if head else "not_registered")
+    state = None
+    if path is not None:
+        try:
+            state = journal.read(path)
+        except JournalError:
+            pass
+    if state is not None and state.torn is None and (state.head.seq != head.seq or state.head.hash != head.record_hash):
+        raise RecoveryError("journal_out_of_sync")
+    if state is not None and (state.torn is not None or state.open_recovery is not None):
+        raise RecoveryError("recovery_in_progress")
+    records, mirrors = [], []
+    for row in rows:
+        record = journal.make_record(head.seq + 1, SESSION_REVOCATION, session_body(row), head.record_hash) if not records \
+            else journal.next_record(records[-1], SESSION_REVOCATION, session_body(row))
+        records.append(record)
+        mirrors.append(_mirror(record, "revoke", "session_revoked", None, confirmed=False,
+                               session_id=row.id, session_user_id=row.user_id))
+    db.add_all(mirrors)
+    db.flush()  # CHECK and target trigger run BEFORE any byte is appended.
+    written = False
+    if state is not None:
+        try:
+            journal.append(path, state, records)
+            written = True
+        except (OSError, JournalError):
+            pass
+    if written:
+        for row in mirrors:
+            row.journal_confirmed = True
+        db.flush()
+    return [Journaled(record, written) for record in records]
 
 
 # --- replay -------------------------------------------------------------------
@@ -415,7 +473,16 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
     was fsynced (the revoke that just appended it, or ``recover`` after its
     own ``journal.sync``).
     """
-    item, rights, rr = None, [], None
+    # Validate even direct replay callers, not just lines read from the file.
+    if journal.make_record(record.seq, record.kind, record.body, record.prev) != record:
+        raise RecoveryError("journal_corrupt")
+    item, rights, rr, session_row = None, [], None, None
+    if record.kind == SESSION_REVOCATION:
+        db.scalar(select(User.id).where(User.id == uuid.UUID(record.body["user_id"])).with_for_update(key_share=True))
+        session_row = db.scalar(select(UserSession).where(UserSession.id == uuid.UUID(record.body["session_id"]))
+                                .with_for_update().execution_options(populate_existing=True))
+        if session_row is not None and str(session_row.user_id) != record.body["user_id"]:
+            raise RecoveryError("record_names_another_session_user")
     if record.kind == REVIEW_CLOSURE:
         # The request row first, as withdraw/reject/approve lock it, then the journal.
         rr = db.scalar(select(ReviewRequest).where(ReviewRequest.id == uuid.UUID(record.body["request_id"]))
@@ -442,9 +509,22 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
         result, tombstone_id, cancelled = _apply_revocation(db, record.body, item, rights, now)
     elif record.kind == REVIEW_CLOSURE:
         result, request_id = _apply_review_closure(db, record.body, rr)
+    elif record.kind == SESSION_REVOCATION:
+        result = "recorded_session_absent"
+        if session_row is not None:
+            stamp = datetime.fromisoformat(record.body["revoked_at"])
+            if session_row.revoked_at is None:
+                session_row.revoked_at, session_row.revoked_reason = stamp, record.body["reason_code"]
+                result = "session_revoked"
+            elif (session_row.revoked_at, session_row.revoked_reason) != (stamp, record.body["reason_code"]):
+                raise RecoveryError("session_revocation_conflict")
+            else:
+                result = "session_already_revoked"
     else:
         result = record.kind
-    db.add(_mirror(record, via, result, tombstone_id, confirmed=True, review_request_id=request_id))
+    db.add(_mirror(record, via, result, tombstone_id, confirmed=True, review_request_id=request_id,
+                   session_id=uuid.UUID(record.body["session_id"]) if record.kind == SESSION_REVOCATION else None,
+                   session_user_id=uuid.UUID(record.body["user_id"]) if record.kind == SESSION_REVOCATION else None))
     db.flush()
     record_event(db, action="recovery.journal_replay", outcome=AuditOutcome.SUCCESS,
                  actor_type=AuditActorType.SYSTEM, target_type="revocation_journal_record", target_id=str(record.seq),
@@ -488,6 +568,20 @@ def _unjournaled_closures(db: Session) -> list[ReviewRequest]:
         .exists()).order_by(ReviewRequest.closed_at, ReviewRequest.id)).all())
 
 
+def _unjournaled_sessions(db: Session) -> list[UserSession]:
+    return list(db.scalars(select(UserSession).where(UserSession.revoked_at.is_not(None),
+        ~select(RevocationJournalRecord.seq).where(RevocationJournalRecord.session_id == UserSession.id).exists())
+        .order_by(UserSession.user_id, UserSession.id)).all())
+
+
+def _lock_legacy_sessions(db: Session) -> None:
+    """Backfill locks users -> sessions, before the journal lock; operators stop writers."""
+    owners = list(db.scalars(select(UserSession.user_id).where(UserSession.revoked_at.is_not(None)).distinct()))
+    list(db.scalars(select(User.id).where(User.id.in_(owners)).order_by(User.id).with_for_update(key_share=True)))
+    list(db.scalars(select(UserSession.id).where(UserSession.revoked_at.is_not(None))
+                    .order_by(UserSession.id).with_for_update()))
+
+
 def _imported_closure_body(rr: ReviewRequest) -> dict:
     """A close found in the database as a record; its code names the decision (also for ``closed_by_recovery``)."""
     return closure_body(rr) | {"status": closed_status_of(rr.close_reason_code)}
@@ -511,6 +605,7 @@ def init_new(engine: Engine, settings: Settings, now: datetime) -> Record:
         if _registration(db) is not None:
             raise RecoveryError("already_registered")
         if (db.scalar(select(func.count()).select_from(LibraryItem)) or
+                db.scalar(select(func.count()).select_from(UserSession)) or
                 db.scalar(select(func.count()).select_from(DeletionTombstone)) or _db_head(db) is not None):
             raise RecoveryError("database_not_new")
         if path.exists():
@@ -537,6 +632,7 @@ def register_existing(engine: Engine, settings: Settings, now: datetime) -> tupl
     """
     path = _path(settings)
     with Session(engine) as db:
+        _lock_legacy_sessions(db)
         _lock_journal(db)
         if _registration(db) is not None:
             raise RecoveryError("already_registered")
@@ -554,6 +650,10 @@ def register_existing(engine: Engine, settings: Settings, now: datetime) -> tupl
         for rr in _unjournaled_closures(db):  # M6c-2b1: closed grants too, so no restore reopens them
             records.append(journal.next_record(records[-1], REVIEW_CLOSURE, _imported_closure_body(rr)))
             db.add(_mirror(records[-1], "import", "imported", None, confirmed=True, review_request_id=rr.id))
+        for row in _unjournaled_sessions(db):
+            records.append(journal.next_record(records[-1], SESSION_REVOCATION, session_body(row)))
+            db.add(_mirror(records[-1], "import", "imported", None, confirmed=True,
+                           session_id=row.id, session_user_id=row.user_id))
         db.flush()
         try:
             journal.create(path, records)
@@ -572,6 +672,7 @@ class RecoveryReport:
     journal_repaired: int = 0
     journal_confirmed: int = 0
     closures_imported: int = 0
+    sessions_imported: int = 0
     torn_tail_dropped: bool = False
     replayed: dict[str, int] = field(default_factory=dict)
     cleanup: dict[str, int] = field(default_factory=dict)
@@ -603,6 +704,7 @@ def _repair_journal(engine: Engine, path: Path, now: datetime, confirm_db_curren
     foreign journal is never rewritten automatically.
     """
     with Session(engine) as db:
+        _lock_legacy_sessions(db)
         _lock_journal(db)
         registration = _registration(db)
         rows = list(db.scalars(select(RevocationJournalRecord).order_by(RevocationJournalRecord.seq)).all())
@@ -675,6 +777,20 @@ def _repair_journal(engine: Engine, path: Path, now: datetime, confirm_db_curren
             except OSError:
                 raise RecoveryError("journal_write_failed") from None
             report.closures_imported += len(added)
+        in_file = {r.body["session_id"] for r in state.records if r.kind == SESSION_REVOCATION}
+        sessions = [row for row in _unjournaled_sessions(db) if str(row.id) not in in_file]
+        if sessions:
+            added = []
+            for row in sessions:
+                added.append(journal.next_record(added[-1] if added else state.head, SESSION_REVOCATION,
+                                                 session_body(row)))
+            try:
+                state = journal.append(path, state, added)
+            except JournalError as exc:
+                raise RecoveryError(exc.code) from None
+            except OSError:
+                raise RecoveryError("journal_write_failed") from None
+            report.sessions_imported += len(added)
         # Every DB record is now in the file and matches it. Sync the file ourselves: once this returns,
         # each complete line is durable, so records whose write was never confirmed (fsync raised) are
         # confirmed now, and the lines replayed afterwards are mirrored confirmed.
@@ -764,6 +880,18 @@ def _verify(engine: Engine, path: Path) -> None:
             raise RecoveryError("journal_unconfirmed")
         if _unjournaled_closures(db):
             raise RecoveryError("review_closures_not_journaled")
+        if _unjournaled_sessions(db):
+            raise RecoveryError("sessions_not_journaled")
+        for record in journal.read(path).records:
+            if record.kind != SESSION_REVOCATION:
+                continue
+            row = db.get(UserSession, uuid.UUID(record.body["session_id"]))
+            if row is not None:
+                if str(row.user_id) != record.body["user_id"]:
+                    raise RecoveryError("record_names_another_session_user")
+                if (row.revoked_at, row.revoked_reason) != (
+                        datetime.fromisoformat(record.body["revoked_at"]), record.body["reason_code"]):
+                    raise RecoveryError("session_not_revoked")
         for record in _closures(path):
             request_status = db.scalar(select(ReviewRequest.status).where(
                 ReviewRequest.id == uuid.UUID(record.body["request_id"])))
@@ -894,6 +1022,7 @@ def status(engine: Engine, settings: Settings) -> dict:
             out["unjournaled_tombstones"] = len(_unjournaled(db))
             out["unconfirmed_records"] = _unconfirmed(db)
             out["unjournaled_review_closures"] = len(_unjournaled_closures(db))
+            out["unjournaled_sessions"] = len(_unjournaled_sessions(db))
     except Exception:  # noqa: BLE001
         out["database"] = "unavailable"
     if settings.recovery.journal_path is not None:

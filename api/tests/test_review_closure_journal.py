@@ -831,10 +831,10 @@ def test_0029_upgrades_matching_closure_rows_and_refuses_a_mismatched_one(empty_
     with eng.begin() as conn:  # 0028 accepted either row
         _closure_row_at_0028(conn, filed, filed if matching else uuid.uuid4())
     if matching:
-        upgrade(empty_db_url)
+        upgrade(empty_db_url, "0029")
     else:
         with pytest.raises(Exception, match="filed under another request than its line names"):
-            upgrade(empty_db_url)
+            upgrade(empty_db_url, "0029")
     with eng.connect() as conn:
         assert conn.scalar(text("SELECT version_num FROM alembic_version")) == ("0029" if matching else "0028")
     eng.dispose()

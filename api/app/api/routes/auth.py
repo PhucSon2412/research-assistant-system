@@ -26,6 +26,7 @@ from app.delivery import DeliveryAdapter, MessageKind, OutgoingMessage, build_li
 from app.identity import invitations, password_reset
 from app.identity.errors import InvalidCredentials, InvalidToken
 from app.identity.login import login
+from app.identity.session_commit import commit_auth
 from app.identity.passwords import PasswordPolicyError
 from app.identity.sessions import (
     SessionContext,
@@ -112,18 +113,10 @@ def login_route(
     settings: Settings = Depends(get_settings),
 ) -> dict:
     try:
-        user, issued = login(db, email=body.email, password=body.password, now=now, settings=settings)
+        user, issued = login(db, email=body.email, password=body.password, now=now, settings=settings,
+                             previous_token=request.cookies.get(session_cookie_name(settings)))
     except InvalidCredentials:
         raise ApiError(401, "invalid_credentials") from None
-    # A fresh session per login (no fixation); end the one this browser had.
-    previous = request.cookies.get(session_cookie_name(settings))
-    if previous:
-        ctx = resolve_session(db, previous, now=now, idle=settings.auth.session_idle)
-        if ctx is not None and ctx.session_id != issued.session_id:
-            revoke_session(
-                db, session_id=ctx.session_id, user_id=ctx.user_id, reason=SessionRevokeReason.REPLACED, now=now
-            )
-        db.commit()
     set_session_cookie(response, settings, issued.token)
     set_csrf_cookie(response, settings, issued.csrf_token)
     return {"user": user_out(user.id, user.email, user.display_name, user.role)}
@@ -139,7 +132,7 @@ def logout(
 ) -> Response:
     revoke_session(db, session_id=ctx.session_id, user_id=ctx.user_id, reason=SessionRevokeReason.LOGOUT, now=now)
     _audit_session(db, ctx, "auth.logout", ctx.session_id)
-    db.commit()
+    commit_auth(db)
     response.status_code = status.HTTP_204_NO_CONTENT
     clear_session_cookie(response, settings)
     return response
@@ -196,7 +189,7 @@ def revoke_my_session(
         db.rollback()
         raise ApiError(404, "not_found")
     _audit_session(db, ctx, "auth.session.revoke", session_id)
-    db.commit()
+    commit_auth(db)
     response.status_code = status.HTTP_204_NO_CONTENT
     if session_id == ctx.session_id:
         clear_session_cookie(response, settings)
@@ -213,7 +206,7 @@ def revoke_other_sessions(
         db, user_id=ctx.user_id, reason=SessionRevokeReason.USER_REVOKED, now=now, keep_session_id=ctx.session_id
     )
     _audit_session(db, ctx, "auth.session.revoke_others", ctx.session_id, details={"revoked": count})
-    db.commit()
+    commit_auth(db)
     return {"revoked": count}
 
 
