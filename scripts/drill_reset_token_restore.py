@@ -150,6 +150,11 @@ def main():
         step(f"{label}: repeated recovery idempotent", recovery_cli(DST, "recover").returncode == 0)
     restore_and_recover("first")
     restore_and_recover("second")
+    start_app(DST)
+    assert wait_http(url(DST, "web"), 200)
+    step("unrelated B token completes a real reset after second restore",
+         Person(DST, cookies=public_saved).post("/api/auth/password-reset/confirm",
+                  {"token": old["b"], "new_password": new_password}, True).status_code == 200)
     step("source journal unchanged byte for byte", sha(path.read_bytes()) == source_hash)
     logs = dc(SRC, "logs", "--no-color").stdout + dc(DST, "logs", "--no-color").stdout
     step("logs contain no traceback or reset/session secrets", "Traceback" not in logs

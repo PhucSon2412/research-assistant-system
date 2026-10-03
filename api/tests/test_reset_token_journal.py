@@ -115,6 +115,7 @@ def test_restore_endings_inside_ttl_twice_and_other_token_stays_valid(world, adm
                     assert browser(cookies).get("/auth/session").status_code == 401
             # A weak password exercises validity without ending the unrelated token/journal.
             assert w.h.browser().post("/auth/password-reset/confirm", {"token": other.token, "new_password": "short"}).json()["error"] == "weak_password"
+        assert confirm(w, other.token).status_code == 200  # Unrelated token completes a real reset after restore.
 
 
 def test_post_snapshot_token_and_user_remain_absent(world, admin_engine, app_env):
