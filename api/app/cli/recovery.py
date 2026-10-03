@@ -21,7 +21,8 @@
     After a restore, with API/web/worker/beat stopped: verify the journal,
     replay what the database lacks, run cleanup until every tombstone is
     purged, remove any revoked copy's object the object store brought back,
-    verify, and only then close the recovery (the gate opens). Safe to repeat;
+    verify, and only then close journal reconciliation. C1 safety stays pending
+    until C4; the report distinguishes reconciliation_complete/safety_ready. Safe to repeat;
     any failure leaves the gate closed. ``--confirm-db-is-current`` also lets
     it repair the *journal* from the database (lost, truncated or older
     file): only when the database is known to be the live one.

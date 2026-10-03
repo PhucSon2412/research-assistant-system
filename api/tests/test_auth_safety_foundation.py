@@ -1,0 +1,621 @@
+"""C1 direct PostgreSQL/journal checks; HTTP pending is reported separately."""
+import copy
+import json
+import os
+import uuid
+from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
+
+import pytest
+from alembic import command
+from sqlalchemy import create_engine, select, text
+from sqlalchemy.exc import DBAPIError, IntegrityError
+from sqlalchemy.orm import Session
+from fastapi.testclient import TestClient
+
+from app import auth_safety, journal, recovery
+from app.auth_safety import Change
+from app.config import get_settings
+from app.db_roles import provision
+from app.identity.passwords import hash_password
+from app.models import (User, UserSession, PasswordResetToken, Invitation, AuthChangeReceipt,
+                        AuthSafetyHead, AuthSafetyState, RevocationJournalRecord, LibraryItem)
+from tests.conftest import upgrade, alembic_config
+
+NOW = datetime(2026, 10, 3, 9, 0, tzinfo=UTC)
+SECRET = "C1-private-password-marker-123!"
+
+
+@pytest.fixture
+def foundation(engine, app_env, migrated_db_url, journal_path):
+    app_env(migrated_db_url)
+    with Session(engine) as db:
+        u = User(id=uuid.uuid4(), email="c1@example.test", role="admin", password_verifier=hash_password(SECRET),
+                 password_changed_at=NOW, created_at=NOW, updated_at=NOW)
+        db.add(u)
+        db.commit()
+        uid = u.id
+    return SimpleNamespace(engine=engine, uid=uid, path=journal_path, settings=get_settings())
+
+
+def changes(w, *, credential=True, decision="active", at=NOW):
+    out = [Change(w.uid,"credential","verified_recovery",at,verifier=hash_password(SECRET),policy_version=1)] if credential else []
+    if decision:
+        out.append(Change(w.uid,"status","admin_enable" if decision == "active" else "admin_disable",at,decision=decision))
+    return out
+
+
+def append_changes(w, values=None, *, rollback=False, tokens=(), sessions=(), invitations=(), engine=None):
+    with Session(engine or w.engine) as db:
+        db.execute(text("SELECT ras_auth_lock_users(:ids)"),{"ids":[w.uid]})
+        batch = recovery.record_auth_endings(db,w.path,list(tokens),list(sessions),invitations=list(invitations),auth_changes=values if values is not None else changes(w))
+        if rollback:
+            db.rollback()
+        else:
+            db.commit()
+        return batch
+
+
+def run_recover(w, **kw):
+    return recovery.recover(w.engine,SimpleNamespace(),w.settings,NOW,**kw)
+
+
+def user(w):
+    with Session(w.engine) as db:
+        u = db.get(User,w.uid)
+        db.expunge(u)
+        return u
+
+
+def event(kind=journal.CREDENTIAL_TRANSITION, uid=None):
+    b={"user_id":str(uid or uuid.uuid4()),"operation_id":str(uuid.uuid4()),"generation":str(uuid.uuid4()),
+       "reason_code":"verified_recovery","recorded_at":NOW.isoformat()}
+    if kind==journal.ACCOUNT_STATUS_DECISION:
+        b.update(decision="active",reason_code="admin_enable")
+    return b
+
+
+def raw_record(body, kind=journal.CREDENTIAL_TRANSITION):
+    # Bypass Python intentionally: exercise independent SQL validation.
+    e={"body":body,"seq":2,"kind":kind,"prev":"0"*64,"hash":"a"*64}
+    return journal.canonical(e)
+
+
+@pytest.mark.parametrize("kind",journal.AUTH_KINDS)
+@pytest.mark.parametrize("shape",["missing","null","number","extra"])
+@pytest.mark.parametrize("field",["user_id","operation_id","generation","reason_code","recorded_at"])
+def test_python_and_sql_independently_reject_field_shapes(engine,kind,shape,field):
+    b=event(kind)
+    if shape=="missing": del b[field]
+    elif shape=="null": b[field]=None
+    elif shape=="number": b[field]=10
+    else: b["password_verifier"]=SECRET
+    with pytest.raises(journal.JournalError): journal.make_record(2,kind,b,journal.ZERO_HASH)
+    with engine.begin() as conn, pytest.raises(DBAPIError):
+        conn.execute(text("SELECT ras_auth_mirror(:line,'replay','test',false)"),{"line":raw_record(b,kind)})
+
+
+@pytest.mark.parametrize("kind",journal.AUTH_KINDS)
+@pytest.mark.parametrize("field,value",[("operation_id","not-uuid"),("generation",str(uuid.uuid1())),("user_id","A"*36),
+    ("reason_code","caller_rehash"),("recorded_at","2026-10-03T09:00:00"),("recorded_at","2026-10-03T24:00:00+00:00"),
+    ("recorded_at","infinity"),("recorded_at","2026-02-30T09:00:00Z")])
+def test_bad_values_no_sql_unknown(engine,kind,field,value):
+    b=event(kind); b[field]=value
+    with pytest.raises(journal.JournalError): journal.make_record(2,kind,b,journal.ZERO_HASH)
+    with engine.begin() as conn, pytest.raises(DBAPIError):
+        conn.execute(text("SELECT ras_auth_mirror(:line,'replay','test',false)"),{"line":raw_record(b,kind)})
+
+
+@pytest.mark.parametrize("decision",[None,123,"changed","enabled"])
+def test_status_decision_parser_and_sql(engine,decision):
+    b=event(journal.ACCOUNT_STATUS_DECISION); b["decision"]=decision
+    with pytest.raises(journal.JournalError): journal.make_record(2,journal.ACCOUNT_STATUS_DECISION,b,journal.ZERO_HASH)
+    with engine.begin() as conn, pytest.raises(DBAPIError):
+        conn.execute(text("SELECT ras_auth_mirror(:line,'replay','test',false)"),{"line":raw_record(b,journal.ACCOUNT_STATUS_DECISION)})
+
+
+@pytest.mark.parametrize("column",["auth_user_id","auth_operation_id","auth_generation","auth_domain","auth_decision","auth_reason_code","auth_recorded_at"])
+@pytest.mark.parametrize("null",[False,True])
+def test_typed_mirror_binding_and_confirm_only(engine,column,null):
+    b=event(); r=journal.make_record(2,journal.CREDENTIAL_TRANSITION,b,journal.ZERO_HASH)
+    with Session(engine) as db:
+        row=recovery._mirror(r,"replay","test",None,confirmed=False)
+        actual=getattr(row,column)
+        setattr(row,column,None if null else uuid.uuid4() if isinstance(actual,uuid.UUID) else NOW+timedelta(seconds=1) if isinstance(actual,datetime) else "bad")
+        db.add(row)
+        with pytest.raises(DBAPIError): db.flush()
+        db.rollback()
+    with Session(engine) as db:
+        row=recovery._mirror(r,"replay","test",None,confirmed=False); db.add(row);db.flush()
+        row.journal_confirmed=True;setattr(row,column,None)
+        with pytest.raises(DBAPIError):db.flush()
+        db.rollback()
+    with Session(engine) as db:
+        row=recovery._mirror(r,"replay","test",None,confirmed=False);db.add(row);db.flush()
+        row.journal_confirmed=True;db.flush()  # allowed confirmation, with all typed fields unchanged
+        with pytest.raises(DBAPIError):
+            db.delete(row);db.flush()
+        db.rollback()
+
+
+def test_batch_valid_receipts_pending_and_secrets(foundation,caplog):
+    w=foundation
+    batch=append_changes(w)
+    assert all(r.written for r in batch)
+    u=user(w)
+    assert (u.credential_state,u.status_safety)==("usable","proven")
+    report=run_recover(w)
+    assert report.reconciliation_complete and not report.safety_ready and report.gate=="auth_safety_pending"
+    assert not recovery.evaluate(w.settings,w.engine).open
+    assert recovery.evaluate_integrity(w.settings,w.engine).open
+    with Session(w.engine) as db:
+        assert len(list(db.scalars(select(AuthChangeReceipt))))==2
+        auth_safety.verify(db,journal.read(w.path).records)
+        audit=" ".join(db.execute(text("SELECT details::text FROM audit_events")).scalars())
+        assert SECRET not in audit
+    data=w.path.read_text()
+    assert SECRET not in data and u.password_verifier not in data and "argon2" not in data
+    assert SECRET not in caplog.text and u.password_verifier not in repr(changes(w))
+
+
+@pytest.mark.parametrize("shape",["none","torn","prefix","full"])
+@pytest.mark.parametrize("outcome",["commit","rollback","uncertain_commit","uncertain_rollback"])
+def test_fault_matrix(foundation,monkeypatch,shape,outcome):
+    w=foundation; original=journal.append
+    def fail(path,state,records):
+        assert deciding.scalar(text("SELECT count(*) FROM revocation_journal_records WHERE NOT journal_confirmed"))==2
+        assert deciding.scalar(text("SELECT count(*) FROM auth_change_receipts"))==2
+        with Session(w.engine) as other:
+            # The whole batch exists unconfirmed in the deciding transaction, not visible here.
+            assert other.scalar(select(AuthChangeReceipt.operation_id)) is None
+        if shape=="torn":
+            with path.open("ab") as f:f.write(records[0].line[:30].encode())
+        elif shape=="prefix":original(path,state,records[:1])
+        elif shape=="full":
+            # Fault at the actual fsync boundary, after _write flushed every line.
+            with monkeypatch.context() as fault:
+                def fail_sync(fd):raise OSError("synthetic_fsync")
+                fault.setattr(journal.os,"fsync",fail_sync)
+                original(path,state,records)
+        raise OSError("synthetic_fsync")
+    monkeypatch.setattr(journal,"append",fail)
+    with Session(w.engine) as db:
+        deciding=db
+        db.scalar(select(User.id).where(User.id==w.uid).with_for_update(key_share=True))
+        batch=recovery.record_auth_endings(db,w.path,[],[],auth_changes=changes(w))
+        assert all(not r.written for r in batch)
+        assert db.scalar(text("SELECT count(*) FROM revocation_journal_records WHERE NOT journal_confirmed"))==2
+        if outcome in ("commit","uncertain_commit"):
+            db.commit()  # uncertain means the caller has no acknowledgment; no writer success is claimed
+        else: db.rollback()
+    assert not recovery.evaluate(w.settings,w.engine).open or (shape=="none" and outcome in ("rollback","uncertain_rollback"))
+    monkeypatch.setattr(journal,"append",original)
+    run_recover(w,confirm_db_current=outcome in ("commit","uncertain_commit"))
+    u=user(w)
+    if outcome in ("commit","uncertain_commit"):
+        assert (u.credential_state,u.status_safety)==("usable","proven")
+    else:
+        assert (u.credential_state,u.status_safety)==("quarantined","held")
+        with Session(w.engine) as db:assert db.scalar(select(AuthChangeReceipt.operation_id)) is None
+    assert recovery.evaluate(w.settings,w.engine).reason=="auth_safety_pending"
+    before=w.path.read_bytes();run_recover(w)
+    assert user(w).credential_state==u.credential_state
+    seqs=[r.seq for r in journal.read(w.path).records]
+    assert seqs==list(range(1,len(seqs)+1))
+
+
+def test_old_disable_does_not_destroy_new_enable_receipt(foundation):
+    w=foundation;append_changes(w)
+    append_changes(w,changes(w,credential=False,decision="disabled",at=NOW+timedelta(seconds=1)))
+    last=append_changes(w,changes(w,credential=False,decision="active",at=NOW+timedelta(seconds=2)))
+    before=user(w)
+    run_recover(w);run_recover(w)
+    after=user(w)
+    assert (after.status,after.status_safety,after.status_operation_id)==("active","proven",before.status_operation_id)
+    assert after.status_operation_id==uuid.UUID(last[0].record.body["operation_id"])
+
+
+@pytest.mark.parametrize("decision",["active","disabled"])
+def test_rollback_replay_only_restricts_and_does_not_release(foundation,decision):
+    w=foundation;append_changes(w)
+    old=user(w)
+    append_changes(w,changes(w,decision=decision,at=NOW+timedelta(seconds=1)),rollback=True)
+    run_recover(w);run_recover(w)
+    u=user(w)
+    assert u.password_verifier==old.password_verifier and u.credential_generation==old.credential_generation
+    assert u.credential_state=="quarantined"
+    assert (u.status,u.status_safety)==(("disabled","proven") if decision=="disabled" else ("active","held"))
+    with Session(w.engine) as db:assert len(list(db.scalars(select(AuthChangeReceipt))))==2
+
+
+def test_absent_user_projection_replay_and_uuid_reuse(foundation,monkeypatch):
+    w=foundation;state=journal.read(w.path);uid=uuid.uuid4()
+    record=journal.next_record(state.head,journal.CREDENTIAL_TRANSITION,event(uid=uid))
+    journal.append(w.path,state,[record])
+    run_recover(w);run_recover(w)
+    with Session(w.engine) as db:
+        assert db.get(User,uid) is None and db.get(AuthSafetyHead,uid) is not None
+        assert db.scalar(select(AuthChangeReceipt.operation_id)) is None
+    op,gen=uuid.uuid4(),uuid.uuid4()
+    sequence=iter([uuid.UUID(record.body["generation"]),uuid.UUID(record.body["operation_id"]),op,gen])
+    monkeypatch.setattr(auth_safety.uuid,"uuid4",lambda:next(sequence))
+    assert auth_safety.fresh_ids(journal.read(w.path).records)==(op,gen)
+
+
+def test_collision_cross_domain_and_rollback_sql_and_file(foundation):
+    w=foundation;batch=append_changes(w,rollback=True);r=batch[0].record
+    state=journal.read(w.path);b=event(journal.ACCOUNT_STATUS_DECISION);b["generation"]=r.body["operation_id"]
+    reused=journal.next_record(state.head,journal.ACCOUNT_STATUS_DECISION,b)
+    with pytest.raises(journal.JournalError):journal.append(w.path,state,[reused])
+    run_recover(w)
+    with w.engine.begin() as conn,pytest.raises(DBAPIError):
+        conn.execute(text("SELECT ras_auth_mirror(:line,'replay','test',false)"),{"line":reused.line})
+
+
+@pytest.mark.parametrize("step",["project","restrict","progress","verify"])
+def test_recovery_fault_then_idempotent_present_records(foundation,monkeypatch,step):
+    w=foundation;append_changes(w,rollback=True)
+    original=Session.execute;original_verify=auth_safety.verify
+    def fail(db,statement,*args,**kw):
+        if "ras_auth_"+step+"(" in str(statement):raise RuntimeError("injected_step")
+        return original(db,statement,*args,**kw)
+    if step=="verify":monkeypatch.setattr(auth_safety,"verify",lambda *a:(_ for _ in ()).throw(RuntimeError("injected_verify")))
+    else:monkeypatch.setattr(Session,"execute",fail)
+    with pytest.raises(RuntimeError):run_recover(w)
+    assert not recovery.evaluate(w.settings,w.engine).open
+    monkeypatch.setattr(Session,"execute",original);monkeypatch.setattr(auth_safety,"verify",original_verify)
+    run_recover(w);run_recover(w)
+    with Session(w.engine) as db:auth_safety.verify(db,journal.read(w.path).records)
+
+
+@pytest.mark.parametrize("revision",["0030","0031","0032"])
+def test_upgrade_0032_data_hold_legacy_and_backfill(empty_db_url,journal_path,app_env,revision):
+    upgrade(empty_db_url,revision);eng=create_engine(empty_db_url,hide_parameters=True)
+    app_env(empty_db_url);settings=get_settings()
+    # Construct a real 0032 journal registration, without invoking the 0033 ORM on an old DB.
+    genesis=journal.genesis(uuid.uuid4(),NOW,"new_install")
+    journal.create(journal_path,[genesis])
+    with eng.begin() as conn:
+        conn.execute(text("INSERT INTO recovery_registrations(id,journal_id,genesis_hash,mode,registered_at) VALUES(1,:id,:hash,'new_install',:at)"),{"id":uuid.UUID(genesis.body["journal_id"]),"hash":genesis.hash,"at":NOW})
+        conn.execute(text("INSERT INTO revocation_journal_records(seq,kind,record_hash,line,applied_via,result,journal_confirmed) VALUES(1,'genesis',:hash,:line,'genesis','new_install',true)"),{"hash":genesis.hash,"line":genesis.line})
+    ids=[uuid.uuid4(),uuid.uuid4()]
+    with eng.begin() as conn:
+        for uid,status in zip(ids,["active","disabled"]):
+            conn.execute(text("INSERT INTO users(id,email,role,status,password_verifier) VALUES(:u,:e,'admin',:s,:p)"),{"u":uid,"e":str(uid)+"@legacy.test","s":status,"p":hash_password(SECRET)})
+        conn.execute(text("INSERT INTO sessions(user_id,token_hash,csrf_token_hash,created_at,last_activity_at,absolute_expires_at) VALUES(:u,:t,:t,:a,:a,:e)"),{"u":ids[0],"t":"a"*64,"a":NOW,"e":NOW+timedelta(hours=2)})
+        conn.execute(text("INSERT INTO password_reset_tokens(user_id,token_hash,created_at,expires_at) VALUES(:u,:t,:a,:e)"),{"u":ids[0],"t":"b"*64,"a":NOW,"e":NOW+timedelta(hours=2)})
+    recovery.hold(eng,settings,NOW)  # old snapshot has no receipt/projection/safety fields
+    upgrade(empty_db_url)
+    w=SimpleNamespace(engine=eng,path=journal_path,settings=settings)
+    for _ in range(2):run_recover(w)
+    with Session(eng) as db:
+        active,disabled=[db.get(User,u) for u in ids]
+        assert (active.credential_state,active.status_safety)==("quarantined","held")
+        assert (disabled.credential_state,disabled.status,disabled.status_safety)==("quarantined","disabled","proven")
+        assert db.scalar(select(AuthChangeReceipt.operation_id)) is None
+        assert db.scalar(select(UserSession.revoked_reason))=="auth_safety_backfill"
+        assert db.scalar(select(PasswordResetToken.closure_reason))=="auth_safety_backfill"
+        assert db.get(AuthSafetyState,1).backfill_complete
+    with pytest.raises(DBAPIError):command.downgrade(alembic_config(empty_db_url),"0032")
+    eng.dispose()
+
+
+@pytest.fixture
+def runtime(foundation):
+    w=foundation
+    # Login role passwords are disposable env values; never interpolate into logs.
+    import psycopg
+    from psycopg import sql
+    for name,env in (("c1_runtime","RAS_C1_RUNTIME_PASSWORD"),("c1_recovery","RAS_C1_RECOVERY_PASSWORD")):
+        with psycopg.connect(w.engine.url.render_as_string(hide_password=False).replace("postgresql+psycopg://","postgresql://"),autocommit=True) as conn:
+            if not conn.execute("SELECT 1 FROM pg_roles WHERE rolname=%s",(name,)).fetchone():
+                conn.execute(sql.SQL("CREATE ROLE {} LOGIN PASSWORD {} NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS").format(sql.Identifier(name),sql.Literal(os.environ[env])))
+    provision(w.engine,runtime="c1_runtime",recovery="c1_recovery",definer="c1_definer")
+    eng=create_engine(w.engine.url.set(username="c1_runtime",password=os.environ["RAS_C1_RUNTIME_PASSWORD"]),hide_parameters=True)
+    yield eng
+    eng.dispose()
+
+
+@pytest.mark.parametrize("query",[
+    "UPDATE users SET status='active'", "UPDATE users SET password_verifier='$argon2id$fake'", "UPDATE users SET credential_generation=gen_random_uuid()",
+    "UPDATE auth_safety_heads SET credential_generation=gen_random_uuid()", "DELETE FROM auth_safety_heads", "DELETE FROM auth_change_receipts",
+    "UPDATE auth_safety_state SET backfill_complete=true", "INSERT INTO auth_change_receipts(operation_id) VALUES(gen_random_uuid())",
+    "ALTER TABLE users DISABLE TRIGGER ALL", "CREATE TABLE auth_bypass(id int)", "CREATE TEMP TABLE auth_bypass(id int)", "SET ROLE c1_migrator",
+    "UPDATE revocation_journal_records SET journal_confirmed=true", "INSERT INTO sessions(user_id) VALUES(gen_random_uuid())",
+    "UPDATE password_reset_tokens SET credential_fence_operation_id=gen_random_uuid()"])
+def test_runtime_raw_mutation_and_fake_guc_denied(foundation,runtime,query):
+    append_changes(foundation,engine=runtime)
+    with runtime.begin() as conn,pytest.raises(DBAPIError):
+        conn.execute(text("SET LOCAL ras.is_rehash='true'"));conn.execute(text(query))
+
+
+def test_runtime_valid_routines_and_rehash_cas(foundation,runtime):
+    with foundation.engine.begin() as conn:
+        conn.execute(text("INSERT INTO auth_hash_policies SELECT 2,memory_kib,time_cost,parallelism,salt_bytes,hash_bytes FROM auth_hash_policies WHERE version=1"))
+    w=foundation;append_changes(w,engine=runtime);u=user(w);new=hash_password(SECRET)
+    params={"uid":w.uid,"old":u.password_verifier,"gen":u.credential_generation,"op":u.credential_operation_id,"new":new,"policy":2,"at":NOW+timedelta(seconds=2)}
+    stmt=text("SELECT ras_auth_rehash(:uid,:old,:gen,:op,:new,:policy,:at)")
+    with runtime.begin() as conn:
+        assert conn.scalar(stmt,params|{"op":uuid.uuid4()}) is False
+        assert conn.scalar(stmt,params) is True
+    after=user(w)
+    assert after.credential_generation==u.credential_generation and after.password_changed_at==u.password_changed_at
+    with runtime.begin() as conn,pytest.raises(DBAPIError):conn.execute(stmt,params|{"new":"plain-secret"})
+    with runtime.begin() as conn,pytest.raises(DBAPIError):conn.execute(stmt,params|{"new":new.replace("m=65536","m=8")})
+    with runtime.begin() as conn,pytest.raises(DBAPIError):conn.execute(stmt,params|{"policy":99})
+    with runtime.begin() as conn:
+        conn.execute(text("SELECT ras_auth_session_create(:id,:uid,:g,:t,:c,:a,:e)"),{"id":uuid.uuid4(),"uid":w.uid,"g":u.credential_generation,"t":"a"*64,"c":"b"*64,"a":NOW,"e":NOW+timedelta(hours=1)})
+        conn.execute(text("SELECT ras_auth_token_create(:id,:uid,:f,'normal',:t,:a,:e)"),{"id":uuid.uuid4(),"uid":w.uid,"f":u.credential_operation_id,"t":"a"*64,"a":NOW,"e":NOW+timedelta(minutes=30)})
+    with runtime.begin() as conn,pytest.raises(DBAPIError):
+        conn.execute(text("SELECT ras_auth_session_create(:id,:uid,:g,:t,:c,:a,:e)"),{"id":uuid.uuid4(),"uid":w.uid,"g":uuid.uuid4(),"t":"c"*64,"c":"d"*64,"a":NOW,"e":NOW+timedelta(hours=1)})
+    with runtime.begin() as conn,pytest.raises(DBAPIError):
+        conn.execute(text("SELECT ras_auth_token_create(:id,:uid,:f,'normal',:t,:a,:e)"),{"id":uuid.uuid4(),"uid":w.uid,"f":uuid.uuid4(),"t":"b"*64,"a":NOW,"e":NOW+timedelta(minutes=30)})
+    with runtime.connect() as conn:
+        assert conn.scalar(text("SELECT rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb FROM pg_roles WHERE rolname=current_user")) is False
+        assert not conn.scalar(text("SELECT pg_has_role(current_user,'c1_definer','MEMBER')"))
+        assert not conn.scalar(text("SELECT pg_has_role(current_user,'c1_migrator','MEMBER')"))
+        assert not conn.scalar(text("SELECT has_database_privilege(current_database(),'TEMP') OR has_database_privilege(current_database(),'CREATE')"))
+
+
+@pytest.mark.parametrize("field",["user_id","domain","generation","reason_code","recorded_at","operation_id"])
+def test_receipt_cross_binding_and_append_only(foundation,field):
+    w=foundation;append_changes(w)
+    with Session(w.engine) as db:
+        r=db.scalar(select(AuthChangeReceipt).where(AuthChangeReceipt.domain=="credential"))
+        values={c.name:getattr(r,c.name) for c in AuthChangeReceipt.__table__.columns}
+        values["operation_id"]=uuid.uuid4()
+        values[field]=uuid.uuid4() if field in ("operation_id","generation","user_id") else NOW+timedelta(seconds=1) if field=="recorded_at" else "bad"
+        db.add(AuthChangeReceipt(**values))
+        with pytest.raises(DBAPIError):db.flush()
+        db.rollback()
+    with w.engine.begin() as conn,pytest.raises(DBAPIError):conn.execute(text("DELETE FROM auth_change_receipts"))
+
+
+@pytest.mark.parametrize("route",["/auth/csrf","/auth/login","/library/items","/files/00000000-0000-0000-0000-000000000000/original","/search","/rag","/admin/users","/collections"])
+def test_http_pending_real_gate(foundation,route):
+    from app.main import app
+    w=foundation;run_recover(w)
+    with TestClient(app) as client:
+        response=client.get(route) if route not in ("/auth/login","/search","/rag") else client.post(route,json={})
+        assert response.status_code==503 and response.json()=={"error":"service_recovering"}
+        assert client.get("/healthz").status_code==200
+        assert client.get("/readyz").status_code==503
+
+
+def test_legacy_writers_empty_batch_and_bootstrap_blocked(foundation):
+    from app.identity.session_commit import commit_auth
+    from app.identity.bootstrap import bootstrap_admin
+    from app.api.errors import ApiError
+    w=foundation
+    with Session(w.engine) as db,pytest.raises(ApiError):commit_auth(db)
+    with pytest.raises(ApiError):bootstrap_admin(w.engine,email="other@example.test",password=SECRET,policy=w.settings.password)
+    from app.ingest.worker import process_job
+    assert process_job(str(uuid.uuid4()))=="recovery_gate_closed"
+
+
+def test_no_user_locks_after_journal_and_no_replay_release(foundation,runtime):
+    w=foundation;append_changes(w,engine=runtime)
+    with runtime.begin() as conn,pytest.raises(DBAPIError):
+        conn.execute(text("SELECT pg_advisory_xact_lock(:k)"),{"k":recovery.JOURNAL_LOCK})
+        conn.execute(text("SELECT ras_auth_lock_users(:ids)"),{"ids":[w.uid]})
+    with w.engine.begin() as conn:
+        conn.execute(text("UPDATE users SET credential_state='quarantined',status_safety='held' WHERE id=:u"),{"u":w.uid})
+    run_recover(w)
+    assert (user(w).credential_state,user(w).status_safety)==("quarantined","held")
+    with runtime.begin() as conn,pytest.raises(DBAPIError):
+        conn.execute(text("SELECT ras_auth_restrict(:u)"),{"u":w.uid})
+
+
+def test_fixed_search_path_resists_temp_shadowing(foundation,runtime):
+    w=foundation;u=user(w);op,gen=uuid.uuid4(),uuid.uuid4()
+    with w.engine.begin() as conn:
+        conn.execute(text("INSERT INTO auth_hash_policies SELECT 2,memory_kib,time_cost,parallelism,salt_bytes,hash_bytes FROM auth_hash_policies WHERE version=1"))
+        # Adversarial fixture only: production provisioning denies TEMP. Prove fixed path
+        # still works if deployment accidentally regrants it.
+        database=conn.dialect.identifier_preparer.quote(conn.scalar(text("SELECT current_database()")))
+        conn.execute(text(f"GRANT TEMPORARY ON DATABASE {database} TO c1_runtime"))
+    with runtime.begin() as conn:
+        conn.execute(text("CREATE TEMP TABLE users AS SELECT * FROM public.users"))
+        conn.execute(text("CREATE TEMP TABLE auth_safety_heads AS SELECT * FROM public.auth_safety_heads"))
+        conn.execute(text("UPDATE pg_temp.users SET credential_state='usable',status_safety='proven',credential_generation=:g,credential_operation_id=:o,status_operation_id=:o,status_generation=:g"),{"g":gen,"o":op})
+        conn.execute(text("INSERT INTO pg_temp.auth_safety_heads(user_id,projection_head_seq,credential_generation,credential_operation_id,status_operation_id,status_generation) VALUES(:u,2,:g,:o,:o,:g)"),{"u":w.uid,"g":gen,"o":op})
+        assert conn.scalar(text("SELECT ras_auth_rehash(:u,:old,:g,:o,:new,2,:at)"),{"u":w.uid,"old":u.password_verifier,"g":gen,"o":op,"new":hash_password(SECRET),"at":NOW}) is False
+    assert user(w).credential_state=="quarantined"
+
+
+@pytest.mark.parametrize("landed",[True,False])
+def test_commit_exception_never_becomes_acknowledgment(foundation,monkeypatch,landed):
+    w=foundation;commit=Session.commit
+    def uncertain(db):
+        if landed:commit(db)
+        else:db.rollback()
+        raise OSError("lost_commit_reply")
+    with Session(w.engine) as db:
+        db.execute(text("SELECT ras_auth_lock_users(:ids)"),{"ids":[w.uid]})
+        batch=recovery.record_auth_endings(db,w.path,[],[],auth_changes=changes(w))
+        assert all(r.written for r in batch)
+        monkeypatch.setattr(Session,"commit",uncertain)
+        with pytest.raises(OSError):db.commit()
+        db.rollback()
+    monkeypatch.setattr(Session,"commit",commit)
+    run_recover(w)
+    assert user(w).credential_state==("usable" if landed else "quarantined")
+
+
+@pytest.mark.parametrize("registered",[False,True])
+def test_registration_cannot_prove_legacy(empty_db_url,journal_path,app_env,registered):
+    upgrade(empty_db_url);eng=create_engine(empty_db_url,hide_parameters=True);app_env(empty_db_url)
+    with Session(eng) as db:
+        u=User(email="legacy@example.test",password_verifier=hash_password(SECRET));db.add(u);db.commit();uid=u.id
+    settings=get_settings()
+    with pytest.raises(recovery.RecoveryError,match="database_not_new"):recovery.init_new(eng,settings,NOW)
+    recovery.register_existing(eng,settings,NOW)
+    recovery.recover(eng,SimpleNamespace(),settings,NOW,confirm_db_current=registered)
+    with Session(eng) as db:
+        u=db.get(User,uid);assert (u.credential_state,u.status_safety)==("quarantined","held")
+        assert db.scalar(select(AuthChangeReceipt.operation_id)) is None
+    eng.dispose()
+
+
+def test_old_domains_direct_closure_positive_and_reopen_negative(foundation):
+    from app.identity.invitation_endings import lock_email
+    w=foundation;append_changes(w);u=user(w)
+    sid,tid,iid=uuid.uuid4(),uuid.uuid4(),uuid.uuid4()
+    with Session(w.engine) as db:
+        db.add(UserSession(id=sid,user_id=w.uid,credential_generation=u.credential_generation,token_hash="c"*64,
+            csrf_token_hash="d"*64,created_at=NOW,last_activity_at=NOW,absolute_expires_at=NOW+timedelta(hours=2)))
+        db.add(PasswordResetToken(id=tid,user_id=w.uid,credential_fence_operation_id=u.credential_operation_id,
+            token_hash="d"*64,created_at=NOW,expires_at=NOW+timedelta(minutes=30)))
+        db.add(Invitation(id=iid,email="invite@example.test",token_hash="e"*64,created_at=NOW,expires_at=NOW+timedelta(days=3),invited_by_user_id=w.uid))
+        db.commit()
+    with Session(w.engine) as db:
+        lock_email(db,"invite@example.test")
+        db.execute(text("SELECT ras_auth_lock_users(:ids)"),{"ids":[w.uid]})
+        token=db.scalar(select(PasswordResetToken).where(PasswordResetToken.id==tid).with_for_update())
+        session=db.scalar(select(UserSession).where(UserSession.id==sid).with_for_update())
+        invitation=db.scalar(select(Invitation).where(Invitation.id==iid).with_for_update())
+        token.revoked_at,token.closure_reason=NOW+timedelta(seconds=1),"user_disabled"
+        session.revoked_at,session.revoked_reason=NOW+timedelta(seconds=1),"user_disabled"
+        invitation.revoked_at,invitation.closure_reason=NOW+timedelta(seconds=1),"admin_revoked"
+        db.flush()
+        batch=recovery.record_auth_endings(db,w.path,[token],[session],invitations=[invitation],auth_changes=changes(w,at=NOW+timedelta(seconds=1),decision="disabled"))
+        assert [r.record.kind for r in batch]==[*journal.AUTH_KINDS,journal.INVITATION_CLOSURE,journal.RESET_TOKEN_CLOSURE,journal.SESSION_REVOCATION]
+        db.commit()
+    for table,field,identifier in (("sessions","revoked_at",sid),("password_reset_tokens","revoked_at",tid),("invitations","revoked_at",iid)):
+        with w.engine.begin() as conn,pytest.raises(DBAPIError):
+            conn.execute(text(f"UPDATE {table} SET {field}=NULL WHERE id=:id"),{"id":identifier})
+    run_recover(w);run_recover(w)
+    with Session(w.engine) as db:
+        assert db.get(UserSession,sid).revoked_reason=="user_disabled"
+        assert db.get(PasswordResetToken,tid).closure_reason=="user_disabled"
+        assert db.get(Invitation,iid).closure_reason=="admin_revoked"
+
+
+def test_common_private_acl_and_review_closure_direct(foundation):
+    from app.authz import Principal, visible_items_clause, m2a_private_derivatives_clause, review_grant_clause
+    from app.models import PaperVersion, SourceFile, ReviewRequest
+    from app.review_closing import commit_close
+    w=foundation;owner=uuid.uuid4();other=uuid.uuid4();item_id=uuid.uuid4();common=uuid.uuid4()
+    with Session(w.engine) as db:
+        db.add_all([User(id=owner,email="owner@example.test",password_verifier=hash_password(SECRET)),
+                    User(id=other,email="other@example.test",password_verifier=hash_password(SECRET))]);db.flush()
+        db.add_all([LibraryItem(id=item_id,visibility="private",owner_user_id=owner),LibraryItem(id=common,visibility="common",publication_state="listed")]);db.flush()
+        version=PaperVersion(item_id=item_id);db.add(version);db.flush()
+        file=SourceFile(item_id=item_id,version_id=version.id,storage_key="originals/"+uuid.uuid4().hex,
+                        verified_mime="text/markdown",byte_size=100,checksum_sha256="a"*64);db.add(file);db.flush()
+        rr=ReviewRequest(item_id=item_id,version_id=version.id,source_file_id=file.id,requester_user_id=owner,
+                         status="open",file_checksum_sha256="a"*64,rights_epoch_at_submit=0,notice_version="n",
+                         declared_source="source",declared_rights="rights",submitted_at=NOW);db.add(rr);db.commit();rid=rr.id
+    admin=Principal(w.uid,"admin",uuid.uuid4(),"admin@example.test",None)
+    p_owner=Principal(owner,"user",uuid.uuid4(),"owner@example.test",None)
+    p_other=Principal(other,"user",uuid.uuid4(),"other@example.test",None)
+    with Session(w.engine) as db:
+        assert set(db.scalars(select(LibraryItem.id).where(visible_items_clause(p_owner))))=={item_id,common}
+        assert set(db.scalars(select(LibraryItem.id).where(visible_items_clause(p_other))))=={common}
+        assert set(db.scalars(select(LibraryItem.id).where(m2a_private_derivatives_clause(p_owner))))=={item_id}
+        assert list(db.scalars(select(LibraryItem.id).where(m2a_private_derivatives_clause(p_other))))==[]
+        assert db.scalar(select(SourceFile.id).join(PaperVersion,PaperVersion.id==SourceFile.version_id).join(LibraryItem,LibraryItem.id==SourceFile.item_id)
+                         .where(review_grant_clause(admin))) is not None
+    with Session(w.engine) as db,pytest.raises(DBAPIError):
+        rr=db.get(ReviewRequest,rid);rr.status="withdrawn";rr.closed_at=NOW;rr.closed_by_user_id=owner;rr.close_reason_code="withdrawn_by_requester";db.commit()
+    with Session(w.engine) as db:
+        rr=db.scalar(select(ReviewRequest).where(ReviewRequest.id==rid).with_for_update())
+        rr.status="withdrawn";rr.closed_at=NOW;rr.closed_by_user_id=owner;rr.close_reason_code="withdrawn_by_requester"
+        commit_close(db,rr,journal_path=w.path)
+    run_recover(w)
+    with Session(w.engine) as db:
+        assert db.scalar(select(SourceFile.id).join(PaperVersion,PaperVersion.id==SourceFile.version_id).join(LibraryItem,LibraryItem.id==SourceFile.item_id)
+                         .where(review_grant_clause(admin))) is None
+
+
+def test_recovery_login_role_restricts_without_receipts(foundation,runtime):
+    w=foundation;append_changes(w,engine=runtime,rollback=True)
+    eng=create_engine(w.engine.url.set(username="c1_recovery",password=os.environ["RAS_C1_RECOVERY_PASSWORD"]),hide_parameters=True)
+    try:
+        r=recovery.recover(eng,SimpleNamespace(),w.settings,NOW)
+        assert r.reconciliation_complete and r.gate=="auth_safety_pending"
+        with Session(eng) as db:
+            assert db.get(User,w.uid).credential_state=="quarantined"
+            assert db.scalar(select(AuthChangeReceipt.operation_id)) is None
+            assert db.get(AuthSafetyState,1).backfill_complete
+        for sql in ("UPDATE users SET status='active'", "SELECT ras_auth_change(:u,:o,NULL,NULL)",
+                    "SELECT ras_auth_rehash(:u,'old',:o,:o,'new',1,:at)"):
+            with eng.begin() as conn,pytest.raises(DBAPIError):
+                conn.execute(text(sql),{"u":w.uid,"o":uuid.uuid4(),"at":NOW})
+    finally:eng.dispose()
+
+
+def test_quarantine_token_allowed_but_normal_token_denied(foundation,runtime):
+    w=foundation;append_changes(w,engine=runtime)
+    append_changes(w,changes(w,decision=None,at=NOW+timedelta(seconds=1)),engine=runtime,rollback=True)
+    run_recover(w)
+    with Session(w.engine) as db:fence=db.get(AuthSafetyHead,w.uid).credential_operation_id
+    query=text("SELECT ras_auth_token_create(:id,:u,:f,:purpose,:t,:at,:expires)")
+    params={"id":uuid.uuid4(),"u":w.uid,"f":fence,"purpose":"quarantine","t":"f"*64,"at":NOW,"expires":NOW+timedelta(minutes=20)}
+    with runtime.begin() as conn:conn.execute(query,params)
+    with runtime.begin() as conn,pytest.raises(DBAPIError):conn.execute(query,params|{"id":uuid.uuid4(),"purpose":"normal","t":"e"*64})
+
+
+def test_secret_field_and_scalar_errors_are_redacted(engine):
+    b=event();b["operation_id"]=SECRET
+    with engine.begin() as conn,pytest.raises(DBAPIError) as err:
+        conn.execute(text("SELECT ras_auth_mirror(:line,'replay','test',false)"),{"line":raw_record(b)})
+    assert SECRET not in str(err.value.orig)
+
+
+def test_common_publish_download_revoke_cleanup_direct(foundation):
+    import hashlib
+    from io import BytesIO
+    from botocore.response import StreamingBody
+    from botocore.exceptions import ClientError
+    from app import publication
+    from app.authz import Principal
+    from app.common_original import common_original_rows
+    from app.models import AccessRights, PaperVersion, SourceFile, ReviewRequest, DeletionTombstone
+    from app.models.enums import RevocationReason
+    from app.review_closing import commit_close
+    from app.api.errors import ApiError
+    w=foundation;body=b"synthetic common copy";checksum=hashlib.sha256(body).hexdigest()
+    private_key,common_key=["originals/"+uuid.uuid4().hex for _ in range(2)]
+    class Storage:
+        objects={private_key:body,common_key:body}
+        def open(self,key):return StreamingBody(BytesIO(self.objects[key]),len(self.objects[key]))
+        def delete(self,key):self.objects.pop(key,None)
+        def size(self,key):
+            if key not in self.objects:raise ClientError({"Error":{"Code":"NoSuchKey"}},"HeadObject")
+            return len(self.objects[key])
+    storage=Storage();admin=Principal(w.uid,"admin",uuid.uuid4(),"c1@example.test",None)
+    with Session(w.engine) as db:
+        private=LibraryItem(visibility="private",owner_user_id=w.uid)
+        common=LibraryItem(visibility="common",publication_state="pending",title="synthetic copy")
+        db.add_all([private,common]);db.flush()
+        versions=[PaperVersion(item_id=i.id) for i in (private,common)];db.add_all(versions);db.flush()
+        files=[SourceFile(item_id=i.id,version_id=v.id,storage_key=k,verified_mime="text/markdown",byte_size=len(body),checksum_sha256=checksum)
+               for i,v,k in zip((private,common),versions,(private_key,common_key))];db.add_all(files);db.flush()
+        request=ReviewRequest(item_id=private.id,version_id=versions[0].id,source_file_id=files[0].id,requester_user_id=w.uid,
+            status="open",file_checksum_sha256=checksum,rights_epoch_at_submit=0,notice_version="n",declared_source="source",declared_rights="rights",submitted_at=NOW)
+        db.add(request);db.flush()
+        db.add(AccessRights(item_id=common.id,version_id=versions[1].id,source_file_id=files[1].id,file_checksum_sha256=checksum,
+            origin_kind="review_request",origin_review_request_id=request.id,verified_source="checked",evidence_note="synthetic evidence",
+            checked_on=NOW.date(),reviewer_user_id=w.uid,recorded_at=NOW,scope_audience="instance_users",
+            permits_original_download=True,permits_fulltext_search=False,permits_external_processing=False,rights_epoch_at_grant=0))
+        request.status="approved";request.closed_at=NOW;request.closed_by_user_id=w.uid;request.close_reason_code="approved_by_admin"
+        iid,fid=common.id,files[1].id
+        commit_close(db,request,journal_path=w.path)
+    with Session(w.engine) as db:
+        assert db.execute(common_original_rows(admin)).first() is None
+        with pytest.raises(ApiError):publication.publish(db,admin,storage,iid,"a"*64,NOW)
+        publication.publish(db,admin,storage,iid,checksum,NOW)
+        assert db.execute(common_original_rows(admin)).first()[0].id==fid
+    with pytest.raises(DBAPIError),w.engine.begin() as conn:
+        conn.execute(text("UPDATE library_items SET publication_state='revoked',rights_epoch=rights_epoch+1 WHERE id=:id"),{"id":iid})
+    with Session(w.engine) as db:
+        publication.revoke(db,admin,iid,RevocationReason.RIGHTS_RECORDED_IN_ERROR,NOW,timedelta(seconds=1),journal_path=w.path)
+        assert db.execute(common_original_rows(admin)).first() is None
+    counts=publication.cleanup_revoked(w.engine,storage,NOW+timedelta(seconds=2),100)
+    assert not any(k.startswith("error:") for k in counts),counts
+    publication.cleanup_revoked(w.engine,storage,NOW+timedelta(seconds=2),100)
+    assert common_key not in storage.objects and private_key in storage.objects
+    with Session(w.engine) as db:
+        assert db.get(LibraryItem,iid).title is None
+        assert db.scalar(select(DeletionTombstone.purged_at))==NOW+timedelta(seconds=2)

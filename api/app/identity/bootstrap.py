@@ -45,6 +45,9 @@ def bootstrap_admin(
     policy: PasswordPolicy,
     display_name: str | None = None,
 ) -> BootstrapResult:
+    from app.auth_safety import require_writer
+    with Session(engine) as gate_db:
+        require_writer(gate_db)
     email = normalise_email(email)
     validate_password(password, policy, email=email)
     # Hash before opening the transaction to keep the lock window short.

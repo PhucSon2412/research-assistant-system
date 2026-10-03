@@ -19,6 +19,8 @@ PENDING = "session_revocations"
 
 
 def commit_auth(db: Session) -> None:
+    from app.auth_safety import require_writer
+    require_writer(db)
     rows = db.info.pop(PENDING, [])
     tokens = db.info.pop(TOKEN_PENDING, [])
     invitations = db.info.pop(INVITATION_PENDING, [])

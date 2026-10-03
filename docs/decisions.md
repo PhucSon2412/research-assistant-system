@@ -1,5 +1,31 @@
 # Nhật ký quyết định
 
+## Quyết định nền C1 theo ủy quyền (2026-10-03)
+
+**Đã chốt theo ủy quyền của chủ dự án:** sau khi nhận báo cáo khảo sát C1 và bốn quyết định đầu vào còn mở, chủ dự án yêu cầu: “Tùy bạn quyết định sao cho hợp lý, thuận tiện nhất”. Orchestrator chọn bộ quyết định dưới đây và cho phép coding agent bắt đầu C1. Đây là quyết định do orchestrator đưa ra trong phạm vi được ủy quyền; không ghi rằng chủ dự án trực tiếp chọn từng phương án. PR #32 đã merge tại `a5c75b88da72eaf3d8a28c0c00d82d12099f28a4`; head source trước coding `0032`, C1 thêm `0033` chỉ trên môi trường thử cô lập.
+
+| Quyết định đã chốt | Phạm vi và lý do |
+| --- | --- |
+| Chọn A | Generation UUID độc lập cho credential/status, journal hiện hành và receipt trong cùng transaction DB. Giữ credential/session đúng bằng chứng sau restore, chỉ cách ly account bị rollback nhận biết; không thêm dịch vụ auth/SSO ngoài MVP |
+| Baseline legacy một lần | Khi nâng schema mới, mọi credential legacy chưa có bằng chứng, kể cả Admin, vào quarantine; legacy active status vào held. Giữ verifier, business status và role. Credential và status cần chứng cứ riêng; reset không enable. Legacy disabled chỉ import quyết định hạn chế khi chain chưa có status event cho UUID đó; không dùng snapshot để ghi đè quyết định mới hơn |
+| Triển khai C1–C3 cô lập | Chỉ dùng DB/journal/Compose project thử riêng. Môi trường đã nâng schema giữ safety pending tới C4; stack dev hiện có không migrate/restart. Nâng môi trường đang phục vụ là task cutover sau khi C1–C4 được review, có runbook và maintenance riêng. Việc này tránh khóa tài khoản đang dùng trong thời gian các PR nền chưa hoàn chỉnh |
+| Tách quyền DB | Runtime API/worker có quyền tối thiểu, không owner/superuser/DDL/BYPASSRLS hoặc quyền chuyển sang migrator; migrator/owner giữ quyền schema. Auth mutation được bảo vệ đi qua routine cố định, thu hồi EXECUTE từ PUBLIC, search_path cố định và quyền tối thiểu. Recovery chỉ có routine hạn chế cần thiết; không dùng role runtime để tắt trigger hoặc sửa receipt/head thô |
+| Ranh giới rehash | Trusted identity code verify cùng mật khẩu đầu vào trước rehash; routine CAS kiểm old verifier/generation/operation/state và PHC/policy, giữ generation/password_changed_at. DB không chứng minh hai PHC biểu diễn cùng mật khẩu; không có GUC/reason caller tự khai để bỏ guard. Threat model không bao gồm DBA/host hoặc identity service bị chiếm quyền |
+
+**Hợp đồng C1 đã chốt:** dùng schema/event/receipt, fold latest theo seq, replay hai pha và backfill hạn chế trong [thiết kế](auth-restore-safety.md). Tên trường/routine/mã lỗi là chi tiết triển khai cần review; không thay bất biến hoặc quyền mới trong C1. Kiểm integrity/hold riêng với pending cutover; recover phải báo riêng việc đối soát hoàn tất và việc chưa sẵn sàng phục vụ. Mọi auth writer chưa chuyển hợp đồng bị chặn, kể cả bootstrap và batch closure rỗng.
+
+**Kiểm chứng pending:** Compose hiện kiểm API bằng `/readyz` và web chờ API healthy. Smoke C1 dùng cấu hình khởi động project cô lập phù hợp để gọi API/web khi readiness còn 503; không đổi readiness thành 200, không thêm bypass auth/gate. Kiểm trực tiếp SQL/journal/replay/fence có cả ca được phép và bị chặn; HTTP pending là nhóm riêng, các ca HTTP nghiệp vụ giữ expectation và hoãn tới C4 có inventory rõ.
+
+**Còn mở theo milestone:** Origin/client compatibility trước C2; operator thực tế, inventory UUID, chứng cứ/approval, initial status/Admin và delivery trước C3; runbook cutover, quyền journal writer và storage độc lập trước triển khai ngoài môi trường thử. Chưa chọn người vận hành hoặc cấp quyền enable Admin từ lời ủy quyền này. Không coi các quyết định đó là điều kiện chặn C1.
+
+[Prompt giao coding C1](tasks/m6c2b2c1-auth-safety-foundation.md). Coding agent giữ và đưa các cập nhật tài liệu này vào PR C1; không cần một PR thiết kế nền mới. Các mục PR #32 bên dưới là lịch sử trước khi được ủy quyền chốt.
+
+### Chi tiết triển khai C1 (2026-10-03)
+
+Nguồn cho phép coding: chủ dự án trong phiên này: “Bắt đầu coding C1 theo docs/tasks/m6c2b2c1-auth-safety-foundation.md. Orchestrator đã chốt quyết định nền theo ủy quyền của tôi; không cần xin lại. Giữ các cập nhật docs đang chưa commit và đưa vào PR C1.” Không suy phê duyệt từ merge PR #32.
+
+Coding chọn revision `0033`, domain computed cho FK receipt, NOLOGIN definer không owner bảng, provisioning CLI riêng, policy PHC lưu DB, routine khóa User để runtime không cần UPDATE trực tiếp. Fixed search_path đặt pg_temp cuối, thu hồi PUBLIC; không GUC/reason bypass. Replay mirror/fold toàn chain trước so snapshot/restrict; recover tách integrity hoàn tất khỏi safety pending. Guard downgrade C1 rộng hơn fence lịch sử: chỉ DB pristine được hạ, tránh quay schema đã quarantine về auth cũ. Test fence lịch sử pin tới 0032 rồi upgrade head giữ expectation nghiệp vụ. [Chi tiết schema/quyền/kiểm chứng/bàn giao](c1-auth-safety-foundation.md); operator/delivery/initial status/C4 vẫn mở như trên.
+
 ## M6c-2b2c0: thiết kế auth sau restore (2026-10-03)
 
 **Chủ dự án yêu cầu:** PR chỉ tài liệu thiết kế chống rollback verifier/account status sau restore, phân tích tám tình huống, phương án A/B/C, recovery User/Admin, tiêu chí kiểm thử và PR coding nhỏ; commit/push/mở PR tiếng Việt, chưa merge. Không triển khai auth/migration/CLI. Fetch xác minh `origin/main` tại `3f2179487b1e7041af2b398f54c6ad4406510f96`, merge PR #31 (`0032`); PR #29/#30/#31 đã bảo vệ session/reset/invitation nhưng không credential/status.

@@ -35,6 +35,8 @@ def _dummy_verifier() -> str:
 
 def login(db: Session, *, email: str, password: str, now: datetime, settings: Settings,
           previous_token: str | None = None) -> tuple[User, IssuedSession]:
+    from app.auth_safety import require_writer
+    require_writer(db)
     try:
         normalised = normalise_email(email)
     except EmailFormatError:

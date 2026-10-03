@@ -20,6 +20,7 @@ class UserStatus(StrEnum):
 
 
 class SessionRevokeReason(StrEnum):
+    AUTH_SAFETY_BACKFILL = "auth_safety_backfill"
     LOGOUT = "logout"
     # Replaced by a new login from the same browser.
     REPLACED = "replaced"

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Text, func, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Computed, Integer, Index, Text, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -35,6 +35,11 @@ class User(Base):
 
     __tablename__ = "users"
     __table_args__ = (
+        CheckConstraint("credential_state IN ('usable','quarantined') AND status_safety IN ('proven','held') AND password_hash_policy_version > 0", name="auth_states"),
+        CheckConstraint("credential_state <> 'usable' OR (credential_generation IS NOT NULL AND credential_operation_id IS NOT NULL)", name="credential_evidence"),
+        CheckConstraint("status_safety <> 'proven' OR (status_generation IS NOT NULL AND (status = 'disabled' OR status_operation_id IS NOT NULL))", name="status_evidence"),
+        ForeignKeyConstraint(["credential_operation_id", "id", "credential_domain", "credential_generation"], ["auth_change_receipts.operation_id", "auth_change_receipts.user_id", "auth_change_receipts.domain", "auth_change_receipts.generation"], name="fk_users_credential_receipt", deferrable=True, initially="DEFERRED", use_alter=True),
+        ForeignKeyConstraint(["status_operation_id", "id", "status_domain", "status_generation"], ["auth_change_receipts.operation_id", "auth_change_receipts.user_id", "auth_change_receipts.domain", "auth_change_receipts.generation"], name="fk_users_status_receipt", deferrable=True, initially="DEFERRED", use_alter=True),
         CheckConstraint(f"role IN ({sql_in(UserRole)})", name="role_valid"),
         CheckConstraint(f"status IN ({sql_in(UserStatus)})", name="status_valid"),
         # Stored normalised so the plain unique constraint is case-insensitive.
@@ -43,6 +48,18 @@ class User(Base):
         # never be stored by mistake.
         CheckConstraint("password_verifier LIKE '$argon2id$%'", name="password_verifier_argon2id"),
     )
+
+    credential_domain: Mapped[str] = mapped_column(Text, Computed("'credential'", persisted=True))
+    status_domain: Mapped[str] = mapped_column(Text, Computed("'status'", persisted=True))
+    credential_generation: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    credential_operation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    credential_state: Mapped[str] = mapped_column(Text, server_default="quarantined")
+    credential_reason_code: Mapped[str] = mapped_column(Text, server_default="legacy_unproven")
+    status_generation: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    status_operation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    status_safety: Mapped[str] = mapped_column(Text, server_default="held")
+    status_reason_code: Mapped[str] = mapped_column(Text, server_default="legacy_unproven")
+    password_hash_policy_version: Mapped[int] = mapped_column(Integer, ForeignKey("auth_hash_policies.version", ondelete="RESTRICT"), server_default=text("1"))
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
@@ -127,6 +144,8 @@ class UserSession(Base):
     """Server-side session. Valid while not revoked, the user is active,
     ``now < last_activity_at + idle`` and ``now < absolute_expires_at``."""
 
+    credential_generation: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+
     __tablename__ = "sessions"
     __table_args__ = (
         CheckConstraint(f"token_hash {_SHA256_HEX}", name="token_hash_sha256_hex"),
@@ -158,14 +177,17 @@ class PasswordResetToken(Base):
     """Single-use reset token. A newer request or a password change revokes
     any other open token of the same user."""
 
+    credential_fence_operation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    recovery_purpose: Mapped[str] = mapped_column(Text, server_default="normal")
     __tablename__ = "password_reset_tokens"
     __table_args__ = (
         CheckConstraint(f"token_hash {_SHA256_HEX}", name="token_hash_sha256_hex"),
+        CheckConstraint("recovery_purpose IN ('normal','quarantine')", name="recovery_purpose_valid"),
         CheckConstraint("expires_at > created_at", name="expires_after_created"),
         CheckConstraint("used_at IS NULL OR revoked_at IS NULL", name="used_or_revoked"),
         CheckConstraint("closure_reason IS NULL OR (used_at IS NOT NULL AND closure_reason IN"
                         " ('password_reset', 'legacy_consumed')) OR (revoked_at IS NOT NULL AND closure_reason IN"
-                        " ('reset_replaced', 'reset_completed', 'user_disabled', 'legacy_revoked'))",
+                        " ('reset_replaced', 'reset_completed', 'user_disabled', 'legacy_revoked', 'auth_safety_backfill'))",
                         name="closure_reason_valid"),
         Index(
             "uq_password_reset_tokens_open_user_id",

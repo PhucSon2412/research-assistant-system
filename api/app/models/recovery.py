@@ -9,7 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
 
-JOURNAL_KINDS = "'genesis', 'revocation', 'recovery_begin', 'recovery_end', 'review_closure', 'session_revocation', 'reset_token_closure', 'invitation_closure'"
+JOURNAL_KINDS = "'genesis', 'revocation', 'recovery_begin', 'recovery_end', 'review_closure', 'session_revocation', 'reset_token_closure', 'invitation_closure', 'credential_transition', 'account_status_decision'"
 TOKEN_IDS_REQUIRED = ("CASE WHEN kind = 'reset_token_closure' THEN reset_token_id IS NOT NULL"
                       " AND reset_token_user_id IS NOT NULL AND reset_end_kind IS NOT NULL"
                       " AND reset_reason_code IS NOT NULL AND reset_ended_at IS NOT NULL"
@@ -24,7 +24,7 @@ TOKEN_MATCHES_BODY = ("CASE WHEN kind = 'reset_token_closure' THEN"
     " AND (line::jsonb ->> 'kind' IS NOT DISTINCT FROM kind)"
     " AND COALESCE((reset_end_kind = 'consumed' AND reset_reason_code IN ('password_reset', 'legacy_consumed'))"
     " OR (reset_end_kind = 'revoked' AND reset_reason_code IN"
-    " ('reset_replaced', 'reset_completed', 'user_disabled', 'legacy_revoked')), false) ELSE true END")
+    " ('reset_replaced', 'reset_completed', 'user_disabled', 'legacy_revoked', 'auth_safety_backfill')), false) ELSE true END")
 INVITATION_IDS_REQUIRED = ("CASE WHEN kind = 'invitation_closure' THEN invitation_id IS NOT NULL"
                       " AND invitation_end_kind IS NOT NULL"
                       " AND invitation_reason_code IS NOT NULL AND invitation_ended_at IS NOT NULL"
@@ -131,11 +131,18 @@ class RevocationJournalRecord(Base):
                         " AND (session_user_id::text IS NOT DISTINCT FROM (line::jsonb #>> '{body,user_id}'))"
                         " AND (line::jsonb ->> 'kind' IS NOT DISTINCT FROM kind)"
                         " AND COALESCE((line::jsonb #>> '{body,reason_code}') IN"
-                        " ('logout', 'replaced', 'user_revoked', 'password_reset', 'user_disabled'), false)"
+                        " ('logout', 'replaced', 'user_revoked', 'password_reset', 'user_disabled', 'auth_safety_backfill'), false)"
                         " AND COALESCE(length(line::jsonb #>> '{body,revoked_at}') > 0, false)"
                         " ELSE true END", name="session_matches_body"),
     )
 
+    auth_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    auth_operation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), unique=True)
+    auth_generation: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), unique=True)
+    auth_domain: Mapped[str | None] = mapped_column(Text)
+    auth_decision: Mapped[str | None] = mapped_column(Text)
+    auth_reason_code: Mapped[str | None] = mapped_column(Text)
+    auth_recorded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     seq: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
     kind: Mapped[str] = mapped_column(Text)
     record_hash: Mapped[str] = mapped_column(Text)

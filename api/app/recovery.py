@@ -164,7 +164,7 @@ def compare(state: JournalState, view: tuple) -> GateStatus:
     return GateStatus(True, "open", head.seq, db_seq)
 
 
-def evaluate(settings: Settings, engine: Engine) -> GateStatus:
+def evaluate_integrity(settings: Settings, engine: Engine) -> GateStatus:
     """Whether content may be served and processed now. Every failure closes the gate."""
     path = settings.recovery.journal_path
     if path is None:
@@ -190,6 +190,19 @@ def evaluate(settings: Settings, engine: Engine) -> GateStatus:
 
 
 _last_logged: list[str] = []
+
+
+def evaluate(settings: Settings, engine: Engine) -> GateStatus:
+    integrity = evaluate_integrity(settings, engine)
+    if not integrity.open:
+        return integrity
+    try:
+        from app.auth_safety import cutover
+        with Session(engine) as db:
+            reason = cutover(db)
+    except Exception:
+        return GateStatus(False, "auth_safety_version_missing", integrity.journal_seq, integrity.db_seq)
+    return GateStatus(reason == "ready", reason, integrity.journal_seq, integrity.db_seq)
 
 
 def log_if_changed(status: GateStatus, where: str) -> None:
@@ -254,10 +267,16 @@ def _mirror(record: Record, via: str, result: str, tombstone_id: uuid.UUID | Non
     invitation_fields = {} if record.kind != INVITATION_CLOSURE else dict(
         invitation_id=uuid.UUID(record.body["invitation_id"]), invitation_end_kind=record.body["end_kind"],
         invitation_reason_code=record.body["reason_code"], invitation_ended_at=datetime.fromisoformat(record.body["ended_at"]))
+    auth_fields = {} if record.kind not in journal.AUTH_KINDS else dict(
+        auth_user_id=uuid.UUID(record.body["user_id"]), auth_operation_id=uuid.UUID(record.body["operation_id"]),
+        auth_generation=uuid.UUID(record.body["generation"]),
+        auth_domain="credential" if record.kind == journal.CREDENTIAL_TRANSITION else "status",
+        auth_decision="changed" if record.kind == journal.CREDENTIAL_TRANSITION else record.body["decision"],
+        auth_reason_code=record.body["reason_code"], auth_recorded_at=datetime.fromisoformat(record.body["recorded_at"]))
     return RevocationJournalRecord(seq=record.seq, kind=record.kind, record_hash=record.hash, line=record.line,
                                    tombstone_id=tombstone_id, review_request_id=review_request_id, applied_via=via,
                                    session_id=session_id, session_user_id=session_user_id,
-                                   result=result, journal_confirmed=confirmed, **token_fields, **invitation_fields)
+                                   result=result, journal_confirmed=confirmed, **token_fields, **invitation_fields, **auth_fields)
 
 
 def _unconfirmed(db: Session) -> int:
@@ -356,7 +375,7 @@ def invitation_body(row: Invitation) -> dict:
 
 
 def record_auth_endings(db: Session, path: Path | None, tokens: list[PasswordResetToken],
-                        rows: list[UserSession], *, invitations: list[Invitation] | None = None, during_recovery: bool = False) -> list[Journaled]:
+                        rows: list[UserSession], *, invitations: list[Invitation] | None = None, during_recovery: bool = False, auth_changes=None) -> list[Journaled]:
     """One batch after ALL invitation/email or user/token/session locks. Mirror all lines before one append/fsync.
 
     A failed append leaves ALL rows unconfirmed, including any complete prefix.
@@ -365,7 +384,7 @@ def record_auth_endings(db: Session, path: Path | None, tokens: list[PasswordRes
     after rollback. No further auth row locks may be taken after this call.
     """
     invitations = invitations or []
-    if not rows and not tokens and not invitations:
+    if not rows and not tokens and not invitations and not auth_changes:
         return []
     _lock_journal(db)
     head = _db_head(db)
@@ -382,6 +401,11 @@ def record_auth_endings(db: Session, path: Path | None, tokens: list[PasswordRes
     if state is not None and (state.torn is not None or (state.open_recovery is not None and not during_recovery)):
         raise RecoveryError("recovery_in_progress")
     records, mirrors = [], []
+    if auth_changes:
+        if state is None or state.torn is not None:
+            raise RecoveryError("auth_journal_unavailable")
+        from app.auth_safety import stage
+        records = stage(db, state, auth_changes)
     for row in [*invitations, *tokens, *rows]:
         if isinstance(row, Invitation):
             kind, body = INVITATION_CLOSURE, invitation_body(row)
@@ -408,6 +432,9 @@ def record_auth_endings(db: Session, path: Path | None, tokens: list[PasswordRes
         except (OSError, JournalError):
             pass
     if written:
+        for record in records:
+            if record.kind in journal.AUTH_KINDS:
+                db.execute(text("SELECT ras_auth_confirm(:seq)"), {"seq": record.seq})
         for row in mirrors:
             row.journal_confirmed = True
         db.flush()
@@ -567,6 +594,8 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
     if journal.make_record(record.seq, record.kind, record.body, record.prev) != record:
         raise RecoveryError("journal_corrupt")
     item, rights, rr, session_row, token_row, invitation_row = None, [], None, None, None, None
+    if record.kind in journal.AUTH_KINDS:
+        db.execute(text("SELECT ras_auth_lock_users(:ids)"), {"ids": [uuid.UUID(record.body["user_id"])]})
     if record.kind == INVITATION_CLOSURE:
         from app.identity.invitation_endings import lock_email
         iid = uuid.UUID(record.body["invitation_id"])
@@ -576,11 +605,11 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
         invitation_row = db.scalar(select(Invitation).where(Invitation.id == iid).with_for_update()
                                    .execution_options(populate_existing=True))
     if record.kind == RESET_TOKEN_CLOSURE:
-        db.scalar(select(User.id).where(User.id == uuid.UUID(record.body["user_id"])).with_for_update(key_share=True))
+        db.execute(text("SELECT ras_auth_lock_users(:ids)"), {"ids": [uuid.UUID(record.body["user_id"])]})
         token_row = db.scalar(select(PasswordResetToken).where(PasswordResetToken.id == uuid.UUID(record.body["token_id"]))
                               .with_for_update().execution_options(populate_existing=True))
     if record.kind == SESSION_REVOCATION:
-        db.scalar(select(User.id).where(User.id == uuid.UUID(record.body["user_id"])).with_for_update(key_share=True))
+        db.execute(text("SELECT ras_auth_lock_users(:ids)"), {"ids": [uuid.UUID(record.body["user_id"])]})
         session_row = db.scalar(select(UserSession).where(UserSession.id == uuid.UUID(record.body["session_id"]))
                                 .with_for_update().execution_options(populate_existing=True))
         if session_row is not None and str(session_row.user_id) != record.body["user_id"]:
@@ -604,7 +633,11 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
             _apply_invitation_closure(invitation_row, record.body, apply=False)
         if record.kind == RESET_TOKEN_CLOSURE:
             _apply_reset_token_closure(token_row, record.body, apply=False)
-        db.rollback()
+        if record.kind in journal.AUTH_KINDS:
+            db.execute(text("SELECT ras_auth_project(:uid)"), {"uid": uuid.UUID(record.body["user_id"])})
+            db.commit()
+        else:
+            db.rollback()
         return "present", 0
     head = _db_head(db)
     if (head is None and record.seq != 1) or (head is not None and (
@@ -636,6 +669,8 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
                    session_id=uuid.UUID(record.body["session_id"]) if record.kind == SESSION_REVOCATION else None,
                    session_user_id=uuid.UUID(record.body["user_id"]) if record.kind == SESSION_REVOCATION else None))
     db.flush()
+    if record.kind in journal.AUTH_KINDS:
+        db.execute(text("SELECT ras_auth_project(:uid)"), {"uid": uuid.UUID(record.body["user_id"])})
     record_event(db, action="recovery.journal_replay", outcome=AuditOutcome.SUCCESS,
                  actor_type=AuditActorType.SYSTEM, target_type="revocation_journal_record", target_id=str(record.seq),
                  details={"kind": record.kind, "result": result, "jobs_cancelled": cancelled})
@@ -707,7 +742,7 @@ def _lock_legacy_sessions(db: Session) -> None:
     owners = list(db.scalars(select(UserSession.user_id).where(UserSession.revoked_at.is_not(None)).distinct()))
     ended = or_(PasswordResetToken.used_at.is_not(None), PasswordResetToken.revoked_at.is_not(None))
     owners += list(db.scalars(select(PasswordResetToken.user_id).where(ended).distinct()))
-    list(db.scalars(select(User.id).where(User.id.in_(owners)).order_by(User.id).with_for_update(key_share=True)))
+    db.execute(text("SELECT ras_auth_lock_users(:ids)"), {"ids": sorted(set(owners))})
     list(db.scalars(select(PasswordResetToken.id).where(ended).order_by(PasswordResetToken.id).with_for_update()))
     list(db.scalars(select(UserSession.id).where(UserSession.revoked_at.is_not(None))
                     .order_by(UserSession.id).with_for_update()))
@@ -737,7 +772,8 @@ def init_new(engine: Engine, settings: Settings, now: datetime) -> Record:
         _lock_journal(db)
         if _registration(db) is not None:
             raise RecoveryError("already_registered")
-        if (db.scalar(select(func.count()).select_from(LibraryItem)) or
+        if (db.scalar(select(func.count()).select_from(User)) or
+                db.scalar(select(func.count()).select_from(LibraryItem)) or
                 db.scalar(select(func.count()).select_from(UserSession)) or
                 db.scalar(select(func.count()).select_from(PasswordResetToken)) or
                 db.scalar(select(func.count()).select_from(Invitation)) or
@@ -822,6 +858,8 @@ class RecoveryReport:
     cleanup: dict[str, int] = field(default_factory=dict)
     objects_removed: int = 0
     gate: str = "closed"
+    reconciliation_complete: bool = False
+    safety_ready: bool = False
 
 
 def _records_from_rows(rows: list[RevocationJournalRecord], prev: str) -> list[Record]:
@@ -966,11 +1004,7 @@ def _replay_all(engine: Engine, now: datetime, path: Path, report: RecoveryRepor
         state = journal.read(path)
     except JournalError as exc:
         raise RecoveryError(exc.code) from None
-    with Session(engine) as db:
-        present = set(db.scalars(select(RevocationJournalRecord.seq)).all())
     for record in state.records:
-        if record.seq in present:
-            continue
         result, _ = replay_record(engine, record, now)
         report.replayed[result] = report.replayed.get(result, 0) + 1
 
@@ -986,6 +1020,76 @@ def _import_legacy_auth_tokens(engine: Engine, path: Path, report: RecoveryRepor
         db.commit()
         report.reset_tokens_imported += len(tokens)
         report.invitations_imported += len(invitations)
+        if any(not line.written for line in batch):
+            raise RecoveryError("journal_write_failed")
+
+
+def _reconcile_auth(engine: Engine, path: Path) -> None:
+    """Phase 2 only after ALL events have been mirrored/folded. Writers stopped."""
+    from app.auth_safety import verify_snapshot
+    with Session(engine) as db:
+        verify_snapshot(db)
+        ids = list(db.scalars(select(User.id).order_by(User.id)))
+    for uid in ids:
+        with Session(engine) as db:
+            db.execute(text("SELECT ras_auth_lock_users(:ids)"), {"ids": [uid]})
+            _lock_journal(db)
+            db.execute(text("SELECT ras_auth_restrict(:uid)"), {"uid": uid})
+            db.commit()  # Release journal before the next User lock.
+
+
+def _backfill_auth_safety(engine: Engine, path: Path, now: datetime, report: RecoveryReport) -> None:
+    """No permissive baseline: only legacy disabled and legacy token/session closure."""
+    from app.auth_safety import fresh_ids
+    from app.models.enums import SessionRevokeReason
+    with Session(engine) as db:
+        ids = list(db.scalars(select(User.id).order_by(User.id)))
+    for uid in ids:
+        with Session(engine) as db:
+            db.execute(text("SELECT ras_auth_lock_users(:ids)"), {"ids": [uid]})
+            u = db.scalar(select(User).where(User.id == uid)
+                          .execution_options(populate_existing=True))
+            _lock_journal(db)
+            state = journal.read(path)
+            if u.status != "disabled" or any(r.kind == journal.ACCOUNT_STATUS_DECISION and r.body["user_id"] == str(uid) for r in state.records):
+                db.rollback()
+                continue
+            op, generation = fresh_ids(state.records)
+            record = journal.next_record(state.head, journal.ACCOUNT_STATUS_DECISION,
+                {"user_id": str(uid), "operation_id": str(op), "generation": str(generation),
+                 "decision": "disabled", "reason_code": "legacy_disabled", "recorded_at": now.isoformat()})
+            db.add(_mirror(record, "import", "legacy_disabled", None, confirmed=False))
+            db.flush()
+            db.execute(text("SELECT ras_auth_project(:uid)"), {"uid": uid})
+            db.execute(text("SELECT ras_auth_restrict(:uid)"), {"uid": uid})
+            written = False
+            try:
+                journal.append(path, state, [record])
+                written = True
+            except (OSError, JournalError):
+                pass
+            if written:
+                db.execute(text("SELECT ras_auth_confirm(:seq)"), {"seq": record.seq})
+            db.commit()
+            if not written:
+                raise RecoveryError("journal_write_failed")
+    # Separate batch: lock every User, then tokens, then sessions, before journal.
+    with Session(engine) as db:
+        db.execute(text("SELECT ras_auth_lock_users(:ids)"), {"ids": list(db.scalars(select(User.id).order_by(User.id)))})
+        tokens = list(db.scalars(select(PasswordResetToken).where(
+            PasswordResetToken.credential_fence_operation_id.is_(None), PasswordResetToken.used_at.is_(None),
+            PasswordResetToken.revoked_at.is_(None)).order_by(PasswordResetToken.id).with_for_update()))
+        sessions = list(db.scalars(select(UserSession).where(UserSession.credential_generation.is_(None),
+            UserSession.revoked_at.is_(None)).order_by(UserSession.id).with_for_update()))
+        for t in tokens:
+            t.revoked_at, t.closure_reason = now, "auth_safety_backfill"
+        for s in sessions:
+            s.revoked_at, s.revoked_reason = now, SessionRevokeReason.AUTH_SAFETY_BACKFILL.value
+        db.flush()
+        batch = record_auth_endings(db, path, tokens, sessions, during_recovery=True)
+        db.commit()
+        report.reset_tokens_imported += len(tokens)
+        report.sessions_imported += len(sessions)
         if any(not line.written for line in batch):
             raise RecoveryError("journal_write_failed")
 
@@ -1159,22 +1263,32 @@ def recover(engine: Engine, storage, settings: Settings, now: datetime, *,
                 _append_marker(engine, path, RECOVERY_BEGIN, {"recovery_id": recovery_id, "started_at": now.isoformat(),
                                                               "db_head_seq": head.seq if head else 0})
             _replay_all(engine, now, path, report)
+            _reconcile_auth(engine, path)
+            _backfill_auth_safety(engine, path, now, report)
             _import_legacy_auth_tokens(engine, path, report)
             _cleanup(engine, storage, settings, now, report)
             _sweep_objects(engine, storage, path, report)
             _verify(engine, path)
+            from app.auth_safety import verify
+            with Session(engine) as db:
+                verify(db, journal.read(path).records)
             purged = sum(v for k, v in report.cleanup.items() if not k.startswith("error:"))
             _append_marker(engine, path, RECOVERY_END, {
                 "recovery_id": recovery_id, "finished_at": now.isoformat(),
                 "replayed": sum(v for k, v in report.replayed.items() if k not in ("present", "tombstone_present")),
                 "tombstones_purged": purged, "objects_removed": report.objects_removed})
             _replay_all(engine, now, path, report)
+            with Session(engine) as db:
+                _lock_journal(db)
+                db.execute(text("SELECT ras_auth_progress(:seq)"), {"seq": journal.read(path).head.seq})
+                db.commit()
+            report.reconciliation_complete = True
         finally:
             mutex.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": RECOVER_LOCK})
             mutex.commit()
     status = evaluate(settings, engine)
     report.gate = status.reason
-    if not status.open:
+    if not status.open and status.reason != "auth_safety_pending":
         raise RecoveryError(f"gate_still_closed_{status.reason}"[:64])
     return report
 

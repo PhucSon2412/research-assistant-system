@@ -47,6 +47,8 @@ class SessionContext:
 
 def issue_session(db: Session, *, user_id: uuid.UUID, now: datetime, lifetimes: AuthLifetimes) -> IssuedSession:
     """Add a session row to the caller's transaction (caller commits)."""
+    from app.auth_safety import require_writer
+    require_writer(db)
     # key_share=True means FOR NO KEY UPDATE on PostgreSQL: serialises auth,
     # but remains compatible with audit/token FKs' KEY SHARE. Sort multiple users first.
     db.scalar(select(User.id).where(User.id == user_id).with_for_update(key_share=True))
@@ -74,6 +76,8 @@ def resolve_session(db: Session, raw_token: str | None, *, now: datetime, idle: 
     ``now < absolute_expires_at``. Exactly at a boundary the session is
     expired. Caller commits.
     """
+    from app.auth_safety import require_writer
+    require_writer(db)
     if not plausible_token(raw_token):
         return None
     stmt = (
@@ -132,6 +136,8 @@ def session_is_live(db: Session, session_id: uuid.UUID, *, now: datetime, idle: 
 
 def rotate_csrf(db: Session, session_id: uuid.UUID) -> str:
     """New CSRF token for a live session whose CSRF cookie was lost."""
+    from app.auth_safety import require_writer
+    require_writer(db)
     csrf_token, csrf_hash = generate_token()
     db.execute(
         update(UserSession)

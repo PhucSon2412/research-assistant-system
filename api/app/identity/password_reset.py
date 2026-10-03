@@ -41,6 +41,8 @@ class IssuedReset:
 def request_reset(db: Session, *, email: str, now: datetime, lifetime: timedelta) -> IssuedReset | None:
     """Create a token for an active account; ``None`` otherwise. The caller
     must respond the same way in both cases."""
+    from app.auth_safety import require_writer
+    require_writer(db)
     try:
         normalised = normalise_email(email)
     except EmailFormatError:
@@ -72,6 +74,8 @@ def request_reset(db: Session, *, email: str, now: datetime, lifetime: timedelta
 def confirm_reset(
     db: Session, *, raw_token: str, new_password: str, now: datetime, policy: PasswordPolicy
 ) -> uuid.UUID:
+    from app.auth_safety import require_writer
+    require_writer(db)
     if not plausible_token(raw_token):
         raise InvalidToken()
     digest = hash_token(raw_token)
