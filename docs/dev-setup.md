@@ -1134,6 +1134,23 @@ Base `origin/main=d38c6b8` (PR #29 đã merge); nhánh `feat/m6c2b2b1-reset-toke
 4. Chỉ start writer khi report `gate=open`, status `unjournaled_reset_tokens=0`, `unconfirmed_records=0` và các gate khác mở. Token đã journal không được mở lại kể cả sau xóa hàng/tái chèn cùng ID. Downgrade `0030` bị từ chối ở DB đã đăng ký.
 5. Append/fsync lỗi nhưng DB live commit: gate đóng, API confirm/disable trả lỗi. Dòng đủ fsync lỗi: recover tự sync; file thiếu đuôi/mirror ahead cần `--confirm-db-is-current` **chỉ live**. Mật khẩu/status/token mới có thể chưa commit khi outcome không rõ; replay chỉ kết thúc token/session. Request 202 không bảo đảm link gửi; thử yêu cầu mới sau recovery nếu cần.
 
+Ví dụ lệnh cho operator **sau khi đã kiểm đúng project/DB/journal**, không chạy tự động trong PR:
+
+```powershell
+$rasProject = '<project đã kiểm tra>'
+docker compose -p $rasProject stop api web worker beat
+# Với restore: ras_backup.py đã hold trước migrate; có thể hold riêng trên snapshot đã gắn đúng journal copy.
+docker compose -p $rasProject run --rm --no-deps api python -m app.cli.recovery hold
+docker compose -p $rasProject run --rm migrate
+docker compose -p $rasProject run --rm --no-deps api python -m app.cli.recovery status
+docker compose -p $rasProject run --rm --no-deps api python -m app.cli.recovery recover
+docker compose -p $rasProject run --rm --no-deps api python -m app.cli.recovery status
+# Chỉ khi status gate=open và mọi hậu điều kiện đạt mới start writer.
+docker compose -p $rasProject up -d api web worker beat
+```
+
+DB live chưa đăng ký không thể hold: migrate rồi `register-existing --confirm-db-is-current` chỉ khi operator xác minh đúng live. DB live đã đăng ký có journal thiếu đuôi/mirror ahead có thể cần recover với cờ xác nhận; **không** thêm cờ vào ví dụ restore trên. Không downgrade để tránh gate.
+
 **Lệnh kiểm và diễn tập:** chạy từ repo, Conda đã xác minh. Mọi dữ liệu dưới temp/ngoài repo.
 
 ```powershell
@@ -1151,4 +1168,16 @@ $env:DRILL_WORK_DIR = '<thư mục tuyệt đối ngoài repo, chưa có hoặc 
 
 Script từ chối project/volume/container có sẵn, bind thử mọi port trước build/up. Dùng `ras-drill-src`/`ras-drill-restore`, port DB 45432/46432, API 48000/46800, web 43000/46300, MinIO 49000/49001 và 46900/46901; không stop/restart/migrate `ras`. Backup khi token mở → consume A (ba session), replace C/disable D (không session) → copy journal riêng → restore/hold/migrate/recover → thử link cũ qua web/API trong TTL, token B vẫn hợp lệ, session A bị từ chối, file B đúng hash → recover lặp/restore lần hai. Source journal không đổi; chỉ target viết copy. Không provider/key, không thay `.env`/`pricing_verified`. `--down` chỉ dọn hai project này.
 
-**Kiểm chứng lượt triển khai:** kết quả cuối được ghi dưới đây sau khi suite/diễn tập hoàn tất; lỗi chỉ tiêm, không kiểm mất điện thật. Invitation chưa bảo vệ; mật khẩu/status vẫn rollback, credential cũ có thể login tạo session mới. Journal cùng rollback với DB không phát hiện; lịch sử mất không backfill. Production journal/vận hành backup chưa chốt. Kế tiếp journal invitation, rồi credential/account status.
+**Kiểm chứng lượt triển khai:** kết quả suite/diễn tập dưới đây; lỗi chỉ tiêm, không kiểm mất điện thật. Invitation chưa bảo vệ; mật khẩu/status vẫn rollback, credential cũ có thể login tạo session mới. Journal cùng rollback với DB không phát hiện; lịch sử mất không backfill. Production journal/vận hành backup chưa chốt. Kế tiếp journal invitation, rồi credential/account status.
+
+**Chứng cứ ngày 2026-10-03 (Asia/Saigon):**
+
+- Base đã fetch `d38c6b8eee5180a63b3a24f2ceb0ea78bb6295b7`, `merge-base --is-ancestor d38c6b8 origin/main` exit 0; GitHub PR #29 `merged=true`, merge commit đúng, merged_at 2026-10-02 09:06:31 UTC. Workspace ban đầu sạch. Không nâng DB dev; kiểm đọc cuối vẫn `0030`, container dev không restart; `.env` không sửa.
+- Nhóm sáu file test trong block trên, thêm `--disable-warnings --maxfail=3`: **244 passed**, 1 warning, **527,80 s**; app/test đã nạp tại `fb317b8` (tree `948f7d78987cbc51651373ae2f304427cde79503`). Trước đó 78 test session/migration qua; các lượt đầu có lỗi fixture CSRF lấy trong gate đóng, verifier không Argon2 và hold ghi cùng journal trước kiểm gate nguồn; đã sửa fixture/thứ tự, không nới invariant.
+- Bổ sung `-k restore_endings` trên `test_reset_token_journal.py`: **8 passed**, 84 deselected, **28,93 s** tại `dc436dd` (tree `b9cf14a3502098a240148b3fcb23ec541a18e39a`), chứng minh token User khác hoàn tất reset thật sau restore. Migration/backfill/deferred/absent/replay lỗi + ORM đã qua lượt chọn **8 passed**, 84 deselected trước lượt regression; ORM còn nằm trong full suite.
+- Web `npm test --prefix web`: **42/42**, typecheck và build thành công; chạy lại cả ba sau sửa thông điệp tiếp nhận ở `b9d6c1f` cũng qua **42/42**. Node có warning MODULE_TYPELESS_PACKAGE_JSON, không đổi package config ngoài task.
+- Mutant chạy **tuần tự trước full suite**, bỏ tạm replay token, deferred fence, finality fence hoặc coi fsync lỗi là confirmed: **4/4 bị test bắt (exit 1)**. Khôi phục đúng bytes từng file trong `finally`; test chuẩn chạy lại. Không chạy mutant/sửa code khi full suite đang chạy.
+- Diễn tập cuối `scripts/drill_reset_token_restore.py --down` tại `dc436dd`: **54/54**, **0 provider call**. Artifact/journal ở thư mục ngoài repo; 4 token còn mở lúc backup, A có ba session, C/D không session, B có một original tổng hợp **58 byte** trong MinIO thật. Sau backup A consumed, C replaced, D disabled. Source journal có 3 token closure + 3 session revocation (head 7). Restore/hold/migrate/recover qua proxy web và API trực tiếp từ chối 3 link cũ; token B còn hợp lệ rồi thực sự reset thành công sau restore thứ hai; session A bị chặn, B original/session còn nguyên trước reset B. Replay không đổi verifier A hay disable D.
+- Diễn tập này: dump **236.344 byte**, 1 object; backup **1,48 s**, restore đầu **14,27 s**, recover đầu **1,89 s**; restore hai **9,70 s**, recover hai **2,06 s**. Tuổi token snapshot lớn nhất lúc thử **50,94 s** và **79,55 s**, so TTL cấu hình **1.800 s** (không sửa TTL để test). Recover lặp và restore/recover lần hai giữ kết quả. Source journal không đổi SHA-256; chỉ target ghi copy; logs không traceback/token. `--down` dọn hai project/volume, không còn project diễn tập. Một lượt nhỏ, không SLO; tất cả cùng máy, không kiểm mất điện.
+- Lượt toàn API tuần tự `& $py -m pytest api -q` tại `03b7ea0` (tree `1b12ffa69265e7d6dc8fec538d38a803709a3cb7`): **811 passed, 2 failed**, 1 warning, **1.806,45 s**. Hai test review SQL dùng PostgreSQL `now()` đóng request được tạo bằng FakeClock trước thời gian thật, nên CHECK `closed_after` từ chối trước khi tới fence journal dự kiến. Sau khi suite kết thúc, sửa fixture dùng cùng FakeClock và đẩy trước một giờ để kiểm sự độc lập; **3 passed**, 35 deselected, **6,87 s**. Không đổi production review hay nới constraint. Cùng commit sửa UI public 202 để chỉ xác nhận tiếp nhận, không hứa gửi email.
+- Chạy lại toàn inventory API tại **`b9d6c1f6f4d3782f180f06fbc8086425ef6538f4`**, tree **`a8a9e6a691fb0fd5519a3a840ceed683948c0325`**: collect **813** test, phân file vào ba tiến trình độc lập **273/270/270**, DB/journal tạm riêng, mỗi test đúng một lần. Lệnh mỗi tiến trình: `& $py -m pytest <danh sách file từ manifest> -q --junitxml=<temp>/shard-N.xml`; manifest/collection/log/XML và helper điều phối ở temp ngoài repo (`ras-reset-full-final`, `ras_reset_full_final.py`). **813/813 passed**, exit **0/0/0**; từng tiến trình **273 passed/762,09 s**, **270 passed/518,26 s**, **270 passed/824,85 s**, tổng wall **830,00 s**. Đối chiếu node ID từ XML với collect: 813 unique, không thiếu/trùng; gồm `test_orm_models_match_migrated_schema`. Mỗi tiến trình có cùng 1 StarletteDeprecationWarning (httpx TestClient); không đổi dependency ngoài task. Không sửa code/test/script hoặc chạy mutant trong full suite; chỉ cập nhật docs chứng cứ.
