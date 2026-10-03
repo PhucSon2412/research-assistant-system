@@ -64,6 +64,8 @@ PORTS = {"POSTGRES_HOST_PORT": "5432", "API_HOST_PORT": "8000", "WEB_HOST_PORT":
 
 def env_subset() -> dict[str, str]:
     """Only the whitelisted names; every other line of .env (keys included) is skipped unread."""
+    if all(os.environ.get(name) for name in ALLOWED):
+        return {name: os.environ[name] for name in ALLOWED}
     values = {}
     for line in (ROOT / ".env").read_text(encoding="utf-8").splitlines():
         name, sep, value = line.strip().partition("=")
@@ -84,18 +86,24 @@ def outside_repo(path: Path, code: str) -> Path:
     return resolved
 
 
+def compose_prefix(project: str) -> list[str]:
+    # Explicit isolated env file prevents Compose from reading the developer .env.
+    env_file = os.environ.get("RAS_COMPOSE_ENV_FILE")
+    return ["docker", "compose", *(["--env-file", env_file] if env_file else []), "-p", project]
+
+
 def compose(project: str, *args: str, extra_env: dict | None = None, check: bool = True, **kwargs):
     env = {**os.environ, **(extra_env or {})}
     if "stdout" not in kwargs:
         kwargs.setdefault("capture_output", True)
-    result = subprocess.run(["docker", "compose", "-p", project, *args], cwd=ROOT, env=env, **kwargs)
+    result = subprocess.run([*compose_prefix(project), *args], cwd=ROOT, env=env, **kwargs)
     if check and result.returncode != 0:
         raise BackupError("compose_failed", f"{args[0]} exit {result.returncode}")
     return result
 
 
 def compose_text(project: str, *args: str, **kwargs) -> str:
-    result = subprocess.run(["docker", "compose", "-p", project, *args], cwd=ROOT, capture_output=True,
+    result = subprocess.run([*compose_prefix(project), *args], cwd=ROOT, capture_output=True,
                             encoding="utf-8", errors="replace",
                             env={**os.environ, **kwargs.pop("extra_env", {})}, **kwargs)
     return result.stdout if result.returncode == 0 else ""
@@ -228,7 +236,7 @@ def psql(project: str, sql: str, extra_env: dict, database: str = "postgres", re
     # this tool may not own.
     prefix = 'PGOPTIONS="-c default_transaction_read_only=on" ' if read_only else ""
     result = subprocess.run(
-        ["docker", "compose", "-p", project, "exec", "-T", "db", "sh", "-c",
+        [*compose_prefix(project), "exec", "-T", "db", "sh", "-c",
          f'exec env {prefix}psql -X -q -At -v ON_ERROR_STOP=1 -v app_db="$POSTGRES_DB" -U "$POSTGRES_USER" -d "$1"',
          "sh", database], cwd=ROOT, input=sql, capture_output=True, encoding="utf-8", errors="replace",
         env={**os.environ, **extra_env})

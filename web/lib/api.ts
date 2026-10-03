@@ -118,7 +118,7 @@ const MESSAGES: Record<string, string> = {
   session_revocation_pending_recovery: "Hệ thống đang khôi phục việc thu hồi phiên. Thử lại sau.",
   auth_outcome_uncertain: "Chưa xác định được kết quả thao tác tài khoản. Kiểm tra trạng thái trước khi thử lại.",
   auth_journal_unavailable: "Thao tác tài khoản đã được ghi vào cơ sở dữ liệu; hệ thống đang khôi phục nhật ký. Kiểm tra trạng thái trước khi thử lại.",
-  auth_closure_pending_recovery: "Hệ thống đang khôi phục việc kết thúc token hoặc phiên. Chưa xác định kết quả thao tác tài khoản.",
+  auth_closure_pending_recovery: "Hệ thống đang khôi phục việc kết thúc lời mời, token hoặc phiên. Chưa xác định kết quả thao tác tài khoản.",
   auth_unavailable: "Chưa hoàn tất thao tác tài khoản. Thử lại sau.",
   file_unavailable: "Chưa đọc được file gốc. Thử lại sau.",
 };

@@ -52,9 +52,11 @@ Token snapshot còn mở → đúng trạng thái/mã/time journal; đã đóng 
 
 Gate/status thêm `reset_tokens_not_journaled`, `unjournaled_reset_tokens`; report thêm `reset_tokens_imported`. Token kết thúc trước migration còn trong DB phải journal trước phục vụ. Migration không I/O file hoặc tự backfill. `init` từ chối DB có **bất kỳ token**, không coi DB có lịch sử auth là cài mới. `register-existing` chỉ DB live và `recover` lấy đủ User → token → session trước journal. Recover replay file trước, rồi import token lịch sử bằng batch: không tạo gap seq khi file ahead. Register-existing INSERT/flush mọi mirror false trước create/fsync, rồi xác nhận cả batch. `hold` chỉ đọc seq/hash, chạy trên snapshot `0030` trước migrate. Giữ các gate common revocation/review closure/session.
 
+**Trạng thái sau PR #30:** đã merge tại `ce67ce8` (`0031`); M6c-2b2b2 mở rộng riêng [invitation](invitation-journal.md), giữ các bảo vệ reset/session trên đây.
+
 ## Giới hạn và việc kế tiếp
 
-- Invitation chưa bảo vệ; membership/xóa paper riêng là task sau.
+- Tại PR #30 invitation chưa bảo vệ (M6c-2b2b2 mở rộng sau đó); membership/xóa paper riêng là task sau.
 - Mật khẩu/account status vẫn rollback; credential cũ có thể tạo **session mới**. Auth sau restore chưa an toàn hoàn toàn.
 - Journal cùng mất/rollback với DB không phát hiện; cần bản độc lập, hiện hành. Lịch sử mất không backfill; backup cũ chỉ được bảo vệ bởi sự kiện journal đã nhận.
 - Lỗi chỉ tiêm, chưa mất điện thật; diễn tập một máy không chứng minh độ bền production hay SLO/RTO.

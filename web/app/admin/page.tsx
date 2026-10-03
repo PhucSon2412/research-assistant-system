@@ -84,7 +84,7 @@ export default function AdminPage() {
       <ul>
         {invitations.map((inv) => (
           <li key={inv.id}>
-            {inv.email} · {inv.status} · tạo {fmt(inv.created_at)} · hết hạn {fmt(inv.expires_at)}{" "}
+            {inv.email} · {inv.status === "closed_by_recovery" ? "Link đã đóng khi khôi phục; không khôi phục tài khoản" : inv.status} · tạo {fmt(inv.created_at)} · hết hạn {fmt(inv.expires_at)}{" "}
             {inv.status === "pending" && (
               <button onClick={() => run(() => api(`/admin/invitations/${inv.id}/revoke`, { method: "POST" }), "Đã thu hồi lời mời.")}>
                 Thu hồi

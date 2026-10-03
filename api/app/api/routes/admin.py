@@ -95,8 +95,9 @@ def create_invitation(
             now=now,
         )
     except Exception:  # noqa: BLE001
-        # An undelivered link must not stay usable.
-        invitations.revoke_invitation(db, invitation_id=inv.id, actor_id=admin.user_id, now=now)
+        # The adapter may have delivered the link before raising. Close it durably.
+        invitations.revoke_invitation(db, invitation_id=inv.id, actor_id=admin.user_id, now=now,
+                                      reason="delivery_failed", compensation=True)
         raise ApiError(503, "delivery_failed") from None
     return {"invitation": _invitation_out(inv, now)}
 

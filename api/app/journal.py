@@ -23,6 +23,8 @@ removed or reordered record breaks the chain. Kinds:
   text, rejection note, title, email, URL, checksum or the Admin's evidence.
 - ``session_revocation`` (M6c-2b2a): session ID, user ID, reason code and
   revocation time. Never a cookie, token/hash, CSRF, email, verifier or paper.
+- ``invitation_closure`` (M6c-2b2b2): invitation ID, accepted/revoked,
+  reason code and time. Replay closes the link without recreating an account.
 - ``reset_token_closure`` (M6c-2b2b1): token ID, User ID, consumed/revoked,
   reason code and time. No raw token/hash; replay never changes credentials.
 
@@ -54,10 +56,13 @@ MAX_LINE_BYTES = 64 * 1024
 GENESIS, REVOCATION, RECOVERY_BEGIN, RECOVERY_END = "genesis", "revocation", "recovery_begin", "recovery_end"
 REVIEW_CLOSURE = "review_closure"
 SESSION_REVOCATION = "session_revocation"
+INVITATION_CLOSURE = "invitation_closure"
+INVITATION_END_REASONS = {"accepted": {"invitation_accepted", "legacy_accepted"},
+                          "revoked": {"admin_revoked", "invitation_replaced", "delivery_failed", "legacy_revoked"}}
 RESET_TOKEN_CLOSURE = "reset_token_closure"
 RESET_END_REASONS = {"consumed": {"password_reset", "legacy_consumed"},
                      "revoked": {"reset_replaced", "reset_completed", "user_disabled", "legacy_revoked"}}
-KINDS = (GENESIS, REVOCATION, RECOVERY_BEGIN, RECOVERY_END, REVIEW_CLOSURE, SESSION_REVOCATION, RESET_TOKEN_CLOSURE)
+KINDS = (GENESIS, REVOCATION, RECOVERY_BEGIN, RECOVERY_END, REVIEW_CLOSURE, SESSION_REVOCATION, RESET_TOKEN_CLOSURE, INVITATION_CLOSURE)
 GENESIS_MODES = ("new_install", "existing_db", "rebuilt_from_db")
 REVOCATION_FIELDS = ("id", "target_kind", "item_id", "version_id", "source_file_id", "storage_key",
                      "access_rights_id", "reason_code", "prior_publication_state", "rights_epoch", "recorded_at",
@@ -73,6 +78,7 @@ BODY_FIELDS = {
     RECOVERY_END: frozenset({"recovery_id", "finished_at", "replayed", "tombstones_purged", "objects_removed"}),
     REVIEW_CLOSURE: frozenset(CLOSURE_FIELDS),
     SESSION_REVOCATION: frozenset(SESSION_FIELDS),
+    INVITATION_CLOSURE: frozenset({"invitation_id", "end_kind", "reason_code", "ended_at"}),
     RESET_TOKEN_CLOSURE: frozenset({"token_id", "user_id", "end_kind", "reason_code", "ended_at"}),
 }
 _KEY = re.compile(r"originals/[0-9a-f]{32}")
@@ -217,6 +223,15 @@ def _check_body(kind: str, body) -> None:
                 _text(basis["reason"], 1000)
                 _uuid(basis["confirmed_by_user_id"])
                 _time(basis["recorded_at"])
+        elif kind == INVITATION_CLOSURE:
+            _uuid(body["invitation_id"])
+            if (not isinstance(body["end_kind"], str) or body["end_kind"] not in INVITATION_END_REASONS
+                    or not isinstance(body["reason_code"], str)
+                    or body["reason_code"] not in INVITATION_END_REASONS[body["end_kind"]]):
+                raise ValueError("ending")
+            _time(body["ended_at"])
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})", body["ended_at"]):
+                raise ValueError("time")
         elif kind == RESET_TOKEN_CLOSURE:
             _uuid(body["token_id"])
             _uuid(body["user_id"])

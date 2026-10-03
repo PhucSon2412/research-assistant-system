@@ -1,5 +1,7 @@
 # Môi trường phát triển và schema (M1a–M6c-2b2b1)
 
+**Trạng thái hiện hành:** PR #30 đã merge `ce67ce8` (`0031`); M6c-2b2b2 thêm `0032` trong PR chưa merge. [Runbook mới](#journal-invitation-m6c-2b2b2); revision ở các mục cũ là chứng cứ lịch sử.
+
 [Mục lục](README.md) · [Mô hình dữ liệu](data-model.md) · [Roadmap](roadmap.md)
 
 Tài liệu này mô tả phần **đã triển khai**: M1a (Compose dev, migration nền, bootstrap Admin), M1b (invite/session/CSRF/ACL), M1c (upload intent, lưu/tải original private — xem [mục M1c](#upload-intent-và-original-m1c)), M2a (worker Markdown, đã merge PR #4), M2b (PDF/coverage/references, đã merge PR #5), M3a và M3b (PR #7, merge `5911038`), M3c collection (PR #8, `6b0a96a`), M4a một paper riêng (PR #9, `6eaaf12`), M4b scope (PR #10, `2977142`), M4c bộ đánh giá (PR #11, `99e439d`), M4d (PR #12–#14 đã merge), M5a arXiv discovery (PR #15, `332a9b0`) và M5b-1 liên kết citation (PR #16, `a03c2c5`, [mục M5b-1](#m5b-1-liên-kết-citation-arxiv-chính-xác-pr-16-đã-merge)); sửa proxy web cho search/collections/RAG ở [mục proxy](#proxy-web-json-search-collections-và-rag) (PR #17, `8265c30`); M6a yêu cầu duyệt đúng version/file ở [mục M6a](#yêu-cầu-duyệt-paper-riêng-m6a), M6b-1 phê duyệt vào bản chung chờ công bố (PR #19, 5c0f28a) ở [mục M6b-1](#phê-duyệt-vào-bản-chung-chờ-công-bố-m6b-1) M6b-2a công bố metadata/thu hồi (PR #20, `458b5dd`) ở [mục M6b-2a](#công-bố-metadata-và-thu-hồi-bản-chung-m6b-2a) M6b-2b1 tải original bản chung theo quyền (PR #21, `87a200e`) ở [mục M6b-2b1](#tải-original-bản-chung-theo-quyền-m6b-2b1), M6b-2b2a cleanup dữ liệu dẫn xuất bản chung đã thu hồi (PR #22, `cf12319`) ở [mục M6b-2b2a](#cleanup-dữ-liệu-dẫn-xuất-bản-chung-đã-thu-hồi-m6b-2b2a), M6b-2b2b lập chỉ mục bản chung (PR #23, `d01ea57`, revision `0025`) ở [mục M6b-2b2b](#lập-chỉ-mục-bản-chung-đã-công-bố-m6b-2b2b), M6b-2b3a tìm kiếm toàn văn bản chung (PR #24, `3fd3374`) ở [mục M6b-2b3a](#tìm-kiếm-toàn-văn-bản-chung-m6b-2b3a) và M6b-2b3b RAG trên bản chung (PR #25, `80a07ca`, không migration) ở [mục M6b-2b3b](#hỏi-đáp-rag-trên-bản-chung-m6b-2b3b), và M6c-1 journal thu hồi + recovery gate sau restore (PR #26, `35501f5`, revision `0026`/`0027`) ở [mục M6c-1](#journal-thu-hồi-và-recovery-gate-m6c-1), và M6c-2a backup/restore có manifest + diễn tập (PR đang review, không migration) ở [mục M6c-2a](#backup-restore-và-diễn-tập-m6c-2a). Live smoke bằng dữ liệu tổng hợp đã qua adapter thật cho document embedding, query embedding và rerank; hai route OpenRouter trả `200`. Charge thực trên key chưa đối soát, nên `pricing_verified=false` tiếp tục chặn lời gọi trả phí trên dữ liệu riêng và bản chung (embedding, rerank, generation); test và smoke của M6b dùng provider giả. Compose chỉ dành cho dev, không phải cấu hình production.
@@ -1216,3 +1218,80 @@ Script từ chối project/volume/container có sẵn, bind thử mọi port tr�
 - Project mới `ras-runbook-0031`, volume/container chưa tồn tại; bind kiểm trước năm port **55432/58000/53000/59000/59001**. Env/journal/log/helper ở thư mục ngoài repo, dùng secret tổng hợp và `--env-file` riêng, provider key trống/discovery tắt; không đọc key trong `.env`. Image API dev cũ có head **0030**, chỉ dùng làm tool tạo DB/journal **0030** đã đăng ký và một token consumed trước migration. Lượt đầu fixture verifier không đạt CHECK Argon2id, đã dọn project rồi sửa fixture; không nới constraint/code.
 - Chạy nguyên block PowerShell runbook với project/file env cô lập: stop → **build sáu service** → `alembic heads` trong **api/worker/beat/migrate/recovery-init đều `0031 (head)`** → hold trên DB `0030` → migrate → SQL đọc `alembic_version=0031` → recover → status → force-recreate writer. Có thêm kiểm đọc ngay trước recover: status exit **3**, `unjournaled_reset_tokens=1`, writer chưa chạy. Recover import **1** token legacy; status exit **0**, `gate=open`, `journal_seq=db_seq=4`, mọi count unjournaled/unconfirmed/unpurged **0**, `open_recovery=False`, `torn_tail=False`.
 - Sau mở writer: image ID của cả **api/web/worker/beat** khớp image vừa build của project, API `/readyz` **200**, web `/login` **200**. Chuỗi lệnh đo **46,58 s**, **0 provider call**; phép đo một lượt, không SLO. `down --volumes --remove-orphans` chỉ dọn project mới, không còn container/volume của nó. Đối chiếu dev trước/sau: ID container, image ID và StartedAt của bảy service không đổi; DB dev vẫn **0030**, image API dev vẫn head **0030**. `.env` không đổi. Sau commit đo chỉ bổ sung chứng cứ docs.
+
+## Journal invitation M6c-2b2b2
+
+Base `origin/main=ce67ce8`, merge PR #30; nhánh `feat/m6c2b2b2-invitation-journal`, revision mới `0032`. [Thiết kế/replay/bảng lỗi](invitation-journal.md). Python host chỉ Conda `C:\Users\ADMIN\.conda\envs\ras`; kiểm interpreter và pip trước chạy. Không venv, key/provider, đọc/sửa `.env` hoặc đổi pricing trong kiểm chứng này.
+
+**Nâng cấp DB đã đăng ký:** xác minh đúng project, DB và journal hiện hành; dừng writer → build api/web/worker/beat/migrate/recovery-init → kiểm head từng image Python → hold → migrate → đọc revision DB thật → recover/status/postcondition → recreate writer bằng image mới. Build thành công không chứng minh container đang dùng code mới: đối chiếu image ID writer với image vừa build và kiểm `/readyz`. DB chưa đăng ký: build/check rồi migrate/check DB, `register-existing --confirm-db-is-current` chỉ khi đã xác minh DB live; không init DB có invitation. Restore không dùng cờ xác nhận DB current.
+
+PowerShell 5.1 cho DB đã đăng ký và hạ tầng sẵn sàng, sau khi chọn đúng env/project (không phải lệnh tự động nâng stack dev):
+
+```powershell
+$rasProject = '<project đã kiểm tra>'
+$rasExpectedRevision = '0032'
+git rev-parse HEAD
+if ($LASTEXITCODE -ne 0) { throw 'Không xác minh được commit nguồn' }
+docker compose -p $rasProject stop api web worker beat
+if ($LASTEXITCODE -ne 0) { throw 'Không dừng được writer' }
+docker compose -p $rasProject build api web worker beat migrate recovery-init
+if ($LASTEXITCODE -ne 0) { throw 'Build thất bại; giữ writer đóng' }
+foreach ($rasService in @('api', 'worker', 'beat', 'migrate', 'recovery-init')) {
+    $rasHeads = docker compose -p $rasProject run --rm --no-deps $rasService alembic heads
+    if ($LASTEXITCODE -ne 0 -or ($rasHeads | Out-String).Trim() -ne "$rasExpectedRevision (head)") {
+        throw "Image $rasService thiếu head $rasExpectedRevision; giữ writer đóng"
+    }
+}
+# Restore phải gắn journal copy hiện hành; ras_backup.py đã hold, gọi lại là idempotent.
+docker compose -p $rasProject run --rm --no-deps api python -m app.cli.recovery hold
+if ($LASTEXITCODE -ne 0) { throw 'Hold thất bại; giữ writer đóng' }
+docker compose -p $rasProject run --rm --no-deps migrate
+if ($LASTEXITCODE -ne 0) { throw 'Migration thất bại; giữ writer đóng' }
+$rasDbRevision = 'SELECT version_num FROM alembic_version;' | docker compose -p $rasProject exec -T db sh -c 'psql -U $POSTGRES_USER -d $POSTGRES_DB -At'
+if ($LASTEXITCODE -ne 0 -or ($rasDbRevision | Out-String).Trim() -ne $rasExpectedRevision) {
+    throw 'DB chưa ở revision yêu cầu; giữ writer đóng'
+}
+docker compose -p $rasProject run --rm --no-deps api python -m app.cli.recovery recover
+if ($LASTEXITCODE -ne 0) { throw 'Recover thất bại; giữ writer đóng' }
+$rasStatus = docker compose -p $rasProject run --rm --no-deps api python -m app.cli.recovery status
+if ($LASTEXITCODE -ne 0) { throw 'Gate chưa mở; giữ writer đóng' }
+$rasStatusText = ($rasStatus | Out-String).Trim()
+Write-Output $rasStatusText
+foreach ($rasExpectedField in @('gate=open', 'unconfirmed_records=0', 'unjournaled_invitations=0', 'unjournaled_reset_tokens=0', 'unjournaled_sessions=0', 'unjournaled_review_closures=0', 'unjournaled_tombstones=0', 'unpurged_tombstones=0', 'open_recovery=False', 'torn_tail=False')) {
+    if ($rasStatusText -notmatch "(^|\s)$([regex]::Escape($rasExpectedField))(\s|$)") {
+        throw "Chưa đạt $rasExpectedField; giữ writer đóng"
+    }
+}
+# Chỉ tới đây khi image, revision DB và mọi điều kiện recovery đều đạt.
+docker compose -p $rasProject up -d --no-deps --force-recreate --wait api web worker beat
+if ($LASTEXITCODE -ne 0) { throw 'Writer chưa sẵn sàng; kiểm health/log của đúng project' }
+```
+
+DB live thiếu file/đuôi journal: điều tra rồi chỉ dùng `--confirm-db-is-current` sau xác minh live; không áp trên snapshot. Dòng đủ nhưng fsync lỗi: recover tự sync. Backfill accepted/revoked còn trong DB dùng mã legacy, không suy nguyên nhân lịch sử. `invitations_imported`/`unjournaled_invitations` là report/count mới; lịch sử mất không import được.
+
+**Diễn tập cô lập:**
+
+```powershell
+$py = 'C:\Users\ADMIN\.conda\envs\ras\python.exe'
+& $py -c "import sys; print(sys.executable)"
+& $py -m pip --version
+& $py scripts/drill_invitation_restore.py --work '<thư mục tuyệt đối ngoài repo, trống/chưa tồn tại>' --down
+```
+
+Project `ras-inv-drill-src`/`ras-inv-drill-restore`, DB 45432/46432, API 48000/46800, web 43000/46300, MinIO 49000/49001 và 46900/46901. Drill từ chối tài nguyên có sẵn, kiểm port trước mutation; secret tổng hợp trong process và `--env-file` rỗng ngoài repo. `ras_backup.py` nhận đủ năm POSTGRES/MINIO env và `RAS_COMPOSE_ENV_FILE` cho **mọi** lệnh Compose, bypass `.env`. Key trống/discovery tắt, pricing giữ mặc định; artifact và copy journal ngoài repo. `--down` chỉ dọn đúng tài nguyên do drill tạo.
+
+Build image đích **trước restore** và kiểm bằng `docker run --rm --entrypoint alembic <image-mới> heads`: `compose run --no-deps` vẫn có thể tạo volume toàn project, làm guard sở hữu từ chối project chưa có marker. Không nới guard hoặc tự tạo marker để vượt kiểm.
+
+Backup khi năm invitation mở + session/reset cũ → accept/revoke/reinvite/bù delivery → copy journal riêng → restore/hold/migrate/recover → proxy web chặn inspect/accept trong TTL, account sau backup không dựng lại, invitation khác nhận được, session/reset cũ không sống lại → lặp restore/recover. MinIO thật giữ object tổng hợp và checksum. Fault delivery trong drill: host adapter nhận link đã chuyển rồi ném lỗi, đúng helper bù của API chạy trong transaction riêng; test API kiểm adapter-error route và accept thắng. Không coi đây là kiểm kênh email production.
+
+Để kiểm proxy lúc hold, start API và web bằng hai `up --no-deps` riêng (cùng lệnh sẽ đợi `/readyz` API, đúng là 503). Chờ `/healthz` 200 rồi mới thử proxy; giữ writer nghiệp vụ đóng tới recover. Sau recover, force-recreate và kiểm image ID từng writer.
+
+Không migrate/restart stack `ras`. Bàn giao credential/account status rollback; journal production và độ bền mất điện chưa chứng minh.
+
+**Chứng cứ drill trên code cuối, 2026-10-03:** `scripts/drill_invitation_restore.py --work <temp ngoài repo> --down` đạt **59/59**, **0 provider call**. Hai lần restore đều chặn inspect/accept của bốn link đã kết thúc trong TTL; không dựng account sau backup; invitation khác vẫn nhận được một lần; session/reset đã đóng không sống lại. Recover lặp giữ kết quả, source journal không đổi. Writer sau recover có image ID đúng image vừa build. Cả hai project/volume drill đã được dọn theo quyền sở hữu.
+
+Fixture: dump **247.146 byte**, một object tổng hợp **41 byte** trong MinIO thật, không có hàng source file (`file_rows_checked=0`). Backup **1,06 s**; restore/recover lần đầu **16,11/1,75 s**, lần hai **8,64/1,88 s**. Đây là phép đo nhỏ trên một máy, không SLO, không diễn tập tải paper hoặc mất điện. Delivery lỗi dùng host adapter và helper bù thực tế; kênh email production chưa được kiểm.
+
+Các lượt chuẩn bị drill từng dừng vì `compose run` tạo volume trước guard sở hữu, chờ `/readyz` trong hold và proxy gọi API trước `/healthz` sẵn sàng. Đã sửa harness theo các lưu ý ở trên, dọn đúng project cô lập rồi chạy lại; không nới guard hoặc bỏ kiểm tra. Lượt cuối hoàn tất toàn bộ 59 kiểm tra.
+
+**Bàn giao kiểm chứng:** [toàn inventory API](testing.md#invitation-journal-m6c-2b2b2) cuối **901/901** (289/217/395, JUnit đủ/không trùng), web **42/42** và typecheck/build, đối chứng **8/8**. Lượt full đầu 899 passed/2 failed và các lỗi chuẩn bị được báo riêng, đã sửa fixture rồi chạy lại toàn suite. Không code/mutant song song full cuối; 19 file nguồn giữ checksum. Sau kiểm quyền sở hữu, đã dọn `ras-invtest` và hai project drill; chín container dev giữ nguyên ID/image/StartedAt. Artifact/journal/log được giữ ngoài repo; không đọc/sửa `.env`, không gọi provider, không đổi `pricing_verified`, không nâng DB/restart dev.
