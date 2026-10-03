@@ -54,7 +54,7 @@ Gate/status thêm `reset_tokens_not_journaled`, `unjournaled_reset_tokens`; repo
 
 **Trạng thái sau PR #30:** đã merge tại `ce67ce8` (`0031`); M6c-2b2b2 mở rộng riêng [invitation](invitation-journal.md), giữ các bảo vệ reset/session trên đây.
 
-**Hiện hành:** PR #31 đã merge `3f21794` (`0032`); [thiết kế M6c-2b2c0](auth-restore-safety.md) đề xuất generation/receipt và cách ly credential/status. Chưa triển khai và chưa được chủ dự án phê duyệt; reset-token closure vẫn không chứng minh verifier mới hay enable/disable đã commit.
+**Hiện hành:** PR #31 đã merge `3f21794` (`0032`); [C1 `0033`](c1-auth-safety-foundation.md) thêm reset fence/purpose, receipt/generation và backfill NULL bằng `auth_safety_backfill`, chỉ thử cô lập/pending. Writer/predicate reset mới thuộc C2; closure reset vẫn không chứng minh verifier mới hoặc enable/disable đã commit. Receipt trong transaction là bằng chứng riêng; replay không dựng nó.
 
 ## Giới hạn và việc kế tiếp
 

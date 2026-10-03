@@ -29,6 +29,8 @@ def list_users(db: Session) -> list[User]:
 def set_user_status(
     db: Session, *, user_id: uuid.UUID, actor_id: uuid.UUID, status: UserStatus, now: datetime
 ) -> User:
+    from app.auth_safety import require_writer
+    require_writer(db)
     if user_id == actor_id:
         # Avoid an Admin locking themselves (possibly the only Admin) out.
         raise Forbidden()

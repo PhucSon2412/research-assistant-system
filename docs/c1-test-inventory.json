@@ -1,0 +1,213 @@
+{
+  "collected": 1055,
+  "unique_nodes": 1055,
+  "passed_in_final_c1_suite": 236,
+  "not_run": 819,
+  "files": [
+    {
+      "file": "api/tests/test_auth_safety_foundation.py",
+      "count": 154,
+      "status": "passed"
+    },
+    {
+      "file": "api/tests/test_auth_secrets.py",
+      "count": 1,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_auth_sessions.py",
+      "count": 19,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_backup.py",
+      "count": 10,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_bootstrap.py",
+      "count": 19,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_citations.py",
+      "count": 72,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_collections.py",
+      "count": 5,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_common_cleanup.py",
+      "count": 5,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_common_index.py",
+      "count": 26,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_common_original.py",
+      "count": 10,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_common_rag.py",
+      "count": 17,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_common_search.py",
+      "count": 12,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_config.py",
+      "count": 54,
+      "status": "passed"
+    },
+    {
+      "file": "api/tests/test_csrf_and_cookies.py",
+      "count": 8,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_db_connection.py",
+      "count": 36,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_discovery.py",
+      "count": 8,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_embedding_transport.py",
+      "count": 5,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_evaluation.py",
+      "count": 20,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_health.py",
+      "count": 5,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_ingest_worker.py",
+      "count": 9,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_invitation_journal.py",
+      "count": 88,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_invitations.py",
+      "count": 20,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_keyword_query.py",
+      "count": 9,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_library_acl.py",
+      "count": 12,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_markdown_ingest.py",
+      "count": 5,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_migrations.py",
+      "count": 28,
+      "status": "passed"
+    },
+    {
+      "file": "api/tests/test_password_reset.py",
+      "count": 10,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_pdf_ingest.py",
+      "count": 24,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_private_index.py",
+      "count": 28,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_publication.py",
+      "count": 18,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_rag.py",
+      "count": 24,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_recovery.py",
+      "count": 26,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_reset_token_journal.py",
+      "count": 92,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_review_approval.py",
+      "count": 12,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_review_closure_journal.py",
+      "count": 38,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_review_requests.py",
+      "count": 8,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_schema_constraints.py",
+      "count": 24,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_search.py",
+      "count": 33,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_session_revocation_journal.py",
+      "count": 50,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_smoke_routes.py",
+      "count": 2,
+      "status": "not_run_in_c1"
+    },
+    {
+      "file": "api/tests/test_uploads.py",
+      "count": 9,
+      "status": "not_run_in_c1"
+    }
+  ]
+}

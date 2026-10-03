@@ -61,8 +61,14 @@ INVITATION_END_REASONS = {"accepted": {"invitation_accepted", "legacy_accepted"}
                           "revoked": {"admin_revoked", "invitation_replaced", "delivery_failed", "legacy_revoked"}}
 RESET_TOKEN_CLOSURE = "reset_token_closure"
 RESET_END_REASONS = {"consumed": {"password_reset", "legacy_consumed"},
-                     "revoked": {"reset_replaced", "reset_completed", "user_disabled", "legacy_revoked"}}
-KINDS = (GENESIS, REVOCATION, RECOVERY_BEGIN, RECOVERY_END, REVIEW_CLOSURE, SESSION_REVOCATION, RESET_TOKEN_CLOSURE, INVITATION_CLOSURE)
+                     "revoked": {"reset_replaced", "reset_completed", "user_disabled", "legacy_revoked", "auth_safety_backfill"}}
+CREDENTIAL_TRANSITION = "credential_transition"
+ACCOUNT_STATUS_DECISION = "account_status_decision"
+AUTH_KINDS = (CREDENTIAL_TRANSITION, ACCOUNT_STATUS_DECISION)
+AUTH_REASONS = {"credential": {"bootstrap", "invitation_accept", "password_reset", "verified_recovery"},
+                "active": {"bootstrap", "invitation_accept", "verified_initial_status", "admin_enable"},
+                "disabled": {"admin_disable", "legacy_disabled"}}
+KINDS = (*AUTH_KINDS, GENESIS, REVOCATION, RECOVERY_BEGIN, RECOVERY_END, REVIEW_CLOSURE, SESSION_REVOCATION, RESET_TOKEN_CLOSURE, INVITATION_CLOSURE)
 GENESIS_MODES = ("new_install", "existing_db", "rebuilt_from_db")
 REVOCATION_FIELDS = ("id", "target_kind", "item_id", "version_id", "source_file_id", "storage_key",
                      "access_rights_id", "reason_code", "prior_publication_state", "rights_epoch", "recorded_at",
@@ -72,6 +78,8 @@ CLOSURE_FIELDS = ("request_id", "item_id", "version_id", "source_file_id", "stat
 SESSION_FIELDS = ("session_id", "user_id", "reason_code", "revoked_at")
 CLOSED_STATUSES = (ReviewStatus.WITHDRAWN.value, ReviewStatus.REJECTED.value, ReviewStatus.APPROVED.value)
 BODY_FIELDS = {
+    CREDENTIAL_TRANSITION: frozenset({"user_id", "operation_id", "generation", "reason_code", "recorded_at"}),
+    ACCOUNT_STATUS_DECISION: frozenset({"user_id", "operation_id", "generation", "decision", "reason_code", "recorded_at"}),
     GENESIS: frozenset({"journal_id", "created_at", "mode"}),
     REVOCATION: frozenset(REVOCATION_FIELDS) | {"retentions"},
     RECOVERY_BEGIN: frozenset({"recovery_id", "started_at", "db_head_seq"}),
@@ -188,7 +196,23 @@ def _check_body(kind: str, body) -> None:
     if kind not in KINDS or not isinstance(body, dict) or set(body) != BODY_FIELDS[kind]:
         raise JournalError("journal_corrupt")
     try:
-        if kind == GENESIS:
+        if kind in AUTH_KINDS:
+            for key in ("user_id", "operation_id", "generation"):
+                _uuid(body[key])
+            for key in ("operation_id", "generation"):
+                if uuid.UUID(body[key]).version != 4:
+                    raise ValueError("uuid_version")
+            if body["operation_id"] == body["generation"]:
+                raise ValueError("uuid_reuse")
+            decision = "credential" if kind == CREDENTIAL_TRANSITION else body["decision"]
+            if not isinstance(decision, str) or decision not in AUTH_REASONS or (kind == ACCOUNT_STATUS_DECISION and decision == "credential"):
+                raise ValueError("decision")
+            if not isinstance(body["reason_code"], str) or body["reason_code"] not in AUTH_REASONS[decision]:
+                raise ValueError("reason")
+            _time(body["recorded_at"])
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})", body["recorded_at"]):
+                raise ValueError("time")
+        elif kind == GENESIS:
             _uuid(body["journal_id"])
             _time(body["created_at"])
             if body["mode"] not in GENESIS_MODES:
@@ -297,6 +321,7 @@ def parse(data: bytes) -> JournalState:
     records: list[Record] = []
     prev = ZERO_HASH
     open_recovery = None
+    auth_ids = set()
     for number, raw in enumerate(parts, start=1):
         if len(raw) + 1 > MAX_LINE_BYTES:
             raise JournalError("journal_corrupt")
@@ -311,6 +336,11 @@ def parse(data: bytes) -> JournalState:
             if record.body["recovery_id"] != open_recovery:
                 raise JournalError("journal_corrupt")
             open_recovery = None
+        if record.kind in AUTH_KINDS:
+            identifiers = {record.body["operation_id"], record.body["generation"]}
+            if identifiers.intersection(auth_ids):
+                raise JournalError("auth_uuid_reused")
+            auth_ids.update(identifiers)
         records.append(record)
         prev = record.hash
     if not records:
@@ -412,6 +442,7 @@ def append(path: Path, state: JournalState, records: list[Record]) -> JournalSta
         prev = record
     if path.stat().st_size != state.size:
         raise JournalError("journal_changed")
+    parse(b"".join(r.line.encode("ascii") + b"\n" for r in (*state.records, *records)))
     _write(path, b"".join(r.line.encode("ascii") + b"\n" for r in records), "ab")
     return JournalState(state.records + tuple(records), state.size + sum(len(r.line) + 1 for r in records), None)
 

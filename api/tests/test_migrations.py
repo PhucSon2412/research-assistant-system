@@ -18,6 +18,7 @@ from app.models import Base
 from tests.conftest import HEAD_REVISION, alembic_config, upgrade
 
 EXPECTED_TABLES = {
+    "auth_change_receipts", "auth_safety_heads", "auth_safety_state", "auth_hash_policies",
     "alembic_version",
     "users",
     "bootstrap_state",
@@ -291,7 +292,7 @@ def test_0022_upgrades_m6b1_database_keeps_pending_and_listed_then_gates_publica
                              {"i": pending, "v": pv, "f": pf, "h": "f" * 64, "r": rr, "a": admin})
         conn.execute(text("UPDATE review_requests SET status='approved', closed_at=now(), closed_by_user_id=:a,"
                           " close_reason_code='approved_by_admin' WHERE id=:r"), {"a": admin, "r": rr})
-    upgrade(empty_db_url)
+    upgrade(empty_db_url, "0032")
     with eng.connect() as conn:
         states = dict(conn.execute(text("SELECT id, publication_state FROM library_items")).all())
         assert states == {item: None, legacy: "listed", pending: "pending"}  # nothing changes state on upgrade
@@ -311,6 +312,9 @@ def test_0022_upgrades_m6b1_database_keeps_pending_and_listed_then_gates_publica
     eng.dispose()
     with pytest.raises(Exception, match="published or revoked common copies exist"):
         command.downgrade(alembic_config(empty_db_url), "0021")
+
+    # C1 adds its own fence; retain the historical fence assertions above.
+    upgrade(empty_db_url)
 
 
 def test_0023_removes_metadata_of_copies_already_purged_under_0022(empty_db_url: str) -> None:
@@ -362,7 +366,7 @@ def test_0023_removes_metadata_of_copies_already_purged_under_0022(empty_db_url:
             rights_epoch,recorded_at,recorded_by_user_id,purge_due_at,purged_at,object_outcome)
             VALUES('common_copy',:i,'other','pending',1,now(),:a,now()+interval '1 day',now(),'deleted')"""),
                      {"i": copy, "a": admin})
-    upgrade(empty_db_url)
+    upgrade(empty_db_url, "0032")
     with eng.connect() as conn:
         left = conn.execute(text("""SELECT i.title, v.source_url, f.original_filename, r.verified_source,
             r.verified_source_url, r.license_url, r.evidence_note, r.scope_conditions
@@ -380,6 +384,9 @@ def test_0023_removes_metadata_of_copies_already_purged_under_0022(empty_db_url:
     eng.dispose()
     with pytest.raises(Exception, match="removed metadata or retention records exist"):
         command.downgrade(alembic_config(empty_db_url), "0022")
+
+    # C1 adds its own fence; retain the historical fence assertions above.
+    upgrade(empty_db_url)
 
 
 def _derived_fixture(conn, item, version, source, owner, job_origin: str, label: str) -> dict:
@@ -492,7 +499,7 @@ def test_0024_removes_derived_rows_of_copies_purged_under_0023_and_fences_writes
         cost_before = conn.execute(text("SELECT id, cost_usd, input_tokens, status FROM embedding_calls"
                                         " WHERE id=:e"), {"e": copies["PURGEDTEXT"][1]["e"]}).one()
 
-    upgrade(empty_db_url)
+    upgrade(empty_db_url, "0032")
     with eng.connect() as conn:
         after = _derived_rows(conn, purged)
         assert all(after[t] == [] for t in (*DERIVED_0024, "entries", "links"))
@@ -518,6 +525,9 @@ def test_0024_removes_derived_rows_of_copies_purged_under_0023_and_fences_writes
     eng.dispose()
     with pytest.raises(Exception, match="removed embedding content exists"):
         command.downgrade(alembic_config(empty_db_url), "0023")
+
+    # C1 adds its own fence; retain the historical fence assertions above.
+    upgrade(empty_db_url)
 
 
 def _reviewed_copy_0024(conn, owner, admin, *, h: str, label: str) -> tuple:
@@ -572,9 +582,9 @@ def test_0025_pins_promotion_jobs_and_charges_common_calls_to_the_application(em
             pipeline_version,chunk_hash,status,reserved_usd,cost_status,reserved_day) VALUES(:f,:a,'m','openrouter',
             'md-v1',:h,'uncertain',0.00000100,'unknown',CURRENT_DATE) RETURNING id"""),
                                   {"f": cf, "a": admin, "h": "c" * 64})
-    upgrade(empty_db_url)
+    upgrade(empty_db_url, "0032")
     with eng.connect() as conn:
-        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == HEAD_REVISION
+        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == "0032"
         assert tuple(conn.execute(text("SELECT source_file_id, version_id FROM ingestion_jobs WHERE id=:j"),
                                   {"j": job}).one()) == (cf, cv)
         assert conn.scalar(text("SELECT source_file_id FROM ingestion_jobs WHERE id=:j"), {"j": upload}) is None
@@ -599,11 +609,14 @@ def test_0025_pins_promotion_jobs_and_charges_common_calls_to_the_application(em
         conn.execute(text("DELETE FROM embedding_calls WHERE owner_user_id IS NULL"))
     eng.dispose()
     command.downgrade(alembic_config(empty_db_url), "0024")
-    upgrade(empty_db_url)
+    upgrade(empty_db_url, "0032")
     eng = create_engine(empty_db_url)
     with eng.connect() as conn:  # re-pinned on the way back up
         assert conn.scalar(text("SELECT source_file_id FROM ingestion_jobs WHERE id=:j"), {"j": job}) == cf
     eng.dispose()
+
+    # C1 adds its own fence; retain the historical fence assertions above.
+    upgrade(empty_db_url)
 
 
 def test_0025_refuses_a_promotion_job_it_cannot_pin(empty_db_url: str) -> None:
@@ -637,7 +650,7 @@ def test_0026_leaves_registration_to_the_operator_and_imports_existing_tombstone
             prior_publication_state,rights_epoch,recorded_at,recorded_by_user_id,purge_due_at,storage_key)
             VALUES('common_copy',gen_random_uuid(),'rights_withdrawn','listed',1,now(),:a,now()+interval '1 day',
             'originals/0123456789abcdef0123456789abcdef') RETURNING id"""), {"a": admin})
-    upgrade(empty_db_url)
+    upgrade(empty_db_url, "0032")
     command.downgrade(alembic_config(empty_db_url), "0025")  # nothing registered yet: allowed
     upgrade(empty_db_url)
     settings = SimpleNamespace(recovery=SimpleNamespace(journal_path=tmp_path / "revocations.jsonl",
@@ -646,13 +659,13 @@ def test_0026_leaves_registration_to_the_operator_and_imports_existing_tombstone
     with pytest.raises(recovery.RecoveryError, match="database_not_new"):
         recovery.init_new(eng, settings, utcnow())
     _, imported = recovery.register_existing(eng, settings, utcnow())
-    assert imported == 1 and recovery.evaluate(settings, eng).reason == "open"
+    assert imported == 1 and recovery.evaluate_integrity(settings, eng).reason == "open"
     (genesis, record) = journal.read(settings.recovery.journal_path).records
     assert genesis.body["mode"] == "existing_db" and record.body["id"] == str(tomb)
     with eng.connect() as conn:
         assert conn.scalar(text("SELECT tombstone_id FROM revocation_journal_records WHERE seq=2")) == tomb
     eng.dispose()
-    with pytest.raises(Exception, match="registered with a revocation journal"):
+    with pytest.raises(Exception, match="auth safety history prevents downgrade"):
         command.downgrade(alembic_config(empty_db_url), "0025")
 
 
@@ -688,7 +701,7 @@ def test_0027_backfills_revoke_records_unconfirmed_so_recover_must_confirm_them(
             VALUES(:t,'common_copy',:i,'other','listed',1,now(),:a,now()+interval '1 day')"""),
                      {"t": body["id"], "i": body["item_id"], "a": admin})
     journal.create(path, [genesis, revocation])
-    upgrade(empty_db_url)
+    upgrade(empty_db_url, "0032")
     with eng.connect() as conn:
         assert conn.execute(text("SELECT seq, journal_confirmed FROM revocation_journal_records ORDER BY seq")).all() \
             == [(1, True), (2, False)]
@@ -699,11 +712,14 @@ def test_0027_backfills_revoke_records_unconfirmed_so_recover_must_confirm_them(
     assert recovery.evaluate(settings, eng).reason == "journal_unconfirmed"
     with pytest.raises(Exception, match="registered with a revocation journal"):
         command.downgrade(alembic_config(empty_db_url), "0026")
+    upgrade(empty_db_url)
     report = recovery.recover(eng, None, settings, utcnow())
-    assert report.journal_confirmed == 1 and report.gate == "open"
+    assert report.journal_confirmed == 1 and report.reconciliation_complete
+    assert recovery.evaluate_integrity(settings, eng).reason == "open"
+    assert report.gate == "auth_safety_pending"
     # Confirmed or not, a registered database never goes below 0027: 0026 code would open the gate again
     # after the next revocation whose fsync fails (PR #26 review).
-    with pytest.raises(Exception, match="registered with a revocation journal"):
+    with pytest.raises(Exception, match="auth safety history prevents downgrade"):
         command.downgrade(alembic_config(empty_db_url), "0026")
     with eng.connect() as conn:
         assert conn.scalar(text("SELECT version_num FROM alembic_version")) == HEAD_REVISION
@@ -929,7 +945,7 @@ def test_migration_sql_seeds_no_accounts() -> None:
 
 def _snapshot(conn) -> dict[str, list]:
     # Keep the 0001 projection stable as later migrations add nullable columns.
-    columns = {"library_items": "id, visibility, owner_user_id, content_status, active_version_id, title, rights_epoch, created_by_user_id, created_at, updated_at"}
+    columns = {"users": "id, email, display_name, role, status, password_verifier, password_changed_at, created_at, updated_at", "library_items": "id, visibility, owner_user_id, content_status, active_version_id, title, rights_epoch, created_by_user_id, created_at, updated_at"}
     return {
         t: [tuple(r) for r in conn.execute(text(f"SELECT {columns.get(t, '*')} FROM {t} ORDER BY 1")).all()]
         for t in ("users", "bootstrap_state", "library_items", "paper_versions", "audit_events")
@@ -956,6 +972,14 @@ def test_upgrade_from_0001_keeps_existing_data(empty_db_url: str) -> None:
     with eng.connect() as conn:
         before = _snapshot(conn)
 
+    # Historical M1b downgrade, before installing the C1 baseline.
+    upgrade(empty_db_url, "0002")
+    command.downgrade(alembic_config(empty_db_url), "0001")
+    with eng.connect() as conn:
+        assert _snapshot(conn) == before
+    assert "sessions" not in _tables(empty_db_url)
+    eng.dispose()
+
     upgrade(empty_db_url)
     with eng.connect() as conn:
         assert conn.scalar(text("SELECT version_num FROM alembic_version")) == HEAD_REVISION
@@ -967,12 +991,6 @@ def test_upgrade_from_0001_keeps_existing_data(empty_db_url: str) -> None:
             assert conn.scalar(text(f"SELECT count(*) FROM {table}")) == 0
     assert before == after_first == after_second
 
-    # Downgrading only M1b keeps the M1a data too.
-    command.downgrade(alembic_config(empty_db_url), "0001")
-    with eng.connect() as conn:
-        assert _snapshot(conn) == before
-    assert "sessions" not in _tables(empty_db_url)
-    eng.dispose()
 
 
 def test_0005_preserves_received_m1c_job_and_original_metadata(empty_db_url: str) -> None:

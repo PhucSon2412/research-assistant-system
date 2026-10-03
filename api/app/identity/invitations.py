@@ -66,6 +66,8 @@ def create_invitation(
     now: datetime,
     lifetime: timedelta,
 ) -> CreatedInvitation:
+    from app.auth_safety import require_writer
+    require_writer(db)
     email = normalise_email(email)
     lock_email(db, email)
     if db.scalar(select(exists().where(User.email == email))):
@@ -124,6 +126,8 @@ def accept_invitation(
     Two concurrent requests with the same token serialise on the invitation
     row lock; the loser re-reads it as accepted and gets ``InvalidToken``.
     """
+    from app.auth_safety import require_writer
+    require_writer(db)
     inv = find_open_invitation(db, raw_token, now=now)
     if inv is None:
         raise InvalidToken()
@@ -177,6 +181,8 @@ def accept_invitation(
 
 def revoke_invitation(db: Session, *, invitation_id: uuid.UUID, actor_id: uuid.UUID, now: datetime,
                       reason: str = "admin_revoked", compensation: bool = False) -> None:
+    from app.auth_safety import require_writer
+    require_writer(db)
     email = db.scalar(select(Invitation.email).where(Invitation.id == invitation_id))
     if email is None:
         raise NotFound()
