@@ -70,7 +70,7 @@ Ba task search/RAG riêng, mở sau khi PR M4c merge; mỗi task là một PR, �
 
 ## Ưu tiên sau MVP — đã xác nhận về thứ tự
 
-**M6c-2b2a (nhánh review, revision `0030`, sau PR #28 merge `47a1aab`):** journal mọi đường thu hồi session, batch trước commit, DB fence và recovery/backfill để cookie/CSRF cũ không sống lại sau restore với journal hiện hành. Không bảo vệ token/credential/account status. **Task auth tiếp theo:** journal reset/invitation token; chống rollback credential và account status để không login mới bằng mật khẩu cũ. Sau đó membership/xóa paper riêng, scheduler và nơi lưu journal production vẫn là task riêng. Hợp đồng bàn giao và giới hạn ở [decisions](decisions.md#quyết-định-triển-khai-m6c-2b2a-2026-10-02).
+**M6c-2b2a (PR #29 đã merge `d38c6b8`, revision `0030`, sau PR #28 merge `47a1aab`):** journal mọi đường thu hồi session, batch trước commit, DB fence và recovery/backfill để cookie/CSRF cũ không sống lại sau restore với journal hiện hành. Không bảo vệ token/credential/account status. **Task auth tiếp theo:** journal reset/invitation token; chống rollback credential và account status để không login mới bằng mật khẩu cũ. Sau đó membership/xóa paper riêng, scheduler và nơi lưu journal production vẫn là task riêng. Hợp đồng bàn giao và giới hạn ở [decisions](decisions.md#quyết-định-triển-khai-m6c-2b2a-2026-10-02).
 
 1. DOI/arXiv URL import: metadata + link trước; full text chỉ nếu có file và quyền.
 2. Hugging Face daily sau khi arXiv ingest/chống trùng/`metadata_only` ổn định; gộp cùng paper theo identifier mà không nhân đôi full text.

@@ -1087,7 +1087,7 @@ PYTHONIOENCODING=utf-8 "$USERPROFILE/.conda/envs/ras/python.exe" scripts/drill_r
 
 ## Journal thu hồi session (M6c-2b2a)
 
-Nhánh review sau PR #28 merge `47a1aab`, revision `0030`. Schema, batch, khóa và cửa sổ lỗi ở [decisions](decisions.md#quyết-định-triển-khai-m6c-2b2a-2026-10-02). Không nâng DB dev trong PR này; test tạo/xóa DB riêng và diễn tập chỉ dùng hai project cô lập.
+PR #29 đã merge `d38c6b8` sau PR #28 `47a1aab`, revision `0030`. Phần này ghi kết quả lịch sử của PR #29; M6c-2b2b1 mở rộng token ở mục sau. Schema, batch, khóa và cửa sổ lỗi ở [decisions](decisions.md#quyết-định-triển-khai-m6c-2b2a-2026-10-02). Không nâng DB dev trong PR này; test tạo/xóa DB riêng và diễn tập chỉ dùng hai project cô lập.
 
 **Nâng cấp DB có lịch sử session:** dừng `api web worker beat`, migrate `0030`. Nếu còn session đã thu hồi trước migration, status báo `sessions_not_journaled`, `unjournaled_sessions=N`. Chạy `recover` (không cần xác nhận DB live cho việc import thu hồi cũ), phải có `sessions_imported=N`, `gate=open` và `unjournaled_sessions=0`, rồi mới start writer. Migration không đọc journal. Lịch sử đã mất khỏi DB trước import không thể khôi phục.
 

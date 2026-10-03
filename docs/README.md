@@ -6,7 +6,7 @@ Repo đã merge M3a private index (PR #6, merge commit `1c4a6f7`), M3b private s
 
 ## Cách đọc trạng thái quyết định
 
-M6c-2b2a trên nhánh review thêm journal thu hồi session, revision `0030`, sau PR #28 merge `47a1aab`. Xem [quyết định/cửa sổ lỗi/bàn giao](decisions.md#quyết-định-triển-khai-m6c-2b2a-2026-10-02) và [runbook/kiểm chứng](dev-setup.md#journal-thu-hồi-session-m6c-2b2a). Reset token, invitation, credential và account status sau restore vẫn chưa được bảo vệ.
+M6c-2b2a (PR #29 đã merge `d38c6b8`) thêm journal thu hồi session, revision `0030`, sau PR #28 merge `47a1aab`. Xem [quyết định/cửa sổ lỗi/bàn giao](decisions.md#quyết-định-triển-khai-m6c-2b2a-2026-10-02) và [runbook/kiểm chứng](dev-setup.md#journal-thu-hồi-session-m6c-2b2a). Tại PR #29, reset token/invitation/credential/account status chưa bảo vệ; M6c-2b2b1 mở rộng riêng reset token ở hợp đồng phía trên.
 
 - **Đã xác nhận**: yêu cầu trong brief khởi tạo và các quyết định tiếp theo do chủ dự án nêu, ghi ở [nhật ký quyết định](decisions.md).
 - **Đề xuất**: phương án thiết kế để có thể chia việc và đánh giá; chưa phải quyết định ràng buộc.
