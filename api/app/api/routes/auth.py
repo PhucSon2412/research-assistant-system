@@ -18,7 +18,7 @@ from app.api.cookies import (
     set_csrf_cookie,
     set_session_cookie,
 )
-from app.api.deps import get_clock, get_db, get_now, get_session_context
+from app.api.deps import get_clock, get_db, get_now, get_session_context, get_auth_write_context
 from app.api.errors import ApiError
 from app.audit import record_event
 from app.config import Settings, get_settings
@@ -26,7 +26,7 @@ from app.delivery import DeliveryAdapter, MessageKind, OutgoingMessage, build_li
 from app.identity import invitations, password_reset
 from app.identity.errors import InvalidCredentials, InvalidToken
 from app.identity.login import login
-from app.identity.session_commit import commit_auth
+from app.identity.session_commit import commit_auth, commit_activity
 from app.identity.passwords import PasswordPolicyError
 from app.identity.sessions import (
     SessionContext,
@@ -88,16 +88,24 @@ def csrf(
     db: Session = Depends(get_db),
     now: datetime = Depends(get_now),
     settings: Settings = Depends(get_settings),
+    clock=Depends(get_clock),
 ) -> dict:
     """Ensure the browser holds a usable CSRF cookie (anonymous or bound to
     the live session). Returns no token in the body; the page reads the cookie."""
     cookie = request.cookies.get(CSRF_COOKIE)
     raw_session = request.cookies.get(session_cookie_name(settings))
-    ctx = resolve_session(db, raw_session, now=now, idle=settings.auth.session_idle) if raw_session else None
+    ctx = resolve_session(db, raw_session, now=now, idle=settings.auth.session_idle, clock=clock) if raw_session else None
     if ctx is not None:
         if not (cookie and digest_matches(cookie, ctx.csrf_token_hash)):
-            set_csrf_cookie(response, settings, rotate_csrf(db, ctx.session_id))
-        db.commit()
+            token = rotate_csrf(db, ctx.session_id, user_id=ctx.user_id, clock=clock)
+        else:
+            token = None
+        commit_activity(db)
+        from app.identity.sessions import session_is_live
+        if not session_is_live(db, ctx.session_id, now=clock(), idle=settings.auth.session_idle, clock=clock):
+            raise ApiError(401, "session_expired", clear_session=True)
+        if token:
+            set_csrf_cookie(response, settings, token)
     elif not cookie:
         set_csrf_cookie(response, settings, generate_token()[0])
     return {"status": "ok"}
@@ -111,10 +119,11 @@ def login_route(
     db: Session = Depends(get_db),
     now: datetime = Depends(get_now),
     settings: Settings = Depends(get_settings),
+    clock=Depends(get_clock),
 ) -> dict:
     try:
         user, issued = login(db, email=body.email, password=body.password, now=now, settings=settings,
-                             previous_token=request.cookies.get(session_cookie_name(settings)))
+                             previous_token=request.cookies.get(session_cookie_name(settings)), clock=clock)
     except InvalidCredentials:
         raise ApiError(401, "invalid_credentials") from None
     set_session_cookie(response, settings, issued.token)
@@ -125,12 +134,13 @@ def login_route(
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(
     response: Response,
-    ctx: SessionContext = Depends(get_session_context),
+    ctx: SessionContext = Depends(get_auth_write_context),
     db: Session = Depends(get_db),
     now: datetime = Depends(get_now),
     settings: Settings = Depends(get_settings),
+    clock=Depends(get_clock),
 ) -> Response:
-    revoke_session(db, session_id=ctx.session_id, user_id=ctx.user_id, reason=SessionRevokeReason.LOGOUT, now=now)
+    revoke_session(db, session_id=ctx.session_id, user_id=ctx.user_id, reason=SessionRevokeReason.LOGOUT, now=clock())
     _audit_session(db, ctx, "auth.logout", ctx.session_id)
     commit_auth(db)
     response.status_code = status.HTTP_204_NO_CONTENT
@@ -156,8 +166,9 @@ def my_sessions(
     db: Session = Depends(get_db),
     now: datetime = Depends(get_now),
     settings: Settings = Depends(get_settings),
+    clock=Depends(get_clock),
 ) -> dict:
-    rows = list_live_sessions(db, user_id=ctx.user_id, now=now, idle=settings.auth.session_idle)
+    rows = list_live_sessions(db, user_id=ctx.user_id, now=now, idle=settings.auth.session_idle, clock=clock)
     return {
         "sessions": [
             {
@@ -176,15 +187,16 @@ def my_sessions(
 def revoke_my_session(
     session_id: uuid.UUID,
     response: Response,
-    ctx: SessionContext = Depends(get_session_context),
+    ctx: SessionContext = Depends(get_auth_write_context),
     db: Session = Depends(get_db),
     now: datetime = Depends(get_now),
     settings: Settings = Depends(get_settings),
+    clock=Depends(get_clock),
 ) -> Response:
     # Scoped to the caller's own sessions: another user's session ID is
     # indistinguishable from an unknown one.
     if not revoke_session(
-        db, session_id=session_id, user_id=ctx.user_id, reason=SessionRevokeReason.USER_REVOKED, now=now
+        db, session_id=session_id, user_id=ctx.user_id, reason=SessionRevokeReason.USER_REVOKED, now=clock()
     ):
         db.rollback()
         raise ApiError(404, "not_found")
@@ -198,12 +210,13 @@ def revoke_my_session(
 
 @router.post("/sessions/revoke-others")
 def revoke_other_sessions(
-    ctx: SessionContext = Depends(get_session_context),
+    ctx: SessionContext = Depends(get_auth_write_context),
     db: Session = Depends(get_db),
     now: datetime = Depends(get_now),
+    clock=Depends(get_clock),
 ) -> dict:
     count = revoke_user_sessions(
-        db, user_id=ctx.user_id, reason=SessionRevokeReason.USER_REVOKED, now=now, keep_session_id=ctx.session_id
+        db, user_id=ctx.user_id, reason=SessionRevokeReason.USER_REVOKED, now=clock(), keep_session_id=ctx.session_id
     )
     _audit_session(db, ctx, "auth.session.revoke_others", ctx.session_id, details={"revoked": count})
     commit_auth(db)

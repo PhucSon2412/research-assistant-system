@@ -12,6 +12,7 @@ from collections.abc import Callable, Iterator
 from datetime import datetime
 
 from fastapi import Depends, Request
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.cookies import CSRF_HEADER, session_cookie_name
@@ -19,9 +20,13 @@ from app.api.csrf import SAFE_METHODS
 from app.api.errors import ApiError
 from app.authz import Principal
 from app.clock import utcnow
-from app.config import Settings, get_settings
+from app.config import Settings, get_settings, origin_allowed
 from app.db import get_engine
-from app.identity.sessions import SessionContext, resolve_session
+from app.identity.sessions import SessionContext, resolve_session, session_is_live
+from app.identity.predicates import lock_users, session_live
+from app.auth_safety import require_writer
+from app.models import UserSession
+from app.identity.session_commit import commit_activity
 from app.identity.tokens import digest_matches
 
 
@@ -45,19 +50,40 @@ def get_session_context(
     db: Session = Depends(get_db),
     now: datetime = Depends(get_now),
     settings: Settings = Depends(get_settings),
+    clock=Depends(get_clock),
 ) -> SessionContext:
     raw = request.cookies.get(session_cookie_name(settings))
     if not raw:
         raise ApiError(401, "not_authenticated")
-    ctx = resolve_session(db, raw, now=now, idle=settings.auth.session_idle)
+    ctx = resolve_session(db, raw, now=now, idle=settings.auth.session_idle, clock=clock)
     if ctx is None:
         db.rollback()
         raise ApiError(401, "session_expired", clear_session=True)
-    db.commit()
+    commit_activity(db)
+    try:
+        if not session_is_live(db, ctx.session_id, now=clock(), idle=settings.auth.session_idle, clock=clock):
+            raise ApiError(401, "session_expired", clear_session=True)
+        final_csrf = db.get(UserSession, ctx.session_id, populate_existing=True).csrf_token_hash
+    finally:
+        db.rollback()  # release final read journal lock before any downstream row locks
     if request.method not in SAFE_METHODS:
         header = request.headers.get(CSRF_HEADER) or ""
-        if not digest_matches(header, ctx.csrf_token_hash):
+        if not digest_matches(header, final_csrf):
             raise ApiError(403, "csrf_failed")
+    return ctx
+
+
+def get_auth_write_context(request: Request, ctx: SessionContext = Depends(get_session_context),
+                           db: Session = Depends(get_db), settings: Settings = Depends(get_settings),
+                           clock=Depends(get_clock)) -> SessionContext:
+    require_writer(db)
+    lock_users(db, [ctx.user_id])
+    if not session_live(db, ctx.session_id, clock(), settings.auth.session_idle, user_id=ctx.user_id):
+        raise ApiError(401, "session_expired", clear_session=True)
+    row = db.get(UserSession, ctx.session_id, populate_existing=True)
+    if not digest_matches(request.headers.get(CSRF_HEADER) or "", row.csrf_token_hash):
+        raise ApiError(403, "csrf_failed")
+    db.info["auth_actor"] = (ctx.session_id, ctx.user_id, row.csrf_token_hash, clock, settings.auth.session_idle)
     return ctx
 
 
@@ -72,9 +98,8 @@ def get_principal(ctx: SessionContext = Depends(get_session_context)) -> Princip
 
 
 def require_trusted_origin(request: Request, settings: Settings = Depends(get_settings)) -> None:
-    """Sensitive writes also require an allowed ``Origin`` header; the CSRF
-    middleware only rejects a disallowed one when the header is present."""
-    if request.headers.get("origin") not in settings.http.allowed_origins:
+    """Same explicit Origin rule as every write in the middleware."""
+    if len(request.headers.getlist("origin")) != 1 or not origin_allowed(request.headers.get("origin"), settings.http.allowed_origins):
         raise ApiError(403, "csrf_failed")
 
 

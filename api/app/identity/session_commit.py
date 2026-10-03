@@ -16,14 +16,40 @@ from app.identity.reset_tokens import PENDING as TOKEN_PENDING
 from app.identity.invitation_endings import PENDING as INVITATION_PENDING
 
 PENDING = "session_revocations"
+AUTH_PENDING = "auth_changes"
+
+
+def commit_activity(db: Session) -> None:
+    """Touch/CSRF transaction has no journal event; uncertain commit is never success."""
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise ApiError(503, "auth_outcome_uncertain") from None
+
+
+def _check_actor(db, actor, rows):
+    from app.auth_safety import account_live
+    from app.models import User, UserSession
+    sid, uid, csrf, clock, idle = actor
+    session = db.get(UserSession, sid, populate_existing=True)
+    user = db.get(User, uid, populate_existing=True)
+    at = clock()
+    ours = any(r.id == sid for r in rows)
+    if (not session or session.user_id != uid or not user or not account_live(db, uid)
+            or session.credential_generation != user.credential_generation
+            or session.csrf_token_hash != csrf or session.absolute_expires_at <= at
+            or session.last_activity_at <= at - idle or (session.revoked_at is not None and not ours)):
+        raise ApiError(401, "session_expired", clear_session=True)
 
 
 def commit_auth(db: Session) -> None:
-    from app.auth_safety import require_writer
-    require_writer(db)
+    from app.auth_safety import require_final
     rows = db.info.pop(PENDING, [])
     tokens = db.info.pop(TOKEN_PENDING, [])
     invitations = db.info.pop(INVITATION_PENDING, [])
+    changes = db.info.pop(AUTH_PENDING, [])
+    actor = db.info.pop("auth_actor", None)
     if invitations:
         ended_at = invitations[0].accepted_at or invitations[0].revoked_at
     elif tokens:
@@ -31,21 +57,28 @@ def commit_auth(db: Session) -> None:
     else:
         ended_at = rows[0].revoked_at if rows else None
     # Preserve session-only codes; invitation/token batches name auth endings.
-    pending_code = "auth_closure_pending_recovery" if tokens or invitations else "session_revocation_pending_recovery"
-    unavailable_code = "auth_journal_unavailable" if tokens or invitations else "session_journal_unavailable"
+    pending_code = "auth_closure_pending_recovery" if tokens or invitations or changes else "session_revocation_pending_recovery"
+    unavailable_code = "auth_journal_unavailable" if tokens or invitations or changes else "session_journal_unavailable"
     batch = []
     commit_attempted = False
     try:
         db.flush()
-        batch = recovery.record_auth_endings(db, get_settings().recovery.journal_path, tokens, rows, invitations=invitations)
+        require_final(db, writer=True, pending_endings=(invitations, tokens, rows))
+        if actor:
+            _check_actor(db, actor, rows)
+        batch = recovery.record_auth_endings(db, get_settings().recovery.journal_path, tokens, rows,
+                                             invitations=invitations, auth_changes=changes)
         commit_attempted = True
         db.commit()
     except recovery.RecoveryError:
         db.rollback()
         raise ApiError(503, "service_recovering") from None
+    except ApiError:
+        db.rollback()
+        raise
     except Exception:
         db.rollback()
-        if batch and all(line.written for line in batch):
+        if batch and all(line.written for line in batch) and not changes:
             try:
                 for line in batch:
                     recovery.replay_record(db.get_bind(), line.record, ended_at)
@@ -54,3 +87,7 @@ def commit_auth(db: Session) -> None:
         raise ApiError(503, "auth_outcome_uncertain" if commit_attempted else "auth_unavailable") from None
     if any(not line.written for line in batch):
         raise ApiError(503, unavailable_code)
+    if actor:
+        # Success after a known commit still requires a fresh gate/account check.
+        require_final(db)
+        _check_actor(db, actor, rows)

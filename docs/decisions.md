@@ -1,5 +1,24 @@
 # Nhật ký quyết định
 
+## Triển khai C2a trong phạm vi task (2026-10-04)
+
+**Nguồn:** coding agent triển khai theo task chủ dự án giao và nền/Origin/cách chia C2 do orchestrator chốt theo ủy quyền; không ghi đây là lựa chọn trực tiếp mới của chủ dự án. Nhánh review dựa `c98bd33`, chứa `c647d6e`; giữ docs orchestrator chưa commit. [Bàn giao và bằng chứng](c2a-login-session-predicates.md).
+
+Thêm revision `0035`, giữ `0033/0034`: predicate receipt/latest confirmed mirror, session runtime mutation và typed closure mirror; giữ fixed search_path/NOLOGIN definer/revoke PUBLIC, không raw protected grant runtime. Final integrity cùng transaction, journal shared read hoặc exclusive writer sau row locks; queue closure của chính transaction được đối chiếu riêng trước mirror, constraints thật kiểm trước append. Login verify/hash ngoài transaction, stale snapshot từ chối bounded, rehash CAS không event/generation mới. Commit nền nhận Change cho C2b/C2c, một batch; uncertain luôn lỗi, recovery không dựng quyền.
+
+Origin normalize scheme/IDNA host/effective port (HTTP 80/HTTPS 443 bỏ trong dạng chuẩn), exact allowlist; cấu hình có path kể cả `/`, credentials/query/fragment/wildcard hoặc port sai bị từ chối. Thiếu/null/duplicate Origin không được fallback; proxy chuyển header thật. Chưa chọn non-browser exemption, delivery/provider/operator hay cutover.
+
+C1 code cũ có issuance routine nhưng session touch/closure mirror và replay session còn ORM mutation, không chạy được bằng runtime hạn chế. C2a chuyển đúng các đường này, không coi code cũ là lý do cấp raw grant. Inventory cho thấy nhiều resource final callers chưa kiểm session cuối; bàn giao C2d, không tuyên bố T14 toàn hệ thống. Kiểm runtime/migration/config **367 pass**, web **43 pass**; safety vẫn pending, không nâng/restart dev.
+
+## Chia C2 và chốt Origin theo ủy quyền (2026-10-03)
+
+**Nguồn và trạng thái:** chủ dự án đã ủy quyền orchestrator chọn phương án hợp lý, thuận tiện, và sau khi merge PR #33 yêu cầu giao task tiếp. Orchestrator chọn chính sách/cách chia dưới đây; không ghi là chủ dự án trực tiếp chọn từng phương án. Fetch đã xác minh PR #33 merge `c98bd33`, chứa `c647d6e`, head source `0034`; không truy vấn DB dev. C1 giữ safety pending, không mở traffic.
+
+- **Origin đã chốt cho C2:** browser vẫn qua proxy Next.js cùng origin, cookie + CSRF. Mọi HTTP request ghi POST/PUT/PATCH/DELETE, kể cả auth anonymous, phải có Origin tường minh thuộc allowlist cấu hình HTTP(S) hợp lệ. Thiếu/null/sai Origin bị từ chối; không fallback Host/Referer/Forwarded/development, proxy không tự sinh Origin tin cậy. GET/HEAD/OPTIONS giữ hợp đồng cũ; CLI dùng quyền/hợp đồng riêng. Client/script HTTP phải gửi Origin cùng cookie/CSRF, không có exemption hay auth API key mới. Header này là kiểm CSRF bổ sung, không thay session/ACL hoặc chứng minh caller là browser. Lý do: một chính sách nhất quán, kiểm được qua proxy và client thử, không mở nhánh tương thích yếu hơn.
+- **Chia C2:** C2a login/session/predicate dùng chung; C2b reset + disable/enable; C2c bootstrap/invitation; C2d final checks caller chậm và integration đủ writer. C2a chỉ chuyển phần của nó, phần còn lại được inventory và vẫn đóng trong pending. Không gọi toàn auth đã hoàn chỉnh hoặc lùi writer/predicate/status tới C4. C3 giữ recovery/operator/approval/delivery; C4 giữ cutover/full HTTP/drill.
+- **Task đã giao:** [prompt C2a](tasks/m6c2b2c2a-login-session-predicates.md). Coding agent bắt đầu triển khai, không xin lại nền C1/Origin hoặc chỉ báo kế hoạch; dùng project/DB/journal/roles thử riêng và giữ các docs bàn giao này trong PR.
+- **Kiểm và giới hạn:** test writer/predicate dùng runtime thật, chỉ patch boundary pending trong fixture test-only, giữ integrity/hold/auth/DB guard; HTTP pending không patch là kiểm riêng. Full HTTP/proxy sau ready thuộc C4. Chưa chọn operator, approval initial status/Admin, delivery production, nơi lưu journal độc lập hoặc runbook cutover; không migrate/restart dev, gọi provider hay bật pricing.
+
 ## Quyết định nền C1 theo ủy quyền (2026-10-03)
 
 **Đã chốt theo ủy quyền của chủ dự án:** sau khi nhận báo cáo khảo sát C1 và bốn quyết định đầu vào còn mở, chủ dự án yêu cầu: “Tùy bạn quyết định sao cho hợp lý, thuận tiện nhất”. Orchestrator chọn bộ quyết định dưới đây và cho phép coding agent bắt đầu C1. Đây là quyết định do orchestrator đưa ra trong phạm vi được ủy quyền; không ghi rằng chủ dự án trực tiếp chọn từng phương án. PR #32 đã merge tại `a5c75b88da72eaf3d8a28c0c00d82d12099f28a4`; head source trước coding `0032`, C1 thêm `0033` chỉ trên môi trường thử cô lập.
@@ -16,7 +35,7 @@
 
 **Kiểm chứng pending:** Compose hiện kiểm API bằng `/readyz` và web chờ API healthy. Smoke C1 dùng cấu hình khởi động project cô lập phù hợp để gọi API/web khi readiness còn 503; không đổi readiness thành 200, không thêm bypass auth/gate. Kiểm trực tiếp SQL/journal/replay/fence có cả ca được phép và bị chặn; HTTP pending là nhóm riêng, các ca HTTP nghiệp vụ giữ expectation và hoãn tới C4 có inventory rõ.
 
-**Còn mở theo milestone:** Origin/client compatibility trước C2; operator thực tế, inventory UUID, chứng cứ/approval, initial status/Admin và delivery trước C3; runbook cutover, quyền journal writer và storage độc lập trước triển khai ngoài môi trường thử. Chưa chọn người vận hành hoặc cấp quyền enable Admin từ lời ủy quyền này. Không coi các quyết định đó là điều kiện chặn C1.
+**Còn mở theo milestone:** Origin/client compatibility từng chờ trước C2, nay đã [chốt theo ủy quyền](#chia-c2-và-chốt-origin-theo-ủy-quyền-2026-10-03). Operator thực tế, inventory UUID, chứng cứ/approval, initial status/Admin và delivery trước C3; runbook cutover, quyền journal writer và storage độc lập trước triển khai ngoài môi trường thử vẫn mở. Chưa chọn người vận hành hoặc cấp quyền enable Admin từ lời ủy quyền này. Không coi các quyết định đó là điều kiện chặn C1/C2a.
 
 [Prompt giao coding C1](tasks/m6c2b2c1-auth-safety-foundation.md). Coding agent giữ và đưa các cập nhật tài liệu này vào PR C1; không cần một PR thiết kế nền mới. Các mục PR #32 bên dưới là lịch sử trước khi được ủy quyền chốt.
 
@@ -28,7 +47,7 @@ Coding chọn revision `0033`, domain computed cho FK receipt, NOLOGIN definer k
 
 ### Review P2 reset token của PR #33 (2026-10-03)
 
-Nguồn yêu cầu: chủ dự án báo “Chưa nên merge PR #33”, tái hiện bằng role runtime thật: disable đã journal nhưng transaction rollback, replay mirror/projection để head mới hơn snapshot active/proven, routine reset token vẫn cấp được. Chủ dự án yêu cầu cả normal/quarantine khớp status operation/generation mới nhất, latest active có receipt, kiểm đối chứng trước sửa và kiểm tình trạng áp `0033` trước khi chọn cách migration.
+Nguồn yêu cầu: orchestrator review báo “Chưa nên merge PR #33”, tái hiện bằng role runtime thật: disable đã journal nhưng transaction rollback, replay mirror/projection để head mới hơn snapshot active/proven, routine reset token vẫn cấp được. Orchestrator yêu cầu cả normal/quarantine khớp status operation/generation mới nhất, latest active có receipt, kiểm đối chứng trước sửa và kiểm tình trạng áp `0033` trước khi chọn cách migration. Đây không phải lựa chọn trực tiếp của chủ dự án.
 
 Đã đọc chứng cứ triển khai C1 (chỉ DB tạm đã dọn), kiểm source/PR và inventory container chỉ đọc; chưa có xác nhận đủ về mọi DB lâu dài đã áp `0033`. Không đọc `.env` hay truy vấn DB dev. Chọn **revision mới `0034`**, giữ nguyên `0033`, để sửa cả môi trường đã áp revision cũ; đây là lựa chọn triển khai bảo toàn lịch sử khi tình trạng deployment chưa xác minh đầy đủ, không tuyên bố mọi DB lâu dài chưa áp `0033`.
 

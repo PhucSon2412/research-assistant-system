@@ -43,3 +43,9 @@ def verify_password(verifier: str, password: str) -> bool:
 
 def needs_rehash(verifier: str) -> bool:
     return _hasher.check_needs_rehash(verifier)
+
+
+def hasher_for_policy(policy) -> PasswordHasher:
+    """Policy rows are migrator-managed and PHC checked again by the CAS routine."""
+    return PasswordHasher(memory_cost=policy["memory_kib"], time_cost=policy["time_cost"],
+                          parallelism=policy["parallelism"], salt_len=policy["salt_bytes"], hash_len=policy["hash_bytes"])

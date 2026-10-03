@@ -15,7 +15,9 @@ from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
+import re
+import ipaddress
 
 from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -369,6 +371,41 @@ class GenerationPolicy(BaseModel):
         return self
 
 
+def normalise_origin(value: str) -> str:
+    """Canonical HTTP(S) scheme/host/effective port, with no URL extras."""
+    if not isinstance(value, str) or not value or any(c.isspace() for c in value) or any(c in value for c in ('\\', '%', '*', '?', '#')):
+        raise ValueError("invalid HTTP origin")
+    parsed = urlsplit(value)
+    if parsed.scheme.lower() not in ('http', 'https') or not parsed.netloc or parsed.path or parsed.query or parsed.fragment or parsed.username is not None or parsed.password is not None:
+        raise ValueError("origin must be HTTP(S) scheme://host[:port]")
+    host = parsed.hostname
+    if not host or parsed.netloc.endswith(':'):
+        raise ValueError("invalid origin host/port")
+    try:
+        port = parsed.port
+        if port is not None and not 1 <= port <= 65535:
+            raise ValueError("invalid origin port")
+        if ':' in host:
+            host = '[' + ipaddress.IPv6Address(host).compressed + ']'
+        else:
+            host = host.encode('idna').decode('ascii').lower()
+            if not re.fullmatch(r'[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?', host) or any(not re.fullmatch(r'[a-z0-9](?:[a-z0-9-]*[a-z0-9])?', label) for label in host.split('.')):
+                raise ValueError("invalid origin hostname")
+    except (UnicodeError, ValueError):
+        raise ValueError("invalid origin host/port") from None
+    scheme = parsed.scheme.lower()
+    port = port or (443 if scheme == 'https' else 80)
+    suffix = '' if port == (443 if scheme == 'https' else 80) else f':{port}'
+    return f'{scheme}://{host}{suffix}'
+
+
+def origin_allowed(value: str | None, allowed: list[str]) -> bool:
+    try:
+        return normalise_origin(value) in allowed
+    except (ValueError, TypeError):
+        return False
+
+
 class HttpSecurity(BaseModel):
     """Cookie and request-origin policy (M1b).
 
@@ -385,9 +422,7 @@ class HttpSecurity(BaseModel):
 
     @model_validator(mode="after")
     def _check_urls(self) -> "HttpSecurity":
-        for origin in self.allowed_origins:
-            if not origin.startswith(("http://", "https://")) or origin.endswith("/"):
-                raise ValueError("allowed_origins entries must be scheme://host[:port] without a trailing slash")
+        self.allowed_origins = list(dict.fromkeys(normalise_origin(o) for o in self.allowed_origins))
         if self.public_base_url is not None:
             if not self.public_base_url.startswith(("http://", "https://")):
                 raise ValueError("public_base_url must start with http:// or https://")

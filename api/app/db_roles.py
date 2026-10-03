@@ -3,8 +3,12 @@ import re
 from sqlalchemy import text
 
 RUNTIME_ROUTINES = {"ras_auth_mirror", "ras_auth_confirm", "ras_auth_project", "ras_auth_change", "ras_auth_rehash",
-                    "ras_auth_session_create", "ras_auth_token_create", "ras_auth_lock_users"}
-RECOVERY_ROUTINES = {"ras_auth_mirror", "ras_auth_confirm", "ras_auth_project", "ras_auth_restrict", "ras_auth_progress", "ras_auth_lock_users"}
+                    "ras_auth_session_create", "ras_auth_token_create", "ras_auth_lock_users",
+                    "ras_auth_session_lock", "ras_auth_session_activity", "ras_auth_session_close", "ras_auth_closure_mirror",
+                    "ras_auth_account_live", "ras_auth_session_live"}
+RECOVERY_ROUTINES = {"ras_auth_mirror", "ras_auth_confirm", "ras_auth_project", "ras_auth_restrict", "ras_auth_progress", "ras_auth_lock_users",
+                     "ras_auth_account_live", "ras_auth_session_live", "ras_auth_session_lock",
+                     "ras_auth_session_close", "ras_auth_closure_mirror"}
 PROTECTED = {"users", "sessions", "password_reset_tokens", "auth_change_receipts", "auth_safety_heads", "auth_safety_state", "auth_hash_policies", "revocation_journal_records"}
 
 
@@ -63,10 +67,10 @@ def provision(engine, *, runtime: str, recovery: str, definer: str):
             conn.execute(text(f"GRANT INSERT,UPDATE ON {_identifier(table)} TO {rc}"))
         conn.execute(text(f"GRANT SELECT ON users,sessions,password_reset_tokens,auth_change_receipts,auth_safety_heads,auth_safety_state,auth_hash_policies,revocation_journal_records TO {df}"))
         conn.execute(text(f"GRANT INSERT ON auth_change_receipts,auth_safety_heads,sessions,password_reset_tokens,revocation_journal_records TO {df}"))
-        conn.execute(text(f"GRANT UPDATE ON users,auth_safety_heads,auth_safety_state,revocation_journal_records TO {df}"))
+        conn.execute(text(f"GRANT UPDATE ON users,sessions,auth_safety_heads,auth_safety_state,revocation_journal_records TO {df}"))
         conn.execute(text(f"GRANT EXECUTE ON FUNCTION ras_auth_phc_valid(text,integer) TO {df}"))
         # Triggers execute under the caller; SELECT is already granted. Trigger functions don't expose mutation.
-        functions = conn.execute(text("SELECT oid::regprocedure::text signature,proname FROM pg_proc WHERE pronamespace='public'::regnamespace AND prosecdef AND proname LIKE 'ras_auth_%'"))
+        functions = conn.execute(text("SELECT oid::regprocedure::text signature,proname FROM pg_proc WHERE pronamespace='public'::regnamespace AND (prosecdef OR proname IN ('ras_auth_account_live','ras_auth_session_live')) AND proname LIKE 'ras_auth_%'"))
         for signature, name in functions:
             conn.execute(text(f"ALTER FUNCTION {signature} OWNER TO {df}"))
             conn.execute(text(f"REVOKE ALL ON FUNCTION {signature} FROM PUBLIC"))
