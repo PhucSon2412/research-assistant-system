@@ -305,6 +305,9 @@ def closure_of(w, request_id, *, status="withdrawn", code="withdrawn_by_requeste
 
 
 def test_db_refuses_at_insert_a_mirror_row_whose_line_names_another_or_no_request(upload_api, monkeypatch):
+    # Keep fake time well ahead of PostgreSQL's wall clock: the journal fence,
+    # not an unrelated closed_after CHECK, must be the reason the SQL is refused.
+    upload_api[0].clock.advance(hours=1)
     w = review_world(upload_api, monkeypatch)
     head = journal.read(journal_file()).head
     absent = str(uuid.uuid4())
@@ -330,9 +333,9 @@ def test_db_refuses_at_insert_a_mirror_row_whose_line_names_another_or_no_reques
         conn.execute(text("ALTER TABLE revocation_journal_records"
                           " DROP CONSTRAINT ck_revocation_journal_records_closure_request_matches_body"))
         conn.execute(MIRROR_INSERT, {"s": record.seq, "h": record.hash, "l": record.line, "r": uuid.UUID(w.rid)})
-        conn.execute(text("""UPDATE review_requests SET status='withdrawn', closed_at=now(),
+        conn.execute(text("""UPDATE review_requests SET status='withdrawn', closed_at=:closed,
             closed_by_user_id=requester_user_id, close_reason_code='withdrawn_by_requester' WHERE id=:r"""),
-                     {"r": uuid.UUID(w.rid)})
+                     {"r": uuid.UUID(w.rid), "closed": w.api.clock.now})
     assert w.api.scalar("SELECT count(*) FROM pg_constraint"
                         " WHERE conname='ck_revocation_journal_records_closure_request_matches_body'") == 1
     assert status_in(w.api.engine, w.rid)[0] == "open" and closures() == [] and gate(w.api.engine) == "open"
@@ -343,6 +346,7 @@ def test_db_refuses_at_insert_a_mirror_row_whose_line_names_another_or_no_reques
 def test_db_refuses_at_insert_a_mirror_row_whose_line_has_no_request_id(upload_api, monkeypatch, shape):
     """PR #28 review, second round: ``=`` gave NULL for a missing or null body.request_id, and a CHECK lets
     NULL through; the comparison must be TRUE for the row to be accepted."""
+    upload_api[0].clock.advance(hours=1)
     w = review_world(upload_api, monkeypatch)
     head = journal.read(journal_file()).head
     value = json.loads(journal.next_record(head, journal.REVIEW_CLOSURE, closure_of(w, w.rid)).line)
@@ -357,9 +361,9 @@ def test_db_refuses_at_insert_a_mirror_row_whose_line_has_no_request_id(upload_a
             conn.execute(MIRROR_INSERT, params)  # refused by the INSERT itself
         conn.rollback()
     with pytest.raises(IntegrityError, match="closure_request_matches_body"), w.api.engine.begin() as conn:
-        conn.execute(text("""UPDATE review_requests SET status='withdrawn', closed_at=now(),
+        conn.execute(text("""UPDATE review_requests SET status='withdrawn', closed_at=:closed,
             closed_by_user_id=requester_user_id, close_reason_code='withdrawn_by_requester' WHERE id=:r"""),
-                     {"r": uuid.UUID(w.rid)})
+                     {"r": uuid.UUID(w.rid), "closed": w.api.clock.now})
         conn.execute(MIRROR_INSERT, params)
     # The other layers refuse it too: the reader never accepts such a line.
     with pytest.raises(journal.JournalError, match="journal_corrupt"):
