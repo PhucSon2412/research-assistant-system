@@ -6,6 +6,8 @@ Brief khởi tạo và quyết định của chủ dự án ngày **2026-09-24**
 
 ## Quyết định triển khai M6c-2b2b1 (2026-10-03)
 
+**Sửa runbook theo review PR #30:** thiếu build khiến Compose có thể dùng image `0030` dù host chứa `0031`. Build đủ service từ commit được duyệt trước hold/migrate/recover, kiểm head từng image Python, đọc revision DB sau migrate và chỉ recreate writer khi revision/recovery status đều đạt. Đây là sửa vận hành, không đổi auth/journal; kiểm trên project cô lập, giữ DB dev `0030`. Chứng cứ riêng ở [dev-setup](dev-setup.md#journal-reset-token-m6c-2b2b1).
+
 **Mâu thuẫn kiểm thử/thông điệp xử lý:** lượt toàn suite đầu lộ hai fixture review trộn FakeClock với PostgreSQL wall clock, bị CHECK thời gian chặn trước fence journal. Dùng cùng FakeClock (đẩy trước một giờ), không thay production review. UI quên mật khẩu trước đây hứa gửi email cho tài khoản active; với public 202 chung cả lỗi nội bộ, sửa thành xác nhận tiếp nhận, không xác nhận delivery. Xem [chứng cứ](dev-setup.md#journal-reset-token-m6c-2b2b1).
 
 **Đã xác nhận:** bảo vệ reset token đã dùng/thu hồi sau restore với journal độc lập, hiện hành; chỉ vòng đời reset token. PR #29 đã merge `d38c6b8` (fetch + kiểm ancestor `origin/main`); nhánh `feat/m6c2b2b1-reset-token-journal` xuất phát tại đó. Invitation/credential/account rollback/membership/xóa riêng là task sau; không provider, scheduler/production.

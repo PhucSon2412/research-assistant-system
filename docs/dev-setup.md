@@ -1128,28 +1128,56 @@ Base `origin/main=d38c6b8` (PR #29 đã merge); nhánh `feat/m6c2b2b1-reset-toke
 
 **Runbook nâng cấp DB hiện có (operator thực hiện, không chạy trên dev trong PR):**
 
-1. Xác minh DB live hay snapshot restore, bảo toàn journal hiện hành ở nơi độc lập; dừng `api web worker beat` của **đúng project**. Xác minh artifact/journal trước restore theo M6c-2a, không cho writer chạy giữa migrate/recover.
-2. DB live đã đăng ký: migrate `0031`, chạy `recovery status`. Nếu còn token kết thúc trước migration, thấy `reset_tokens_not_journaled`, `unjournaled_reset_tokens=N`. Chạy `recover` không cần `--confirm-db-is-current` chỉ để import lịch sử có thật còn trong DB; report `reset_tokens_imported=N`. Mã `legacy_consumed`/`legacy_revoked` không suy lý do cũ. DB live chưa đăng ký: migrate rồi `register-existing --confirm-db-is-current` sau khi xác minh đúng live; không `init` DB có token.
-3. Snapshot restore: luôn `hold` trước writer, migrate rồi `recover` với **bản sao journal hiện hành riêng**. `hold` dùng seq/hash, chạy được trên `0030` trước migrate. Không dùng `--confirm-db-is-current` trên snapshot; nếu journal thiếu/khác/xung đột thì dừng để tìm bản đúng, không tự suy lịch sử.
-4. Chỉ start writer khi report `gate=open`, status `unjournaled_reset_tokens=0`, `unconfirmed_records=0` và các gate khác mở. Token đã journal không được mở lại kể cả sau xóa hàng/tái chèn cùng ID. Downgrade `0030` bị từ chối ở DB đã đăng ký.
-5. Append/fsync lỗi nhưng DB live commit: gate đóng, API confirm/disable trả lỗi. Dòng đủ fsync lỗi: recover tự sync; file thiếu đuôi/mirror ahead cần `--confirm-db-is-current` **chỉ live**. Mật khẩu/status/token mới có thể chưa commit khi outcome không rõ; replay chỉ kết thúc token/session. Request 202 không bảo đảm link gửi; thử yêu cầu mới sau recovery nếu cần.
+1. Xác minh DB live hay snapshot restore, bảo toàn journal hiện hành ở nơi độc lập; dừng `api web worker beat` của **đúng project**. Xác minh artifact/journal trước restore theo M6c-2a; DB/Redis/MinIO phải sẵn sàng, không cho writer chạy giữa migrate/recover.
+2. Checkout đúng commit mới đã được duyệt, ghi `git rev-parse HEAD`; **build cả `api web worker beat migrate recovery-init` trước mọi hold/migration/recovery**. `compose run`/`up` không bảo đảm tự build lại image có sẵn. Kiểm `alembic heads` trong từng image Python là đúng một head `0031`; nếu build/check lỗi hoặc còn `0030`, dừng, giữ writer đóng. Không suy revision của image từ source trên host hay từ DB.
+3. DB live đã đăng ký: hold rồi migrate `0031`, **đọc trực tiếp `alembic_version` trong đúng DB và buộc là `0031`**, chạy `recover`. Nếu còn token kết thúc trước migration, recover import lịch sử có thật còn trong DB, report `reset_tokens_imported=N`; mã `legacy_consumed`/`legacy_revoked` không suy lý do cũ. DB live chưa đăng ký: sau build/check image, migrate/check DB rồi `register-existing --confirm-db-is-current` chỉ khi operator đã xác minh đúng live; không hold/init DB chưa đăng ký có token.
+4. Snapshot restore: luôn `hold` trước writer, migrate/check DB rồi `recover` với **bản sao journal hiện hành riêng**. `hold` dùng seq/hash, chạy được trên `0030` trước migrate. Không dùng `--confirm-db-is-current` trên snapshot; nếu journal thiếu/khác/xung đột thì dừng để tìm bản đúng, không tự suy lịch sử.
+5. Chỉ start writer khi **revision DB `0031`**, recover thành công, status exit 0/`gate=open`, mọi count unjournaled/unconfirmed/unpurged bằng 0, `open_recovery=False`, `torn_tail=False`. Dùng `--force-recreate` để writer lấy image vừa build, không giữ container cũ; `--no-deps` vì hạ tầng và các bước one-shot đã được kiểm riêng. Token đã journal không mở lại kể cả xóa/tái chèn cùng ID. Downgrade `0030` bị từ chối ở DB đã đăng ký.
+6. Append/fsync lỗi nhưng DB live commit: gate đóng, API confirm/disable trả lỗi. Dòng đủ fsync lỗi: recover tự sync; file thiếu đuôi/mirror ahead cần `--confirm-db-is-current` **chỉ live**. Mật khẩu/status/token mới có thể chưa commit khi outcome không rõ; replay chỉ kết thúc token/session. Request 202 không bảo đảm link gửi; thử yêu cầu mới sau recovery nếu cần.
 
-Ví dụ lệnh cho operator **sau khi đã kiểm đúng project/DB/journal**, không chạy tự động trong PR:
+Ví dụ PowerShell 5.1 cho **DB đã đăng ký (live hoặc restore)**, sau khi đã kiểm đúng project/DB/journal và hạ tầng sẵn sàng. Chạy nguyên block; lỗi sẽ `throw` trước mở writer. Với DB chưa đăng ký, dùng nhánh ở bước 3 thay hold/recover; không tự thêm cờ xác nhận vào ví dụ restore.
 
 ```powershell
 $rasProject = '<project đã kiểm tra>'
+$rasExpectedRevision = '0031'
+git rev-parse HEAD
+if ($LASTEXITCODE -ne 0) { throw 'Không xác minh được commit nguồn' }
 docker compose -p $rasProject stop api web worker beat
-# Với restore: ras_backup.py đã hold trước migrate; có thể hold riêng trên snapshot đã gắn đúng journal copy.
+if ($LASTEXITCODE -ne 0) { throw 'Không dừng được writer' }
+docker compose -p $rasProject build api web worker beat migrate recovery-init
+if ($LASTEXITCODE -ne 0) { throw 'Build thất bại; giữ writer đóng' }
+foreach ($rasService in @('api', 'worker', 'beat', 'migrate', 'recovery-init')) {
+    $rasHeads = docker compose -p $rasProject run --rm --no-deps $rasService alembic heads
+    if ($LASTEXITCODE -ne 0 -or ($rasHeads | Out-String).Trim() -ne "$rasExpectedRevision (head)") {
+        throw "Image $rasService thiếu head $rasExpectedRevision; giữ writer đóng"
+    }
+}
+# Restore phải gắn journal copy hiện hành; ras_backup.py đã hold, gọi lại là idempotent.
 docker compose -p $rasProject run --rm --no-deps api python -m app.cli.recovery hold
-docker compose -p $rasProject run --rm migrate
-docker compose -p $rasProject run --rm --no-deps api python -m app.cli.recovery status
+if ($LASTEXITCODE -ne 0) { throw 'Hold thất bại; giữ writer đóng' }
+docker compose -p $rasProject run --rm --no-deps migrate
+if ($LASTEXITCODE -ne 0) { throw 'Migration thất bại; giữ writer đóng' }
+$rasDbRevision = 'SELECT version_num FROM alembic_version;' | docker compose -p $rasProject exec -T db sh -c 'psql -U $POSTGRES_USER -d $POSTGRES_DB -At'
+if ($LASTEXITCODE -ne 0 -or ($rasDbRevision | Out-String).Trim() -ne $rasExpectedRevision) {
+    throw 'DB chưa ở revision yêu cầu; giữ writer đóng'
+}
 docker compose -p $rasProject run --rm --no-deps api python -m app.cli.recovery recover
-docker compose -p $rasProject run --rm --no-deps api python -m app.cli.recovery status
-# Chỉ khi status gate=open và mọi hậu điều kiện đạt mới start writer.
-docker compose -p $rasProject up -d api web worker beat
+if ($LASTEXITCODE -ne 0) { throw 'Recover thất bại; giữ writer đóng' }
+$rasStatus = docker compose -p $rasProject run --rm --no-deps api python -m app.cli.recovery status
+if ($LASTEXITCODE -ne 0) { throw 'Gate chưa mở; giữ writer đóng' }
+$rasStatusText = ($rasStatus | Out-String).Trim()
+Write-Output $rasStatusText
+foreach ($rasExpectedField in @('gate=open', 'unconfirmed_records=0', 'unjournaled_reset_tokens=0', 'unjournaled_sessions=0', 'unjournaled_review_closures=0', 'unjournaled_tombstones=0', 'unpurged_tombstones=0', 'open_recovery=False', 'torn_tail=False')) {
+    if ($rasStatusText -notmatch "(^|\s)$([regex]::Escape($rasExpectedField))(\s|$)") {
+        throw "Chưa đạt $rasExpectedField; giữ writer đóng"
+    }
+}
+# Chỉ tới đây khi image, revision DB và mọi điều kiện recovery đều đạt.
+docker compose -p $rasProject up -d --no-deps --force-recreate --wait api web worker beat
+if ($LASTEXITCODE -ne 0) { throw 'Writer chưa sẵn sàng; kiểm health/log của đúng project' }
 ```
 
-DB live chưa đăng ký không thể hold: migrate rồi `register-existing --confirm-db-is-current` chỉ khi operator xác minh đúng live. DB live đã đăng ký có journal thiếu đuôi/mirror ahead có thể cần recover với cờ xác nhận; **không** thêm cờ vào ví dụ restore trên. Không downgrade để tránh gate.
+DB live đã đăng ký có journal thiếu đuôi/mirror ahead có thể cần recover với cờ xác nhận sau khi operator xác minh; **không** dùng cờ đó trên snapshot. Không downgrade để tránh gate.
 
 **Lệnh kiểm và diễn tập:** chạy từ repo, Conda đã xác minh. Mọi dữ liệu dưới temp/ngoài repo.
 
