@@ -1,4 +1,4 @@
-# Môi trường phát triển và schema (M1a–M6c-2b2a)
+# Môi trường phát triển và schema (M1a–M6c-2b2b1)
 
 [Mục lục](README.md) · [Mô hình dữ liệu](data-model.md) · [Roadmap](roadmap.md)
 
@@ -1121,3 +1121,34 @@ Hai project mới `ras-drill-src` / `ras-drill-restore` dùng port như M6c-2a, 
 - Diễn tập Compose `scripts/drill_session_revocation_restore.py --down`: **35/35**, **0 provider call**. A có ba session, B một session, Admin; lưu cookie và CSRF; B upload một Markdown tổng hợp 65 byte. Backup writer dừng (1 object, dump **227.037 byte**, journal DB head 1). Sau backup: A1 logout; A0 revoke-others thu hồi A2, giữ A0; session mới của A tạo rồi logout (snapshot không có). Journal hiện hành có ba dòng chỉ ID/mã/thời điểm. Copy riêng, restore → gate `db_behind_journal`; snapshot có ba session A sống. Trước recover: **20/20** request (5 bộ cookie × GET/POST × web/API) `503 service_recovering`. Recover → `session_revoked=2`, `recorded_session_absent=1`, gate mở. Sau recover: cookie **và CSRF cũ** của A1/A2 → `401 session_expired` qua web/API; A0/B → `200`, file B đúng SHA-256; session sau backup vẫn không tồn tại. Session snapshot còn trong idle/absolute; tuổi lớn nhất quan sát **75,03 s**, so với lifetimes từ config (không sửa timeout để test). Recover lặp, restore lần hai + recover cho cùng kết quả. Journal nguồn không đổi byte; logs container không traceback/token. `--down` đã gỡ hai project/volume; dev không bị nâng schema hay restart. Một lần đo nhỏ, không SLO: backup **1,44 s**, restore **14,98 s**, recover **2,30 s**; dữ liệu/journal/artifact cùng máy.
 
 **Giới hạn:** chỉ session; reset token/invitation, mật khẩu và account status có thể trở về snapshot cũ. Credential cũ có thể tạo **session mới** sau restore. Backfill không cứu lịch sử đã mất, journal cũ/cùng rollback với DB không phát hiện được. Crash/fsync/commit lỗi chỉ tiêm lỗi, chưa kiểm mất điện thật; journal/DB/artifact cùng máy trong diễn tập. Hợp đồng task token/credential tiếp theo ở decisions. Không thay `.env`/key hoặc `pricing_verified`.
+
+## Journal reset token (M6c-2b2b1)
+
+Base `origin/main=d38c6b8` (PR #29 đã merge); nhánh `feat/m6c2b2b1-reset-token-journal`, revision `0031`. [Thiết kế, batch và cửa sổ lỗi](reset-token-journal.md). Không nâng DB dev; migration/test dùng DB riêng, diễn tập hai project cô lập. Host Python đã kiểm `C:\Users\ADMIN\.conda\envs\ras\python.exe`, pip cùng env; không venv.
+
+**Runbook nâng cấp DB hiện có (operator thực hiện, không chạy trên dev trong PR):**
+
+1. Xác minh DB live hay snapshot restore, bảo toàn journal hiện hành ở nơi độc lập; dừng `api web worker beat` của **đúng project**. Xác minh artifact/journal trước restore theo M6c-2a, không cho writer chạy giữa migrate/recover.
+2. DB live đã đăng ký: migrate `0031`, chạy `recovery status`. Nếu còn token kết thúc trước migration, thấy `reset_tokens_not_journaled`, `unjournaled_reset_tokens=N`. Chạy `recover` không cần `--confirm-db-is-current` chỉ để import lịch sử có thật còn trong DB; report `reset_tokens_imported=N`. Mã `legacy_consumed`/`legacy_revoked` không suy lý do cũ. DB live chưa đăng ký: migrate rồi `register-existing --confirm-db-is-current` sau khi xác minh đúng live; không `init` DB có token.
+3. Snapshot restore: luôn `hold` trước writer, migrate rồi `recover` với **bản sao journal hiện hành riêng**. `hold` dùng seq/hash, chạy được trên `0030` trước migrate. Không dùng `--confirm-db-is-current` trên snapshot; nếu journal thiếu/khác/xung đột thì dừng để tìm bản đúng, không tự suy lịch sử.
+4. Chỉ start writer khi report `gate=open`, status `unjournaled_reset_tokens=0`, `unconfirmed_records=0` và các gate khác mở. Token đã journal không được mở lại kể cả sau xóa hàng/tái chèn cùng ID. Downgrade `0030` bị từ chối ở DB đã đăng ký.
+5. Append/fsync lỗi nhưng DB live commit: gate đóng, API confirm/disable trả lỗi. Dòng đủ fsync lỗi: recover tự sync; file thiếu đuôi/mirror ahead cần `--confirm-db-is-current` **chỉ live**. Mật khẩu/status/token mới có thể chưa commit khi outcome không rõ; replay chỉ kết thúc token/session. Request 202 không bảo đảm link gửi; thử yêu cầu mới sau recovery nếu cần.
+
+**Lệnh kiểm và diễn tập:** chạy từ repo, Conda đã xác minh. Mọi dữ liệu dưới temp/ngoài repo.
+
+```powershell
+$py = 'C:\Users\ADMIN\.conda\envs\ras\python.exe'
+& $py -c "import sys; print(sys.executable)"
+& $py -m pip --version
+& $py -m pytest api/tests/test_reset_token_journal.py api/tests/test_password_reset.py api/tests/test_session_revocation_journal.py api/tests/test_review_closure_journal.py api/tests/test_recovery.py api/tests/test_migrations.py -q
+& $py -m pytest api -q
+npm test --prefix web
+npm run typecheck --prefix web
+npm run build --prefix web
+$env:DRILL_WORK_DIR = '<thư mục tuyệt đối ngoài repo, chưa có hoặc trống>'
+& $py scripts/drill_reset_token_restore.py --down
+```
+
+Script từ chối project/volume/container có sẵn, bind thử mọi port trước build/up. Dùng `ras-drill-src`/`ras-drill-restore`, port DB 45432/46432, API 48000/46800, web 43000/46300, MinIO 49000/49001 và 46900/46901; không stop/restart/migrate `ras`. Backup khi token mở → consume A (ba session), replace C/disable D (không session) → copy journal riêng → restore/hold/migrate/recover → thử link cũ qua web/API trong TTL, token B vẫn hợp lệ, session A bị từ chối, file B đúng hash → recover lặp/restore lần hai. Source journal không đổi; chỉ target viết copy. Không provider/key, không thay `.env`/`pricing_verified`. `--down` chỉ dọn hai project này.
+
+**Kiểm chứng lượt triển khai:** kết quả cuối được ghi dưới đây sau khi suite/diễn tập hoàn tất; lỗi chỉ tiêm, không kiểm mất điện thật. Invitation chưa bảo vệ; mật khẩu/status vẫn rollback, credential cũ có thể login tạo session mới. Journal cùng rollback với DB không phát hiện; lịch sử mất không backfill. Production journal/vận hành backup chưa chốt. Kế tiếp journal invitation, rồi credential/account status.

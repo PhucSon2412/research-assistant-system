@@ -1,5 +1,7 @@
 # Mô hình dữ liệu logic
 
+**M6c-2b2b1 `0031`:** `password_reset_tokens.closure_reason` nullable cho lịch sử; mirror thêm `reset_token_id` unique, `reset_token_user_id`, `reset_end_kind`, `reset_reason_code`, `reset_ended_at`, không FK. CHECK/trigger INSERT khớp body/owner và JSON missing/null/thừa; trigger hoãn closure đúng loại/mã/time, BEFORE cấm đổi identity/kết thúc/tái chèn token mở. Không sửa `0030` của PR #29 đã merge `d38c6b8`. [Hợp đồng](reset-token-journal.md).
+
 [Mục lục](README.md) · [Kiến trúc](architecture.md) · [Quyền và dữ liệu](access-and-data.md)
 
 **M6c-2b2a revision `0030` (nhánh review):** `revocation_journal_records.kind` thêm `session_revocation`, `session_id` unique và `session_user_id` (không FK). Body chỉ session/User ID, reason code và revoked_at. Hai cột mirror bắt buộc, khớp body ngay INSERT, missing/null không qua CHECK; target trigger chặn User sai. Trigger hoãn trên `sessions` buộc mirror đúng ID/User/reason/time; trigger BEFORE giữ ID/User/token hash/created_at bất biến, cặp revoked_at/reason cuối và chặn tái chèn session sống đã journal. Confirm-only so mọi cột ngoài journal_confirmed. Không backfill ở migration; gate `sessions_not_journaled` tới recover import thu hồi cũ còn trong DB. `hold` dùng seq/hash trước migrate; downgrade bị chặn khi đã đăng ký. Không thay schema credential/token/account status. Xem [decisions](decisions.md#quyết-định-triển-khai-m6c-2b2a-2026-10-02).

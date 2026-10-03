@@ -1,5 +1,7 @@
 # Quyền và dữ liệu
 
+**M6c-2b2b1, `0031`:** journal độc lập hiện hành giữ reset token đã dùng/thu hồi không dùng lại sau restore/recover trong TTL. Request/confirm/disable ghi closure cùng batch session trong transaction auth. Replay chỉ đóng token/session, không đổi verifier/status/phát link. Invitation chưa bảo vệ; credential/status cũ có thể tạo session mới. [Hợp đồng/bảng lỗi](reset-token-journal.md). PR #29 đã merge `d38c6b8`.
+
 [Mục lục](README.md) · [Mô hình dữ liệu](data-model.md) · [Search và RAG](search-and-rag.md)
 
 ## Nguyên tắc

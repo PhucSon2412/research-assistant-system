@@ -252,10 +252,15 @@ def request_password_reset(
     settings: Settings = Depends(get_settings),
     delivery: DeliveryAdapter = Depends(get_delivery),
 ) -> dict:
-    """Same status and body whether or not the account exists; delivery runs
-    after the response so its duration does not reveal it either."""
+    """Generic acceptance, not a guarantee of delivery. Only a known committed
+    token reaches the adapter. This does not claim to prevent timing enumeration."""
     if delivery.enabled:
-        issued = password_reset.request_reset(db, email=body.email, now=now, lifetime=settings.auth.password_reset)
+        try:
+            issued = password_reset.request_reset(db, email=body.email, now=now, lifetime=settings.auth.password_reset)
+        except Exception:  # No account-dependent status/body or delivery after an uncertain commit.
+            db.rollback()
+            issued = None
+            log.error("password reset request unavailable")
         if issued is not None:
             message = OutgoingMessage(
                 kind=MessageKind.PASSWORD_RESET,

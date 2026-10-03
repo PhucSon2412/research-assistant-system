@@ -4,7 +4,19 @@
 
 Brief khởi tạo và quyết định của chủ dự án ngày **2026-09-24** là nguồn cho các mục **Đã xác nhận**. Quyết định kỹ thuật đã chốt được ghi ở đây; chi tiết triển khai còn mở vẫn là **Đề xuất** hoặc **Cần xác nhận**. Khi đổi quyết định, ghi ngày/lý do và sửa docs cùng code liên quan.
 
+## Quyết định triển khai M6c-2b2b1 (2026-10-03)
+
+**Đã xác nhận:** bảo vệ reset token đã dùng/thu hồi sau restore với journal độc lập, hiện hành; chỉ vòng đời reset token. PR #29 đã merge `d38c6b8` (fetch + kiểm ancestor `origin/main`); nhánh `feat/m6c2b2b1-reset-token-journal` xuất phát tại đó. Invitation/credential/account rollback/membership/xóa riêng là task sau; không provider, scheduler/production.
+
+**Lựa chọn triển khai của agent:** `0031`; cùng journal thêm `reset_token_closure` tối thiểu, mirror không FK khớp body ngay INSERT, SQL/parser kiểm missing/null/thừa độc lập; fence closure/identity/reinsert, batch token/session false + flush trước append/fsync, xác nhận toàn batch sau thành công. Không phụ thuộc session. Backfill dùng mã legacy vì schema cũ không có nguyên nhân. [Thiết kế/bảng cửa sổ lỗi](reset-token-journal.md), [runbook/kiểm chứng](dev-setup.md#journal-reset-token-m6c-2b2b1).
+
+**Mâu thuẫn docs/code đã xử lý:** docs ghi PR #29 nhánh review → đã merge. Dùng một lần M1b đúng trên DB live nhưng snapshot token mở dùng lại được sau restore → mở rộng bằng journal có điều kiện. Request-reset commit trực tiếp, reset/disable UPDATE token không khóa từng hàng, helper chỉ journal session → khóa token theo UUID và batch hỗn hợp giữ transaction nguyên tử. Lỗi journal nhánh account tồn tại có thể lộ qua status khác → giữ 202 tiếp nhận chung, không bảo đảm delivery hay timing enumeration. Partial unique chỉ một token mở/User, test reset-completed qua helper với giới hạn đã nêu. Recover import token sau replay để mirror không tạo gap khi file ahead. Register-existing mirror false trước create/fsync, xác nhận toàn batch sau thành công.
+
+**Cần chủ dự án xác nhận cho task sau:** nơi lưu journal production/vận hành backup và thiết kế chống rollback credential/account status. Không chọn thay chủ dự án trong PR này. Kế tiếp journal invitation, rồi credential/account status. [Giới hạn](reset-token-journal.md#giới-hạn-và-việc-kế-tiếp).
+
 ## Quyết định triển khai M6c-2b2a (2026-10-02)
+
+PR #29 đã merge `d38c6b8`; phần dưới là quyết định/kết quả lịch sử của PR đó. M6c-2b2b1 mở rộng reset token; credential/account status vẫn rollback.
 
 **Đã xác nhận cho PR này:** với journal độc lập và hiện hành, session đã logout/thu hồi không được sử dụng lại sau restore, dù cookie và CSRF cũ chưa hết hạn. Chỉ bảo vệ session. PR #28 đã merge ở `47a1aab`; nhánh này bắt đầu từ commit đó và bàn giao để review, chưa merge.
 

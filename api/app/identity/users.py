@@ -10,14 +10,15 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.audit import record_event
 from app.identity.errors import Forbidden, NotFound
 from app.identity.sessions import revoke_user_sessions
 from app.identity.session_commit import commit_auth
-from app.models import PasswordResetToken, User
+from app.identity.reset_tokens import revoke_open_tokens
+from app.models import User
 from app.models.enums import AuditActorType, AuditOutcome, SessionRevokeReason, UserStatus
 
 
@@ -38,16 +39,7 @@ def set_user_status(
     user.status = status.value
     user.updated_at = now
     if status is UserStatus.DISABLED:
-        db.execute(
-            update(PasswordResetToken)
-            .where(
-                PasswordResetToken.user_id == user_id,
-                PasswordResetToken.used_at.is_(None),
-                PasswordResetToken.revoked_at.is_(None),
-            )
-            .values(revoked_at=now)
-            .execution_options(synchronize_session=False)
-        )
+        revoke_open_tokens(db, user_id, reason="user_disabled", now=now)
         revoke_user_sessions(db, user_id=user_id, reason=SessionRevokeReason.USER_DISABLED, now=now)
     record_event(
         db,

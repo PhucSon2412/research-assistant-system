@@ -5,6 +5,8 @@ import { ApiError, api, describeError } from "../lib/api.ts";
 test("uncertain auth transaction never claims password reset or disable succeeded", () => {
   assert.match(describeError(new ApiError(503, "auth_outcome_uncertain")), /Chưa xác định.*Kiểm tra/);
   assert.match(describeError(new ApiError(503, "session_journal_unavailable")), /Phiên đã bị thu hồi/);
+  assert.doesNotMatch(describeError(new ApiError(503, "auth_journal_unavailable")), /Phiên đã bị thu hồi/);
+  assert.match(describeError(new ApiError(503, "auth_closure_pending_recovery")), /Chưa xác định/);
   for (const code of ["auth_outcome_uncertain", "session_revocation_pending_recovery"]) {
     assert.doesNotMatch(describeError(new ApiError(503, code)), /đổi mật khẩu thành công|vô hiệu hóa thành công/);
   }
