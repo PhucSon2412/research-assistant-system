@@ -26,6 +26,14 @@ Nguồn cho phép coding: chủ dự án trong phiên này: “Bắt đầu codi
 
 Coding chọn revision `0033`, domain computed cho FK receipt, NOLOGIN definer không owner bảng, provisioning CLI riêng, policy PHC lưu DB, routine khóa User để runtime không cần UPDATE trực tiếp. Fixed search_path đặt pg_temp cuối, thu hồi PUBLIC; không GUC/reason bypass. Replay mirror/fold toàn chain trước so snapshot/restrict; recover tách integrity hoàn tất khỏi safety pending. Guard downgrade C1 rộng hơn fence lịch sử: chỉ DB pristine được hạ, tránh quay schema đã quarantine về auth cũ. Test fence lịch sử pin tới 0032 rồi upgrade head giữ expectation nghiệp vụ. [Chi tiết schema/quyền/kiểm chứng/bàn giao](c1-auth-safety-foundation.md); operator/delivery/initial status/C4 vẫn mở như trên.
 
+### Review P2 reset token của PR #33 (2026-10-03)
+
+Nguồn yêu cầu: chủ dự án báo “Chưa nên merge PR #33”, tái hiện bằng role runtime thật: disable đã journal nhưng transaction rollback, replay mirror/projection để head mới hơn snapshot active/proven, routine reset token vẫn cấp được. Chủ dự án yêu cầu cả normal/quarantine khớp status operation/generation mới nhất, latest active có receipt, kiểm đối chứng trước sửa và kiểm tình trạng áp `0033` trước khi chọn cách migration.
+
+Đã đọc chứng cứ triển khai C1 (chỉ DB tạm đã dọn), kiểm source/PR và inventory container chỉ đọc; chưa có xác nhận đủ về mọi DB lâu dài đã áp `0033`. Không đọc `.env` hay truy vấn DB dev. Chọn **revision mới `0034`**, giữ nguyên `0033`, để sửa cả môi trường đã áp revision cũ; đây là lựa chọn triển khai bảo toàn lịch sử khi tình trạng deployment chưa xác minh đầy đủ, không tuyên bố mọi DB lâu dài chưa áp `0033`.
+
+`0034` chỉ `CREATE OR REPLACE ras_auth_token_fence`, giữ OID/owner/ACL/search_path, thêm latest active status binding và receipt đúng operation/User/domain/generation/decision/reason/time cho cả purpose. Giữ credential fence, quarantine/held, pending/progress, replay hai pha và quyền DB hiện hành. Không journal I/O trong migration; downgrade có fence pristine như C1. [Kiểm chứng](testing.md#c1-auth-safety-foundation): trước sửa bốn ca lỗi fail đúng/hai ca hợp lệ pass; sau sửa tám ca bổ sung pass, toàn nhóm nền/migration/config 236 pass. C2 vẫn phải chuyển đầy đủ writer/predicate, C3/C4 còn mở; không mở traffic.
+
 ## M6c-2b2c0: thiết kế auth sau restore (2026-10-03)
 
 **Chủ dự án yêu cầu:** PR chỉ tài liệu thiết kế chống rollback verifier/account status sau restore, phân tích tám tình huống, phương án A/B/C, recovery User/Admin, tiêu chí kiểm thử và PR coding nhỏ; commit/push/mở PR tiếng Việt, chưa merge. Không triển khai auth/migration/CLI. Fetch xác minh `origin/main` tại `3f2179487b1e7041af2b398f54c6ad4406510f96`, merge PR #31 (`0032`); PR #29/#30/#31 đã bảo vệ session/reset/invitation nhưng không credential/status.

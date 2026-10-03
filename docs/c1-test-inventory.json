@@ -1,12 +1,12 @@
 {
-  "collected": 1047,
-  "unique_nodes": 1047,
-  "passed_in_final_c1_suite": 228,
+  "collected": 1055,
+  "unique_nodes": 1055,
+  "passed_in_final_c1_suite": 236,
   "not_run": 819,
   "files": [
     {
       "file": "api/tests/test_auth_safety_foundation.py",
-      "count": 146,
+      "count": 154,
       "status": "passed"
     },
     {

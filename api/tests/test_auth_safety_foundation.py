@@ -300,9 +300,7 @@ def test_upgrade_0032_data_hold_legacy_and_backfill(empty_db_url,journal_path,ap
     eng.dispose()
 
 
-@pytest.fixture
-def runtime(foundation):
-    w=foundation
+def runtime_engine(w):
     # Login role passwords are disposable env values; never interpolate into logs.
     import psycopg
     from psycopg import sql
@@ -312,8 +310,16 @@ def runtime(foundation):
                 conn.execute(sql.SQL("CREATE ROLE {} LOGIN PASSWORD {} NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS").format(sql.Identifier(name),sql.Literal(os.environ[env])))
     provision(w.engine,runtime="c1_runtime",recovery="c1_recovery",definer="c1_definer")
     eng=create_engine(w.engine.url.set(username="c1_runtime",password=os.environ["RAS_C1_RUNTIME_PASSWORD"]),hide_parameters=True)
-    yield eng
-    eng.dispose()
+    return eng
+
+
+@pytest.fixture
+def runtime(foundation):
+    eng = runtime_engine(foundation)
+    try:
+        yield eng
+    finally:
+        eng.dispose()
 
 
 @pytest.mark.parametrize("query",[
@@ -554,6 +560,133 @@ def test_quarantine_token_allowed_but_normal_token_denied(foundation,runtime):
     params={"id":uuid.uuid4(),"u":w.uid,"f":fence,"purpose":"quarantine","t":"f"*64,"at":NOW,"expires":NOW+timedelta(minutes=20)}
     with runtime.begin() as conn:conn.execute(query,params)
     with runtime.begin() as conn,pytest.raises(DBAPIError):conn.execute(query,params|{"id":uuid.uuid4(),"purpose":"normal","t":"e"*64})
+
+
+@pytest.mark.parametrize("purpose", ["normal", "quarantine"])
+@pytest.mark.parametrize("decision", ["disabled", "active"])
+def test_reset_token_rejects_status_head_ahead_of_snapshot(foundation, runtime, purpose, decision):
+    w = foundation
+    append_changes(w, engine=runtime)
+    if purpose == "quarantine":
+        with w.engine.begin() as conn:
+            conn.execute(text("UPDATE users SET credential_state='quarantined' WHERE id=:u"), {"u": w.uid})
+    before = user(w)
+    batch = append_changes(w, changes(w, credential=False, decision=decision, at=NOW+timedelta(seconds=1)),
+                           engine=runtime, rollback=True)
+    # First replay phase only: preserve the snapshot while advancing mirror/projection.
+    recovery.replay_record(w.engine, batch[0].record, NOW)
+    with Session(w.engine) as db:
+        current, head = db.get(User, w.uid), db.get(AuthSafetyHead, w.uid)
+        assert (current.status, current.status_safety) == ("active", "proven")
+        assert (current.status_operation_id, current.status_generation) == (before.status_operation_id, before.status_generation)
+        assert head.status_decision == decision and head.status_operation_id != current.status_operation_id
+        assert db.get(AuthChangeReceipt, head.status_operation_id) is None
+        fence = head.credential_operation_id
+    token_id = uuid.uuid4()
+    with pytest.raises(DBAPIError, match="reset token credential fence mismatch"), runtime.begin() as conn:
+        conn.execute(text("SELECT ras_auth_lock_users(:ids)"), {"ids": [w.uid]})
+        conn.execute(text("SELECT ras_auth_token_create(:id,:u,:f,:purpose,:t,:at,:expires)"),
+                     {"id": token_id, "u": w.uid, "f": fence, "purpose": purpose, "t": "a"*64,
+                      "at": NOW, "expires": NOW+timedelta(minutes=20)})
+    with Session(w.engine) as db:
+        assert db.get(PasswordResetToken, token_id) is None
+        assert db.get(AuthSafetyState, 1).cutover_state == "pending"
+
+
+@pytest.mark.parametrize("purpose", ["normal", "quarantine"])
+def test_reset_token_current_status_receipt_allowed_with_credential_fence(foundation, runtime, purpose):
+    w = foundation
+    append_changes(w, engine=runtime)
+    if purpose == "quarantine":
+        with w.engine.begin() as conn:
+            conn.execute(text("UPDATE users SET credential_state='quarantined' WHERE id=:u"), {"u": w.uid})
+    with Session(w.engine) as db:
+        current, head = db.get(User, w.uid), db.get(AuthSafetyHead, w.uid)
+        receipt = db.get(AuthChangeReceipt, head.status_operation_id)
+        assert (current.status_operation_id, current.status_generation) == (head.status_operation_id, head.status_generation)
+        assert (receipt.user_id, receipt.domain, receipt.generation, receipt.decision) == (w.uid, "status", head.status_generation, "active")
+        fence = head.credential_operation_id
+    query = text("SELECT ras_auth_token_create(:id,:u,:f,:purpose,:t,:at,:expires)")
+    params = {"id": uuid.uuid4(), "u": w.uid, "f": fence, "purpose": purpose, "t": "b"*64,
+              "at": NOW, "expires": NOW+timedelta(minutes=20)}
+    with runtime.begin() as conn:
+        conn.execute(text("SELECT ras_auth_lock_users(:ids)"), {"ids": [w.uid]})
+        conn.execute(query, params)
+    with Session(w.engine) as db:
+        token = db.get(PasswordResetToken, params["id"])
+        assert (token.credential_fence_operation_id, token.recovery_purpose) == (fence, purpose)
+    for invalid in ({"f": uuid.uuid4()}, {"purpose": "quarantine" if purpose == "normal" else "normal"}):
+        with pytest.raises(DBAPIError, match="reset token credential fence mismatch"), runtime.begin() as conn:
+            conn.execute(text("SELECT ras_auth_lock_users(:ids)"), {"ids": [w.uid]})
+            conn.execute(query, params | {"id": uuid.uuid4(), "t": "c"*64} | invalid)
+
+
+def test_0034_upgrade_preserves_auth_history_roles_and_pending(empty_db_url, journal_path, app_env):
+    upgrade(empty_db_url, "0033")
+    owner = create_engine(empty_db_url, hide_parameters=True)
+    app_env(empty_db_url)
+    settings = get_settings()
+    recovery.init_new(owner, settings, NOW)
+    uid = uuid.uuid4()
+    with Session(owner) as db:
+        db.add(User(id=uid, email="upgrade@example.test", password_verifier=hash_password(SECRET)))
+        db.commit()
+    w = SimpleNamespace(engine=owner, uid=uid, path=journal_path, settings=settings)
+    rt = runtime_engine(w)
+    try:
+        append_changes(w, engine=rt)
+        snapshot_queries = (
+            "SELECT * FROM auth_change_receipts ORDER BY operation_id",
+            "SELECT * FROM auth_safety_heads ORDER BY user_id",
+            "SELECT * FROM auth_safety_state",
+            "SELECT * FROM users ORDER BY id",
+            "SELECT oid,proowner,proacl,proconfig,prosecdef FROM pg_proc WHERE oid='ras_auth_token_fence()'::regprocedure",
+            "SELECT oid,proowner,proacl,proconfig,prosecdef FROM pg_proc WHERE proname='ras_auth_token_create'",
+        )
+        with owner.connect() as conn:
+            before = [conn.execute(text(q)).all() for q in snapshot_queries]
+        journal_before = journal_path.read_bytes()
+        upgrade(empty_db_url)
+        upgrade(empty_db_url)
+        with owner.connect() as conn:
+            assert [conn.execute(text(q)).all() for q in snapshot_queries] == before
+            assert conn.scalar(text("SELECT version_num FROM alembic_version")) == "0034"
+        assert journal_path.read_bytes() == journal_before
+        current = user(w)
+        query = text("SELECT ras_auth_token_create(:id,:u,:f,:purpose,:t,:at,:expires)")
+        for purpose in ("normal", "quarantine"):
+            if purpose == "quarantine":
+                with owner.begin() as conn:
+                    conn.execute(text("UPDATE users SET credential_state='quarantined' WHERE id=:u"), {"u": uid})
+            with Session(rt) as db:
+                db.execute(text("SELECT ras_auth_lock_users(:ids)"), {"ids": [uid]})
+                db.execute(query, {"id": uuid.uuid4(), "u": uid, "f": current.credential_operation_id,
+                             "purpose": purpose, "t": ("a" if purpose == "normal" else "b")*64,
+                             "at": NOW, "expires": NOW+timedelta(minutes=20)})
+                assert db.scalar(select(PasswordResetToken.id)) is not None
+                db.rollback()  # Keep the one-open-token-per-User contract for the next purpose.
+        with pytest.raises(DBAPIError, match="auth safety history prevents downgrade"):
+            command.downgrade(alembic_config(empty_db_url), "0033")
+        assert recovery.evaluate(settings, owner).reason == "auth_safety_pending"
+    finally:
+        rt.dispose()
+        owner.dispose()
+
+
+def test_0034_pristine_downgrade_restores_0033_guard(empty_db_url):
+    upgrade(empty_db_url, "0033")
+    eng = create_engine(empty_db_url, hide_parameters=True)
+    try:
+        with eng.connect() as conn:
+            original = conn.scalar(text("SELECT pg_get_functiondef('ras_auth_token_fence()'::regprocedure)"))
+        upgrade(empty_db_url)
+        command.downgrade(alembic_config(empty_db_url), "0033")
+        with eng.connect() as conn:
+            assert conn.scalar(text("SELECT pg_get_functiondef('ras_auth_token_fence()'::regprocedure)")) == original
+            assert conn.scalar(text("SELECT version_num FROM alembic_version")) == "0033"
+        upgrade(empty_db_url)
+    finally:
+        eng.dispose()
 
 
 def test_secret_field_and_scalar_errors_are_redacted(engine):

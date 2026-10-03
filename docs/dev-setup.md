@@ -1,6 +1,6 @@
 # Môi trường phát triển và schema (M1a–C1)
 
-**Trạng thái hiện hành:** PR #32 đã merge `a5c75b8`; head **mã nguồn** C1 `0033`, [schema/quyền/replay/guard](c1-auth-safety-foundation.md) chỉ được thử cô lập, vẫn pending tới C4. Không truy vấn/nâng DB hoặc restart dev; source không là revision DB dev. [Runbook invitation](#journal-invitation-m6c-2b2b2) và các lệnh milestone cũ dưới đây là chứng cứ lịch sử, không lệnh vận hành C1 trên dev. [C1 auth safety cô lập](#c1-auth-safety-cô-lập) ghi đúng lệnh đã chạy.
+**Trạng thái hiện hành:** PR #32 đã merge `a5c75b8`; head **mã nguồn** C1 `0034` (nền `0033`, sửa status fence reset token `0034`), [schema/quyền/replay/guard](c1-auth-safety-foundation.md) chỉ được thử cô lập, vẫn pending tới C4. Không truy vấn/nâng DB hoặc restart dev; source không là revision DB dev. [Runbook invitation](#journal-invitation-m6c-2b2b2) và các lệnh milestone cũ dưới đây là chứng cứ lịch sử, không lệnh vận hành C1 trên dev. [C1 auth safety cô lập](#c1-auth-safety-cô-lập) ghi đúng lệnh đã chạy.
 
 **Vận hành auth restore hoàn chỉnh C2–C4 — chưa triển khai:**
 
@@ -9,6 +9,19 @@
 [Mục lục](README.md) · [Mô hình dữ liệu](data-model.md) · [Roadmap](roadmap.md)
 
 ## C1 auth safety cô lập
+
+Sau review P2 PR #33, dùng DB Compose riêng `rasc1reset3136add3`, context/journal/credentials ngoài repo `ras-c1-reset-uxjegtuu`, PostgreSQL 16/pgvector thật. Giữ nguyên `0033`, thêm `0034` vì chưa xác minh đủ DB lâu dài đã áp revision cũ. Không truy vấn/nâng/restart dev hoặc đọc `.env`. Đã chạy các lệnh sau từ root bằng Conda ras; nhóm đầu trên code `0033` trước sửa exit 1 đúng bốn ca lỗi, không tính là suite pass:
+
+```powershell
+& 'C:\Users\ADMIN\.conda\envs\ras\python.exe' scripts/c1_test_host.py --context C:\Users\ADMIN\AppData\Local\Temp\ras-c1-reset-uxjegtuu\context.json api/tests/test_auth_safety_foundation.py -q -k 'reset_token_rejects_status_head or reset_token_current_status_receipt' --junitxml=C:\Users\ADMIN\AppData\Local\Temp\ras-c1-reset-uxjegtuu\red.xml
+& 'C:\Users\ADMIN\.conda\envs\ras\python.exe' scripts/c1_test_host.py --context C:\Users\ADMIN\AppData\Local\Temp\ras-c1-reset-uxjegtuu\context.json api/tests/test_auth_safety_foundation.py -q -k 'reset_token_rejects_status_head or reset_token_current_status_receipt or test_0034' --tb=short --junitxml=C:\Users\ADMIN\AppData\Local\Temp\ras-c1-reset-uxjegtuu\targeted.xml
+& 'C:\Users\ADMIN\.conda\envs\ras\python.exe' scripts/c1_test_host.py --context C:\Users\ADMIN\AppData\Local\Temp\ras-c1-reset-uxjegtuu\context.json api/tests/test_auth_safety_foundation.py api/tests/test_migrations.py api/tests/test_config.py -q --tb=short --junitxml=C:\Users\ADMIN\AppData\Local\Temp\ras-c1-reset-uxjegtuu\final.xml
+& 'C:\Users\ADMIN\.conda\envs\ras\python.exe' scripts/c1_test_host.py --context C:\Users\ADMIN\AppData\Local\Temp\ras-c1-reset-uxjegtuu\context.json api --collect-only -q
+```
+
+Kết quả mới: targeted cuối 8 pass; suite 236 pass/0 fail-error-skip/3 warning; collect 1055 unique, 819 chưa chạy, giữ HTTP nghiệp vụ hoãn C4. Upgrade từ `0033` có dữ liệu/quyền thật giữ journal/receipt/head/User/progress/OID/owner/ACL, token normal/quarantine hợp lệ vẫn được cấp; downgrade có lịch sử bị chặn. Safety vẫn pending, không chạy lại web/Compose smoke trong review fix này. [Chi tiết lượt fail/đối chiếu JUnit](testing.md#c1-auth-safety-foundation). Các lệnh/smoke `0033` dưới đây là lịch sử C1 trước review.
+
+Sau khi kiểm label ownership đúng project, đã dọn DB thử bằng `docker compose --env-file C:\Users\ADMIN\AppData\Local\Temp\ras-c1-reset-uxjegtuu\empty.env -p rasc1reset3136add3 -f C:\Users\ADMIN\AppData\Local\Temp\ras-c1-reset-uxjegtuu\compose.json down --volumes --remove-orphans`. Chín container dev giữ nguyên ID/image/StartedAt trước/sau **cleanup**; không suy phép so này là truy vấn revision DB. Log/JUnit/journal/đối chiếu vẫn ở temp ngoài repo; context đã hết container, không là lệnh vận hành dev.
 
 Đã chạy bằng Conda ras; không venv mới. Context thử nằm tại `C:\Users\ADMIN\AppData\Local\Temp\ras-c1-__a7mdmn\context.json`, chứa credentials tổng hợp, **không commit/print**. Compose JSON, empty env-file, journal/log nằm cùng temp ngoài repo, project `rasc1d6fc401c`, ports host tự cấp. DB owner thử `c1_migrator` tạo DB fixtures/roles; runtime `c1_runtime`, recovery `c1_recovery`, NOLOGIN definer `c1_definer`. Không dùng compose dev, `.env`, tài nguyên hoặc secrets dev.
 
