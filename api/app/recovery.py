@@ -70,11 +70,11 @@ from sqlalchemy.orm import Session
 from app import journal
 from app.audit import record_event
 from app.config import Settings
-from app.journal import (GENESIS, RECOVERY_BEGIN, RECOVERY_END, REVIEW_CLOSURE, REVOCATION, SESSION_REVOCATION, RESET_TOKEN_CLOSURE, JournalError,
+from app.journal import (GENESIS, RECOVERY_BEGIN, RECOVERY_END, REVIEW_CLOSURE, REVOCATION, SESSION_REVOCATION, RESET_TOKEN_CLOSURE, INVITATION_CLOSURE, JournalError,
                          JournalState, Record)
 from app.models import (AccessRights, DeletionTombstone, LibraryItem, PaperVersion, RecoveryRegistration,
                         ReviewRequest, RevocationJournalRecord, RevocationMetadataRetention, SourceFile, User, UserSession,
-                        PasswordResetToken)
+                        PasswordResetToken, Invitation)
 from app.models.enums import AuditActorType, AuditOutcome, PublicationState, ReviewStatus, UserRole, Visibility
 from app.models.review import closed_status_of
 
@@ -113,11 +113,16 @@ UNJOURNALED_RESET_TOKENS_SQL = """SELECT count(*) FROM password_reset_tokens t
     (SELECT 1 FROM revocation_journal_records j WHERE j.reset_token_id = t.id)"""
 
 
+UNJOURNALED_INVITATIONS_SQL = """SELECT count(*) FROM invitations i
+    WHERE num_nonnulls(i.accepted_at,i.revoked_at,i.closed_by_recovery_at) > 0 AND NOT EXISTS
+    (SELECT 1 FROM revocation_journal_records j WHERE j.invitation_id = i.id)"""
+
+
 def _db_view(conn) -> tuple:
     return tuple(conn.execute(text(f"""
         SELECT r.journal_id, r.genesis_hash, (SELECT count(*) FROM revocation_journal_records), h.seq, h.record_hash,
                (SELECT count(*) FROM revocation_journal_records WHERE NOT journal_confirmed),
-               ({UNJOURNALED_CLOSURES_SQL}), ({UNJOURNALED_SESSIONS_SQL}), ({UNJOURNALED_RESET_TOKENS_SQL})
+               ({UNJOURNALED_CLOSURES_SQL}), ({UNJOURNALED_SESSIONS_SQL}), ({UNJOURNALED_RESET_TOKENS_SQL}), ({UNJOURNALED_INVITATIONS_SQL})
         FROM (SELECT 1) one
         LEFT JOIN recovery_registrations r ON r.id = 1
         LEFT JOIN LATERAL (SELECT seq, record_hash FROM revocation_journal_records ORDER BY seq DESC LIMIT 1) h
@@ -125,7 +130,7 @@ def _db_view(conn) -> tuple:
 
 
 def compare(state: JournalState, view: tuple) -> GateStatus:
-    journal_id, genesis_hash, count, db_seq, db_hash, unconfirmed, unjournaled_closures, unjournaled_sessions, unjournaled_tokens = view
+    journal_id, genesis_hash, count, db_seq, db_hash, unconfirmed, unjournaled_closures, unjournaled_sessions, unjournaled_tokens, unjournaled_invitations = view
     head = state.head
     closed = lambda reason: GateStatus(False, reason, head.seq, db_seq)  # noqa: E731
     if state.torn is not None:
@@ -152,6 +157,8 @@ def compare(state: JournalState, view: tuple) -> GateStatus:
         return closed("sessions_not_journaled")
     if unjournaled_tokens:
         return closed("reset_tokens_not_journaled")
+    if unjournaled_invitations:
+        return closed("invitations_not_journaled")
     if state.open_recovery is not None:
         return closed("recovery_in_progress")
     return GateStatus(True, "open", head.seq, db_seq)
@@ -244,10 +251,13 @@ def _mirror(record: Record, via: str, result: str, tombstone_id: uuid.UUID | Non
         reset_token_id=uuid.UUID(record.body["token_id"]), reset_token_user_id=uuid.UUID(record.body["user_id"]),
         reset_end_kind=record.body["end_kind"], reset_reason_code=record.body["reason_code"],
         reset_ended_at=datetime.fromisoformat(record.body["ended_at"]))
+    invitation_fields = {} if record.kind != INVITATION_CLOSURE else dict(
+        invitation_id=uuid.UUID(record.body["invitation_id"]), invitation_end_kind=record.body["end_kind"],
+        invitation_reason_code=record.body["reason_code"], invitation_ended_at=datetime.fromisoformat(record.body["ended_at"]))
     return RevocationJournalRecord(seq=record.seq, kind=record.kind, record_hash=record.hash, line=record.line,
                                    tombstone_id=tombstone_id, review_request_id=review_request_id, applied_via=via,
                                    session_id=session_id, session_user_id=session_user_id,
-                                   result=result, journal_confirmed=confirmed, **token_fields)
+                                   result=result, journal_confirmed=confirmed, **token_fields, **invitation_fields)
 
 
 def _unconfirmed(db: Session) -> int:
@@ -338,16 +348,24 @@ def reset_token_body(row: PasswordResetToken) -> dict:
             "ended_at": (row.used_at or row.revoked_at).isoformat()}
 
 
+def invitation_body(row: Invitation) -> dict:
+    kind = row.recovery_end_kind or ("accepted" if row.accepted_at is not None else "revoked")
+    return {"invitation_id": str(row.id), "end_kind": kind,
+            "reason_code": row.closure_reason or f"legacy_{kind}",
+            "ended_at": (row.accepted_at or row.revoked_at or row.closed_by_recovery_at).isoformat()}
+
+
 def record_auth_endings(db: Session, path: Path | None, tokens: list[PasswordResetToken],
-                        rows: list[UserSession], *, during_recovery: bool = False) -> list[Journaled]:
-    """One batch after ALL user/token/session locks. Mirror all lines before one append/fsync.
+                        rows: list[UserSession], *, invitations: list[Invitation] | None = None, during_recovery: bool = False) -> list[Journaled]:
+    """One batch after ALL invitation/email or user/token/session locks. Mirror all lines before one append/fsync.
 
     A failed append leaves ALL rows unconfirmed, including any complete prefix.
     Commit still revokes the whole batch atomically; recover repairs missing
     lines from the live DB (confirmation required) or replays a durable prefix
     after rollback. No further auth row locks may be taken after this call.
     """
-    if not rows and not tokens:
+    invitations = invitations or []
+    if not rows and not tokens and not invitations:
         return []
     _lock_journal(db)
     head = _db_head(db)
@@ -364,16 +382,22 @@ def record_auth_endings(db: Session, path: Path | None, tokens: list[PasswordRes
     if state is not None and (state.torn is not None or (state.open_recovery is not None and not during_recovery)):
         raise RecoveryError("recovery_in_progress")
     records, mirrors = [], []
-    for row in [*tokens, *rows]:
-        is_token = isinstance(row, PasswordResetToken)
-        kind, body = (RESET_TOKEN_CLOSURE, reset_token_body(row)) if is_token else (SESSION_REVOCATION, session_body(row))
+    for row in [*invitations, *tokens, *rows]:
+        if isinstance(row, Invitation):
+            kind, body = INVITATION_CLOSURE, invitation_body(row)
+        elif isinstance(row, PasswordResetToken):
+            kind, body = RESET_TOKEN_CLOSURE, reset_token_body(row)
+        else:
+            kind, body = SESSION_REVOCATION, session_body(row)
         record = journal.make_record(head.seq + 1, kind, body, head.record_hash) if not records \
             else journal.next_record(records[-1], kind, body)
         records.append(record)
-        mirrors.append(_mirror(record, "import" if during_recovery else "close" if is_token else "revoke",
-                               "imported" if during_recovery else "reset_token_ended" if is_token else "session_revoked", None, confirmed=False,
-                               session_id=None if is_token else row.id,
-                               session_user_id=None if is_token else row.user_id))
+        is_session = kind == SESSION_REVOCATION
+        mirrors.append(_mirror(record, "import" if during_recovery else "revoke" if is_session else "close",
+                               "imported" if during_recovery else "session_revoked" if is_session else
+                               "invitation_ended" if kind == INVITATION_CLOSURE else "reset_token_ended",
+                               None, confirmed=False, session_id=row.id if is_session else None,
+                               session_user_id=row.user_id if is_session else None))
     db.add_all(mirrors)
     db.flush()  # CHECK and target trigger run BEFORE any byte is appended.
     written = False
@@ -513,6 +537,23 @@ def _apply_reset_token_closure(row: PasswordResetToken | None, body: dict, *, ap
     return "reset_token_ended"
 
 
+def _apply_invitation_closure(row: Invitation | None, body: dict, *, apply: bool = True) -> str:
+    if row is None:
+        return "recorded_invitation_absent"
+    if row.accepted_at or row.revoked_at or row.closed_by_recovery_at:
+        actual = invitation_body(row)
+        if ((actual | {"ended_at": body["ended_at"]}) != body or
+                (row.accepted_at or row.revoked_at or row.closed_by_recovery_at) != datetime.fromisoformat(body["ended_at"])):
+            raise RecoveryError("invitation_closure_conflict")
+        return "invitation_already_ended"
+    if not apply:
+        raise RecoveryError("invitation_not_ended")
+    row.closed_by_recovery_at = datetime.fromisoformat(body["ended_at"])
+    row.recovery_end_kind, row.closure_reason = body["end_kind"], body["reason_code"]
+    # Never synthesize accepted_at/accepted_user_id or an identity account.
+    return "invitation_closed_by_recovery"
+
+
 def apply_record(db: Session, record: Record, now: datetime, via: str = "replay") -> tuple[str, int]:
     """Bring one journal record into the database, in seq order; safe to repeat.
 
@@ -525,7 +566,15 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
     # Validate even direct replay callers, not just lines read from the file.
     if journal.make_record(record.seq, record.kind, record.body, record.prev) != record:
         raise RecoveryError("journal_corrupt")
-    item, rights, rr, session_row, token_row = None, [], None, None, None
+    item, rights, rr, session_row, token_row, invitation_row = None, [], None, None, None, None
+    if record.kind == INVITATION_CLOSURE:
+        from app.identity.invitation_endings import lock_email
+        iid = uuid.UUID(record.body["invitation_id"])
+        email = db.scalar(select(Invitation.email).where(Invitation.id == iid))
+        if email is not None:
+            lock_email(db, email)
+        invitation_row = db.scalar(select(Invitation).where(Invitation.id == iid).with_for_update()
+                                   .execution_options(populate_existing=True))
     if record.kind == RESET_TOKEN_CLOSURE:
         db.scalar(select(User.id).where(User.id == uuid.UUID(record.body["user_id"])).with_for_update(key_share=True))
         token_row = db.scalar(select(PasswordResetToken).where(PasswordResetToken.id == uuid.UUID(record.body["token_id"]))
@@ -551,6 +600,8 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
     if existing is not None:
         if existing.record_hash != record.hash or existing.line != record.line:
             raise RecoveryError("journal_diverged")
+        if record.kind == INVITATION_CLOSURE:
+            _apply_invitation_closure(invitation_row, record.body, apply=False)
         if record.kind == RESET_TOKEN_CLOSURE:
             _apply_reset_token_closure(token_row, record.body, apply=False)
         db.rollback()
@@ -564,6 +615,8 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
         result, tombstone_id, cancelled = _apply_revocation(db, record.body, item, rights, now)
     elif record.kind == REVIEW_CLOSURE:
         result, request_id = _apply_review_closure(db, record.body, rr)
+    elif record.kind == INVITATION_CLOSURE:
+        result = _apply_invitation_closure(invitation_row, record.body)
     elif record.kind == RESET_TOKEN_CLOSURE:
         result = _apply_reset_token_closure(token_row, record.body)
     elif record.kind == SESSION_REVOCATION:
@@ -638,8 +691,19 @@ def _unjournaled_reset_tokens(db: Session) -> list[PasswordResetToken]:
         .order_by(PasswordResetToken.user_id, PasswordResetToken.id)))
 
 
+def _unjournaled_invitations(db: Session) -> list[Invitation]:
+    return list(db.scalars(select(Invitation).where(
+        or_(Invitation.accepted_at.is_not(None), Invitation.revoked_at.is_not(None),
+            Invitation.closed_by_recovery_at.is_not(None)),
+        ~select(RevocationJournalRecord.seq).where(RevocationJournalRecord.invitation_id == Invitation.id).exists())
+        .order_by(Invitation.id)))
+
+
 def _lock_legacy_sessions(db: Session) -> None:
-    """Backfill locks users -> tokens -> sessions, before journal; operators stop writers."""
+    """Backfill locks sorted invitation emails -> users -> tokens -> sessions -> invitations, before journal; operators stop writers."""
+    from app.identity.invitation_endings import lock_email
+    for email in sorted({r.email for r in _unjournaled_invitations(db)}):
+        lock_email(db, email)
     owners = list(db.scalars(select(UserSession.user_id).where(UserSession.revoked_at.is_not(None)).distinct()))
     ended = or_(PasswordResetToken.used_at.is_not(None), PasswordResetToken.revoked_at.is_not(None))
     owners += list(db.scalars(select(PasswordResetToken.user_id).where(ended).distinct()))
@@ -647,6 +711,8 @@ def _lock_legacy_sessions(db: Session) -> None:
     list(db.scalars(select(PasswordResetToken.id).where(ended).order_by(PasswordResetToken.id).with_for_update()))
     list(db.scalars(select(UserSession.id).where(UserSession.revoked_at.is_not(None))
                     .order_by(UserSession.id).with_for_update()))
+    list(db.scalars(select(Invitation.id).where(Invitation.id.in_([r.id for r in _unjournaled_invitations(db)]))
+                    .order_by(Invitation.id).with_for_update()))
 
 
 def _imported_closure_body(rr: ReviewRequest) -> dict:
@@ -674,6 +740,7 @@ def init_new(engine: Engine, settings: Settings, now: datetime) -> Record:
         if (db.scalar(select(func.count()).select_from(LibraryItem)) or
                 db.scalar(select(func.count()).select_from(UserSession)) or
                 db.scalar(select(func.count()).select_from(PasswordResetToken)) or
+                db.scalar(select(func.count()).select_from(Invitation)) or
                 db.scalar(select(func.count()).select_from(DeletionTombstone)) or _db_head(db) is not None):
             raise RecoveryError("database_not_new")
         if path.exists():
@@ -718,6 +785,9 @@ def register_existing(engine: Engine, settings: Settings, now: datetime) -> tupl
         for rr in _unjournaled_closures(db):  # M6c-2b1: closed grants too, so no restore reopens them
             records.append(journal.next_record(records[-1], REVIEW_CLOSURE, _imported_closure_body(rr)))
             db.add(_mirror(records[-1], "import", "imported", None, confirmed=False, review_request_id=rr.id))
+        for row in _unjournaled_invitations(db):
+            records.append(journal.next_record(records[-1], INVITATION_CLOSURE, invitation_body(row)))
+            db.add(_mirror(records[-1], "import", "imported", None, confirmed=False))
         for row in _unjournaled_reset_tokens(db):
             records.append(journal.next_record(records[-1], RESET_TOKEN_CLOSURE, reset_token_body(row)))
             db.add(_mirror(records[-1], "import", "imported", None, confirmed=False))
@@ -746,6 +816,7 @@ class RecoveryReport:
     closures_imported: int = 0
     sessions_imported: int = 0
     reset_tokens_imported: int = 0
+    invitations_imported: int = 0
     torn_tail_dropped: bool = False
     replayed: dict[str, int] = field(default_factory=dict)
     cleanup: dict[str, int] = field(default_factory=dict)
@@ -904,15 +975,17 @@ def _replay_all(engine: Engine, now: datetime, path: Path, report: RecoveryRepor
         report.replayed[result] = report.replayed.get(result, 0) + 1
 
 
-def _import_legacy_reset_tokens(engine: Engine, path: Path, report: RecoveryReport) -> None:
+def _import_legacy_auth_tokens(engine: Engine, path: Path, report: RecoveryReport) -> None:
     # File decisions have already been replayed: mirror seqs stay contiguous.
     # Writers are stopped, and all auth row locks precede the journal lock.
     with Session(engine) as db:
         _lock_legacy_sessions(db)
         tokens = _unjournaled_reset_tokens(db)
-        batch = record_auth_endings(db, path, tokens, [], during_recovery=True)
+        invitations = _unjournaled_invitations(db)
+        batch = record_auth_endings(db, path, tokens, [], invitations=invitations, during_recovery=True)
         db.commit()
-        report.reset_tokens_imported += len(batch)
+        report.reset_tokens_imported += len(tokens)
+        report.invitations_imported += len(invitations)
         if any(not line.written for line in batch):
             raise RecoveryError("journal_write_failed")
 
@@ -970,7 +1043,12 @@ def _verify(engine: Engine, path: Path) -> None:
             raise RecoveryError("sessions_not_journaled")
         if _unjournaled_reset_tokens(db):
             raise RecoveryError("reset_tokens_not_journaled")
+        if _unjournaled_invitations(db):
+            raise RecoveryError("invitations_not_journaled")
         for record in journal.read(path).records:
+            if record.kind == INVITATION_CLOSURE:
+                _apply_invitation_closure(db.get(Invitation, uuid.UUID(record.body["invitation_id"])),
+                                          record.body, apply=False)
             if record.kind == RESET_TOKEN_CLOSURE:
                 _apply_reset_token_closure(db.get(PasswordResetToken, uuid.UUID(record.body["token_id"])),
                                           record.body, apply=False)
@@ -1081,7 +1159,7 @@ def recover(engine: Engine, storage, settings: Settings, now: datetime, *,
                 _append_marker(engine, path, RECOVERY_BEGIN, {"recovery_id": recovery_id, "started_at": now.isoformat(),
                                                               "db_head_seq": head.seq if head else 0})
             _replay_all(engine, now, path, report)
-            _import_legacy_reset_tokens(engine, path, report)
+            _import_legacy_auth_tokens(engine, path, report)
             _cleanup(engine, storage, settings, now, report)
             _sweep_objects(engine, storage, path, report)
             _verify(engine, path)
@@ -1115,6 +1193,7 @@ def status(engine: Engine, settings: Settings) -> dict:
             out["unconfirmed_records"] = _unconfirmed(db)
             out["unjournaled_review_closures"] = len(_unjournaled_closures(db))
             out["unjournaled_sessions"] = len(_unjournaled_sessions(db))
+            out["unjournaled_invitations"] = len(_unjournaled_invitations(db))
             out["unjournaled_reset_tokens"] = len(_unjournaled_reset_tokens(db))
     except Exception:  # noqa: BLE001
         out["database"] = "unavailable"

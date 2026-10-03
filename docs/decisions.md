@@ -1,5 +1,18 @@
 # Nhật ký quyết định
 
+## Quyết định triển khai M6c-2b2b2 (2026-10-03)
+
+**Chủ dự án yêu cầu:** journal kết thúc invitation trên cả accept/revoke/reinvite/delivery compensation; restore link không sống lại, không tái tạo danh tính; giữ PR #29/#30. PR #30 đã merge `ce67ce8`; base nhánh `feat/m6c2b2b2-invitation-journal`. Không credential/status rollback, membership, private deletion, scheduler hay production trong PR này.
+
+**Lựa chọn của coding agent, không ghi là chủ dự án đã xác nhận thiết kế:** revision `0032`, event bốn trường không User FK/secret, trạng thái `closed_by_recovery`, email advisory serialization, cùng `commit_auth`/batch/mirror/fsync, guard SQL và hậu điều kiện recovery. [Thiết kế, thứ tự khóa và bảng lỗi](invitation-journal.md). Tài khoản của accept sau backup có thể mất; replay chỉ đóng link, không chứng minh account/delivery thành công.
+
+**Mâu thuẫn đã xử lý:** docs vẫn mô tả nhánh PR #30 chưa merge và invitation chưa bảo vệ ở phần trạng thái hiện hành; cập nhật base/trạng thái mới, giữ các giới hạn lịch sử trong mục cũ. Comment delivery cũ coi link chưa gửi khi adapter lỗi; code mới bù có journal vì adapter có thể đã chuyển link. Accept cũ dùng giờ đầu request sau băm; API giờ lấy lại clock dưới khóa. Guard sở hữu restore giữ nguyên: `compose run --no-deps` dùng kiểm image đích có thể tạo volume trước restore, nên drill dùng `docker run --rm` để kiểm image không tạo tài nguyên project đích.
+
+Full suite bộc lộ hai test hồi quy cần đồng bộ: SQL review closure dùng giờ DB khác FakeClock, và test invitation mong CHECK chạy trước BEFORE guard mới. Sửa fixture/expectation, giữ kiểm CHECK cũ và thêm sai User; không nới production guard. [Kết quả từng lượt, gồm cả fail](testing.md#invitation-journal-m6c-2b2b2).
+
+**Giới hạn/bàn giao:** credential/account status rollback vẫn cho login mới bằng mật khẩu/status cũ; journal cùng mất/rollback với DB không phát hiện được; nơi lưu journal production chưa chốt; fault injection/diễn tập một máy chưa chứng minh mất điện. Task tiếp theo là chống rollback credential/account status, không coi bảo vệ session/token là auth recovery hoàn chỉnh.
+
+
 [Mục lục](README.md) · [Roadmap](roadmap.md)
 
 Brief khởi tạo và quyết định của chủ dự án ngày **2026-09-24** là nguồn cho các mục **Đã xác nhận**. Quyết định kỹ thuật đã chốt được ghi ở đây; chi tiết triển khai còn mở vẫn là **Đề xuất** hoặc **Cần xác nhận**. Khi đổi quyết định, ghi ngày/lý do và sửa docs cùng code liên quan.

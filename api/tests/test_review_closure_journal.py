@@ -133,23 +133,26 @@ def test_each_close_journals_ids_decision_code_and_time_only(upload_api, monkeyp
 
 
 def test_db_refuses_a_close_without_the_record_naming_that_target_and_code(upload_api, monkeypatch):
+    api, _ = upload_api
+    api.clock.advance(hours=1)  # SQL must use the fixture clock, independently of DB wall time.
     w = review_world(upload_api, monkeypatch)
-    withdraw = text("""UPDATE review_requests SET status='withdrawn', closed_at=now(),
+    closed_at = w.api.clock.now
+    withdraw = text("""UPDATE review_requests SET status='withdrawn', closed_at=:closed_at,
         closed_by_user_id=requester_user_id, close_reason_code='withdrawn_by_requester' WHERE id=:r""")
     with pytest.raises(IntegrityError, match="needs its revocation journal record"), w.api.engine.begin() as conn:
-        conn.execute(withdraw, {"r": uuid.UUID(w.rid)})
+        conn.execute(withdraw, {"r": uuid.UUID(w.rid), "closed_at": closed_at})
     # A record naming B's file, or A's file with another decision, does not cover A's withdraw.
     close_journaled(w.api.engine, w.rid_b)
     head = journal.read(journal_file()).head
     a_target = {"request_id": w.rid, "item_id": w.ids_a["item_id"], "version_id": w.ids_a["version_id"],
-                "source_file_id": w.ids_a["file_id"], "closed_at": utcnow().isoformat()}
+                "source_file_id": w.ids_a["file_id"], "closed_at": closed_at.isoformat()}
     other_file = a_target | {"item_id": w.ids_b["item_id"], "version_id": w.ids_b["version_id"],
                              "source_file_id": w.ids_b["file_id"]}
     for body in (other_file | {"status": "withdrawn", "reason_code": "withdrawn_by_requester"},
                  a_target | {"status": "rejected", "reason_code": "other"}):
         record = journal.next_record(head, journal.REVIEW_CLOSURE, body)
         with pytest.raises(IntegrityError, match="needs its revocation journal record"), w.api.engine.begin() as conn:
-            conn.execute(withdraw, {"r": uuid.UUID(w.rid)})
+            conn.execute(withdraw, {"r": uuid.UUID(w.rid), "closed_at": closed_at})
             conn.execute(text("""INSERT INTO revocation_journal_records(seq, kind, record_hash, line,
                 review_request_id, applied_via, result, journal_confirmed)
                 VALUES(:s, 'review_closure', :h, :l, :r, 'close', 'closed', true)"""),
@@ -158,8 +161,8 @@ def test_db_refuses_a_close_without_the_record_naming_that_target_and_code(uploa
     for sets in ("close_reason_code='other', closed_by_user_id=requester_user_id",
                  "close_reason_code='other', rejection_note='x'", "close_reason_code='made_up'"):
         with pytest.raises(IntegrityError), w.api.engine.begin() as conn:
-            conn.execute(text(f"""UPDATE review_requests SET status='closed_by_recovery', closed_at=now(), {sets}
-                WHERE id=:r"""), {"r": uuid.UUID(w.rid)})
+            conn.execute(text(f"""UPDATE review_requests SET status='closed_by_recovery', closed_at=:closed_at, {sets}
+                WHERE id=:r"""), {"r": uuid.UUID(w.rid), "closed_at": closed_at})
     assert status_in(w.api.engine, w.rid)[0] == "open" and gate(w.api.engine) == "open"
     assert w.admin.get(w.file_url).content == A_BODY
 

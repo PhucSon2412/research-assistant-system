@@ -9,7 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
 
-JOURNAL_KINDS = "'genesis', 'revocation', 'recovery_begin', 'recovery_end', 'review_closure', 'session_revocation', 'reset_token_closure'"
+JOURNAL_KINDS = "'genesis', 'revocation', 'recovery_begin', 'recovery_end', 'review_closure', 'session_revocation', 'reset_token_closure', 'invitation_closure'"
 TOKEN_IDS_REQUIRED = ("CASE WHEN kind = 'reset_token_closure' THEN reset_token_id IS NOT NULL"
                       " AND reset_token_user_id IS NOT NULL AND reset_end_kind IS NOT NULL"
                       " AND reset_reason_code IS NOT NULL AND reset_ended_at IS NOT NULL"
@@ -25,6 +25,20 @@ TOKEN_MATCHES_BODY = ("CASE WHEN kind = 'reset_token_closure' THEN"
     " AND COALESCE((reset_end_kind = 'consumed' AND reset_reason_code IN ('password_reset', 'legacy_consumed'))"
     " OR (reset_end_kind = 'revoked' AND reset_reason_code IN"
     " ('reset_replaced', 'reset_completed', 'user_disabled', 'legacy_revoked')), false) ELSE true END")
+INVITATION_IDS_REQUIRED = ("CASE WHEN kind = 'invitation_closure' THEN invitation_id IS NOT NULL"
+                      " AND invitation_end_kind IS NOT NULL"
+                      " AND invitation_reason_code IS NOT NULL AND invitation_ended_at IS NOT NULL"
+                      " ELSE invitation_id IS NULL AND invitation_end_kind IS NULL"
+                      " AND invitation_reason_code IS NULL AND invitation_ended_at IS NULL END")
+INVITATION_MATCHES_BODY = ("CASE WHEN kind = 'invitation_closure' THEN"
+    " (invitation_id::text IS NOT DISTINCT FROM (line::jsonb #>> '{body,invitation_id}'))"
+    " AND (invitation_end_kind IS NOT DISTINCT FROM (line::jsonb #>> '{body,end_kind}'))"
+    " AND (invitation_reason_code IS NOT DISTINCT FROM (line::jsonb #>> '{body,reason_code}'))"
+    " AND (invitation_ended_at IS NOT DISTINCT FROM (line::jsonb #>> '{body,ended_at}')::timestamptz)"
+    " AND (line::jsonb ->> 'kind' IS NOT DISTINCT FROM kind)"
+    " AND COALESCE((invitation_end_kind = 'accepted' AND invitation_reason_code IN ('invitation_accepted', 'legacy_accepted'))"
+    " OR (invitation_end_kind = 'revoked' AND invitation_reason_code IN"
+    " ('invitation_replaced', 'admin_revoked', 'delivery_failed', 'legacy_revoked')), false) ELSE true END")
 APPLIED_VIA = "'genesis', 'revoke', 'close', 'replay', 'import'"
 REGISTRATION_MODES = "'new_install', 'existing_db', 'adopted', 'rebuilt_from_db'"
 
@@ -84,6 +98,9 @@ class RevocationJournalRecord(Base):
         UniqueConstraint("review_request_id", name="uq_revocation_journal_records_review_request_id"),
         UniqueConstraint("session_id", name="uq_revocation_journal_records_session_id"),
         UniqueConstraint("reset_token_id", name="uq_revocation_journal_records_reset_token_id"),
+        UniqueConstraint("invitation_id", name="uq_revocation_journal_records_invitation_id"),
+        CheckConstraint(INVITATION_IDS_REQUIRED, name="invitation_fields_required"),
+        CheckConstraint(INVITATION_MATCHES_BODY, name="invitation_matches_body"),
         CheckConstraint(TOKEN_IDS_REQUIRED, name="reset_fields_required"),
         CheckConstraint(TOKEN_MATCHES_BODY, name="reset_matches_body"),
         CheckConstraint("seq > 0", name="seq_positive"),
@@ -133,6 +150,10 @@ class RevocationJournalRecord(Base):
     reset_end_kind: Mapped[str | None] = mapped_column(Text)
     reset_reason_code: Mapped[str | None] = mapped_column(Text)
     reset_ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    invitation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    invitation_end_kind: Mapped[str | None] = mapped_column(Text)
+    invitation_reason_code: Mapped[str | None] = mapped_column(Text)
+    invitation_ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     applied_via: Mapped[str] = mapped_column(Text)
     result: Mapped[str] = mapped_column(Text)
     journal_confirmed: Mapped[bool] = mapped_column(Boolean)

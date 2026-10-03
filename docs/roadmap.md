@@ -1,6 +1,9 @@
 # Roadmap đề xuất
 
-**M6c-2b2b1 (nhánh review, `0031`, base PR #29 đã merge `d38c6b8`):** journal reset token consumed/revoked, batch token/session và recovery/backfill giữ link đã kết thúc không sống lại trong TTL với journal độc lập hiện hành. [Thiết kế/giới hạn](reset-token-journal.md). Kế tiếp journal invitation rồi thiết kế chống rollback credential/account status; mật khẩu/status vẫn rollback. Production journal/backup scheduler, membership/xóa riêng vẫn riêng.
+**M6c-2b2b2 đã triển khai, chờ review, chưa merge:** base PR #30 đã merge `ce67ce8`, `0031`; nhánh invitation journal thêm `0032`. [Hợp đồng](invitation-journal.md) bảo vệ link đã kết thúc sau restore với journal hiện hành, không dựng lại account; full API **901/901**, web **42/42**, đối chứng **8/8**, drill **59/59** (giới hạn ở tài liệu kiểm chứng). **Bàn giao tiếp theo:** chống rollback credential/account status; membership, xóa paper riêng, scheduler và journal production vẫn tách riêng.
+
+
+**M6c-2b2b1 (PR #30 đã merge `ce67ce8`, `0031`, base PR #29 đã merge `d38c6b8`):** journal reset token consumed/revoked, batch token/session và recovery/backfill giữ link đã kết thúc không sống lại trong TTL với journal độc lập hiện hành. [Thiết kế/giới hạn](reset-token-journal.md). M6c-2b2b2 mở rộng invitation ở trên; kế tiếp thiết kế chống rollback credential/account status; mật khẩu/status vẫn rollback. Production journal/backup scheduler, membership/xóa riêng vẫn riêng.
 
 [Mục lục](README.md) · [Quyết định còn mở](decisions.md) · [Kiểm thử](testing.md)
 

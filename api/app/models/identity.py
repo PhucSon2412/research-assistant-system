@@ -15,6 +15,20 @@ from app.models.enums import SessionRevokeReason, UserRole, UserStatus, sql_in
 _SHA256_HEX = "~ '^[0-9a-f]{64}$'"
 
 
+RECOVERY_VALID = ("(closed_by_recovery_at IS NULL AND recovery_end_kind IS NULL) OR"
+                  " (closed_by_recovery_at IS NOT NULL AND recovery_end_kind IS NOT NULL"
+                  " AND recovery_end_kind IN ('accepted','revoked') AND closure_reason IS NOT NULL"
+                  " AND accepted_at IS NULL AND accepted_user_id IS NULL AND revoked_at IS NULL)")
+REASON_VALID = ("closure_reason IS NULL OR (COALESCE(recovery_end_kind,"
+                " CASE WHEN accepted_at IS NOT NULL THEN 'accepted' ELSE 'revoked' END) = 'accepted'"
+                " AND closure_reason IN ('invitation_accepted','legacy_accepted')"
+                " AND COALESCE(accepted_at,closed_by_recovery_at) IS NOT NULL) OR"
+                " (COALESCE(recovery_end_kind,CASE WHEN revoked_at IS NOT NULL THEN 'revoked' END) = 'revoked'"
+                " AND closure_reason IN ('admin_revoked','invitation_replaced','delivery_failed','legacy_revoked')"
+                " AND COALESCE(revoked_at,closed_by_recovery_at) IS NOT NULL)")
+OPEN_INDEX = "accepted_at IS NULL AND revoked_at IS NULL AND closed_by_recovery_at IS NULL"
+
+
 class User(Base):
     """Internal account, created only by bootstrap (first Admin) or by
     accepting an invitation; there is no built-in/default account."""
@@ -77,12 +91,14 @@ class Invitation(Base):
             "(accepted_at IS NULL) = (accepted_user_id IS NULL)", name="accepted_fields_consistent"
         ),
         CheckConstraint("accepted_at IS NULL OR revoked_at IS NULL", name="accepted_or_revoked"),
+        CheckConstraint(RECOVERY_VALID, name="recovery_fields_consistent"),
+        CheckConstraint("COALESCE((" + REASON_VALID + "), false)", name="closure_reason_valid"),
         # At most one open invitation per email; a new one revokes the old.
         Index(
             "uq_invitations_open_email",
             "email",
             unique=True,
-            postgresql_where=text("accepted_at IS NULL AND revoked_at IS NULL"),
+            postgresql_where=text(OPEN_INDEX),
         ),
     )
 
@@ -102,6 +118,9 @@ class Invitation(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), unique=True
     )
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    closed_by_recovery_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    recovery_end_kind: Mapped[str | None] = mapped_column(Text)
+    closure_reason: Mapped[str | None] = mapped_column(Text)
 
 
 class UserSession(Base):

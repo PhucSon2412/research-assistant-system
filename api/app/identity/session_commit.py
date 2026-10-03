@@ -1,9 +1,10 @@
-"""Commit auth after journaling its whole reset-token and session batch.
+"""Commit auth after journaling its whole invitation/reset-token/session batch.
 
 db.info carries pending rows within this Session only. No cookies or secrets.
-All row locks (user -> token -> sessions) precede this final journal step.
+All row locks precede journal: invitation email -> invitations, or
+user -> reset token -> sessions. Flush FK/audit writes before journal.
 Never report login/reset/disable success after a commit exception: replay only
-ends tokens/sessions, it does not reproduce the rest of that auth transaction.
+ends invitations/tokens/sessions, it does not reproduce the rest of that auth transaction.
 """
 from sqlalchemy.orm import Session
 
@@ -12,20 +13,29 @@ from app.api.errors import ApiError
 from app.config import get_settings
 from app.identity.reset_tokens import PENDING as TOKEN_PENDING
 
+from app.identity.invitation_endings import PENDING as INVITATION_PENDING
+
 PENDING = "session_revocations"
 
 
 def commit_auth(db: Session) -> None:
     rows = db.info.pop(PENDING, [])
     tokens = db.info.pop(TOKEN_PENDING, [])
-    ended_at = (tokens[0].used_at or tokens[0].revoked_at) if tokens else rows[0].revoked_at if rows else None
-    # Keep session-only error codes compatible; token/mixed errors name auth endings.
-    pending_code = "auth_closure_pending_recovery" if tokens else "session_revocation_pending_recovery"
-    unavailable_code = "auth_journal_unavailable" if tokens else "session_journal_unavailable"
+    invitations = db.info.pop(INVITATION_PENDING, [])
+    if invitations:
+        ended_at = invitations[0].accepted_at or invitations[0].revoked_at
+    elif tokens:
+        ended_at = tokens[0].used_at or tokens[0].revoked_at
+    else:
+        ended_at = rows[0].revoked_at if rows else None
+    # Preserve session-only codes; invitation/token batches name auth endings.
+    pending_code = "auth_closure_pending_recovery" if tokens or invitations else "session_revocation_pending_recovery"
+    unavailable_code = "auth_journal_unavailable" if tokens or invitations else "session_journal_unavailable"
     batch = []
     commit_attempted = False
     try:
-        batch = recovery.record_auth_endings(db, get_settings().recovery.journal_path, tokens, rows)
+        db.flush()
+        batch = recovery.record_auth_endings(db, get_settings().recovery.journal_path, tokens, rows, invitations=invitations)
         commit_attempted = True
         db.commit()
     except recovery.RecoveryError:

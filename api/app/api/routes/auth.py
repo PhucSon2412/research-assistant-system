@@ -18,7 +18,7 @@ from app.api.cookies import (
     set_csrf_cookie,
     set_session_cookie,
 )
-from app.api.deps import get_db, get_now, get_session_context
+from app.api.deps import get_clock, get_db, get_now, get_session_context
 from app.api.errors import ApiError
 from app.audit import record_event
 from app.config import Settings, get_settings
@@ -223,6 +223,7 @@ def inspect_invitation(body: TokenIn, db: Session = Depends(get_db), now: dateti
 @router.post("/invitations/accept", status_code=status.HTTP_201_CREATED)
 def accept_invitation(
     body: AcceptInvitationIn,
+    clock=Depends(get_clock),
     db: Session = Depends(get_db),
     now: datetime = Depends(get_now),
     settings: Settings = Depends(get_settings),
@@ -235,6 +236,7 @@ def accept_invitation(
             display_name=body.display_name,
             now=now,
             policy=settings.password,
+            clock=clock,
         )
     except InvalidToken:
         raise ApiError(400, "invalid_token") from None

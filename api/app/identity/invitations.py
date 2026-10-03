@@ -10,18 +10,22 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from collections.abc import Callable
 
-from sqlalchemy import exists, select, update
+from sqlalchemy import exists, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.audit import record_event
+from app.clock import utcnow
 from app.config import PasswordPolicy
 from app.identity.emails import normalise_email
 from app.identity.errors import AccountExists, InvalidToken, InvitationConflict, NotFound
 from app.identity.passwords import hash_password, validate_password
 from app.identity.tokens import generate_token, hash_token, plausible_token
 from app.models import Invitation, User
+from app.identity.invitation_endings import lock_email, unended, end_invitation
+from app.identity.session_commit import commit_auth
 from app.models.enums import AuditActorType, AuditOutcome, UserRole, UserStatus
 
 
@@ -36,13 +40,14 @@ class CreatedInvitation:
 
 def _open(now: datetime):
     return (
-        Invitation.accepted_at.is_(None),
-        Invitation.revoked_at.is_(None),
+        *unended(),
         Invitation.expires_at > now,
     )
 
 
 def invitation_status(inv: Invitation, now: datetime) -> str:
+    if inv.closed_by_recovery_at is not None:
+        return "closed_by_recovery"
     if inv.accepted_at is not None:
         return "accepted"
     if inv.revoked_at is not None:
@@ -62,15 +67,14 @@ def create_invitation(
     lifetime: timedelta,
 ) -> CreatedInvitation:
     email = normalise_email(email)
+    lock_email(db, email)
     if db.scalar(select(exists().where(User.email == email))):
         raise AccountExists()
-    # Supersede any earlier open (or expired-but-unused) invitation.
-    db.execute(
-        update(Invitation)
-        .where(Invitation.email == email, Invitation.accepted_at.is_(None), Invitation.revoked_at.is_(None))
-        .values(revoked_at=now)
-        .execution_options(synchronize_session=False)
-    )
+    old = list(db.scalars(select(Invitation).where(Invitation.email == email, *unended())
+                          .order_by(Invitation.id).with_for_update()))
+    for row in old:
+        end_invitation(db, row, kind="revoked", reason="invitation_replaced", now=now)
+    db.flush()  # Release the partial-unique slot before inserting the new link.
     token, digest = generate_token()
     inv = Invitation(
         email=email,
@@ -95,7 +99,7 @@ def create_invitation(
         target_type="invitation",
         target_id=str(inv.id),
     )
-    db.commit()
+    commit_auth(db)
     return CreatedInvitation(invitation=inv, token=token)
 
 
@@ -113,6 +117,7 @@ def accept_invitation(
     display_name: str | None,
     now: datetime,
     policy: PasswordPolicy,
+    clock: Callable[[], datetime] | None = None,
 ) -> User:
     """Consume the invitation once and create the account atomically.
 
@@ -124,16 +129,19 @@ def accept_invitation(
         raise InvalidToken()
     validate_password(password, policy, email=inv.email)
     verifier = hash_password(password)  # slow: outside the locked section
-    inv_id = inv.id
+    inv_id, email = inv.id, inv.email
     db.rollback()
 
+    lock_email(db, email)
     locked = db.scalar(
         select(Invitation)
-        .where(Invitation.id == inv_id, *_open(now))
+        .where(Invitation.id == inv_id)
         .with_for_update()
         .execution_options(populate_existing=True)
     )
-    if locked is None:
+    now = (clock or utcnow)()
+    if (locked is None or locked.accepted_at or locked.revoked_at or locked.closed_by_recovery_at
+            or locked.expires_at <= now):
         db.rollback()
         raise InvalidToken()
     user = User(
@@ -152,8 +160,8 @@ def accept_invitation(
     except IntegrityError as exc:  # email taken meanwhile
         db.rollback()
         raise InvalidToken() from exc
-    locked.accepted_at = now
     locked.accepted_user_id = user.id
+    end_invitation(db, locked, kind="accepted", reason="invitation_accepted", now=now)
     record_event(
         db,
         action="invitation.accept",
@@ -163,30 +171,28 @@ def accept_invitation(
         target_type="invitation",
         target_id=str(locked.id),
     )
-    db.commit()
+    commit_auth(db)
     return user
 
 
-def revoke_invitation(db: Session, *, invitation_id: uuid.UUID, actor_id: uuid.UUID, now: datetime) -> None:
-    result = db.execute(
-        update(Invitation)
-        .where(Invitation.id == invitation_id, Invitation.accepted_at.is_(None), Invitation.revoked_at.is_(None))
-        .values(revoked_at=now)
-        .execution_options(synchronize_session=False)
-    )
-    if result.rowcount != 1:
-        db.rollback()
+def revoke_invitation(db: Session, *, invitation_id: uuid.UUID, actor_id: uuid.UUID, now: datetime,
+                      reason: str = "admin_revoked", compensation: bool = False) -> None:
+    email = db.scalar(select(Invitation.email).where(Invitation.id == invitation_id))
+    if email is None:
         raise NotFound()
-    record_event(
-        db,
-        action="invitation.revoke",
-        outcome=AuditOutcome.SUCCESS,
-        actor_type=AuditActorType.USER,
-        actor_user_id=actor_id,
-        target_type="invitation",
-        target_id=str(invitation_id),
-    )
-    db.commit()
+    lock_email(db, email)
+    row = db.scalar(select(Invitation).where(Invitation.id == invitation_id).with_for_update()
+                    .execution_options(populate_existing=True))
+    if row is None or row.accepted_at or row.revoked_at or row.closed_by_recovery_at:
+        db.rollback()
+        if compensation:
+            return  # Accept/revoke may have won after the adapter received the link.
+        raise NotFound()
+    end_invitation(db, row, kind="revoked", reason=reason, now=now)
+    record_event(db, action="invitation.revoke", outcome=AuditOutcome.SUCCESS,
+                 actor_type=AuditActorType.USER, actor_user_id=actor_id,
+                 target_type="invitation", target_id=str(invitation_id), details={"reason_code": reason})
+    commit_auth(db)
 
 
 def list_invitations(db: Session, *, limit: int = 200) -> list[Invitation]:

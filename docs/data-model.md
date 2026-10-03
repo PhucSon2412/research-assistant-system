@@ -1,5 +1,8 @@
 # Mô hình dữ liệu logic
 
+**M6c-2b2b2 (`0032`, chưa merge), sau PR #30 merge `ce67ce8` (`0031`):** `invitations` thêm `closed_by_recovery_at`, `recovery_end_kind`, `closure_reason`; partial unique email chỉ giữ hàng có `accepted_at`, `revoked_at`, `closed_by_recovery_at` đều NULL. Cặp accepted_at/User FK giữ nguyên cho accept thật; replay không gán chúng. Mirror thêm invitation ID/kind/reason/time, ID unique và không FK. CHECK/INSERT trigger khớp body trước append; deferred closure trigger/BEFORE finality ngăn thiếu journal và mở lại/xóa invitation đã kết thúc. [Chi tiết schema/replay](invitation-journal.md).
+
+
 **M6c-2b2b1 `0031`:** `password_reset_tokens.closure_reason` nullable cho lịch sử; mirror thêm `reset_token_id` unique, `reset_token_user_id`, `reset_end_kind`, `reset_reason_code`, `reset_ended_at`, không FK. CHECK/trigger INSERT khớp body/owner và JSON missing/null/thừa; trigger hoãn closure đúng loại/mã/time, BEFORE cấm đổi identity/kết thúc/tái chèn token mở. Không sửa `0030` của PR #29 đã merge `d38c6b8`. [Hợp đồng](reset-token-journal.md).
 
 [Mục lục](README.md) · [Kiến trúc](architecture.md) · [Quyền và dữ liệu](access-and-data.md)

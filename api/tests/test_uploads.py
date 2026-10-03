@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
@@ -25,7 +26,9 @@ from tests.helpers import WEB_ORIGIN
 
 @pytest.fixture
 def upload_api(api, monkeypatch):
-    env = {k: _unquote(v) for k, v in _read_dotenv(REPO_DIR / ".env").items()}
+    env = {k: os.environ[k] for k in ("MINIO_ROOT_USER", "MINIO_ROOT_PASSWORD", "MINIO_API_HOST_PORT") if k in os.environ}
+    if not all(env.get(k) for k in ("MINIO_ROOT_USER", "MINIO_ROOT_PASSWORD")):
+        env = {k: _unquote(v) for k, v in _read_dotenv(REPO_DIR / ".env").items()}
     assert env.get("MINIO_ROOT_USER") and env.get("MINIO_ROOT_PASSWORD")
     monkeypatch.setenv("RAS_STORAGE__ENDPOINT_URL", f"http://127.0.0.1:{env.get('MINIO_API_HOST_PORT', '9000')}")
     monkeypatch.setenv("RAS_STORAGE__ACCESS_KEY", env["MINIO_ROOT_USER"])
