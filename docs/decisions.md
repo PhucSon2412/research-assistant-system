@@ -10,7 +10,15 @@
 
 **Khác biệt docs/code được ghi rõ:** đầu trang invitation còn ghi chưa merge → sửa PR #31 đã merge `3f21794`; login có rehash verifier không đổi mật khẩu; reset confirm dùng giờ đầu request sau hash/chờ khóa; disable không session/token có journal batch rỗng, enable không có status event. Thiết kế nêu sửa ở PR coding, PR tài liệu này không đổi các hành vi. `journal_confirmed` không chứng minh commit nghiệp vụ; active intent trước commit không tự là quyền sau replay.
 
-**Kiểm chứng PR này:** kiểm 35 file Markdown, 413 liên kết nội bộ (file/anchor), không link hỏng; rà nhất quán schema/state/transaction/recovery/matrix và `git diff --check` đạt. Chỉ 11 file Markdown thay đổi, không secret trong nội dung thêm; không full API/web, provider, `.env`, migration/restart hoặc dữ liệu dev. [Ma trận T01–T23](auth-restore-safety.md#ma-trận-kiểm-thử) là tiêu chí chưa chạy. Giới hạn: journal cùng rollback/mất với DB không phát hiện được, fsync/fault injection chưa chứng minh độ bền mất điện, verifier mới không được dựng từ journal.
+**Kiểm chứng tại `0d04046`:** kiểm 35 file Markdown, 413 liên kết nội bộ (file/anchor), không link hỏng; rà nhất quán schema/state/transaction/recovery/matrix và `git diff --check` đạt. Chỉ 11 file Markdown thay đổi, không secret trong nội dung thêm; không full API/web, provider, `.env`, migration/restart hoặc dữ liệu dev. [Ma trận T01–T23](auth-restore-safety.md#ma-trận-kiểm-thử) là tiêu chí chưa chạy. Giới hạn: journal cùng rollback/mất với DB không phát hiện được, fsync/fault injection chưa chứng minh độ bền mất điện, verifier mới không được dựng từ journal.
+
+### Sửa theo review PR #32 tại 0d04046
+
+Review chưa thấy lỗi chặn generation/receipt nhưng yêu cầu hai sửa tài liệu, không phê duyệt phương án A hay mở coding. README gốc còn ghi invitation chưa merge và bảng trạng thái roadmap còn ghi PR #28 đang review: sửa PR #28/#31 đã merge, head migration source `0032`, PR #32 chỉ thiết kế đang review. DB dev theo chứng cứ gần nhất vẫn `0030`, chưa nâng `0032`; không kiểm lại DB hay nâng/restart trong PR này.
+
+Làm rõ C1 kiểm trực tiếp schema/journal/replay/fence với cả ca được phép và bị chặn; HTTP không patch kiểm gate pending đóng riêng, không là bằng chứng hồi quy nghiệp vụ. C2/C3 kiểm writer/predicate/commit/DB guard thật; fixture chỉ được thay kết quả pending cutover, giữ integrity/hold/auth thật, không thêm bypass production. C4 chạy lại HTTP API/proxy với gate thật; giữ expectation/inventory cũ, không dùng toàn 503 hay tính ca hoãn là pass. Cần chốt A, cách ly mọi legacy/maintenance và runtime/migrator/rehash trước C1; operator/delivery trước C3. Những quyết định này vẫn mở.
+
+Kiểm sửa review: 35 file Markdown, 415 liên kết nội bộ, 0 lỗi; `git diff --check` đạt, ma trận vẫn đủ T01–T23. Lượt sửa này chỉ 7 file Markdown (toàn PR 12 file); không chạy API/web suite, đọc/sửa `.env`, provider, migration/restart hay dữ liệu dev. Hợp đồng test mới là tiêu chí coding, chưa có kết quả chạy.
 
 ## Quyết định triển khai M6c-2b2b2 (2026-10-03)
 

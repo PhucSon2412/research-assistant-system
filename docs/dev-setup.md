@@ -1,6 +1,6 @@
 # Môi trường phát triển và schema (M1a–M6c-2b2b2)
 
-**Trạng thái hiện hành:** PR #31 đã merge `3f21794` (`0032`), sau PR #30 `ce67ce8` (`0031`). [Runbook invitation](#journal-invitation-m6c-2b2b2); revision ở các mục cũ là chứng cứ lịch sử. Credential/status hiện vẫn rollback; [M6c-2b2c0](auth-restore-safety.md) mới là thiết kế, chưa auth/migration/CLI mới.
+**Trạng thái hiện hành:** PR #31 đã merge `3f21794`, head migration **mã nguồn** `0032`, sau PR #30 `ce67ce8` (`0031`). **DB dev** gần nhất được ghi nhận là `0030` ở kiểm chứng PR #30, chưa nâng lên `0032`; chứng cứ PR #31 ghi container dev giữ nguyên. Không truy vấn/nâng DB trong PR tài liệu này, không suy revision DB/image đang chạy từ head source. [Runbook invitation](#journal-invitation-m6c-2b2b2); revision ở các mục cũ là chứng cứ lịch sử. Credential/status hiện vẫn rollback; PR #32 ([M6c-2b2c0](auth-restore-safety.md)) chỉ là thiết kế đang review, chưa merge/chưa auth/migration/CLI mới.
 
 **Vận hành auth restore M6c-2b2c0 — chưa triển khai:**
 
