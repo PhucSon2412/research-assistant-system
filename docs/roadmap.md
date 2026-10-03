@@ -1,6 +1,10 @@
 # Roadmap đề xuất
 
-**M6c-2b2b2 đã triển khai, chờ review, chưa merge:** base PR #30 đã merge `ce67ce8`, `0031`; nhánh invitation journal thêm `0032`. [Hợp đồng](invitation-journal.md) bảo vệ link đã kết thúc sau restore với journal hiện hành, không dựng lại account; full API **901/901**, web **42/42**, đối chứng **8/8**, drill **59/59** (giới hạn ở tài liệu kiểm chứng). **Bàn giao tiếp theo:** chống rollback credential/account status; membership, xóa paper riêng, scheduler và journal production vẫn tách riêng.
+**M6c-2b2b2, PR #31 đã merge `3f21794`:** base PR #30 đã merge `ce67ce8`, `0031`; invitation journal thêm `0032`. [Hợp đồng](invitation-journal.md) bảo vệ link đã kết thúc sau restore với journal hiện hành, không dựng lại account; full API **901/901**, web **42/42**, đối chứng **8/8**, drill **59/59** là chứng cứ lịch sử PR #31 (giới hạn ở tài liệu kiểm chứng).
+
+**M6c-2b2c0: thiết kế và bàn giao coding:**
+
+**Chỉ tài liệu, chưa triển khai/chưa được chủ dự án phê duyệt:** [thiết kế auth restore](auth-restore-safety.md) đề xuất A (generation UUID/receipt + cách ly), ma trận T01–T23 và [bốn PR coding phụ thuộc](auth-restore-safety.md#chia-pr-coding): C1 schema/journal/backfill hạn chế → C2 toàn predicate/writer auth → C3 recovery User/Admin → C4 cutover/drill. C1–C3 giữ safety chưa ready/global gate đóng, không mở tính năng bằng một phần gate. Chủ dự án phải chốt baseline/gián đoạn, role DB, operator/bằng chứng, status/Admin, delivery/Origin và cutover trước PR tương ứng. Membership, xóa paper riêng, scheduler và journal production vẫn tách riêng; các con số suite cũ không là kết quả thiết kế mới.
 
 
 **M6c-2b2b1 (PR #30 đã merge `ce67ce8`, `0031`, base PR #29 đã merge `d38c6b8`):** journal reset token consumed/revoked, batch token/session và recovery/backfill giữ link đã kết thúc không sống lại trong TTL với journal độc lập hiện hành. [Thiết kế/giới hạn](reset-token-journal.md). M6c-2b2b2 mở rộng invitation ở trên; kế tiếp thiết kế chống rollback credential/account status; mật khẩu/status vẫn rollback. Production journal/backup scheduler, membership/xóa riêng vẫn riêng.

@@ -2,7 +2,7 @@
 
 [Mục lục](README.md) · [Quyết định](decisions.md#quyết-định-triển-khai-m6c-2b2b2-2026-10-03) · [Runbook](dev-setup.md#journal-invitation-m6c-2b2b2)
 
-**Yêu cầu của chủ dự án:** bảo vệ link đã nhận/thu hồi trước restore backup cũ, với journal độc lập hiện hành; giữ bảo vệ session/reset của PR #29/#30. PR #30 đã merge tại `ce67ce8`, revision `0031`. Nhánh `feat/m6c2b2b2-invitation-journal` từ đúng base đó; thêm `0032`, không sửa revision đã merge. Chưa merge PR này.
+**Yêu cầu của chủ dự án:** bảo vệ link đã nhận/thu hồi trước restore backup cũ, với journal độc lập hiện hành; giữ bảo vệ session/reset của PR #29/#30. PR #30 đã merge tại `ce67ce8`, revision `0031`. Nhánh `feat/m6c2b2b2-invitation-journal` từ đúng base đó; thêm `0032`, không sửa revision đã merge. PR #31 đã merge tại `3f21794`. Credential/status vẫn chưa bảo vệ; [M6c-2b2c0](auth-restore-safety.md) mới là thiết kế đề xuất, chưa triển khai.
 
 **Lựa chọn triển khai của coding agent:** dùng cùng hash chain, mirror, `journal_confirmed`, recovery gate và `identity.session_commit.commit_auth`. Event `invitation_closure` đúng bốn trường bắt buộc, không null/thừa:
 

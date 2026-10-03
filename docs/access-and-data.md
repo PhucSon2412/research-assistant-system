@@ -1,6 +1,10 @@
 # Quyền và dữ liệu
 
-**M6c-2b2b2, `0032` (chưa merge):** invitation accepted/admin revoked/replaced/delivery compensation ghi cùng auth journal trước commit; restore/replay đóng link bằng `closed_by_recovery`, không dựng lại account. Inspect/accept từ chối trong TTL; Admin hiển thị việc đóng do recovery. Không suy link chưa gửi từ lỗi adapter, không xóa account nếu accept thắng thu hồi bù. PR #30 đã merge `ce67ce8`; session/reset gate giữ nguyên. [Hợp đồng và cửa sổ lỗi](invitation-journal.md).
+**M6c-2b2b2, PR #31 đã merge `3f21794`, `0032`:** invitation accepted/admin revoked/replaced/delivery compensation ghi cùng auth journal trước commit; restore/replay đóng link bằng `closed_by_recovery`, không dựng lại account. Inspect/accept từ chối trong TTL; Admin hiển thị việc đóng do recovery. Không suy link chưa gửi từ lỗi adapter, không xóa account nếu accept thắng thu hồi bù. PR #30 đã merge `ce67ce8`; session/reset gate giữ nguyên. [Hợp đồng và cửa sổ lỗi](invitation-journal.md).
+
+**Thiết kế auth sau restore M6c-2b2c0:**
+
+**Đề xuất, chưa triển khai/chưa được chủ dự án phê duyệt:** [generation/receipt và cách ly credential/status](auth-restore-safety.md). Login/session sẽ cần cả business active được chứng minh và credential usable đúng User UUID/generation; session ghim generation, mọi dependency và lần kiểm cuối dùng cùng predicate. Replay có thể hạn chế account, không tự enable từ event trước commit; reset không enable disabled. User vắng không được dựng lại hay nhận quyết định qua email trùng. User/Admin cần kiểm chứng UUID và đường recovery riêng khi delivery disabled hoặc mọi Admin không đọc được outbox. Những quyền operator mới còn phải chốt; không thay quyền MVP hiện tại bằng tài liệu này.
 
 
 **M6c-2b2b1, PR #30 đã merge `ce67ce8`, `0031`:** journal độc lập hiện hành giữ reset token đã dùng/thu hồi không dùng lại sau restore/recover trong TTL. Request/confirm/disable ghi closure cùng batch session trong transaction auth. Replay chỉ đóng token/session, không đổi verifier/status/phát link. Invitation chưa bảo vệ ở milestone `0031`, được mở rộng trong `0032` ở trên; credential/status cũ vẫn có thể tạo session mới. [Hợp đồng/bảng lỗi](reset-token-journal.md). PR #29 đã merge `d38c6b8`.

@@ -54,6 +54,8 @@ Gate/status thêm `reset_tokens_not_journaled`, `unjournaled_reset_tokens`; repo
 
 **Trạng thái sau PR #30:** đã merge tại `ce67ce8` (`0031`); M6c-2b2b2 mở rộng riêng [invitation](invitation-journal.md), giữ các bảo vệ reset/session trên đây.
 
+**Hiện hành:** PR #31 đã merge `3f21794` (`0032`); [thiết kế M6c-2b2c0](auth-restore-safety.md) đề xuất generation/receipt và cách ly credential/status. Chưa triển khai và chưa được chủ dự án phê duyệt; reset-token closure vẫn không chứng minh verifier mới hay enable/disable đã commit.
+
 ## Giới hạn và việc kế tiếp
 
 - Tại PR #30 invitation chưa bảo vệ (M6c-2b2b2 mở rộng sau đó); membership/xóa paper riêng là task sau.
