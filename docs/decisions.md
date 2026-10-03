@@ -1,6 +1,28 @@
 # Nhật ký quyết định
 
+## M6c-2b2c0: thiết kế auth sau restore (2026-10-03)
+
+**Chủ dự án yêu cầu:** PR chỉ tài liệu thiết kế chống rollback verifier/account status sau restore, phân tích tám tình huống, phương án A/B/C, recovery User/Admin, tiêu chí kiểm thử và PR coding nhỏ; commit/push/mở PR tiếng Việt, chưa merge. Không triển khai auth/migration/CLI. Fetch xác minh `origin/main` tại `3f2179487b1e7041af2b398f54c6ad4406510f96`, merge PR #31 (`0032`); PR #29/#30/#31 đã bảo vệ session/reset/invitation nhưng không credential/status.
+
+**Đề xuất của agent/orchestrator, chưa được chủ dự án phê duyệt:** chọn A, UUID generation credential/status và receipt trong transaction DB, so latest event journal độc lập; rollback credential → quarantine, enable thiếu receipt → held, disable replay hạn chế kể cả không session. Không verifier/fingerprint/token/email trong journal, không tái tạo User/role/session; rehash giữ generation. Baseline legacy đóng và cần kiểm chứng mới, không `--confirm-db-is-current` để hợp thức hóa mật khẩu cũ. [Thiết kế/schema/transaction/bảng lỗi](auth-restore-safety.md), [chia PR](auth-restore-safety.md#chia-pr-coding).
+
+**Cần chủ dự án chốt trước coding phụ thuộc:** chấp nhận gián đoạn chọn A/baseline một lần, role DB và trust boundary rehash, quyền/bằng chứng operator theo UUID, initial status/Admin bị khóa, delivery/Origin compatibility, maintenance/cutover và storage journal độc lập. CLI recovery chỉ là tên đề xuất, không lệnh đã kiểm chứng; reset credential không enable. Không ghi rằng chủ dự án đã xác nhận lựa chọn A hoặc quyền mới.
+
+**Khác biệt docs/code được ghi rõ:** đầu trang invitation còn ghi chưa merge → sửa PR #31 đã merge `3f21794`; login có rehash verifier không đổi mật khẩu; reset confirm dùng giờ đầu request sau hash/chờ khóa; disable không session/token có journal batch rỗng, enable không có status event. Thiết kế nêu sửa ở PR coding, PR tài liệu này không đổi các hành vi. `journal_confirmed` không chứng minh commit nghiệp vụ; active intent trước commit không tự là quyền sau replay.
+
+**Kiểm chứng tại `0d04046`:** kiểm 35 file Markdown, 413 liên kết nội bộ (file/anchor), không link hỏng; rà nhất quán schema/state/transaction/recovery/matrix và `git diff --check` đạt. Chỉ 11 file Markdown thay đổi, không secret trong nội dung thêm; không full API/web, provider, `.env`, migration/restart hoặc dữ liệu dev. [Ma trận T01–T23](auth-restore-safety.md#ma-trận-kiểm-thử) là tiêu chí chưa chạy. Giới hạn: journal cùng rollback/mất với DB không phát hiện được, fsync/fault injection chưa chứng minh độ bền mất điện, verifier mới không được dựng từ journal.
+
+### Sửa theo review PR #32 tại 0d04046
+
+Review chưa thấy lỗi chặn generation/receipt nhưng yêu cầu hai sửa tài liệu, không phê duyệt phương án A hay mở coding. README gốc còn ghi invitation chưa merge và bảng trạng thái roadmap còn ghi PR #28 đang review: sửa PR #28/#31 đã merge, head migration source `0032`, PR #32 chỉ thiết kế đang review. DB dev theo chứng cứ gần nhất vẫn `0030`, chưa nâng `0032`; không kiểm lại DB hay nâng/restart trong PR này.
+
+Làm rõ C1 kiểm trực tiếp schema/journal/replay/fence với cả ca được phép và bị chặn; HTTP không patch kiểm gate pending đóng riêng, không là bằng chứng hồi quy nghiệp vụ. C2/C3 kiểm writer/predicate/commit/DB guard thật; fixture chỉ được thay kết quả pending cutover, giữ integrity/hold/auth thật, không thêm bypass production. C4 chạy lại HTTP API/proxy với gate thật; giữ expectation/inventory cũ, không dùng toàn 503 hay tính ca hoãn là pass. Cần chốt A, cách ly mọi legacy/maintenance và runtime/migrator/rehash trước C1; operator/delivery trước C3. Những quyết định này vẫn mở.
+
+Kiểm sửa review: 35 file Markdown, 415 liên kết nội bộ, 0 lỗi; `git diff --check` đạt, ma trận vẫn đủ T01–T23. Lượt sửa này chỉ 7 file Markdown (toàn PR 12 file); không chạy API/web suite, đọc/sửa `.env`, provider, migration/restart hay dữ liệu dev. Hợp đồng test mới là tiêu chí coding, chưa có kết quả chạy.
+
 ## Quyết định triển khai M6c-2b2b2 (2026-10-03)
+
+**Trạng thái hiện hành:** PR #31 đã merge `3f21794`, revision `0032`. Nội dung và chứng cứ bên dưới là của PR đó; M6c-2b2c0 ở trên chỉ thiết kế credential/status tiếp theo.
 
 **Chủ dự án yêu cầu:** journal kết thúc invitation trên cả accept/revoke/reinvite/delivery compensation; restore link không sống lại, không tái tạo danh tính; giữ PR #29/#30. PR #30 đã merge `ce67ce8`; base nhánh `feat/m6c2b2b2-invitation-journal`. Không credential/status rollback, membership, private deletion, scheduler hay production trong PR này.
 

@@ -1,6 +1,10 @@
-# Môi trường phát triển và schema (M1a–M6c-2b2b1)
+# Môi trường phát triển và schema (M1a–M6c-2b2b2)
 
-**Trạng thái hiện hành:** PR #30 đã merge `ce67ce8` (`0031`); M6c-2b2b2 thêm `0032` trong PR chưa merge. [Runbook mới](#journal-invitation-m6c-2b2b2); revision ở các mục cũ là chứng cứ lịch sử.
+**Trạng thái hiện hành:** PR #31 đã merge `3f21794`, head migration **mã nguồn** `0032`, sau PR #30 `ce67ce8` (`0031`). **DB dev** gần nhất được ghi nhận là `0030` ở kiểm chứng PR #30, chưa nâng lên `0032`; chứng cứ PR #31 ghi container dev giữ nguyên. Không truy vấn/nâng DB trong PR tài liệu này, không suy revision DB/image đang chạy từ head source. [Runbook invitation](#journal-invitation-m6c-2b2b2); revision ở các mục cũ là chứng cứ lịch sử. Credential/status hiện vẫn rollback; PR #32 ([M6c-2b2c0](auth-restore-safety.md)) chỉ là thiết kế đang review, chưa merge/chưa auth/migration/CLI mới.
+
+**Vận hành auth restore M6c-2b2c0 — chưa triển khai:**
+
+[Quy trình đề xuất](auth-restore-safety.md#recovery-nâng-cấp-và-khả-năng-phục-vụ) giữ restore → hold trước migrate → replay/backfill → mọi hậu điều kiện → mở traffic. Các lệnh/image/revision đã kiểm dưới đây chỉ thuộc M6c-2b2b2 trở về trước, không bảo đảm chặn mật khẩu/status snapshot. Không có lệnh `auth_recovery` hiện tại: [CLI User/Admin](auth-restore-safety.md#cli-đề-xuất-cho-user-và-admin-duy-nhất) là đề xuất, không được copy chạy hoặc bootstrap lại để vượt quarantine. `--confirm-db-is-current` không là bằng chứng credential/status hiện hành. Trước cutover coding phải chốt operator/inventory UUID/approval và maintenance; delivery disabled/dev outbox chỉ Admin đọc được không tự là kênh khôi phục khi mọi Admin bị chặn. CLI credential không enable/đổi role/tạo account; latest disabled vẫn đóng. Journal nguồn/bản sao/artifact ngoài repo, độc lập miền sự cố và chỉ một DB writer; lỗi fsync mô phỏng chưa chứng minh mất điện. PR tài liệu này không chạy/sửa `.env`, migrate/restart hoặc dữ liệu dev.
 
 [Mục lục](README.md) · [Mô hình dữ liệu](data-model.md) · [Roadmap](roadmap.md)
 
