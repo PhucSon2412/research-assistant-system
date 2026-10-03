@@ -9,7 +9,22 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
 
-JOURNAL_KINDS = "'genesis', 'revocation', 'recovery_begin', 'recovery_end', 'review_closure', 'session_revocation'"
+JOURNAL_KINDS = "'genesis', 'revocation', 'recovery_begin', 'recovery_end', 'review_closure', 'session_revocation', 'reset_token_closure'"
+TOKEN_IDS_REQUIRED = ("CASE WHEN kind = 'reset_token_closure' THEN reset_token_id IS NOT NULL"
+                      " AND reset_token_user_id IS NOT NULL AND reset_end_kind IS NOT NULL"
+                      " AND reset_reason_code IS NOT NULL AND reset_ended_at IS NOT NULL"
+                      " ELSE reset_token_id IS NULL AND reset_token_user_id IS NULL AND reset_end_kind IS NULL"
+                      " AND reset_reason_code IS NULL AND reset_ended_at IS NULL END")
+TOKEN_MATCHES_BODY = ("CASE WHEN kind = 'reset_token_closure' THEN"
+    " (reset_token_id::text IS NOT DISTINCT FROM (line::jsonb #>> '{body,token_id}'))"
+    " AND (reset_token_user_id::text IS NOT DISTINCT FROM (line::jsonb #>> '{body,user_id}'))"
+    " AND (reset_end_kind IS NOT DISTINCT FROM (line::jsonb #>> '{body,end_kind}'))"
+    " AND (reset_reason_code IS NOT DISTINCT FROM (line::jsonb #>> '{body,reason_code}'))"
+    " AND (reset_ended_at IS NOT DISTINCT FROM (line::jsonb #>> '{body,ended_at}')::timestamptz)"
+    " AND (line::jsonb ->> 'kind' IS NOT DISTINCT FROM kind)"
+    " AND COALESCE((reset_end_kind = 'consumed' AND reset_reason_code IN ('password_reset', 'legacy_consumed'))"
+    " OR (reset_end_kind = 'revoked' AND reset_reason_code IN"
+    " ('reset_replaced', 'reset_completed', 'user_disabled', 'legacy_revoked')), false) ELSE true END")
 APPLIED_VIA = "'genesis', 'revoke', 'close', 'replay', 'import'"
 REGISTRATION_MODES = "'new_install', 'existing_db', 'adopted', 'rebuilt_from_db'"
 
@@ -68,6 +83,9 @@ class RevocationJournalRecord(Base):
         UniqueConstraint("tombstone_id", name="uq_revocation_journal_records_tombstone_id"),
         UniqueConstraint("review_request_id", name="uq_revocation_journal_records_review_request_id"),
         UniqueConstraint("session_id", name="uq_revocation_journal_records_session_id"),
+        UniqueConstraint("reset_token_id", name="uq_revocation_journal_records_reset_token_id"),
+        CheckConstraint(TOKEN_IDS_REQUIRED, name="reset_fields_required"),
+        CheckConstraint(TOKEN_MATCHES_BODY, name="reset_matches_body"),
         CheckConstraint("seq > 0", name="seq_positive"),
         CheckConstraint(f"kind IN ({JOURNAL_KINDS})", name="kind_valid"),
         CheckConstraint("record_hash ~ '^[0-9a-f]{64}$'", name="record_hash_hex"),
@@ -110,6 +128,11 @@ class RevocationJournalRecord(Base):
     # No FKs: the snapshot may lack the session and even its user.
     session_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     session_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    reset_token_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    reset_token_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    reset_end_kind: Mapped[str | None] = mapped_column(Text)
+    reset_reason_code: Mapped[str | None] = mapped_column(Text)
+    reset_ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     applied_via: Mapped[str] = mapped_column(Text)
     result: Mapped[str] = mapped_column(Text)
     journal_confirmed: Mapped[bool] = mapped_column(Boolean)

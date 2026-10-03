@@ -1,4 +1,4 @@
-# Môi trường phát triển và schema (M1a–M6c-2b2a)
+# Môi trường phát triển và schema (M1a–M6c-2b2b1)
 
 [Mục lục](README.md) · [Mô hình dữ liệu](data-model.md) · [Roadmap](roadmap.md)
 
@@ -1087,7 +1087,7 @@ PYTHONIOENCODING=utf-8 "$USERPROFILE/.conda/envs/ras/python.exe" scripts/drill_r
 
 ## Journal thu hồi session (M6c-2b2a)
 
-Nhánh review sau PR #28 merge `47a1aab`, revision `0030`. Schema, batch, khóa và cửa sổ lỗi ở [decisions](decisions.md#quyết-định-triển-khai-m6c-2b2a-2026-10-02). Không nâng DB dev trong PR này; test tạo/xóa DB riêng và diễn tập chỉ dùng hai project cô lập.
+PR #29 đã merge `d38c6b8` sau PR #28 `47a1aab`, revision `0030`. Phần này ghi kết quả lịch sử của PR #29; M6c-2b2b1 mở rộng token ở mục sau. Schema, batch, khóa và cửa sổ lỗi ở [decisions](decisions.md#quyết-định-triển-khai-m6c-2b2a-2026-10-02). Không nâng DB dev trong PR này; test tạo/xóa DB riêng và diễn tập chỉ dùng hai project cô lập.
 
 **Nâng cấp DB có lịch sử session:** dừng `api web worker beat`, migrate `0030`. Nếu còn session đã thu hồi trước migration, status báo `sessions_not_journaled`, `unjournaled_sessions=N`. Chạy `recover` (không cần xác nhận DB live cho việc import thu hồi cũ), phải có `sessions_imported=N`, `gate=open` và `unjournaled_sessions=0`, rồi mới start writer. Migration không đọc journal. Lịch sử đã mất khỏi DB trước import không thể khôi phục.
 
@@ -1121,3 +1121,98 @@ Hai project mới `ras-drill-src` / `ras-drill-restore` dùng port như M6c-2a, 
 - Diễn tập Compose `scripts/drill_session_revocation_restore.py --down`: **35/35**, **0 provider call**. A có ba session, B một session, Admin; lưu cookie và CSRF; B upload một Markdown tổng hợp 65 byte. Backup writer dừng (1 object, dump **227.037 byte**, journal DB head 1). Sau backup: A1 logout; A0 revoke-others thu hồi A2, giữ A0; session mới của A tạo rồi logout (snapshot không có). Journal hiện hành có ba dòng chỉ ID/mã/thời điểm. Copy riêng, restore → gate `db_behind_journal`; snapshot có ba session A sống. Trước recover: **20/20** request (5 bộ cookie × GET/POST × web/API) `503 service_recovering`. Recover → `session_revoked=2`, `recorded_session_absent=1`, gate mở. Sau recover: cookie **và CSRF cũ** của A1/A2 → `401 session_expired` qua web/API; A0/B → `200`, file B đúng SHA-256; session sau backup vẫn không tồn tại. Session snapshot còn trong idle/absolute; tuổi lớn nhất quan sát **75,03 s**, so với lifetimes từ config (không sửa timeout để test). Recover lặp, restore lần hai + recover cho cùng kết quả. Journal nguồn không đổi byte; logs container không traceback/token. `--down` đã gỡ hai project/volume; dev không bị nâng schema hay restart. Một lần đo nhỏ, không SLO: backup **1,44 s**, restore **14,98 s**, recover **2,30 s**; dữ liệu/journal/artifact cùng máy.
 
 **Giới hạn:** chỉ session; reset token/invitation, mật khẩu và account status có thể trở về snapshot cũ. Credential cũ có thể tạo **session mới** sau restore. Backfill không cứu lịch sử đã mất, journal cũ/cùng rollback với DB không phát hiện được. Crash/fsync/commit lỗi chỉ tiêm lỗi, chưa kiểm mất điện thật; journal/DB/artifact cùng máy trong diễn tập. Hợp đồng task token/credential tiếp theo ở decisions. Không thay `.env`/key hoặc `pricing_verified`.
+
+## Journal reset token (M6c-2b2b1)
+
+Base `origin/main=d38c6b8` (PR #29 đã merge); nhánh `feat/m6c2b2b1-reset-token-journal`, revision `0031`. [Thiết kế, batch và cửa sổ lỗi](reset-token-journal.md). Không nâng DB dev; migration/test dùng DB riêng, diễn tập hai project cô lập. Host Python đã kiểm `C:\Users\ADMIN\.conda\envs\ras\python.exe`, pip cùng env; không venv.
+
+**Runbook nâng cấp DB hiện có (operator thực hiện, không chạy trên dev trong PR):**
+
+1. Xác minh DB live hay snapshot restore, bảo toàn journal hiện hành ở nơi độc lập; dừng `api web worker beat` của **đúng project**. Xác minh artifact/journal trước restore theo M6c-2a; DB/Redis/MinIO phải sẵn sàng, không cho writer chạy giữa migrate/recover.
+2. Checkout đúng commit mới đã được duyệt, ghi `git rev-parse HEAD`; **build cả `api web worker beat migrate recovery-init` trước mọi hold/migration/recovery**. `compose run`/`up` không bảo đảm tự build lại image có sẵn. Kiểm `alembic heads` trong từng image Python là đúng một head `0031`; nếu build/check lỗi hoặc còn `0030`, dừng, giữ writer đóng. Không suy revision của image từ source trên host hay từ DB.
+3. DB live đã đăng ký: hold rồi migrate `0031`, **đọc trực tiếp `alembic_version` trong đúng DB và buộc là `0031`**, chạy `recover`. Nếu còn token kết thúc trước migration, recover import lịch sử có thật còn trong DB, report `reset_tokens_imported=N`; mã `legacy_consumed`/`legacy_revoked` không suy lý do cũ. DB live chưa đăng ký: sau build/check image, migrate/check DB rồi `register-existing --confirm-db-is-current` chỉ khi operator đã xác minh đúng live; không hold/init DB chưa đăng ký có token.
+4. Snapshot restore: luôn `hold` trước writer, migrate/check DB rồi `recover` với **bản sao journal hiện hành riêng**. `hold` dùng seq/hash, chạy được trên `0030` trước migrate. Không dùng `--confirm-db-is-current` trên snapshot; nếu journal thiếu/khác/xung đột thì dừng để tìm bản đúng, không tự suy lịch sử.
+5. Chỉ start writer khi **revision DB `0031`**, recover thành công, status exit 0/`gate=open`, mọi count unjournaled/unconfirmed/unpurged bằng 0, `open_recovery=False`, `torn_tail=False`. Dùng `--force-recreate` để writer lấy image vừa build, không giữ container cũ; `--no-deps` vì hạ tầng và các bước one-shot đã được kiểm riêng. Token đã journal không mở lại kể cả xóa/tái chèn cùng ID. Downgrade `0030` bị từ chối ở DB đã đăng ký.
+6. Append/fsync lỗi nhưng DB live commit: gate đóng, API confirm/disable trả lỗi. Dòng đủ fsync lỗi: recover tự sync; file thiếu đuôi/mirror ahead cần `--confirm-db-is-current` **chỉ live**. Mật khẩu/status/token mới có thể chưa commit khi outcome không rõ; replay chỉ kết thúc token/session. Request 202 không bảo đảm link gửi; thử yêu cầu mới sau recovery nếu cần.
+
+Ví dụ PowerShell 5.1 cho **DB đã đăng ký (live hoặc restore)**, sau khi đã kiểm đúng project/DB/journal và hạ tầng sẵn sàng. Chạy nguyên block; lỗi sẽ `throw` trước mở writer. Với DB chưa đăng ký, dùng nhánh ở bước 3 thay hold/recover; không tự thêm cờ xác nhận vào ví dụ restore.
+
+```powershell
+$rasProject = '<project đã kiểm tra>'
+$rasExpectedRevision = '0031'
+git rev-parse HEAD
+if ($LASTEXITCODE -ne 0) { throw 'Không xác minh được commit nguồn' }
+docker compose -p $rasProject stop api web worker beat
+if ($LASTEXITCODE -ne 0) { throw 'Không dừng được writer' }
+docker compose -p $rasProject build api web worker beat migrate recovery-init
+if ($LASTEXITCODE -ne 0) { throw 'Build thất bại; giữ writer đóng' }
+foreach ($rasService in @('api', 'worker', 'beat', 'migrate', 'recovery-init')) {
+    $rasHeads = docker compose -p $rasProject run --rm --no-deps $rasService alembic heads
+    if ($LASTEXITCODE -ne 0 -or ($rasHeads | Out-String).Trim() -ne "$rasExpectedRevision (head)") {
+        throw "Image $rasService thiếu head $rasExpectedRevision; giữ writer đóng"
+    }
+}
+# Restore phải gắn journal copy hiện hành; ras_backup.py đã hold, gọi lại là idempotent.
+docker compose -p $rasProject run --rm --no-deps api python -m app.cli.recovery hold
+if ($LASTEXITCODE -ne 0) { throw 'Hold thất bại; giữ writer đóng' }
+docker compose -p $rasProject run --rm --no-deps migrate
+if ($LASTEXITCODE -ne 0) { throw 'Migration thất bại; giữ writer đóng' }
+$rasDbRevision = 'SELECT version_num FROM alembic_version;' | docker compose -p $rasProject exec -T db sh -c 'psql -U $POSTGRES_USER -d $POSTGRES_DB -At'
+if ($LASTEXITCODE -ne 0 -or ($rasDbRevision | Out-String).Trim() -ne $rasExpectedRevision) {
+    throw 'DB chưa ở revision yêu cầu; giữ writer đóng'
+}
+docker compose -p $rasProject run --rm --no-deps api python -m app.cli.recovery recover
+if ($LASTEXITCODE -ne 0) { throw 'Recover thất bại; giữ writer đóng' }
+$rasStatus = docker compose -p $rasProject run --rm --no-deps api python -m app.cli.recovery status
+if ($LASTEXITCODE -ne 0) { throw 'Gate chưa mở; giữ writer đóng' }
+$rasStatusText = ($rasStatus | Out-String).Trim()
+Write-Output $rasStatusText
+foreach ($rasExpectedField in @('gate=open', 'unconfirmed_records=0', 'unjournaled_reset_tokens=0', 'unjournaled_sessions=0', 'unjournaled_review_closures=0', 'unjournaled_tombstones=0', 'unpurged_tombstones=0', 'open_recovery=False', 'torn_tail=False')) {
+    if ($rasStatusText -notmatch "(^|\s)$([regex]::Escape($rasExpectedField))(\s|$)") {
+        throw "Chưa đạt $rasExpectedField; giữ writer đóng"
+    }
+}
+# Chỉ tới đây khi image, revision DB và mọi điều kiện recovery đều đạt.
+docker compose -p $rasProject up -d --no-deps --force-recreate --wait api web worker beat
+if ($LASTEXITCODE -ne 0) { throw 'Writer chưa sẵn sàng; kiểm health/log của đúng project' }
+```
+
+DB live đã đăng ký có journal thiếu đuôi/mirror ahead có thể cần recover với cờ xác nhận sau khi operator xác minh; **không** dùng cờ đó trên snapshot. Không downgrade để tránh gate.
+
+**Lệnh kiểm và diễn tập:** chạy từ repo, Conda đã xác minh. Mọi dữ liệu dưới temp/ngoài repo.
+
+```powershell
+$py = 'C:\Users\ADMIN\.conda\envs\ras\python.exe'
+& $py -c "import sys; print(sys.executable)"
+& $py -m pip --version
+& $py -m pytest api/tests/test_reset_token_journal.py api/tests/test_password_reset.py api/tests/test_session_revocation_journal.py api/tests/test_review_closure_journal.py api/tests/test_recovery.py api/tests/test_migrations.py -q
+& $py -m pytest api -q
+npm test --prefix web
+npm run typecheck --prefix web
+npm run build --prefix web
+$env:DRILL_WORK_DIR = '<thư mục tuyệt đối ngoài repo, chưa có hoặc trống>'
+& $py scripts/drill_reset_token_restore.py --down
+```
+
+Script từ chối project/volume/container có sẵn, bind thử mọi port trước build/up. Dùng `ras-drill-src`/`ras-drill-restore`, port DB 45432/46432, API 48000/46800, web 43000/46300, MinIO 49000/49001 và 46900/46901; không stop/restart/migrate `ras`. Backup khi token mở → consume A (ba session), replace C/disable D (không session) → copy journal riêng → restore/hold/migrate/recover → thử link cũ qua web/API trong TTL, token B vẫn hợp lệ, session A bị từ chối, file B đúng hash → recover lặp/restore lần hai. Source journal không đổi; chỉ target viết copy. Không provider/key, không thay `.env`/`pricing_verified`. `--down` chỉ dọn hai project này.
+
+**Kiểm chứng lượt triển khai:** kết quả suite/diễn tập dưới đây; lỗi chỉ tiêm, không kiểm mất điện thật. Invitation chưa bảo vệ; mật khẩu/status vẫn rollback, credential cũ có thể login tạo session mới. Journal cùng rollback với DB không phát hiện; lịch sử mất không backfill. Production journal/vận hành backup chưa chốt. Kế tiếp journal invitation, rồi credential/account status.
+
+**Chứng cứ ngày 2026-10-03 (Asia/Saigon):**
+
+- Base đã fetch `d38c6b8eee5180a63b3a24f2ceb0ea78bb6295b7`, `merge-base --is-ancestor d38c6b8 origin/main` exit 0; GitHub PR #29 `merged=true`, merge commit đúng, merged_at 2026-10-02 09:06:31 UTC. Workspace ban đầu sạch. Không nâng DB dev; kiểm đọc cuối vẫn `0030`, container dev không restart; `.env` không sửa.
+- Nhóm sáu file test trong block trên, thêm `--disable-warnings --maxfail=3`: **244 passed**, 1 warning, **527,80 s**; app/test đã nạp tại `fb317b8` (tree `948f7d78987cbc51651373ae2f304427cde79503`). Trước đó 78 test session/migration qua; các lượt đầu có lỗi fixture CSRF lấy trong gate đóng, verifier không Argon2 và hold ghi cùng journal trước kiểm gate nguồn; đã sửa fixture/thứ tự, không nới invariant.
+- Bổ sung `-k restore_endings` trên `test_reset_token_journal.py`: **8 passed**, 84 deselected, **28,93 s** tại `dc436dd` (tree `b9cf14a3502098a240148b3fcb23ec541a18e39a`), chứng minh token User khác hoàn tất reset thật sau restore. Migration/backfill/deferred/absent/replay lỗi + ORM đã qua lượt chọn **8 passed**, 84 deselected trước lượt regression; ORM còn nằm trong full suite.
+- Web `npm test --prefix web`: **42/42**, typecheck và build thành công; chạy lại cả ba sau sửa thông điệp tiếp nhận ở `b9d6c1f` cũng qua **42/42**. Node có warning MODULE_TYPELESS_PACKAGE_JSON, không đổi package config ngoài task.
+- Mutant chạy **tuần tự trước full suite**, bỏ tạm replay token, deferred fence, finality fence hoặc coi fsync lỗi là confirmed: **4/4 bị test bắt (exit 1)**. Khôi phục đúng bytes từng file trong `finally`; test chuẩn chạy lại. Không chạy mutant/sửa code khi full suite đang chạy.
+- Diễn tập cuối `scripts/drill_reset_token_restore.py --down` tại `dc436dd`: **54/54**, **0 provider call**. Artifact/journal ở thư mục ngoài repo; 4 token còn mở lúc backup, A có ba session, C/D không session, B có một original tổng hợp **58 byte** trong MinIO thật. Sau backup A consumed, C replaced, D disabled. Source journal có 3 token closure + 3 session revocation (head 7). Restore/hold/migrate/recover qua proxy web và API trực tiếp từ chối 3 link cũ; token B còn hợp lệ rồi thực sự reset thành công sau restore thứ hai; session A bị chặn, B original/session còn nguyên trước reset B. Replay không đổi verifier A hay disable D.
+- Diễn tập này: dump **236.344 byte**, 1 object; backup **1,48 s**, restore đầu **14,27 s**, recover đầu **1,89 s**; restore hai **9,70 s**, recover hai **2,06 s**. Tuổi token snapshot lớn nhất lúc thử **50,94 s** và **79,55 s**, so TTL cấu hình **1.800 s** (không sửa TTL để test). Recover lặp và restore/recover lần hai giữ kết quả. Source journal không đổi SHA-256; chỉ target ghi copy; logs không traceback/token. `--down` dọn hai project/volume, không còn project diễn tập. Một lượt nhỏ, không SLO; tất cả cùng máy, không kiểm mất điện.
+- Lượt toàn API tuần tự `& $py -m pytest api -q` tại `03b7ea0` (tree `1b12ffa69265e7d6dc8fec538d38a803709a3cb7`): **811 passed, 2 failed**, 1 warning, **1.806,45 s**. Hai test review SQL dùng PostgreSQL `now()` đóng request được tạo bằng FakeClock trước thời gian thật, nên CHECK `closed_after` từ chối trước khi tới fence journal dự kiến. Sau khi suite kết thúc, sửa fixture dùng cùng FakeClock và đẩy trước một giờ để kiểm sự độc lập; **3 passed**, 35 deselected, **6,87 s**. Không đổi production review hay nới constraint. Cùng commit sửa UI public 202 để chỉ xác nhận tiếp nhận, không hứa gửi email.
+- Chạy lại toàn inventory API tại **`b9d6c1f6f4d3782f180f06fbc8086425ef6538f4`**, tree **`a8a9e6a691fb0fd5519a3a840ceed683948c0325`**: collect **813** test, phân file vào ba tiến trình độc lập **273/270/270**, DB/journal tạm riêng, mỗi test đúng một lần. Lệnh mỗi tiến trình: `& $py -m pytest <danh sách file từ manifest> -q --junitxml=<temp>/shard-N.xml`; manifest/collection/log/XML và helper điều phối ở temp ngoài repo (`ras-reset-full-final`, `ras_reset_full_final.py`). **813/813 passed**, exit **0/0/0**; từng tiến trình **273 passed/762,09 s**, **270 passed/518,26 s**, **270 passed/824,85 s**, tổng wall **830,00 s**. Đối chiếu node ID từ XML với collect: 813 unique, không thiếu/trùng; gồm `test_orm_models_match_migrated_schema`. Mỗi tiến trình có cùng 1 StarletteDeprecationWarning (httpx TestClient); không đổi dependency ngoài task. Không sửa code/test/script hoặc chạy mutant trong full suite; chỉ cập nhật docs chứng cứ.
+
+**Kiểm runbook sau review PR #30 (2026-10-03):**
+
+- Chỉ sửa docs vận hành; source/chuỗi lệnh đã đo tại `0700c053248dbbaa45c96827aabd430089989e8e`, tree `edf341326074ddc8aeb35c97a04ef51ae2ec919c`. Host Conda và pip đúng env `ras`; không chạy lại full suite hay đổi code auth. Chủ dự án báo đã chạy riêng **200 test API, 42 test web**; kết quả **813/54** phía trên thuộc lượt coding agent trước, không coi là chủ dự án đã chạy lại.
+- Project mới `ras-runbook-0031`, volume/container chưa tồn tại; bind kiểm trước năm port **55432/58000/53000/59000/59001**. Env/journal/log/helper ở thư mục ngoài repo, dùng secret tổng hợp và `--env-file` riêng, provider key trống/discovery tắt; không đọc key trong `.env`. Image API dev cũ có head **0030**, chỉ dùng làm tool tạo DB/journal **0030** đã đăng ký và một token consumed trước migration. Lượt đầu fixture verifier không đạt CHECK Argon2id, đã dọn project rồi sửa fixture; không nới constraint/code.
+- Chạy nguyên block PowerShell runbook với project/file env cô lập: stop → **build sáu service** → `alembic heads` trong **api/worker/beat/migrate/recovery-init đều `0031 (head)`** → hold trên DB `0030` → migrate → SQL đọc `alembic_version=0031` → recover → status → force-recreate writer. Có thêm kiểm đọc ngay trước recover: status exit **3**, `unjournaled_reset_tokens=1`, writer chưa chạy. Recover import **1** token legacy; status exit **0**, `gate=open`, `journal_seq=db_seq=4`, mọi count unjournaled/unconfirmed/unpurged **0**, `open_recovery=False`, `torn_tail=False`.
+- Sau mở writer: image ID của cả **api/web/worker/beat** khớp image vừa build của project, API `/readyz` **200**, web `/login` **200**. Chuỗi lệnh đo **46,58 s**, **0 provider call**; phép đo một lượt, không SLO. `down --volumes --remove-orphans` chỉ dọn project mới, không còn container/volume của nó. Đối chiếu dev trước/sau: ID container, image ID và StartedAt của bảy service không đổi; DB dev vẫn **0030**, image API dev vẫn head **0030**. `.env` không đổi. Sau commit đo chỉ bổ sung chứng cứ docs.

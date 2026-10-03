@@ -245,7 +245,7 @@ def test_interrupted_bulk_write_commits_all_revocations_unconfirmed_until_recove
 
 
 def failing_commit(monkeypatch, lands):
-    write, commit = recovery.record_session_revocations, Session.commit
+    write, commit = recovery.record_auth_endings, Session.commit
     armed = [False]
     def record(*args, **kwargs):
         result = write(*args, **kwargs)
@@ -258,9 +258,9 @@ def failing_commit(monkeypatch, lands):
                 commit(db)
             raise RuntimeError("commit reply lost")
         return commit(db)
-    monkeypatch.setattr(recovery, "record_session_revocations", record)
+    monkeypatch.setattr(recovery, "record_auth_endings", record)
     monkeypatch.setattr(Session, "commit", fail)
-    return lambda: (monkeypatch.setattr(recovery, "record_session_revocations", write),
+    return lambda: (monkeypatch.setattr(recovery, "record_auth_endings", write),
                     monkeypatch.setattr(Session, "commit", commit))
 
 
@@ -276,7 +276,7 @@ def test_commit_failure_or_unknown_outcome_replays_sessions_but_never_claims_aut
     if how == "disable":
         assert w.h.scalar("SELECT status FROM users WHERE id=:u", u=w.uid) == ("disabled" if lands else "active")
     if how == "reset":
-        assert w.h.scalar("SELECT count(*) FROM password_reset_tokens WHERE used_at IS NOT NULL") == int(lands)
+        assert w.h.scalar("SELECT count(*) FROM password_reset_tokens WHERE used_at IS NOT NULL") == 1
         assert w.h.browser().login(EMAIL, NEW_PASSWORD if lands else USER_PASSWORD).status_code == 200
     if how == "replace":
         assert not any(h.startswith("ras_session=") for h in response.headers.get_list("set-cookie"))
@@ -374,7 +374,7 @@ def test_fsync_failure_preserves_whole_auth_transaction_but_reports_error(world,
     w = world
     fix = fsync_fails(monkeypatch)
     response, _, _ = perform(w, how)
-    assert response.json() == {"error": "session_journal_unavailable"}
+    assert response.json() == {"error": "auth_journal_unavailable" if how == "reset" else "session_journal_unavailable"}
     assert w.h.scalar("SELECT count(*) FROM sessions WHERE revoked_at IS NOT NULL") == 3
     if how == "reset":
         assert w.h.scalar("SELECT count(*) FROM password_reset_tokens WHERE used_at IS NOT NULL") == 1

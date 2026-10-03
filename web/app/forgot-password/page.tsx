@@ -27,8 +27,8 @@ export default function ForgotPasswordPage() {
       {sent ? (
         // Same message whether or not the account exists.
         <p>
-          Nếu email thuộc một tài khoản đang hoạt động, liên kết đặt lại mật khẩu sẽ được gửi tới đó. Liên kết dùng một
-          lần và có thời hạn.
+          Yêu cầu đã được tiếp nhận; đây chưa phải xác nhận email đã gửi thành công. Nếu nhận được email, liên kết đặt
+          lại mật khẩu dùng một lần và có thời hạn.
         </p>
       ) : (
         <form onSubmit={submit} style={{ display: "grid", gap: "0.75rem" }}>

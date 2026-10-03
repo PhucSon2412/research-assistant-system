@@ -11,7 +11,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.audit import record_event
@@ -21,6 +21,7 @@ from app.identity.errors import InvalidToken
 from app.identity.passwords import hash_password, validate_password
 from app.identity.sessions import revoke_user_sessions
 from app.identity.session_commit import commit_auth
+from app.identity.reset_tokens import lock_open_tokens, end_token, revoke_open_tokens
 from app.identity.tokens import generate_token, hash_token, plausible_token
 from app.models import PasswordResetToken, User
 from app.models.enums import AuditActorType, AuditOutcome, SessionRevokeReason, UserStatus
@@ -37,19 +38,6 @@ class IssuedReset:
         return f"IssuedReset(user_id={self.user_id})"
 
 
-def _revoke_open_tokens(db: Session, user_id: uuid.UUID, now: datetime) -> None:
-    db.execute(
-        update(PasswordResetToken)
-        .where(
-            PasswordResetToken.user_id == user_id,
-            PasswordResetToken.used_at.is_(None),
-            PasswordResetToken.revoked_at.is_(None),
-        )
-        .values(revoked_at=now)
-        .execution_options(synchronize_session=False)
-    )
-
-
 def request_reset(db: Session, *, email: str, now: datetime, lifetime: timedelta) -> IssuedReset | None:
     """Create a token for an active account; ``None`` otherwise. The caller
     must respond the same way in both cases."""
@@ -63,7 +51,8 @@ def request_reset(db: Session, *, email: str, now: datetime, lifetime: timedelta
     if user is None:
         db.rollback()
         return None
-    _revoke_open_tokens(db, user.id, now)
+    revoke_open_tokens(db, user.id, reason="reset_replaced", now=now)
+    db.flush()  # Release the open-token unique slot before inserting the replacement.
     token, digest = generate_token()
     row = PasswordResetToken(user_id=user.id, token_hash=digest, created_at=now, expires_at=now + lifetime)
     db.add(row)
@@ -76,7 +65,7 @@ def request_reset(db: Session, *, email: str, now: datetime, lifetime: timedelta
         target_type="user",
         target_id=str(user.id),
     )
-    db.commit()
+    commit_auth(db)
     return IssuedReset(user_id=user.id, email=user.email, token=token, expires_at=row.expires_at)
 
 
@@ -112,21 +101,19 @@ def confirm_reset(
         .with_for_update(key_share=True)
         .execution_options(populate_existing=True)
     )
-    token = db.scalar(
-        select(PasswordResetToken)
-        .where(PasswordResetToken.id == token_id, *open_token)
-        .with_for_update()
-        .execution_options(populate_existing=True)
-    )
+    tokens = lock_open_tokens(db, user_id)
+    token = next((row for row in tokens if row.id == token_id and row.token_hash == digest
+                  and row.expires_at > now), None)
     if user is None or token is None:
         db.rollback()
         raise InvalidToken()
-    token.used_at = now
+    for row in tokens:
+        end_token(db, row, kind="consumed" if row is token else "revoked",
+                  reason="password_reset" if row is token else "reset_completed", now=now)
     user.password_verifier = verifier
     user.password_changed_at = now
     user.updated_at = now
     db.flush()
-    _revoke_open_tokens(db, user_id, now)
     revoked = revoke_user_sessions(db, user_id=user_id, reason=SessionRevokeReason.PASSWORD_RESET, now=now)
     record_event(
         db,

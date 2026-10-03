@@ -144,6 +144,10 @@ class PasswordResetToken(Base):
         CheckConstraint(f"token_hash {_SHA256_HEX}", name="token_hash_sha256_hex"),
         CheckConstraint("expires_at > created_at", name="expires_after_created"),
         CheckConstraint("used_at IS NULL OR revoked_at IS NULL", name="used_or_revoked"),
+        CheckConstraint("closure_reason IS NULL OR (used_at IS NOT NULL AND closure_reason IN"
+                        " ('password_reset', 'legacy_consumed')) OR (revoked_at IS NOT NULL AND closure_reason IN"
+                        " ('reset_replaced', 'reset_completed', 'user_disabled', 'legacy_revoked'))",
+                        name="closure_reason_valid"),
         Index(
             "uq_password_reset_tokens_open_user_id",
             "user_id",
@@ -161,3 +165,4 @@ class PasswordResetToken(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    closure_reason: Mapped[str | None] = mapped_column(Text)

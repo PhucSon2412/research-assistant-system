@@ -71,7 +71,7 @@ def main(argv: list[str] | None = None) -> int:
                       file=sys.stderr)
                 return 2
             _, imported = recovery.register_existing(engine, settings, utcnow())
-            print(f"Registered the existing database: {imported} tombstones journaled")
+            print(f"Registered the existing database: {imported} decisions journaled")
             return 0
         if args.command == "hold":
             recovery_id = recovery.hold(engine, settings, utcnow())
