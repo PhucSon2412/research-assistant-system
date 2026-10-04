@@ -1701,5 +1701,10 @@
     "api/tests/test_uploads.py::test_same_intent_race_at_most_one_success",
     "api/tests/test_uploads.py::test_source_file_job_version_must_share_item",
     "api/tests/test_uploads.py::test_storage_failure_leaves_no_item"
-  ]
+  ],
+  "p2_followup": {
+    "source_migration": "0038",
+    "inventory": "c2c1-p2-test-inventory.json",
+    "note": "Original 0037 evidence above is historical; do not add counts to P2."
+  }
 }

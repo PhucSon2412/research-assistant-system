@@ -1,6 +1,34 @@
 # Môi trường phát triển và schema (M1a–C2c-1)
 
-**Cập nhật C2c-1:** [nhánh review](c2c1-bootstrap-receipts.md) thêm source `0037`, bootstrap runtime/initial receipt; [lệnh cô lập](#c2c-1-bootstrap-cô-lập). C2c-2 chưa chuyển, safety pending tới C4. Trạng thái C2b bên dưới là baseline trước task này, không là revision DB dev.
+**Cập nhật C2c-1:** [nhánh review](c2c1-bootstrap-receipts.md) thêm source `0038`, bootstrap runtime/initial receipt; [lệnh cô lập](#c2c-1-bootstrap-cô-lập). C2c-2 chưa chuyển, safety pending tới C4. Trạng thái C2b bên dưới là baseline trước task này, không là revision DB dev.
+
+## Sửa P2 installation PR #36, cô lập
+
+Ngày 2026-10-04, sửa theo [prompt review](reviews/pr36-c2c1-bootstrap.md), từ source `64cf342`/`0037`; thêm `0038` và giữ `0037`. Conda interpreter/pip đã xác minh; không cài thêm dependency hoặc tạo venv. Project Compose **`rasc2c1p2_20261004`**, PostgreSQL pgvector 16 riêng bind **`127.0.0.1:56438`**; runtime/recovery LOGIN và NOLOGIN definer thật, prerequisite đối chứng `c1_migrator` không membership. Setup/credentials/runner/JUnit/log ở `%TEMP%/ras-c2c1-p2-20261004`, ngoài repo. Không đọc/sửa `.env`, truy vấn/nâng/restart dev hoặc gọi provider.
+
+Runner tự lấy credentials tổng hợp từ file riêng để đặt explicit `RAS_TEST_DATABASE_ADMIN_URL` **trước pytest**, dùng URL parts, root/API sys.path; chặn HTTPTransport sync/async và kiểm hash Python/SQL API trước/sau. Chỉ fixture `auth_safety.cutover` thay kết quả; integrity/hold/SQL/grants/receipt/commit giữ thật. Các lệnh thực chạy từ root:
+
+```powershell
+$py = 'C:\Users\ADMIN\.conda\envs\ras\python.exe'
+$p2Evidence = Join-Path $env:TEMP 'ras-c2c1-p2-20261004'
+& $py -c "import sys; print(sys.executable)"
+& $py -m pip --version
+& $py "$p2Evidence\setup.py"
+docker compose --project-name rasc2c1p2_20261004 --file "$p2Evidence\compose.yaml" up -d --wait db
+& $py "$p2Evidence\runner.py" api/tests/test_c2c1_installation.py -k direct_existing -q --tb=short --junitxml="$p2Evidence\before.xml"
+& $py "$p2Evidence\runner.py" api/tests/test_c2c1_installation.py -q --tb=short --junitxml="$p2Evidence\after.xml"
+& $py "$p2Evidence\runner.py" api/tests/test_c2c1_migration.py -q --tb=short --junitxml="$p2Evidence\migration.xml"
+& $py "$p2Evidence\countercheck.py"
+& $py "$p2Evidence\prerequisite.py"
+& $py -m compileall -q api/app api/migrations api/tests
+git diff --check
+& $py "$p2Evidence\runner.py" api --collect-only -q > "$p2Evidence\collect.log"
+& $py "$p2Evidence\runner.py" api/tests/test_c2c1_installation.py api/tests/test_c2c1_bootstrap.py api/tests/test_c2c1_migration.py api/tests/test_bootstrap.py api/tests/test_c2b_reset_status.py api/tests/test_c2b_migration.py api/tests/test_c2a_login_sessions.py api/tests/test_c2a_migration.py api/tests/test_c2a_origin.py api/tests/test_auth_safety_foundation.py api/tests/test_migrations.py api/tests/test_schema_constraints.py api/tests/test_config.py -q --tb=short --junitxml="$p2Evidence\final.xml" > "$p2Evidence\final.log"
+```
+
+Trước sửa **1 fail đúng P2** (prepare không raise), sau sửa nhóm installation **26 pass**, migration **5 pass**; không cộng các lượt chọn với suite cuối. Bỏ riêng guard SQL mới → **1 failure / 0 errors**, rồi khôi phục nguyên bytes trước suite cuối. Ca existing đi qua `register_existing`/recover thật; malformed registration/genesis do migrator setup riêng, routine chạy runtime. Kiểm new-install trực tiếp + cặp receipt/login thật. Inventory cuối tách source/lượt lịch sử; ConPTY/pg_dump restore ở `0037` bên dưới không chạy lại trong P2. Safety pending tới C4, không có thao tác vận hành trên dev hoặc lệnh mở gate.
+
+**Suite cuối tại code `d222fb1`: 626/626 pass / 834,11 s**, 0 failure/error/skip, 3 warning hiện có, ORM/schema xanh; **202** file API giữ SHA-256. Collect **1402**, **776 chưa chạy** ngoài nhóm chọn trên source `0038`. [Inventory P2](c2c1-p2-test-inventory.json) khớp node/JUnit, tách lịch sử và source. Compileall/diff check pass. Sau kiểm labels project/container/volume đều `rasc2c1p2_20261004`, đã `docker compose --project-name rasc2c1p2_20261004 --file "$p2Evidence\compose.yaml" down -v`; xóa `credentials.json` và `compose.yaml` dùng một lần, giữ scripts/JUnit/log ngoài repo. Không cleanup dev.
 
 ## C2c-1 bootstrap cô lập
 

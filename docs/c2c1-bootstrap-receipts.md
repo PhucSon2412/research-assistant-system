@@ -2,7 +2,21 @@
 
 [Mục lục](README.md) · [Task](tasks/m6c2b2c2c1-bootstrap-initial-receipts.md) · [C2b](c2b-reset-status.md) · [Inventory](c2c1-test-inventory.json)
 
-**Nhánh review, chưa merge; safety pending tới C4.** Fetch xác minh base `1d3e55825901dc81feb892f27a436bbb57b511f2` là merge PR #35 và chứa `f2ba336`. Head source `0036` → `0037`; không suy revision DB dev. Giữ các docs bàn giao chưa commit của orchestrator trong PR. Chỉ thử PostgreSQL pgvector 16/journal tổng hợp cô lập, Conda `ras`; không đọc/sửa `.env`, dùng dữ liệu hay tác động stack dev, gọi provider hoặc đổi pricing.
+**Nhánh review PR #36, chưa merge; safety pending tới C4.** Fetch xác minh base `1d3e55825901dc81feb892f27a436bbb57b511f2` là merge PR #35 và chứa `f2ba336`. Head source `0036` → `0037` → `0038` (sửa P2 SQL installation); không suy revision DB dev. Giữ các docs bàn giao chưa commit của orchestrator trong PR. Chỉ thử PostgreSQL pgvector 16/journal tổng hợp cô lập, Conda `ras`; không đọc/sửa `.env`, dùng dữ liệu hay tác động stack dev, gọi provider hoặc đổi pricing.
+
+## Sửa P2 installation tại SQL creation
+
+[Review độc lập tại `64cf342`](reviews/pr36-c2c1-bootstrap.md) chứng minh CLI guard chưa đủ: runtime gọi prepare trực tiếp trên installation `existing_db` rồi `commit_auth` vẫn tạo Admin usable/proven. Thêm `0038`, giữ nguyên `0037` vì không có chứng cứ chắc chắn revision đó chưa áp vào DB lâu dài. Không mở pending, không chuyển invitation.
+
+Sau bootstrap advisory và trước mọi INSERT, SQL prepare buộc có registration `id=1`, mode `new_install`, journal UUID/genesis hash không NULL; mirror genesis `seq=1`, kind `genesis`, confirmed. Hash mirror phải khớp registration; envelope JSON có seq **number 1**, kind/genesis hash/prev 64 số 0/body journal UUID/mode khớp registration và `new_install`. Dùng `NOT EXISTS`, `IS NOT DISTINCT FROM` và kiểm non-NULL tường minh: missing/null/mismatch hoặc registration existing/adopted/rebuilt đều từ chối với mã lỗi SQL chung, không tạo User/singleton/receipt/audit hay append.
+
+Đây là kiểm binding DB, không xác minh độ mới/canonical chain của file journal độc lập. Writer vẫn kiểm file ở entry và dưới journal lock cuối; integrity/hold/pending/batch/final checks không đổi. Routine không nhận mode từ caller.
+
+`CREATE OR REPLACE` giữ owner NOLOGIN, fixed search path và EXECUTE ACL đã provision. Chỉ thêm **SELECT recovery_registrations cho definer** qua migration/provisioning; không thêm creation EXEC hoặc User/receipt writes cho recovery/runtime. Upgrade giữ nguyên rows/journal bytes/owner/ACL, không backfill account. Downgrade về `0037` chỉ pristine; có registration/auth/journal history thì chặn. Pristine downgrade phục hồi định nghĩa prepare của `0037`, giữ SELECT tối thiểu đã thêm; không thay creation grants.
+
+Test mới gọi prepare **trực tiếp bằng runtime LOGIN**, không wrapper/history gate Python: existing registration/recover thật; fixture migrator riêng tạo missing/null/mismatch và các mode không hợp lệ; kiểm nguyên rows/mirrors/audit và journal bytes sau refusal. Đối chứng new-install trực tiếp tạo cặp receipt thật rồi login. Kiểm populated/provisioned `0037` cả cặp receipt thật và existing registration, quyền đọc definer thiếu trước upgrade, cùng pristine round-trip và history downgrade fence. Kết quả lượt P2 tách khỏi số `0037` ở phần lịch sử dưới.
+
+**P2 tại code `d222fb1`: 626/626 API pass**, 0 failure/error/skip, 3 warning hiện có, **834,11 s**; **202** file API giữ SHA-256 trong suite cuối. Gồm C2c-1/bootstrap 125 + nền 477 + schema 24; collect **1402**, **776 not-run**. Bỏ riêng guard SQL mới → **1 expected failure / 0 errors**, khôi phục bytes trước suite cuối. Compileall/diff check pass; [inventory P2 theo source/node](c2c1-p2-test-inventory.json), [lệnh thực chạy](dev-setup.md#sửa-p2-installation-pr-36-cô-lập). Đã dọn project/volume/credentials thử sau kiểm ownership, giữ evidence ngoài repo. Không chạy lại web, ConPTY hay dump/restore drill trong P2; các số `0037` dưới đây là lịch sử. PR vẫn chưa merge, cần người review lại; safety pending tới C4.
 
 ## Boundary SQL và schema
 

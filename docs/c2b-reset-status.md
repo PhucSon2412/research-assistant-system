@@ -1,6 +1,6 @@
 # C2b: reset credential và disable/enable
 
-**Bàn giao tiếp C2c-1:** [bootstrap runtime và initial receipt](c2c1-bootstrap-receipts.md) đang review, source `0037`; writer bootstrap đã chuyển trong nhánh đó, invitation lifecycle còn C2c-2. Các inventory/số đo C2b dưới đây vẫn gắn source/lượt lịch sử của C2b, safety pending tới C4.
+**Bàn giao tiếp C2c-1:** [bootstrap runtime và initial receipt](c2c1-bootstrap-receipts.md) đang review, source `0038`; writer bootstrap đã chuyển trong nhánh đó, invitation lifecycle còn C2c-2. Các inventory/số đo C2b dưới đây vẫn gắn source/lượt lịch sử của C2b, safety pending tới C4.
 
 [Mục lục](README.md) · [Thiết kế auth sau restore](auth-restore-safety.md) · [Bàn giao C2a](c2a-login-session-predicates.md) · [Hợp đồng reset token](reset-token-journal.md)
 

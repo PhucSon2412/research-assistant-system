@@ -1,6 +1,6 @@
 # Chống rollback credential và trạng thái tài khoản (M6c-2b2c0)
 
-**C2c-1 đang review:** [bootstrap runtime và initial receipt](c2c1-bootstrap-receipts.md), source `0037`, chặn tạo lại Admin từ snapshot thiếu account khi journal còn complete intent. Invitation lifecycle C2c-2, C2d/C3/C4 còn riêng; safety pending tới C4. Không có force/recreate/operator rescue trong C2c-1.
+**C2c-1 đang review:** [bootstrap runtime và initial receipt](c2c1-bootstrap-receipts.md), source `0038`, chặn tạo lại Admin từ snapshot thiếu account khi journal còn complete intent. Invitation lifecycle C2c-2, C2d/C3/C4 còn riêng; safety pending tới C4. Không có force/recreate/operator rescue trong C2c-1.
 
 [Mục lục](README.md) · [Quyết định](decisions.md#m6c-2b2c0-thiết-kế-auth-sau-restore-2026-10-03) · [Task coding](#chia-pr-coding) · [Ma trận kiểm thử](#ma-trận-kiểm-thử)
 

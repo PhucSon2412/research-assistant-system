@@ -2,6 +2,10 @@
 
 ## C2c-1 bootstrap runtime
 
+**Bản sửa P2 `0038` tại code `d222fb1`: 626/626 pass**, 0 failure/error/skip, 3 warning hiện có, **834,11 s**. C2c-1/bootstrap 125 + nền 477 + schema 24, gồm runtime direct installation 26 và migration C2c-1 5; **202** file API giữ SHA-256. Collect **1402**, **776 not-run**; [inventory P2](c2c1-p2-test-inventory.json) và [lệnh cô lập](dev-setup.md#sửa-p2-installation-pr-36-cô-lập). Ca tái hiện trước sửa 1 fail đúng P2; bỏ guard SQL mới 1 expected failure/0 errors, khôi phục bytes trước suite cuối. Compileall/diff check pass, tài nguyên/credentials thử đã dọn sau kiểm ownership. Web/ConPTY/dump-restore không chạy lại trong P2; các lượt chọn 26/5, review độc lập và số `0037` dưới đây không cộng vào 626. SQL binding không thay guard file độc lập; pending tới C4, chưa merge.
+
+**Review PR #36 tại `64cf342`:** nhóm C2c-1/bootstrap/migration và ORM độc lập **97 pass**, ca runtime creation trên installation `existing_db` **1 fail đúng lỗi P2**, chưa đề nghị merge. [Tái hiện, điều kiện đo và prompt sửa](reviews/pr36-c2c1-bootstrap.md). Số 597 bên dưới là lượt riêng của coding agent, không phải lượt reviewer đã chạy.
+
 [Bàn giao](c2c1-bootstrap-receipts.md) · [Inventory theo source/node](c2c1-test-inventory.json) · [Lệnh cô lập](dev-setup.md#c2c-1-bootstrap-cô-lập). Source `0037` trên base merge PR #35 `1d3e558`; safety pending tới C4. Chỉ runtime LOGIN/PostgreSQL/journal thật trên Compose riêng, Conda ras; không `.env`, dev stack hoặc provider. Full business HTTP/proxy và web không tính thành pass của suite scoped.
 
 **Kết quả cuối tại code `51f5714`: 597/597 pass**, 0 failure/error/skip, 3 warning hiện có, **764,18 s**. Gồm C2c-1/bootstrap 96, C1/C2a/C2b/config/migration 477 và schema 24; **199** file API giữ nguyên SHA-256. ConPTY **3/3**, dump/restore **1/1**, compileall/diff check pass. Collect **1373**, **776 not-run** ngoài nhóm đã chọn; web không đổi/không chạy lại. Tài nguyên Compose thử đã dọn sau kiểm label, credentials dùng một lần đã xóa.

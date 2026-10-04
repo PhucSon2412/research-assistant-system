@@ -1,6 +1,6 @@
 # Tài liệu dự án
 
-**C2c-1 đang review:** [bootstrap runtime và initial receipt](c2c1-bootstrap-receipts.md), source `0037`, từ merge PR #35 `1d3e558`; [inventory kiểm chứng](c2c1-test-inventory.json). Safety pending tới C4, invitation lifecycle C2c-2 chưa chuyển. Phần C2b dưới đây ghi trạng thái tại `0036`.
+**C2c-1 đang review:** [bootstrap runtime và initial receipt](c2c1-bootstrap-receipts.md), source `0038`, từ merge PR #35 `1d3e558`; [inventory sửa P2](c2c1-p2-test-inventory.json). Safety pending tới C4, invitation lifecycle C2c-2 chưa chuyển. Phần C2b dưới đây ghi trạng thái tại `0036`.
 
 **Baseline main đã merge trước C2c-1:** PR #33 đã merge `c98bd33` (C1 `0034`), PR #34 đã merge `78e0880` (C2a `0035`), [C2b reset/status](c2b-reset-status.md) đã merge PR #35 `1d3e558`, chứa sửa P2 `f2ba336`; head source `0036`. Safety vẫn pending tới C4. C2b P2: **201/201**, collect 1296 và 1095 chưa chạy lại; suite 471 tại `bdec9ea` là lịch sử; web không đổi (43/43, typecheck/build tại `a8cb586`); [inventory theo source](c2b-test-inventory.json). [C2c-1 bootstrap/initial receipt](tasks/m6c2b2c2c1-bootstrap-initial-receipts.md) được giao tiếp; invitation lifecycle C2c-2 và final callers C2d chưa triển khai. [Cách chia C2c](decisions.md#chia-c2c-sau-merge-pr-35-2026-10-04) bổ sung cho [Origin/cách chia C2 đã chốt](decisions.md#chia-c2-và-chốt-origin-theo-ủy-quyền-2026-10-03). Operator/delivery C3 và cutover C4 vẫn riêng. Không truy vấn/nâng DB hoặc restart dev; head source không là revision DB dev.
 
@@ -20,8 +20,10 @@ Khi có thay đổi quyết định, cập nhật tài liệu liên quan cùng t
 
 | Tài liệu | Nội dung |
 | --- | --- |
+| [Review PR #36](reviews/pr36-c2c1-bootstrap.md) | P2 installation mode ở SQL creation, tái hiện bằng runtime, prompt sửa và kết quả kiểm độc lập |
 | [Bàn giao C2c-1](c2c1-bootstrap-receipts.md) | Runtime bootstrap một lần, pair/singleton/binding/grants, lock order, CLI, fault/replay và caller C2c-2 chưa chuyển |
 | [Inventory C2c-1](c2c1-test-inventory.json) | Kết quả theo node/source, ConPTY thật, đối chứng và pass/fail/not-run; không tính lịch sử thành pass mới |
+| [Inventory sửa P2 C2c-1](c2c1-p2-test-inventory.json) | Source `0038`: runtime SQL installation guard, upgrade/ACL, đối chứng và hồi quy; tách lượt `0037`/review độc lập |
 | [Auth sau restore](auth-restore-safety.md) | Thiết kế C0: generation/receipt, cách ly, disable/enable, khôi phục User/Admin và C1–C4 |
 | [Nền auth safety C1](c1-auth-safety-foundation.md) | Nền 0033, guard reset token 0034, quyền runtime/recovery, replay/backfill, inventory trực tiếp/pending và bàn giao C2 |
 | [Prompt coding C1](tasks/m6c2b2c1-auth-safety-foundation.md) | Nền schema/journal/receipt/replay/guard đã được giao theo ủy quyền; kiểm trên môi trường cô lập, safety pending tới C4 |

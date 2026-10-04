@@ -1,5 +1,13 @@
 # Nhật ký quyết định
 
+## Sửa P2 installation boundary PR #36 (2026-10-04)
+
+**Nguồn:** chủ dự án giao sửa theo [prompt review PR #36](reviews/pr36-c2c1-bootstrap.md). Chọn revision mới `0038`, giữ `0037` vì chưa có chứng cứ mọi DB áp revision đều là disposable. SQL creation buộc registration và confirmed genesis mirror cùng `new_install`, khớp UUID/hash/envelope binding, NULL-safe, sau bootstrap advisory và trước INSERT. `CREATE OR REPLACE` giữ owner/EXECUTE ACL; thêm SELECT registration tối thiểu cho definer. Upgrade không đổi dữ liệu/journal, downgrade có history bị chặn; pristine downgrade giữ read grant tối thiểu. Không đổi guard file độc lập/transaction/batch/lock order/pending hoặc chuyển invitation. Đây là sửa của coding agent trong phạm vi được giao, chưa là phê duyệt merge/cutover của chủ dự án. Lịch sử review dưới đây giữ nguyên source và số đo.
+
+## Review boundary bootstrap PR #36 (2026-10-04)
+
+Review `64cf342` phát hiện routine SQL `ras_auth_bootstrap_prepare` chưa kiểm registration/genesis là `new_install`. Đăng ký DB trống bằng `register_existing`, recover integrity thật, rồi runtime gọi prepare + hai Change bootstrap + `commit_auth` vẫn commit Admin usable/proven. CLI guard Python chặn đúng nhưng không thi hành điều kiện này tại boundary SQL. **P2 chưa sửa, chưa đề nghị merge**; [tái hiện, prompt sửa và chứng cứ](reviews/pr36-c2c1-bootstrap.md). Reviewer chạy 97 test có sẵn pass và một ca mới fail đúng lỗi; không cộng với số 597 của coding agent. Safety vẫn pending, không mở HTTP hoặc tác động dev.
+
 ## Triển khai C2c-1 bootstrap trong phạm vi task (2026-10-04)
 
 **Nguồn:** chủ dự án giao coding đầy đủ [task C2c-1](tasks/m6c2b2c2c1-bootstrap-initial-receipts.md), từ merge PR #35 `1d3e558`, giữ docs orchestrator và chỉ thử cô lập. Đây là lựa chọn triển khai của coding agent, không là quyết định operator/cutover mới của chủ dự án. [Bàn giao/giới hạn](c2c1-bootstrap-receipts.md).
