@@ -65,7 +65,7 @@ from pathlib import Path
 
 from sqlalchemy import Engine, func, select, text, update, or_
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from app import journal
 from app.audit import record_event
@@ -610,7 +610,11 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
         email = db.scalar(select(Invitation.email).where(Invitation.id == iid))
         if email is not None:
             lock_email(db, email)
-        invitation_row = db.scalar(select(Invitation).where(Invitation.id == iid).with_for_update()
+        invitation_routines = db.scalar(text("SELECT to_regprocedure('ras_auth_invitation_lock(uuid[])') IS NOT NULL"))
+        if invitation_routines:
+            db.execute(text("SELECT ras_auth_invitation_lock(:ids)"), {"ids": [iid]})
+        stmt = select(Invitation).options(*_invitation_recovery_columns()).where(Invitation.id == iid)
+        invitation_row = db.scalar((stmt if invitation_routines else stmt.with_for_update())
                                    .execution_options(populate_existing=True))
     if record.kind == RESET_TOKEN_CLOSURE:
         db.execute(text("SELECT ras_auth_lock_users(:ids)"), {"ids": [uuid.UUID(record.body["user_id"])]})
@@ -668,7 +672,16 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
     elif record.kind == REVIEW_CLOSURE:
         result, request_id = _apply_review_closure(db, record.body, rr)
     elif record.kind == INVITATION_CLOSURE:
-        result = _apply_invitation_closure(invitation_row, record.body)
+        if invitation_routines and invitation_row is not None and not (
+                invitation_row.accepted_at or invitation_row.revoked_at or invitation_row.closed_by_recovery_at):
+            db.execute(text("SELECT ras_auth_invitation_recover(:id,:kind,:reason,:at)"),
+                       {"id": invitation_row.id, "kind": record.body["end_kind"],
+                        "reason": record.body["reason_code"], "at": datetime.fromisoformat(record.body["ended_at"])})
+            db.refresh(invitation_row)
+            _apply_invitation_closure(invitation_row, record.body, apply=False)
+            result = "invitation_closed_by_recovery"
+        else:
+            result = _apply_invitation_closure(invitation_row, record.body, apply=not invitation_routines)
     elif record.kind == RESET_TOKEN_CLOSURE:
         if token_routines and token_row is not None and token_row.used_at is None and token_row.revoked_at is None:
             db.execute(text("SELECT ras_auth_token_close(:id,:uid,:kind,:reason,:at)"),
@@ -697,7 +710,8 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
                 result = "session_already_revoked"
     else:
         result = record.kind
-    if (record.kind == SESSION_REVOCATION and routines) or (record.kind == RESET_TOKEN_CLOSURE and token_routines):
+    if ((record.kind == SESSION_REVOCATION and routines) or (record.kind == RESET_TOKEN_CLOSURE and token_routines)
+            or (record.kind == INVITATION_CLOSURE and invitation_routines)):
         db.execute(text("SELECT ras_auth_closure_mirror(:line,:via,:result)"), {"line": record.line,"via":via,"result":result})
         db.execute(text("SELECT ras_auth_confirm(:seq)"), {"seq": record.seq})
     else:
@@ -762,8 +776,15 @@ def _unjournaled_reset_tokens(db: Session) -> list[PasswordResetToken]:
         .order_by(PasswordResetToken.user_id, PasswordResetToken.id)))
 
 
+def _invitation_recovery_columns():
+    # Closure replay/backfill also runs on pre-0039 snapshots. Issuance/pair
+    # transaction markers are irrelevant to recovery and must never lazy-load.
+    return (defer(Invitation.creation_transaction_id, raiseload=True),
+            defer(Invitation.acceptance_transaction_id, raiseload=True))
+
+
 def _unjournaled_invitations(db: Session) -> list[Invitation]:
-    return list(db.scalars(select(Invitation).where(
+    return list(db.scalars(select(Invitation).options(*_invitation_recovery_columns()).where(
         or_(Invitation.accepted_at.is_not(None), Invitation.revoked_at.is_not(None),
             Invitation.closed_by_recovery_at.is_not(None)),
         ~select(RevocationJournalRecord.seq).where(RevocationJournalRecord.invitation_id == Invitation.id).exists())
@@ -771,19 +792,23 @@ def _unjournaled_invitations(db: Session) -> list[Invitation]:
 
 
 def _lock_legacy_sessions(db: Session) -> None:
-    """Backfill locks sorted invitation emails -> users -> tokens -> sessions -> invitations, before journal; operators stop writers."""
+    """Users before emails, matching live Admin writers; recover holds the gate closed."""
     from app.identity.invitation_endings import lock_email
-    for email in sorted({r.email for r in _unjournaled_invitations(db)}):
-        lock_email(db, email)
     owners = list(db.scalars(select(UserSession.user_id).where(UserSession.revoked_at.is_not(None)).distinct()))
     ended = or_(PasswordResetToken.used_at.is_not(None), PasswordResetToken.revoked_at.is_not(None))
     owners += list(db.scalars(select(PasswordResetToken.user_id).where(ended).distinct()))
     db.execute(text("SELECT ras_auth_lock_users(:ids)"), {"ids": sorted(set(owners))})
+    for email in sorted({r.email for r in _unjournaled_invitations(db)}):
+        lock_email(db, email)
     list(db.scalars(select(PasswordResetToken.id).where(ended).order_by(PasswordResetToken.id).with_for_update()))
     list(db.scalars(select(UserSession.id).where(UserSession.revoked_at.is_not(None))
                     .order_by(UserSession.id).with_for_update()))
-    list(db.scalars(select(Invitation.id).where(Invitation.id.in_([r.id for r in _unjournaled_invitations(db)]))
-                    .order_by(Invitation.id).with_for_update()))
+    invitation_ids = [r.id for r in _unjournaled_invitations(db)]
+    if db.scalar(text("SELECT to_regprocedure('ras_auth_invitation_lock(uuid[])') IS NOT NULL")):
+        db.execute(text("SELECT ras_auth_invitation_lock(:ids)"), {"ids": invitation_ids})
+    else:
+        list(db.scalars(select(Invitation.id).where(Invitation.id.in_(invitation_ids))
+                        .order_by(Invitation.id).with_for_update()))
 
 
 def _imported_closure_body(rr: ReviewRequest) -> dict:
@@ -1187,7 +1212,8 @@ def _verify(engine: Engine, path: Path) -> None:
             raise RecoveryError("invitations_not_journaled")
         for record in journal.read(path).records:
             if record.kind == INVITATION_CLOSURE:
-                _apply_invitation_closure(db.get(Invitation, uuid.UUID(record.body["invitation_id"])),
+                _apply_invitation_closure(db.get(Invitation, uuid.UUID(record.body["invitation_id"]),
+                                                options=_invitation_recovery_columns()),
                                           record.body, apply=False)
             if record.kind == RESET_TOKEN_CLOSURE:
                 _apply_reset_token_closure(db.get(PasswordResetToken, uuid.UUID(record.body["token_id"])),

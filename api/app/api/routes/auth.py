@@ -230,12 +230,13 @@ def revoke_other_sessions(
 
 
 @router.post("/invitations/inspect")
-def inspect_invitation(body: TokenIn, db: Session = Depends(get_db), now: datetime = Depends(get_now)) -> dict:
+def inspect_invitation(body: TokenIn, db: Session = Depends(get_db), clock=Depends(get_clock)) -> dict:
     """Show the invitee which email they are activating (token in the body,
     never in a URL)."""
-    inv = invitations.find_open_invitation(db, body.token, now=now)
-    if inv is None:
-        raise ApiError(400, "invalid_token")
+    try:
+        inv = invitations.inspect_invitation(db, body.token, clock=clock)
+    except InvalidToken:
+        raise ApiError(400, "invalid_token") from None
     return {"email": inv.email, "display_name": inv.display_name, "expires_at": inv.expires_at.isoformat()}
 
 

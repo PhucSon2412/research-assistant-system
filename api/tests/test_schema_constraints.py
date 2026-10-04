@@ -350,21 +350,22 @@ def test_one_open_invitation_per_email(conn: Connection) -> None:
 def test_invitation_state_consistency(conn: Connection) -> None:
     admin, user = add_user(conn, role="admin"), add_user(conn, email="state@example.org")
     inv = add_invitation(conn, admin, "state@example.org")
-    # The BEFORE guard rejects a missing account before the table CHECK runs.
+    # Provide the current transaction marker to reach the existing account/field
+    # guards. The initial receipt pair is tested independently in C2c-2.
     assert "accepted invitation must name its User account" in expect_error(
-        conn, "UPDATE invitations SET accepted_at = now() WHERE id = :i", {"i": inv}
+        conn, "UPDATE invitations SET accepted_at = now(), acceptance_transaction_id=txid_current() WHERE id = :i", {"i": inv}
     )
     assert "ck_invitations_accepted_fields_consistent" in expect_error(
         conn, "UPDATE invitations SET accepted_user_id = :u WHERE id = :i", {"i": inv, "u": user}
     )
     wrong_user = add_user(conn)
     assert "accepted invitation must name its User account" in expect_error(
-        conn, "UPDATE invitations SET accepted_at = now(), accepted_user_id = :u WHERE id = :i",
+        conn, "UPDATE invitations SET accepted_at = now(), acceptance_transaction_id=txid_current(), accepted_user_id = :u WHERE id = :i",
         {"i": inv, "u": wrong_user},
     )
     assert "ck_invitations_accepted_or_revoked" in expect_error(
         conn,
-        "UPDATE invitations SET accepted_at = now(), accepted_user_id = :u, revoked_at = now() WHERE id = :i",
+        "UPDATE invitations SET accepted_at = now(), acceptance_transaction_id=txid_current(), accepted_user_id = :u, revoked_at = now() WHERE id = :i",
         {"i": inv, "u": user},
     )
     assert "ck_invitations_email_normalised" in expect_error(

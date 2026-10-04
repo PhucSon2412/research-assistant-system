@@ -39,14 +39,16 @@ def _check_actor(db, actor, rows, expected_role=None):
     ours = any(r.id == sid for r in rows)
     if (not session or session.user_id != uid or not user or not account_live(db, uid)
             or session.credential_generation != user.credential_generation
-            or session.csrf_token_hash != csrf or session.absolute_expires_at <= at
+            or session.absolute_expires_at <= at
             or session.last_activity_at <= at - idle or (session.revoked_at is not None and not ours)):
         raise ApiError(401, "session_expired", clear_session=True)
+    if session.csrf_token_hash != csrf:
+        raise ApiError(403, "csrf_failed")
     if expected_role is not None and user.role != expected_role:
         raise ApiError(403, "admin_required")
 
 
-def commit_auth(db: Session):
+def commit_auth(db: Session, *, postcheck: bool = True):
     from app.auth_safety import require_final
     rows = db.info.pop(PENDING, [])
     tokens = db.info.pop(TOKEN_PENDING, [])
@@ -56,6 +58,7 @@ def commit_auth(db: Session):
     actor_role = db.info.pop("auth_actor_role", None)
     reset_guard = db.info.pop("auth_reset_guard", None)
     bootstrap_guard = db.info.pop("auth_bootstrap_guard", None)
+    invitation_guard = db.info.pop("auth_invitation_guard", None)
     if invitations:
         ended_at = invitations[0].accepted_at or invitations[0].revoked_at
     elif tokens:
@@ -76,8 +79,16 @@ def commit_auth(db: Session):
             reset_guard(db)
         if bootstrap_guard:
             bootstrap_guard(db)
+        if invitation_guard:
+            invitation_guard(db)
         batch = recovery.record_auth_endings(db, get_settings().recovery.journal_path, tokens, rows,
                                              invitations=invitations, auth_changes=changes)
+        # Append/fsync itself can be slow. An intent may now exist independently,
+        # but an expired actor/token still cannot authorize the DB commit.
+        if actor:
+            _check_actor(db, actor, rows, actor_role)
+        if invitation_guard:
+            invitation_guard(db, staged=True)
         commit_attempted = True
         db.commit()
     except recovery.RecoveryError:
@@ -100,7 +111,7 @@ def commit_auth(db: Session):
         raise ApiError(503, "auth_outcome_uncertain" if commit_attempted else "auth_unavailable") from None
     if any(not line.written for line in batch):
         raise ApiError(503, unavailable_code)
-    if actor:
+    if actor and postcheck:
         # Success after a known commit still requires a fresh gate/account check.
         require_final(db)
         _check_actor(db, actor, rows, actor_role)

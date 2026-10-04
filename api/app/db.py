@@ -12,7 +12,10 @@ from app.config import get_settings
 def make_engine(database_url: str | URL) -> Engine:
     # hide_parameters keeps bound values (e.g. password verifiers) out of
     # exception messages and SQL echo.
-    return create_engine(database_url, pool_pre_ping=True, hide_parameters=True)
+    from app.identity.log_safety import protect_engine_logs
+    engine = create_engine(database_url, pool_pre_ping=True, hide_parameters=True)
+    protect_engine_logs(engine)
+    return engine
 
 
 @lru_cache

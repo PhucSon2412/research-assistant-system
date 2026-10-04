@@ -36,7 +36,7 @@ class MessageKind(StrEnum):
 @dataclass(frozen=True)
 class OutgoingMessage:
     kind: MessageKind
-    recipient: str
+    recipient: str = field(repr=False)
     link: str = field(repr=False)
     expires_at: datetime
 
