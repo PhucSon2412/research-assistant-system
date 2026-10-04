@@ -8,6 +8,26 @@
 
 [Mục lục](README.md) · [Mô hình dữ liệu](data-model.md) · [Roadmap](roadmap.md)
 
+## Docker khi auth safety còn pending
+
+Source hiện hành chủ động trả `auth_safety_pending` từ `auth_safety.cutover` khi phiên bản nền hợp lệ. Gate chặn nghiệp vụ tới C4; hoàn tất migration hoặc journal reconciliation không đồng nghĩa hệ thống được phép phục vụ. Không có lệnh `recover` mở safety pending trong C1–C3.
+
+Compose dùng `/readyz` làm healthcheck API và `web.depends_on.api.condition = service_healthy`. Vì vậy, khi pending, `docker compose up -d --build --wait` báo API `unhealthy` và web có thể còn `Created`, dù process API đã khởi động thành công và `/healthz` trả `200`. Worker/beat có thể chạy process nhưng vẫn phải tuân gate. Các hướng dẫn `up --wait` và demo healthy ở milestone trước C1 dưới đây là chứng cứ lịch sử, không cam kết source C1–C3 hiện chạy được nghiệp vụ trên dev.
+
+Chẩn đoán chỉ đọc:
+
+```powershell
+docker compose ps -a
+docker compose logs --tail 20 api migrate recovery-init
+docker compose exec -T api python -m app.cli.recovery status
+```
+
+`status` trả mã thoát khác 0 khi gate đóng; đây cũng là kết quả chẩn đoán. Kiểm `/healthz` và `/readyz` riêng. Nếu reason khác `auth_safety_pending` (ví dụ journal không khớp hoặc DB chưa migrate), điều tra lỗi đó theo runbook tương ứng; không quy mọi lỗi `unhealthy` cho pending.
+
+**Chứng cứ ngày 2026-10-04:** sau khi chủ dự án báo lỗi Docker trên dev, orchestrator chỉ đọc trạng thái/log và gọi health/status: API `running`, startup complete; `/healthz` **200**, `/readyz` **503**; `gate=auth_safety_pending`, journal và DB cùng seq **1**, không unconfirmed/unjournaled records hay recovery đang mở. `migrate` và `recovery-init` thoát **0**, init bỏ qua DB đã đăng ký; web còn `Created`. Không đọc/sửa `.env`, sửa DB/journal, restart hoặc mở gate. Chứng cứ này không xác nhận revision DB dev hay độ an toàn production.
+
+Không cần tăng timeout hoặc đổi healthcheck để làm trạng thái này xanh: readiness vẫn phải báo chưa sẵn sàng khi safety pending. Không downgrade/xóa volume để tránh gate. Tiếp tục thử C2/C3 trong môi trường cô lập; chỉ mở phục vụ ở C4 sau khi writer/caller, recovery và cutover đã được kiểm chứng.
+
 ## C2a login/session cô lập
 
 Ngày 2026-10-04, base sau fetch `c98bd33` chứa `c647d6e`, source head `0034` → `0035`, giữ nguyên migration đã merge. Container PostgreSQL riêng `ras-c2a-test-20261004`, label `ras.task=c2a-20261004`, port `127.0.0.1:58435`; runtime/recovery LOGIN khác nhau, definer NOLOGIN. Journal/credentials/runner/XML/log tổng hợp ở `C:\Users\ADMIN\AppData\Local\Temp\ras-c2a-20261004`, ngoài repo. Conda ras interpreter và pip đã xác minh. Không `.env`, compose dev, object store dev hoặc provider.

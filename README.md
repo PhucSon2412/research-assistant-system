@@ -7,3 +7,7 @@ Dự án website quản lý paper khoa học, khám phá paper mới hằng ngà
 Provider thật (OpenRouter) **chưa bật** cho dữ liệu thật: `pricing_verified=false` mặc định chặn mọi lời gọi trả phí. Trước khi bật cần chốt kế toán embedding bản chung (hiện là phương án orchestrator, chủ dự án chưa trực tiếp xác nhận), đối soát charge trên key, điều kiện provider routing/retention và nơi lưu journal thu hồi bền vững ngoài dev. Chưa có streaming câu trả lời, và chưa có cấu hình triển khai ngoài dev.
 
 Bắt đầu từ [mục lục tài liệu](docs/README.md). Hướng dẫn chung cho agent nằm ở [AGENTS.md](AGENTS.md).
+
+## Chạy Docker trong giai đoạn C1–C3
+
+Auth safety đang **pending tới C4**: API có thể khởi động và trả `/healthz = 200`, nhưng `/readyz = 503`. Compose kiểm API bằng `/readyz`, nên `docker compose up -d --build --wait` sẽ báo API `unhealthy`; web chờ API healthy nên chưa khởi động. Đây là trạng thái bảo trì chủ động, không chứng minh API bị crash. `recover` không mở safety pending. Xem [chẩn đoán và giới hạn vận hành](docs/dev-setup.md#docker-khi-auth-safety-còn-pending); các lệnh chạy toàn stack ở milestone cũ là chứng cứ lịch sử.
