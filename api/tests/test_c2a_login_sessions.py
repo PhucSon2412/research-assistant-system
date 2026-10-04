@@ -300,6 +300,83 @@ def test_http_session_csrf_logout_with_scoped_cutover_fixture(world,monkeypatch)
         app.dependency_overrides.clear();get_settings.cache_clear()
 
 
+@pytest.mark.parametrize('outcome',['live','revoked','idle_expired','absolute_expired','credential_changed'])
+def test_http_session_listing_rechecks_caller_after_dependency(world,monkeypatch,outcome):
+    from fastapi import Depends, Request
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.api.deps import get_clock, get_now, get_db, get_session_context
+    from app.api.cookies import session_cookie_name
+    w=world
+    moment=SimpleNamespace(now=NOW)
+    clock=lambda:moment.now
+    caller=sign_in(w)
+    if outcome=='absolute_expired':
+        # Keep idle life using the real runtime routine; absolute life stays fixed.
+        for minutes in range(20,480,20):
+            at=NOW+timedelta(minutes=minutes)
+            with Session(w.runtime) as db:
+                assert resolve_session(db,caller.token,now=at,idle=w.settings.auth.session_idle,clock=lambda:at)
+                db.commit()
+        moment.now=caller.absolute_expires_at-timedelta(seconds=1)
+    other=sign_in(w,clock=clock)
+    authenticated,continue_handler=threading.Event(),threading.Event()
+    def pause_after_auth(request: Request, db: Session=Depends(get_db),
+                         now=Depends(get_now), settings=Depends(get_settings), clock=Depends(get_clock)):
+        ctx=get_session_context(request,db=db,now=now,settings=settings,clock=clock)
+        assert ctx.session_id==caller.session_id
+        assert not db.in_transaction()  # dependency releases its final journal/read locks
+        authenticated.set()
+        assert continue_handler.wait(15)
+        return ctx
+    monkeypatch.setenv('RAS_ENVIRONMENT','development')
+    monkeypatch.setenv('RAS_HTTP__COOKIE_SECURE','false')
+    get_settings.cache_clear()
+    app.dependency_overrides[get_session_context]=pause_after_auth
+    app.dependency_overrides[get_clock]=lambda:clock
+    app.dependency_overrides[get_now]=clock
+    try:
+        with TestClient(app,base_url='http://web.test') as client,ThreadPoolExecutor(max_workers=1) as pool:
+            client.cookies.set(session_cookie_name(get_settings()),caller.token)
+            response=pool.submit(client.get,'/auth/sessions')
+            try:
+                assert authenticated.wait(15)
+                if outcome=='revoked':
+                    with Session(w.runtime) as db:
+                        assert revoke_session(db,session_id=caller.session_id,user_id=w.uid,
+                                              reason=SessionRevokeReason.USER_REVOKED,now=clock())
+                        commit_auth(db)
+                elif outcome=='credential_changed':
+                    append_changes(w,changes(w,decision=None),engine=w.runtime)
+                    other=sign_in(w,clock=clock)
+                elif outcome=='idle_expired':
+                    at=NOW+w.settings.auth.session_idle-timedelta(seconds=1)
+                    with Session(w.runtime) as db:
+                        assert resolve_session(db,other.token,now=at,idle=w.settings.auth.session_idle,clock=lambda:at)
+                        db.commit()
+                    moment.now=NOW+w.settings.auth.session_idle
+                elif outcome=='absolute_expired':
+                    moment.now=caller.absolute_expires_at
+                with Session(w.runtime) as db:
+                    assert session_live(db,other.session_id,clock(),w.settings.auth.session_idle,user_id=w.uid)
+            finally:
+                continue_handler.set()
+            result=response.result(15)
+            if outcome=='live':
+                assert result.status_code==200
+                listed=result.json()['sessions']
+                assert {s['id'] for s in listed}=={str(caller.session_id),str(other.session_id)}
+                assert [s['id'] for s in listed if s['current']]==[str(caller.session_id)]
+            else:
+                assert result.status_code==401
+                assert result.json()=={'error':'session_expired'}
+                assert str(other.session_id) not in result.text
+                assert 'sessions' not in result.json()
+    finally:
+        continue_handler.set()
+        app.dependency_overrides.clear();get_settings.cache_clear()
+
+
 def test_http_login_uncertain_no_cookie_success(world,monkeypatch):
     from app.main import app
     from app.api.deps import get_clock, get_now, get_db

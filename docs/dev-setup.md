@@ -30,6 +30,19 @@ Collect **1186** nodes, đối chiếu JUnit **367 unique** pass, còn **819 ch�
 
 Fixture writer chỉ thay boundary cutover; pending production thật giữ nguyên. Chưa Docker smoke API/web/Celery/beat mới, MinIO streaming drill, full business HTTP/proxy/browser hay restore/cutover C4. Fault injection không chứng minh mất điện hoặc journal production độc lập. C2b/C2c/C2d và operator/delivery C3 còn mở. Đã dọn container/volume sở hữu sau kiểm label; năm container dev ghi trước task giữ nguyên ID/image/StartedAt qua đối chiếu chỉ đọc. Evidence ngoài repo được giữ.
 
+### Sửa P2 listing PR #34
+
+Parent `a8cb586`, source vẫn `0035`, pending tới C4. Container PostgreSQL riêng `ras-c2a-p2-test-20261004` có label `ras.task=c2a-p2-20261004`, port `127.0.0.1:58436`; fixture provision runtime/recovery LOGIN và NOLOGIN definer thật. Conda ras Python 3.12.14/pip 26.2.1 đã xác minh. Runner ngoài repo như lượt trước, test URL tường minh và HTTP transports bị chặn, không `.env`/dev/provider. Lệnh đã chạy:
+
+```powershell
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$env:TEMP\ras-c2a-p2-20261004\runner.py" api/tests/test_c2a_login_sessions.py -q -k session_listing_rechecks --tb=short --junitxml="$env:TEMP\ras-c2a-p2-20261004\before.xml"
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$env:TEMP\ras-c2a-p2-20261004\runner.py" api/tests/test_c2a_login_sessions.py -q -k session_listing_rechecks --tb=short --junitxml="$env:TEMP\ras-c2a-p2-20261004\targeted.xml"
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$env:TEMP\ras-c2a-p2-20261004\runner.py" api --collect-only -q > "$env:TEMP\ras-c2a-p2-20261004\collect.log"
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$env:TEMP\ras-c2a-p2-20261004\runner.py" api/tests/test_c2a_login_sessions.py api/tests/test_c2a_migration.py api/tests/test_c2a_origin.py api/tests/test_auth_safety_foundation.py api/tests/test_migrations.py api/tests/test_config.py -q --tb=short --maxfail=4 --junitxml="$env:TEMP\ras-c2a-p2-20261004\final.xml"
+```
+
+Trước sửa **4 failed/1 passed / 11,12 s** đúng lỗi 200 thay vì 401; sau sửa **5 passed / 11,74 s**. Suite cuối **372 passed / 411,31 s**, không failure/error/skip, ba warning API hiện có. **136 C2a + 236 hồi quy thực chạy lại**, ORM/schema xanh. JUnit đối chiếu collect **1191**, **372 unique pass**, **819 chưa chạy**; [inventory](c2a-test-inventory.json) tách rõ lịch sử 367 và web 43 tại `a8cb586`, không chạy lại web trong P2. Code/test không đổi trong suite chính; dependency/migration/grants giữ nguyên. Compileall/diff check xanh. Đã dọn container/volume thử sau kiểm label; container dev ghi trước lượt thử giữ nguyên ID/image/StartedAt. Evidence/journal giữ ngoài repo; C2b/C2c/C2d và C4 integration vẫn mở.
+
 ## C1 auth safety cô lập
 
 Lệnh và số đo phần này là lịch sử C1; kết quả source C2a xem [nhóm C2a](#c2a-login-session-cô-lập).

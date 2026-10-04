@@ -1,5 +1,13 @@
 # Nhật ký quyết định
 
+## Sửa caller cuối của session listing, P2 PR #34 (2026-10-04)
+
+**Nguồn:** phản hồi review P2 PR #34 trong task hiện tại. Đã tái hiện bằng PostgreSQL/runtime/journal thật: dependency A thành công, transaction khác thu hồi A commit, handler vẫn trả `200` và session B. `list_live_sessions` lọc session B live không là bằng chứng actor A còn quyền. Tài liệu C2a được sửa để nêu rõ ranh giới đó.
+
+Handler kiểm lại đúng `(ctx.session_id, ctx.user_id)` bằng predicate chung và clock mới **sau** read, dưới journal shared lock listing đang giữ; không thêm User lock sau journal hoặc kéo dài transaction dependency. Caller revoked/generation cũ/hết idle hay absolute TTL trả `401 session_expired`, không danh sách. Không schema/grant/cutover mới. [Tái hiện, kiểm chứng và bàn giao](c2a-login-session-predicates.md#sửa-p2-pr-34-caller-của-session-listing); C2b/C2c/C2d và safety pending tới C4 giữ nguyên.
+
+Năm ca mới: trước sửa 4 fail đúng/1 pass, sau sửa 5 pass; nhóm nền liên quan chạy lại **372 pass**, ORM/schema xanh. Web không đổi và không chạy lại trong P2. Container thử đã dọn; không tác động dev/provider. Không tính 367 lịch sử trước sửa hoặc 143 do reviewer báo thành pass của source mới.
+
 ## Triển khai C2a trong phạm vi task (2026-10-04)
 
 **Nguồn:** coding agent triển khai theo task chủ dự án giao và nền/Origin/cách chia C2 do orchestrator chốt theo ủy quyền; không ghi đây là lựa chọn trực tiếp mới của chủ dự án. Nhánh review dựa `c98bd33`, chứa `c647d6e`; giữ docs orchestrator chưa commit. [Bàn giao và bằng chứng](c2a-login-session-predicates.md).

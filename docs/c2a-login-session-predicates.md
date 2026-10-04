@@ -19,6 +19,14 @@ Trong commit, chỉ trừ khỏi bộ đếm unjournaled closures các hàng đa
 
 `get_session_context` touch/commit, kiểm lại session + CSRF hash hiện hành rồi giải phóng transaction final read trước khi route lấy item/request locks. `get_auth_write_context` dùng riêng cho logout/revoke session: khóa User, kiểm session/CSRF mới và đăng ký actor để commit kiểm cuối. `session_is_live` không lấy User/session row lock khi caller đã giữ item lock. Original chung gọi helper này với clock callable; quyền file/version/checksum/epoch và kiểm byte giữ nguyên.
 
+## Sửa P2 PR #34: caller của session listing
+
+Review chỉ ra `/auth/sessions` có thể trả session B sau khi dependency xác thực A xong nhưng transaction khác đã thu hồi A và commit. Code cũ chỉ kiểm từng hàng trong `list_live_sessions`; mô tả listing đã chuyển không chứng minh actor cuối còn live. Sửa handler kiểm `session_live(db, ctx.session_id, clock(), idle, user_id=ctx.user_id)` **sau** đọc danh sách, dưới shared journal lock mà listing vẫn giữ tới cuối transaction. Predicate kiểm owner, latest credential/status/receipt, generation, revoked và TTL; clock lấy mới sau read. Sai → `401 session_expired`, clear cookie bảo vệ, không trả danh sách. Không lấy User/session row lock mới, không thay việc dependency rollback giải phóng transaction. Migration/role grants vẫn `0035`, safety pending tới C4.
+
+Test `test_http_session_listing_rechecks_caller_after_dependency` gọi dependency thật rồi dừng bằng Event; xác nhận transaction dependency đã được giải phóng. Transaction runtime khác đóng A/commit journal hoặc đổi credential thật; clock kiểm soát idle/absolute boundary. Luôn giữ một session B hợp lệ để lỗi không bị che bởi danh sách rỗng. Trước sửa: **4 failed/1 passed / 11,12 s**, bốn lỗi đúng `200` thay vì `401`; sau sửa: **5 passed / 11,74 s**, gồm ca hợp lệ vẫn trả đúng hai session/current flag. Không patch predicate/guard/integrity hoặc giả User transition; chỉ boundary cutover scoped như C2a và wrapper dừng sau dependency thật.
+
+Hồi quy trên source sau sửa: **372/372 pass / 411,31 s**, không failure/error/skip; **136 C2a** (68 session/login, 66 Origin, 2 migration) + **236 foundation/migration/config**, ORM/schema xanh. Collect **1191 nodes**, JUnit đủ **372 unique** pass và **819 chưa chạy**. Compileall/diff check xanh. Web không sửa/không chạy lại trong P2, số 43 pass/typecheck/build ở `a8cb586` là lịch sử. Journal/DB/roles thật ở container riêng `ras-c2a-p2-test-20261004`, port `58436`, Conda ras; runner/log/XML ở `%TEMP%/ras-c2a-p2-20261004`, không `.env` hoặc provider. Đã kiểm label rồi dọn đúng container/volume; các container dev ghi trước lượt P2 giữ nguyên ID/image/StartedAt qua đối chiếu chỉ đọc. Không sửa source/chạy mutant khi suite chính đang chạy. [Lệnh thực chạy](dev-setup.md#sửa-p2-listing-pr-34).
+
 ## Login và writer runtime
 
 Login đọc snapshot tối thiểu, đóng transaction trước verify/hash thật. Sau công việc chậm, kiểm entry lại, khóa tất cả User liên quan theo UUID, reload và so snapshot + predicate. Mismatch từ chối bounded, không retry bằng verifier cũ. Generic error giữ nguyên; audit chỉ UUID/mã. Body giống nhau chưa chứng minh loại timing enumeration.
@@ -47,6 +55,7 @@ Routine owner là NOLOGIN definer sau provision; runtime không có raw INSERT/U
 | `account_live(db, uid)` | Đọc SQL predicate; không thay entry/final integrity |
 | `session_live(db, sid, at, idle, user_id=...)` | Đọc không khóa; caller cung cấp clock mới và integrity ở ranh giới |
 | `session_is_live(db, sid, now=..., idle=..., clock=...)` | Final integrity cùng transaction rồi lấy clock; dùng khi đã khóa item, không khóa User sau item |
+| `list_live_sessions(...user_id, now, idle, clock)` | Lọc từng session được liệt kê, giữ journal shared lock; **không tự xác thực session gọi request**. HTTP caller phải kiểm session/owner với clock mới trước response |
 | `issue_session(...now, lifetimes)` | Entry + User lock + runtime create; caller commit_auth, kiểm cuối trước cookie |
 | `resolve_session(...now, idle, clock)` | Runtime touch với clock sau User lock; caller commit_activity và final check |
 | `rotate_csrf(...user_id, clock, idle)` | Runtime activity; caller commit_activity + final check trước Set-Cookie |
@@ -83,6 +92,8 @@ Tất cả protected routes đi qua principal mới ở `api/deps.py`, nhưng pr
 Không tuyên bố T14 toàn hệ thống hoặc toàn C2 hoàn chỉnh. Không đổi search/RAG common/private gates, pricing hay provider config.
 
 ## Kiểm chứng và giới hạn
+
+Các số đo trong phần này là lịch sử tại `a8cb586`, trước sửa P2 listing; kết quả source sau sửa được ghi ở [mục P2](#sửa-p2-pr-34-caller-của-session-listing) và inventory hiện hành. Web không đổi trong P2, không chạy lại hay tự tính lịch sử là kiểm mới.
 
 PostgreSQL 16/pgvector thật trong container riêng `ras-c2a-test-20261004`, port `127.0.0.1:58435`; roles LOGIN runtime/recovery riêng, journal/secret/evidence tổng hợp ngoài repo tại `%TEMP%/ras-c2a-20261004`. Python/pip xác minh thuộc Conda ras. Runner đặt admin test URL tường minh trước fixture và chặn HTTPTransport sync/async. Không đọc/sửa `.env`, dùng paper dev, gọi provider hoặc restart/migrate dev.
 

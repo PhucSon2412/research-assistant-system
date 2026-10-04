@@ -3,17 +3,15 @@
   "source_migration": "0035",
   "safety": "pending until C4; scoped writer fixture replaces cutover only",
   "normalisation": "UUID parameter values replaced by <uuid> because module-generated IDs vary across collection processes; function/other parameter IDs unchanged",
-  "collected": 1186,
-  "passed": 367,
   "failed": 0,
   "errors": 0,
   "skipped": 0,
-  "not_run": 819,
-  "pytest_seconds": "379.764",
   "web": {
     "passed": 43,
     "typecheck": "passed",
-    "build": "passed"
+    "build": "passed",
+    "source": "a8cb586; web unchanged in P2",
+    "rerun_for_p2": false
   },
   "counterchecks": [
     {
@@ -32,6 +30,16 @@
       "restored_sha256": "2cb377aeeecc2d40c3631c79157954a81d2f3f2189c34ede6d4ee942cc561380"
     }
   ],
+  "follow_up": {
+    "passed": 63,
+    "pytest_seconds": "123.713",
+    "reason": "Session/login suite rerun after adding the missing enum import for its type annotation; executable writer/predicate logic unchanged",
+    "source": "a8cb586; historical enum-import follow-up before P2"
+  },
+  "collected": 1191,
+  "passed": 372,
+  "not_run": 819,
+  "pytest_seconds": "411.291",
   "files": {
     "api/tests/test_auth_safety_foundation.py": {
       "passed": [
@@ -282,6 +290,11 @@
         "test_http_logout_uncertain_no_success_or_new_cookie[False]",
         "test_http_logout_uncertain_no_success_or_new_cookie[True]",
         "test_http_session_csrf_logout_with_scoped_cutover_fixture",
+        "test_http_session_listing_rechecks_caller_after_dependency[absolute_expired]",
+        "test_http_session_listing_rechecks_caller_after_dependency[credential_changed]",
+        "test_http_session_listing_rechecks_caller_after_dependency[idle_expired]",
+        "test_http_session_listing_rechecks_caller_after_dependency[live]",
+        "test_http_session_listing_rechecks_caller_after_dependency[revoked]",
         "test_login_before_transition_session_generation_fenced",
         "test_login_commit_lost_reply_never_success[False]",
         "test_login_commit_lost_reply_never_success[True]",
@@ -1440,10 +1453,33 @@
       ]
     }
   },
-  "follow_up": {
-    "passed": 63,
-    "pytest_seconds": "123.713",
-    "reason": "Session/login suite rerun after adding the missing enum import for its type annotation; executable writer/predicate logic unchanged"
+  "review_fix_parent": "a8cb5868b4628bc5e9fff3ded8b200841677753b",
+  "previous_api_verification": {
+    "source": "a8cb586",
+    "passed": 367,
+    "pytest_seconds": "379.764"
   },
-  "cleanup": "Owned isolated PostgreSQL container and volume removed after checking ras.task label; five recorded dev container IDs/image/StartedAt unchanged"
+  "counterchecks_source": "a8cb586; three original guards unchanged, counterchecks not repeated for P2",
+  "p2_listing": {
+    "test": "api/tests/test_c2a_login_sessions.py::test_http_session_listing_rechecks_caller_after_dependency",
+    "before": {
+      "passed": 1,
+      "failed": 4,
+      "pytest_seconds": "11.115"
+    },
+    "targeted": {
+      "passed": 5,
+      "failed": 0,
+      "pytest_seconds": "11.735"
+    },
+    "cases": [
+      "live",
+      "revoked",
+      "idle_expired",
+      "absolute_expired",
+      "credential_changed"
+    ],
+    "boundary": "Real dependency completes and releases transaction; Event pauses handler while another runtime transaction commits or the test clock advances"
+  },
+  "cleanup": "Owned P2 PostgreSQL container/volume removed after checking ras.task label; recorded dev container IDs/image/StartedAt compared read-only"
 }
