@@ -26,7 +26,7 @@ from app import db as app_db
 
 API_DIR = Path(__file__).resolve().parents[1]
 # Latest Alembic revision; bump when a migration is added.
-HEAD_REVISION = "0036"
+HEAD_REVISION = "0037"
 REPO_DIR = API_DIR.parent
 
 

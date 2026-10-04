@@ -1,6 +1,33 @@
 # Môi trường phát triển và schema (M1a–C2b)
 
-**Trạng thái hiện hành:** PR #32 đã merge `a5c75b8`; C1 head `0034`; [C2a](c2a-login-session-predicates.md) đã merge PR #34 `78e0880`, head **mã nguồn** `0035`; [C2b](c2b-reset-status.md) đang review PR #35, source `0036`, chưa merge; nền `0033/0034` giữ nguyên, [schema/quyền/replay/guard](c1-auth-safety-foundation.md) chỉ được thử cô lập, vẫn pending tới C4. Không truy vấn/nâng DB hoặc restart dev; source không là revision DB dev. [Runbook invitation](#journal-invitation-m6c-2b2b2) và các lệnh milestone cũ dưới đây là chứng cứ lịch sử, không lệnh vận hành C1/C2a trên dev. [C1 auth safety cô lập](#c1-auth-safety-cô-lập) ghi đúng lệnh đã chạy.
+**Cập nhật C2c-1:** [nhánh review](c2c1-bootstrap-receipts.md) thêm source `0037`, bootstrap runtime/initial receipt; [lệnh cô lập](#c2c-1-bootstrap-cô-lập). C2c-2 chưa chuyển, safety pending tới C4. Trạng thái C2b bên dưới là baseline trước task này, không là revision DB dev.
+
+## C2c-1 bootstrap cô lập
+
+Ngày 2026-10-04, fetch/base `1d3e558`, chứa PR #35 và `f2ba336`; head source `0036` → `0037`. Compose riêng `rasc2c1_20261004`, chỉ PostgreSQL `pgvector/pgvector:pg16`, bind `127.0.0.1:56437`; fixture mỗi test tạo/drop DB mới. Runtime/recovery LOGIN thật và NOLOGIN definer; role đối chứng `c1_migrator` NOLOGIN không có membership runtime. Compose/credentials/runner/ConPTY/counterchecks/JUnit/log ngoài repo `%TEMP%/ras-c2c1-20261004`. Không `.env` hoặc tài nguyên dev. Interpreter và pip đều ở Conda ras; `pywinpty 3.0.5` chỉ cài vào Conda này để kiểm Windows ConPTY, không thêm venv hoặc dependency production.
+
+Các commands sau đã chạy từ root. Script/env dưới đây là evidence của phiên thử tổng hợp, không script vận hành production; cần dựng tài nguyên cô lập và secrets mới để lặp lại. Không dùng test patch để mở readiness:
+
+```powershell
+$taskRoot = Join-Path $env:TEMP 'ras-c2c1-20261004'
+. "$taskRoot\test-env.ps1" # explicit isolated admin URL, generated disposable role credentials
+$env:PYTHONPATH = (Get-Location).Path
+& C:\Users\ADMIN\.conda\envs\ras\python.exe -m pip --version
+docker compose --project-name rasc2c1_20261004 --file "$taskRoot\compose.yaml" up -d --wait db
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$taskRoot\runner.py" api --collect-only -q
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$taskRoot\runner.py" -p tests.conftest "$taskRoot\test_conpty.py" -q --tb=short --junitxml="$taskRoot\conpty.xml"
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$taskRoot\runner.py" -p tests.conftest "$taskRoot\test_real_restore.py" -q --tb=short --junitxml="$taskRoot\real-restore.xml"
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$taskRoot\counterchecks.py"
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$taskRoot\runner.py" api/tests/test_c2c1_bootstrap.py api/tests/test_c2c1_migration.py api/tests/test_bootstrap.py api/tests/test_c2b_reset_status.py api/tests/test_c2b_migration.py api/tests/test_c2a_login_sessions.py api/tests/test_c2a_migration.py api/tests/test_c2a_origin.py api/tests/test_auth_safety_foundation.py api/tests/test_migrations.py api/tests/test_schema_constraints.py api/tests/test_config.py -q --tb=short --junitxml="$taskRoot\final-after-setup.xml"
+```
+
+Runner buộc admin URL tường minh trước fixture, chặn external sync/async HTTPTransport và kiểm SHA-256 API source không đổi trong từng lượt. Writer fixture chỉ thay kết quả `auth_safety.cutover` từng test; integrity/hold/journal/routines/receipt/commit thật. ConPTY scoped success thay riêng boundary đó trong process test-only chạy CLI module thật; mismatch và pending chạy CLI `-m` không patch. Stdin CLI runtime thật cũng có nhóm pending không patch, không session/link.
+
+Restore bổ sung thực chạy `pg_dump -Fc` trước bootstrap rồi `pg_restore` vào DB fixture mới trong đúng container đã kiểm label project, journal nguồn giữ hiện hành ngoài dump. Bootstrap nguồn dùng runtime, còn hold/recover hai lần ở DB restore dùng **recovery LOGIN thật**; report reconciliation complete nhưng safety pending, không User/receipt/singleton và recovery không EXEC prepare. Không chạy hai DB writer đồng thời vào journal đó hoặc dùng object store/paper. Đây là drill DB bootstrap cô lập, không thay full backup/restore/proxy C4.
+
+[Inventory node/lượt chạy](c2c1-test-inventory.json) giữ lỗi chuẩn bị và kết quả cuối riêng. Full HTTP/proxy/cutover C4, invitation lifecycle C2c-2, resource final callers C2d và operator C3 chưa kiểm hoàn chỉnh; web không đổi/không chạy. Không phép thử nào chứng minh mất điện, provider charge, latency hoặc storage production. Tài nguyên DB/container/volume thử chỉ dọn sau khi kiểm label đúng project; không cleanup dev.
+
+**Trạng thái hiện hành:** PR #32/#33 đã merge; C1 head `0034`; [C2a](c2a-login-session-predicates.md) đã merge PR #34 `78e0880` (`0035`); [C2b](c2b-reset-status.md) đã merge PR #35 `1d3e558`, chứa `f2ba336`, head **mã nguồn** `0036`. [Task C2c-1 bootstrap/initial receipt](tasks/m6c2b2c2c1-bootstrap-initial-receipts.md) chưa triển khai; invocation và lệnh của các lượt kiểm bên dưới là lịch sử. Nền `0033`–`0036` chỉ thử cô lập, safety pending tới C4. Không truy vấn/nâng DB hoặc restart dev; source không là revision DB dev. [Runbook invitation](#journal-invitation-m6c-2b2b2) và các lệnh milestone cũ không phải lệnh vận hành auth mới trên dev. [C1 auth safety cô lập](#c1-auth-safety-cô-lập) ghi đúng lệnh đã chạy.
 
 **Vận hành auth restore hoàn chỉnh C2–C4 — chưa triển khai:**
 
@@ -65,7 +92,7 @@ Trước sửa **4 failed/1 passed / 11,12 s** đúng lỗi 200 thay vì 401; sa
 
 ## C1 auth safety cô lập
 
-Lệnh và số đo phần này là lịch sử C1; kết quả source C2a xem [nhóm C2a](#c2a-login-session-cô-lập).
+Lệnh và số đo phần này là lịch sử C1; kết quả source C2a xem [nhóm C2a](#c2a-loginsession-cô-lập).
 
 Sau review P2 PR #33, dùng DB Compose riêng `rasc1reset3136add3`, context/journal/credentials ngoài repo `ras-c1-reset-uxjegtuu`, PostgreSQL 16/pgvector thật. Giữ nguyên `0033`, thêm `0034` vì chưa xác minh đủ DB lâu dài đã áp revision cũ. Không truy vấn/nâng/restart dev hoặc đọc `.env`. Đã chạy các lệnh sau từ root bằng Conda ras; nhóm đầu trên code `0033` trước sửa exit 1 đúng bốn ca lỗi, không tính là suite pass:
 

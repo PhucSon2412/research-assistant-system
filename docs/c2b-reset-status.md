@@ -1,8 +1,10 @@
 # C2b: reset credential và disable/enable
 
+**Bàn giao tiếp C2c-1:** [bootstrap runtime và initial receipt](c2c1-bootstrap-receipts.md) đang review, source `0037`; writer bootstrap đã chuyển trong nhánh đó, invitation lifecycle còn C2c-2. Các inventory/số đo C2b dưới đây vẫn gắn source/lượt lịch sử của C2b, safety pending tới C4.
+
 [Mục lục](README.md) · [Thiết kế auth sau restore](auth-restore-safety.md) · [Bàn giao C2a](c2a-login-session-predicates.md) · [Hợp đồng reset token](reset-token-journal.md)
 
-PR #34 đã merge tại `78e0880e8b25178d13cdd1bf374153041e5f9781`, gồm sửa P2 session listing và cập nhật Docker pending của orchestrator (`d2a4be5`). C2b bắt đầu từ main này trên `feat/m6c2b2c2b-reset-status`, source head `0036`; chưa merge. Safety vẫn **pending tới C4**. Source head không chứng minh revision DB dev. Không nâng/restart/truy vấn DB hoặc journal dev, đọc/sửa `.env`, gọi provider hoặc tạo venv.
+PR #34 đã merge tại `78e0880e8b25178d13cdd1bf374153041e5f9781`, gồm sửa P2 session listing và cập nhật Docker pending của orchestrator (`d2a4be5`). C2b bắt đầu từ main này; **PR #35 đã merge `1d3e55825901dc81feb892f27a436bbb57b511f2`, chứa P2 `f2ba336`, source head `0036`**. Safety vẫn **pending tới C4**. Source head không chứng minh revision DB dev. Các phần kiểm chứng dưới đây giữ trạng thái khi chạy từng lượt, không là phép đo mới sau merge. [Task tiếp C2c-1](tasks/m6c2b2c2c1-bootstrap-initial-receipts.md) giao bootstrap/initial receipt; invitation lifecycle tiếp ở C2c-2. Không nâng/restart/truy vấn DB hoặc journal dev, đọc/sửa `.env`, gọi provider hoặc tạo venv.
 
 ## Predicate và runtime routines
 
@@ -63,7 +65,7 @@ Fault matrix append none/torn/prefix/full-fsync-error + commit biết kết qu�
 
 Các lượt chuẩn bị được giữ trong inventory: 49 pass; lượt mở rộng 49 pass/1 fail vì fixture chưa khai báo Origin allowlist, sửa fixture rồi 51 pass; lượt chọn đầy đủ đầu 467 pass/1 fail vì PostgreSQL cô lập thiếu role NOLOGIN `c1_migrator`, tạo prerequisite chỉ ở DB thử rồi chạy lại đủ 471. Một lệnh sửa docs dừng ở assert do encoding stdin PowerShell, chưa ghi file; chạy lại UTF-8 thành công. Lệnh đọc label Docker lần đầu lỗi Go-template quoting, dừng trước xóa; đọc JSON labels, xác minh rồi dọn đúng container/volume. Không che các lỗi chuẩn bị thành pass mới.
 
-Đã dọn đúng PostgreSQL cô lập sau kiểm label. Chín container dev giữ ID/image qua snapshot đầu/cuối; năm container trọng yếu giữ StartedAt qua các lần inspect chỉ đọc. Không truy vấn DB/journal dev. Evidence tổng hợp vẫn ngoài repo. [Lệnh thực chạy](dev-setup.md#c2b-reset-status-cô-lập).
+Đã dọn đúng PostgreSQL cô lập sau kiểm label. Chín container dev giữ ID/image qua snapshot đầu/cuối; năm container trọng yếu giữ StartedAt qua các lần inspect chỉ đọc. Không truy vấn DB/journal dev. Evidence tổng hợp vẫn ngoài repo. [Lệnh thực chạy](dev-setup.md#c2b-resetstatus-cô-lập).
 
 Fault injection ở boundary Python/driver thực hiện commit hoặc rollback thật rồi mất reply; không là thử mất điện hoặc durability production. Web không sửa; số 43 pass/typecheck/build của C2a là lịch sử, không tự tính thành kết quả C2b.
 

@@ -928,16 +928,26 @@ def test_0013_marks_prelease_reservations_uncertain_without_releasing_cost(empty
     eng.dispose()
 
 
-def test_migration_sql_seeds_no_accounts() -> None:
-    """Ledger backfill is allowed; migrations must never seed accounts."""
+def test_migration_sql_seeds_no_accounts(empty_db_url) -> None:
+    """Execute the offline artifact: a routine body is not an executed seed.
+
+    Checking rows also detects seeds in DO blocks or function calls, which the
+    old line-prefix scan missed. Ledger/policy rows may still be initialized.
+    """
     out = io.StringIO()
     cfg = alembic_config("postgresql+psycopg://offline@localhost/offline", output=out)
     command.upgrade(cfg, "head", sql=True)
-    inserts = [
-        line for line in out.getvalue().splitlines()
-        if line.strip().upper().startswith("INSERT INTO USERS")
-    ]
-    assert inserts == []
+    engine = create_engine(empty_db_url, isolation_level="AUTOCOMMIT", hide_parameters=True)
+    try:
+        with engine.connect() as conn:
+            # No driver parameter mapping: PL/pgSQL format('%I',...) and LIKE
+            # patterns in a complete offline script are literal SQL here.
+            with conn.connection.driver_connection.cursor() as cursor:
+                cursor.execute(out.getvalue())
+            assert conn.scalar(text("SELECT count(*) FROM users")) == 0
+            assert conn.scalar(text("SELECT count(*) FROM bootstrap_state")) == 0
+    finally:
+        engine.dispose()
 
 
 # --- M1b: 0001 -> 0002 on a database that already holds M1a data -------------
@@ -945,7 +955,7 @@ def test_migration_sql_seeds_no_accounts() -> None:
 
 def _snapshot(conn) -> dict[str, list]:
     # Keep the 0001 projection stable as later migrations add nullable columns.
-    columns = {"users": "id, email, display_name, role, status, password_verifier, password_changed_at, created_at, updated_at", "library_items": "id, visibility, owner_user_id, content_status, active_version_id, title, rights_epoch, created_by_user_id, created_at, updated_at"}
+    columns = {"bootstrap_state": "id, admin_user_id, completed_at", "users": "id, email, display_name, role, status, password_verifier, password_changed_at, created_at, updated_at", "library_items": "id, visibility, owner_user_id, content_status, active_version_id, title, rights_epoch, created_by_user_id, created_at, updated_at"}
     return {
         t: [tuple(r) for r in conn.execute(text(f"SELECT {columns.get(t, '*')} FROM {t} ORDER BY 1")).all()]
         for t in ("users", "bootstrap_state", "library_items", "paper_versions", "audit_events")

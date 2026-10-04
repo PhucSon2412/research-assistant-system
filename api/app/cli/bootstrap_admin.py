@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import sys
+import warnings
 from collections.abc import Callable, Sequence
 from typing import TextIO
 
@@ -40,6 +41,12 @@ EXIT_REFUSED = 3
 class _Parser(argparse.ArgumentParser):
     """Never echo unexpected arguments: a mistyped ``--password <secret>``
     would otherwise be printed back in the usage error."""
+
+    def error(self, message):
+        # argparse errors for known flags (e.g. --password-stdin=<secret>) may
+        # also contain argument values. Never forward that diagnostic.
+        super().error("unrecognized or invalid arguments (values not shown); "
+                      "use the hidden prompt or --password-stdin")
 
     def parse_args(self, args=None, namespace=None):  # type: ignore[override]
         parsed, extras = self.parse_known_args(args, namespace)
@@ -78,8 +85,14 @@ def _read_password(
         raise PasswordPolicyError(
             "no terminal for a hidden prompt; use --password-stdin to read the password from stdin"
         )
-    first = getpass_fn("Admin password: ")
-    second = getpass_fn("Repeat password: ")
+    # getpass can warn then fall back to echo if no safe terminal is available.
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", getpass.GetPassWarning)
+        try:
+            first = getpass_fn("Admin password: ")
+            second = getpass_fn("Repeat password: ")
+        except getpass.GetPassWarning:
+            raise PasswordPolicyError("no safe hidden terminal; use --password-stdin") from None
     if first != second:
         raise PasswordPolicyError("passwords do not match")
     return first
@@ -120,14 +133,14 @@ def main(
         print(f"error: {exc}", file=stderr)
         return EXIT_INVALID
     except BootstrapRefused:
-        print("error: bootstrap has already been completed; no account was created", file=stderr)
+        print("error: bootstrap refused: existing account or installation history", file=stderr)
         return EXIT_REFUSED
     except Exception as exc:  # noqa: BLE001
         # Only the exception type: messages may carry connection details.
         print(f"error: bootstrap failed ({type(exc).__name__})", file=stderr)
         return EXIT_ERROR
 
-    print(f"Admin account created: id={result.user_id} email={result.email}", file=stdout)
+    print(f"Admin account created: id={result.user_id}", file=stdout)
     return EXIT_OK
 
 

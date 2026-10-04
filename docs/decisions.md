@@ -1,5 +1,25 @@
 # Nhật ký quyết định
 
+## Triển khai C2c-1 bootstrap trong phạm vi task (2026-10-04)
+
+**Nguồn:** chủ dự án giao coding đầy đủ [task C2c-1](tasks/m6c2b2c2c1-bootstrap-initial-receipts.md), từ merge PR #35 `1d3e558`, giữ docs orchestrator và chỉ thử cô lập. Đây là lựa chọn triển khai của coding agent, không là quyết định operator/cutover mới của chủ dự án. [Bàn giao/giới hạn](c2c1-bootstrap-receipts.md).
+
+Thêm `0037`, không sửa revision đã merge: runtime chỉ EXECUTE prepare Admin cố định; singleton protected/bất biến, marker transaction nullable cho legacy và constraint buộc hai initial receipt đúng binding cùng audit trước append. User/singleton/FK/audit chuẩn bị trước journal, hai Change credential → status qua một `commit_auth` batch. Đọc DB hash policy rồi đóng transaction trước Argon2; final gate cùng transaction, hậu kiểm receipt/operation/singleton trong transaction mới sau known commit.
+
+History guard đọc journal độc lập, yêu cầu genesis new-install và không account history, chặn complete credential prefix dù DB absent/rollback. Recovery không dựng account/verifier/receipt/singleton, không cấp creation cho recovery role. Intent + rollback có thể giữ installation chưa có Admin nhưng không bootstrap lại được; PR này không force/recreate/rescue. Giữ pending tới C4, invitation lifecycle C2c-2 chưa chuyển.
+
+Giữ stdin/getpass contract, chặn fallback echo và argparse diagnostics có secret, stdout chỉ UUID. Refusal read-only thay denial audit transaction riêng của writer cũ; success audit vẫn atomic và bị DB buộc. Không chọn production storage/operator/delivery, không tác động dev/provider. Kiểm chứng theo source/node ở [inventory C2c-1](c2c1-test-inventory.json), không cộng số lịch sử C2b vào pass mới.
+
+## Chia C2c sau merge PR #35 (2026-10-04)
+
+**Nguồn và trạng thái:** chủ dự án báo PR #35 đã merge và yêu cầu prompt cho agent tiếp theo. Fetch xác minh `origin/main` tại `1d3e55825901dc81feb892f27a436bbb57b511f2`, chứa `f2ba336`; tree nguồn trùng nhánh C2b, head migration mã nguồn `0036`. Không truy vấn revision DB dev. Review P2 đã chạy độc lập 106 test C2b/migration/ORM và một ca tái hiện lỗi cũ trên `f2ba336`, tổng 107 pass; đây là kiểm chọn, không full suite/cutover. Số 201 của coding agent và số 107 của reviewer là các lượt riêng, không cộng thành số test khác nhau.
+
+**Orchestrator chốt trong phạm vi được ủy quyền:** chia C2c thành **C2c-1 runtime account creation cho bootstrap + initial receipts + CLI**, rồi **C2c-2 invitation lifecycle + Admin final checks + delivery compensation**. Lý do: runtime chưa được INSERT User, bootstrap còn commit riêng, singleton chưa thuộc tập bảng protected; cần review boundary tạo account trước khi gắn token/closure/actor/delivery của invitation. Không ghi là chủ dự án trực tiếp chọn từng chi tiết SQL/routine.
+
+[Prompt C2c-1](tasks/m6c2b2c2c1-bootstrap-initial-receipts.md) giao coding ngay trên base đã merge, giữ các docs bàn giao chưa commit trong PR. Bootstrap phải gộp User/verifier, hai receipt và event `bootstrap`, singleton/audit trong một transaction/batch; receipt initial status phải đáp ứng guard C2b mới. Journal có bootstrap intent hoặc lịch sử account không được biến thành cài mới chỉ vì snapshot thiếu User/singleton. Replay không tạo lại account; role runtime/recovery không được raw mutation singleton hoặc tạo Admin ngoài bootstrap. Routines/constraints cụ thể do coding agent thiết kế và review trong PR mới, chưa là tính năng đã triển khai.
+
+Invitation writer chưa chuyển vẫn thuộc C2c-2; không gọi C2c hoàn chỉnh sau C2c-1. Giữ safety pending tới C4, chỉ thử DB/journal/project riêng; không thay readiness để chữa Compose unhealthy. Operator/approval/status recovery/delivery production C3 và storage/cutover C4 còn mở; không dùng bootstrap để cứu Admin đang khóa, không mở auth cũ hoặc gọi provider.
+
 ## Sửa initial status độc lập, P2 PR #35 (2026-10-04)
 
 **Nguồn:** review tái hiện credential-only recovery của account legacy vẫn held, nhưng disable rồi enable vượt điều kiện chỉ kiểm có status operation. Điều kiện cũ không đúng baseline đã chốt; một quyết định hạn chế không chứng minh initial status.
