@@ -6,12 +6,15 @@ RUNTIME_ROUTINES = {"ras_auth_mirror", "ras_auth_confirm", "ras_auth_project", "
                     "ras_auth_session_create", "ras_auth_token_create", "ras_auth_lock_users",
                     "ras_auth_session_lock", "ras_auth_session_activity", "ras_auth_session_close", "ras_auth_closure_mirror",
                     "ras_auth_account_live", "ras_auth_session_live", "ras_auth_status_live", "ras_auth_reset_eligible",
-                    "ras_auth_reset_token_live", "ras_auth_token_lock", "ras_auth_token_close", "ras_auth_bootstrap_prepare"}
+                    "ras_auth_reset_token_live", "ras_auth_token_lock", "ras_auth_token_close", "ras_auth_bootstrap_prepare",
+                    "ras_auth_invitation_lock", "ras_auth_invitation_create", "ras_auth_invitation_revoke",
+                    "ras_auth_invitation_prepare", "ras_auth_invitation_compensate", "ras_auth_invitation_recover"}
 RECOVERY_ROUTINES = {"ras_auth_mirror", "ras_auth_confirm", "ras_auth_project", "ras_auth_restrict", "ras_auth_progress", "ras_auth_lock_users",
                      "ras_auth_account_live", "ras_auth_session_live", "ras_auth_session_lock",
                      "ras_auth_session_close", "ras_auth_closure_mirror", "ras_auth_status_live", "ras_auth_reset_eligible",
-                     "ras_auth_reset_token_live", "ras_auth_token_lock", "ras_auth_token_close"}
-PROTECTED = {"users", "bootstrap_state", "sessions", "password_reset_tokens", "auth_change_receipts", "auth_safety_heads", "auth_safety_state", "auth_hash_policies", "revocation_journal_records"}
+                     "ras_auth_reset_token_live", "ras_auth_token_lock", "ras_auth_token_close",
+                     "ras_auth_invitation_lock", "ras_auth_invitation_recover"}
+PROTECTED = {"users", "invitations", "bootstrap_state", "sessions", "password_reset_tokens", "auth_change_receipts", "auth_safety_heads", "auth_safety_state", "auth_hash_policies", "revocation_journal_records"}
 
 
 def _identifier(name):
@@ -73,7 +76,10 @@ def provision(engine, *, runtime: str, recovery: str, definer: str):
         conn.execute(text(f"GRANT SELECT,INSERT ON bootstrap_state TO {df}"))
         conn.execute(text(f"GRANT SELECT ON recovery_registrations TO {df}"))
         conn.execute(text(f"GRANT INSERT ON users,audit_events TO {df}"))
+        conn.execute(text(f"GRANT SELECT,INSERT,UPDATE ON invitations TO {df}"))
         conn.execute(text(f"GRANT EXECUTE ON FUNCTION ras_auth_phc_valid(text,integer) TO {df}"))
+        if conn.scalar(text("SELECT to_regprocedure('ras_auth_invitation_before_journal()') IS NOT NULL")):
+            conn.execute(text(f"GRANT EXECUTE ON FUNCTION ras_auth_invitation_before_journal(),ras_auth_invitation_actor(uuid,uuid,text,timestamptz,interval) TO {df}"))
         # Triggers execute under the caller; SELECT is already granted. Trigger functions don't expose mutation.
         functions = conn.execute(text("SELECT oid::regprocedure::text signature,proname FROM pg_proc WHERE pronamespace='public'::regnamespace AND (prosecdef OR proname IN ('ras_auth_account_live','ras_auth_session_live','ras_auth_status_live','ras_auth_reset_eligible','ras_auth_reset_token_live')) AND proname LIKE 'ras_auth_%'"))
         for signature, name in functions:

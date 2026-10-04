@@ -1,6 +1,6 @@
 # Roadmap đề xuất
 
-**C2c-1 đang review:** [bootstrap runtime/initial receipt](c2c1-bootstrap-receipts.md), head source `0038`, từ merge PR #35 `1d3e558`. C2c tổng chưa hoàn tất; bước tiếp theo C2c-2 invitation lifecycle rồi C2d/C3/C4, safety vẫn pending. Phần C2b dưới đây giữ baseline `0036` và số lịch sử.
+**C2c-1 đã merge PR #36 `d1b53e6`:** [bootstrap runtime/initial receipt](c2c1-bootstrap-receipts.md), head source `0038`. Giao **[C2c-2 invitation lifecycle](tasks/m6c2b2c2c2-invitation-lifecycle.md)**; chưa triển khai. Đầu ra: invitation qua runtime, User mới với hai initial receipt/accepted closure, kiểm Admin cuối và bù delivery; kiểm race/fault/restore. C2c tổng chưa hoàn tất; sau đó C2d final callers → C3 operator → C4 cutover; safety vẫn pending. Phần C2b bên dưới là baseline lịch sử `0036`.
 
 **M6c-2b2b2, PR #31 đã merge `3f21794`:** base PR #30 đã merge `ce67ce8`, `0031`; invitation journal thêm `0032`. [Hợp đồng](invitation-journal.md) bảo vệ link đã kết thúc sau restore với journal hiện hành, không dựng lại account; full API **901/901**, web **42/42**, đối chứng **8/8**, drill **59/59** là chứng cứ lịch sử PR #31 (giới hạn ở tài liệu kiểm chứng).
 

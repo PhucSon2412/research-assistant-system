@@ -1,8 +1,14 @@
 # Chiến lược kiểm thử
 
+## Bàn giao C2c-2 sau merge PR #36
+
+PR #36 đã merge `d1b53e6`, head source `0038`. [Task C2c-2](tasks/m6c2b2c2c2-invitation-lifecycle.md) giao runtime invitation, initial pair/accepted closure, final actor/clock, delivery compensation và fault/restore. **Chưa triển khai/chưa chạy test C2c-2** ở lượt viết prompt; các số C2c-1 dưới đây là lịch sử theo source, không là baseline full suite của task mới. Kiểm HTTP nghiệp vụ invitation trong fixture C2 với quyền/receipt/gate thật; pending riêng không mock. Full integration/cutover C4 vẫn riêng, không biến expectation nghiệp vụ thành 503 để coi là hồi quy pass.
+
 ## C2c-1 bootstrap runtime
 
-**Bản sửa P2 `0038` tại code `d222fb1`: 626/626 pass**, 0 failure/error/skip, 3 warning hiện có, **834,11 s**. C2c-1/bootstrap 125 + nền 477 + schema 24, gồm runtime direct installation 26 và migration C2c-1 5; **202** file API giữ SHA-256. Collect **1402**, **776 not-run**; [inventory P2](c2c1-p2-test-inventory.json) và [lệnh cô lập](dev-setup.md#sửa-p2-installation-pr-36-cô-lập). Ca tái hiện trước sửa 1 fail đúng P2; bỏ guard SQL mới 1 expected failure/0 errors, khôi phục bytes trước suite cuối. Compileall/diff check pass, tài nguyên/credentials thử đã dọn sau kiểm ownership. Web/ConPTY/dump-restore không chạy lại trong P2; các lượt chọn 26/5, review độc lập và số `0037` dưới đây không cộng vào 626. SQL binding không thay guard file độc lập; pending tới C4, chưa merge.
+**Review lại P2 tại `48137e4` (`0038`):** reviewer chạy **126 test chọn pass** và chạy riêng ca tái hiện cũ **1 pass**, không fail/error/skip. `existing_db` bị đúng guard SQL chặn trước INSERT; new-install runtime, migration giữ owner/ACL và ORM/schema đạt. [Kết luận và giới hạn](reviews/pr36-c2c1-bootstrap.md). Không cộng với lượt 626 của coding agent; web/ConPTY/dump-restore và full inventory không chạy lại. Safety vẫn pending.
+
+**Bản sửa P2 `0038` tại code `d222fb1`: 626/626 pass**, 0 failure/error/skip, 3 warning hiện có, **834,11 s**. C2c-1/bootstrap 125 + nền 477 + schema 24, gồm runtime direct installation 26 và migration C2c-1 5; **202** file API giữ SHA-256. Collect **1402**, **776 not-run**; [inventory P2](c2c1-p2-test-inventory.json) và [lệnh cô lập](dev-setup.md#sửa-p2-installation-pr-36-cô-lập). Ca tái hiện trước sửa 1 fail đúng P2; bỏ guard SQL mới 1 expected failure/0 errors, khôi phục bytes trước suite cuối. Compileall/diff check pass, tài nguyên/credentials thử đã dọn sau kiểm ownership. Web/ConPTY/dump-restore không chạy lại trong P2; các lượt chọn 26/5, review độc lập và số `0037` dưới đây không cộng vào 626. SQL binding không thay guard file độc lập; PR #36 sau đó đã merge, safety vẫn pending tới C4.
 
 **Review PR #36 tại `64cf342`:** nhóm C2c-1/bootstrap/migration và ORM độc lập **97 pass**, ca runtime creation trên installation `existing_db` **1 fail đúng lỗi P2**, chưa đề nghị merge. [Tái hiện, điều kiện đo và prompt sửa](reviews/pr36-c2c1-bootstrap.md). Số 597 bên dưới là lượt riêng của coding agent, không phải lượt reviewer đã chạy.
 

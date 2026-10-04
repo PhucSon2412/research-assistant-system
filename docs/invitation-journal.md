@@ -2,6 +2,8 @@
 
 [Mục lục](README.md) · [Quyết định](decisions.md#quyết-định-triển-khai-m6c-2b2b2-2026-10-03) · [Runbook](dev-setup.md#journal-invitation-m6c-2b2b2)
 
+**Bàn giao hiện hành:** PR #36 bootstrap/initial receipt đã merge `d1b53e6`, head source `0038`. [Task C2c-2](tasks/m6c2b2c2c2-invitation-lifecycle.md) chuyển invitation sang runtime/receipt, Admin final checks và bù delivery; chưa triển khai. Lock order và raw writer mô tả dưới đây là lịch sử `0032`, không tự áp cho Admin actor mới. Coding phải đối chiếu C2a/C2b, recovery và task trước khi thay boundary; safety pending tới C4.
+
 **Yêu cầu của chủ dự án:** bảo vệ link đã nhận/thu hồi trước restore backup cũ, với journal độc lập hiện hành; giữ bảo vệ session/reset của PR #29/#30. PR #30 đã merge tại `ce67ce8`, revision `0031`; PR #31 đã merge tại `3f21794`, thêm `0032`. Đây là hợp đồng/chứng cứ lịch sử invitation. [C1 `0033`](c1-auth-safety-foundation.md), theo nền được ủy quyền sau PR #32, thêm receipt/generation/replay hạn chế và gate pending; accept/reinvite writer đầy đủ thuộc C2, operator/delivery C3. Invitation closure không dựng User hoặc chứng minh credential/status đã commit.
 
 **Lựa chọn triển khai của coding agent:** dùng cùng hash chain, mirror, `journal_confirmed`, recovery gate và `identity.session_commit.commit_auth`. Event `invitation_closure` đúng bốn trường bắt buộc, không null/thừa:

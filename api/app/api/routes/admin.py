@@ -18,7 +18,7 @@ from app.api.errors import ApiError
 from app.audit import record_event
 from app.authz import Principal
 from app.config import Settings, get_settings
-from app.delivery import DeliveryAdapter, DevOutbox, MessageKind, OutgoingMessage, build_link, get_delivery
+from app.delivery import DeliveryAdapter, DevOutbox, get_delivery
 from app.identity import invitations, users
 from app.identity.emails import EmailFormatError
 from app.identity.errors import AccountExists, Forbidden, InvitationConflict, NotFound
@@ -60,12 +60,14 @@ def _user_out(user: User) -> dict:
 
 @router.post("/invitations", status_code=status.HTTP_201_CREATED)
 def create_invitation(
+    request: Request,
     body: InvitationIn,
     admin: Principal = Depends(require_admin),
     db: Session = Depends(get_db),
     now: datetime = Depends(get_now),
     settings: Settings = Depends(get_settings),
     delivery: DeliveryAdapter = Depends(get_delivery),
+    clock=Depends(get_clock),
 ) -> dict:
     if not delivery.enabled:
         raise ApiError(503, "delivery_unavailable")
@@ -73,10 +75,13 @@ def create_invitation(
         created = invitations.create_invitation(
             db,
             inviter_id=admin.user_id,
+            actor_session_id=admin.session_id,
+            csrf_token=request.headers.get(CSRF_HEADER) or "",
             email=body.email,
             display_name=body.display_name,
             now=now,
             lifetime=settings.auth.invite,
+            clock=clock,
         )
     except EmailFormatError:
         raise ApiError(422, "invalid_email") from None
@@ -84,41 +89,31 @@ def create_invitation(
         raise ApiError(409, "account_exists") from None
     except InvitationConflict:
         raise ApiError(409, "invitation_conflict") from None
-    inv = created.invitation
-    try:
-        delivery.send(
-            OutgoingMessage(
-                kind=MessageKind.INVITATION,
-                recipient=inv.email,
-                link=build_link(settings.http.public_base_url or "", "/invite", created.token),
-                expires_at=inv.expires_at,
-            ),
-            now=now,
-        )
-    except Exception:  # noqa: BLE001
-        # The adapter may have delivered the link before raising. Close it durably.
-        invitations.revoke_invitation(db, invitation_id=inv.id, actor_id=admin.user_id, now=now,
-                                      reason="delivery_failed", compensation=True)
-        raise ApiError(503, "delivery_failed") from None
-    return {"invitation": _invitation_out(inv, now)}
+    inv = invitations.deliver_invitation(db, created, actor_id=admin.user_id, actor_session_id=admin.session_id,
+        csrf_token=request.headers.get(CSRF_HEADER) or "", delivery=delivery, settings=settings, clock=clock)
+    return {"invitation": _invitation_out(inv, clock())}
 
 
 @router.get("/invitations")
 def list_invitations(
-    _: Principal = Depends(require_admin), db: Session = Depends(get_db), now: datetime = Depends(get_now)
+    admin: Principal = Depends(require_admin), db: Session = Depends(get_db), clock=Depends(get_clock)
 ) -> dict:
-    return {"invitations": [_invitation_out(inv, now) for inv in invitations.list_invitations(db)]}
+    rows = invitations.list_invitations(db, actor_id=admin.user_id, actor_session_id=admin.session_id, clock=clock)
+    return {"invitations": [_invitation_out(inv, clock()) for inv in rows]}
 
 
 @router.post("/invitations/{invitation_id}/revoke", status_code=status.HTTP_204_NO_CONTENT)
 def revoke_invitation(
+    request: Request,
     invitation_id: uuid.UUID,
     admin: Principal = Depends(require_admin),
     db: Session = Depends(get_db),
     now: datetime = Depends(get_now),
+    clock=Depends(get_clock),
 ) -> Response:
     try:
-        invitations.revoke_invitation(db, invitation_id=invitation_id, actor_id=admin.user_id, now=now)
+        invitations.revoke_invitation(db, invitation_id=invitation_id, actor_id=admin.user_id, now=now,
+            actor_session_id=admin.session_id, csrf_token=request.headers.get(CSRF_HEADER) or "", clock=clock)
     except NotFound:
         raise ApiError(404, "not_found") from None
     return Response(status_code=status.HTTP_204_NO_CONTENT)

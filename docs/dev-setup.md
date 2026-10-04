@@ -1,6 +1,6 @@
 # Môi trường phát triển và schema (M1a–C2c-1)
 
-**Cập nhật C2c-1:** [nhánh review](c2c1-bootstrap-receipts.md) thêm source `0038`, bootstrap runtime/initial receipt; [lệnh cô lập](#c2c-1-bootstrap-cô-lập). C2c-2 chưa chuyển, safety pending tới C4. Trạng thái C2b bên dưới là baseline trước task này, không là revision DB dev.
+**C2c-1 đã merge PR #36 `d1b53e6`:** [bootstrap runtime/initial receipt](c2c1-bootstrap-receipts.md), head source `0038`; [lệnh cô lập](#c2c-1-bootstrap-cô-lập) và số đo bên dưới là chứng cứ lịch sử. Giao [C2c-2 invitation lifecycle](tasks/m6c2b2c2c2-invitation-lifecycle.md), chưa triển khai/chưa có lệnh kiểm mới. Safety pending tới C4; không suy revision DB dev hoặc chạy lệnh lịch sử để mở traffic.
 
 ## Sửa P2 installation PR #36, cô lập
 

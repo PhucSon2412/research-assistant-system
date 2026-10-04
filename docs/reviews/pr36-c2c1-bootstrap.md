@@ -2,7 +2,15 @@
 
 [Mục lục](../README.md) · [Task](../tasks/m6c2b2c2c1-bootstrap-initial-receipts.md) · [Bàn giao](../c2c1-bootstrap-receipts.md)
 
-Ngày 2026-10-04, review source `64cf34223e71a47ae6276cc627b01a0eaa963b8e` (code `51f5714`, migration `0037`), base main `1d3e558`. **Chưa đề nghị merge:** có một lỗi P2 đã tái hiện ở boundary SQL. Safety vẫn pending tới C4; không có kết luận rằng HTTP production đang mở hoặc có đường tấn công HTTP mới.
+**Cập nhật sau review:** chủ dự án báo đã merge; fetch xác minh merge PR #36 `d1b53e6` chứa `48137e4`, head source `0038`. Review độc lập dưới đây giữ nguyên source/số đo; ghi chú review chưa commit được giữ để đưa vào PR [C2c-2](../tasks/m6c2b2c2c2-invitation-lifecycle.md), không coi chúng đã nằm trong merge #36. Safety vẫn pending tới C4.
+
+**Kết luận review lại ngày 2026-10-04:** source `48137e4` chứa code `d222fb1`, head `0038`. P2 đã được sửa và kiểm chứng độc lập; không còn điểm chặn merge được phát hiện trong phạm vi C2c-1. Reviewer đề nghị có thể merge PR #36; PR vẫn chưa được reviewer merge. Safety pending tới C4, invitation C2c-2 chưa chuyển.
+
+Nhóm installation/runtime trực tiếp, bootstrap, migration C2c-1 và ORM/schema: **126 pass**, 3 warning hiện có, 205,69 s. Chạy riêng ca tái hiện trước đó, thêm assertion đúng mã guard SQL: **1 pass**, 2,19 s; `existing_db` bị từ chối trước INSERT, không còn tạo Admin live. Hai lượt này độc lập với số 626 của coding agent, không cộng thành một full suite. Giữ SHA-256 source Python/SQL API trong từng lượt. Không chạy lại web, ConPTY, dump/restore hoặc toàn inventory.
+
+Đã kiểm `0037` không đổi; `0038` giữ owner/EXECUTE ACL, bổ sung SELECT registration cho definer và guard registration/confirmed genesis/binding NULL-safe; file gate và transaction/batch vẫn giữ. PostgreSQL/runtime/journal thử riêng, explicit admin URL và HTTPTransport bị chặn; không `.env`, stack dev hoặc provider. Evidence `review-p2.xml` và `boundary-p2.xml` ở thư mục review ngoài repo đã nêu dưới đây. Đã kiểm label `ras.review=pr36-p2-20261004`, dọn container P2 và xóa credentials dùng một lần.
+
+**Lịch sử review lần đầu:** ngày 2026-10-04, source `64cf34223e71a47ae6276cc627b01a0eaa963b8e` (code `51f5714`, migration `0037`), base main `1d3e558`; khi đó chưa đề nghị merge vì P2 đã tái hiện ở boundary SQL. Không có kết luận rằng HTTP production đang mở hoặc có đường tấn công HTTP mới.
 
 ## P2: routine tạo Admin không kiểm installation mode
 
@@ -21,7 +29,7 @@ Tái hiện trên PostgreSQL pgvector 16 mới, journal hợp lệ và runtime L
 
 ## Prompt sửa cho coding agent PR #36
 
-Giữ PR #36 mở, sửa đúng lỗi này rồi báo lại; chưa chuyển C2c-2, không mở pending hoặc tác động dev.
+Prompt sau đã được giao cho bản `0037`; giữ làm lịch sử yêu cầu sửa. Kết luận hiện hành ở đầu tài liệu. Khi giao: giữ PR #36 mở, sửa đúng lỗi này rồi báo lại; chưa chuyển C2c-2, không mở pending hoặc tác động dev.
 
 - Bổ sung guard DB sau bootstrap advisory lock: installation phải có registration và genesis mirror hợp lệ, khớp binding journal hiện hành và mode **new_install**. Từ chối mode khác, thiếu hoặc NULL/sai binding theo cách NULL-safe. Giữ các guard không User/singleton/receipt/head/business history đã có. Chọn SQL cụ thể theo schema thực tế; không suy cài mới chỉ từ DB trống hoặc chỉ từ một trường mode caller cung cấp.
 - Giữ guard file độc lập của writer ở entry và dưới journal lock cuối. Guard SQL bổ sung không chứng minh file journal độc lập đang mới nhất, không thay integrity gate hoặc kiểm file.

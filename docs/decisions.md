@@ -1,5 +1,19 @@
 # Nhật ký quyết định
 
+## Giao C2c-2 sau merge PR #36 (2026-10-04)
+
+**Nguồn và trạng thái:** chủ dự án báo PR #36 đã merge và yêu cầu prompt tiếp theo. Fetch xác minh `origin/main` tại `d1b53e653197af0d11f79cbdda0df514cb0af69a`, chứa `d222fb1`/`48137e4`; tree commit trùng nhánh C2c-1, head source `0038`. Không truy vấn revision DB dev. Giữ ba docs review chưa commit (`decisions`, `testing`, review PR #36), bổ sung bàn giao để coding agent đưa vào PR tiếp; không coi phần chưa commit đã có trong merge #36. Reviewer 126 pass + ca tái hiện 1 pass và coding agent 626 pass là các lượt riêng, không cộng thành full suite.
+
+**Orchestrator chốt theo ủy quyền, trong phạm vi C2c-2:** chuyển create/reinvite/list/inspect/accept/revoke invitation qua runtime/routine; accept User mới role user, initial credential/status `invitation_accept` và accepted closure trong một batch. Admin invitation kiểm actor/session/role/CSRF bằng clock mới trước commit/delivery/response; list/inspect có kiểm cuối. Chuyển grants/recovery tương ứng, không raw protected write hoặc dùng bootstrap prepare cho invitation. Băm mật khẩu và adapter I/O ngoài transaction giữ khóa. [Prompt triển khai và tiêu chí](tasks/m6c2b2c2c2-invitation-lifecycle.md).
+
+**Bù delivery:** tách quyền Admin revoke khỏi bù hệ thống chỉ đóng đúng invitation của lượt phát link có known commit, bằng context nội bộ có binding; không expose flag/reason bypass qua API. Actor mất quyền không bỏ việc bù link còn mở; accept/closure khác thắng phải giữ account/quyết định. Kiểm lại trước adapter và response, nhưng không giữ khóa qua adapter: message gửi trước khi phát hiện thay đổi quyền không thể lấy lại; lỗi delivery không chứng minh chưa gửi. Đây là lựa chọn orchestrator giao theo ủy quyền, không là quyết định trực tiếp của chủ dự án về kênh email production.
+
+**Giới hạn/phụ thuộc:** C2d final callers, C3 operator/delivery/status recovery, C4 cutover và storage journal production vẫn riêng. Safety pending tới C4, chỉ kiểm cô lập; không `.env`, dev hoặc provider. Không mở readiness để né Compose unhealthy. Prefix auth intent thiếu invitation closure không chứng minh link đã đóng; replay chỉ hạn chế theo dòng hoàn chỉnh, không dựng account/receipt/verifier/active. PR tiếp phải kiểm binding/race/fault/restore và báo inventory thật, chưa có kết quả kiểm C2c-2 ở lượt giao docs này.
+
+## Review lại P2 PR #36 (2026-10-04)
+
+Review source `48137e4` (code `d222fb1`, head `0038`) xác nhận SQL prepare từ chối registration/genesis không phải new-install trước INSERT. Nhóm installation/bootstrap/migration/ORM độc lập **126 pass**; ca tái hiện reviewer trước đó **1 pass**, bị đúng guard SQL từ chối. `0037` không đổi, guard journal độc lập và pending giữ nguyên. Reviewer không thấy thêm điểm chặn merge trong C2c-1 và đề nghị có thể merge; đây không phải thao tác merge hoặc quyết định mở cutover. [Kết luận, source và giới hạn](reviews/pr36-c2c1-bootstrap.md). Không cộng lượt này với 626 của coding agent; không chạy web/ConPTY/dump-restore hoặc full inventory.
+
 ## Sửa P2 installation boundary PR #36 (2026-10-04)
 
 **Nguồn:** chủ dự án giao sửa theo [prompt review PR #36](reviews/pr36-c2c1-bootstrap.md). Chọn revision mới `0038`, giữ `0037` vì chưa có chứng cứ mọi DB áp revision đều là disposable. SQL creation buộc registration và confirmed genesis mirror cùng `new_install`, khớp UUID/hash/envelope binding, NULL-safe, sau bootstrap advisory và trước INSERT. `CREATE OR REPLACE` giữ owner/EXECUTE ACL; thêm SELECT registration tối thiểu cho definer. Upgrade không đổi dữ liệu/journal, downgrade có history bị chặn; pristine downgrade giữ read grant tối thiểu. Không đổi guard file độc lập/transaction/batch/lock order/pending hoặc chuyển invitation. Đây là sửa của coding agent trong phạm vi được giao, chưa là phê duyệt merge/cutover của chủ dự án. Lịch sử review dưới đây giữ nguyên source và số đo.

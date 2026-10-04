@@ -2,7 +2,7 @@
 
 [Mục lục](README.md) · [Task](tasks/m6c2b2c2c1-bootstrap-initial-receipts.md) · [C2b](c2b-reset-status.md) · [Inventory](c2c1-test-inventory.json)
 
-**Nhánh review PR #36, chưa merge; safety pending tới C4.** Fetch xác minh base `1d3e55825901dc81feb892f27a436bbb57b511f2` là merge PR #35 và chứa `f2ba336`. Head source `0036` → `0037` → `0038` (sửa P2 SQL installation); không suy revision DB dev. Giữ các docs bàn giao chưa commit của orchestrator trong PR. Chỉ thử PostgreSQL pgvector 16/journal tổng hợp cô lập, Conda `ras`; không đọc/sửa `.env`, dùng dữ liệu hay tác động stack dev, gọi provider hoặc đổi pricing.
+**PR #36 đã merge tại `d1b53e653197af0d11f79cbdda0df514cb0af69a`; safety pending tới C4.** Base triển khai `1d3e55825901dc81feb892f27a436bbb57b511f2` là merge PR #35, chứa `f2ba336`. Head source `0036` → `0037` → `0038` (sửa P2 SQL installation); không suy revision DB dev. Task tiếp theo: [C2c-2 invitation lifecycle](tasks/m6c2b2c2c2-invitation-lifecycle.md). Ghi chú review độc lập chưa commit được giữ để đưa vào PR tiếp theo; không coi chúng đã nằm trong merge #36. Chỉ thử PostgreSQL pgvector 16/journal tổng hợp cô lập, Conda `ras`; không đọc/sửa `.env`, dùng dữ liệu hay tác động stack dev, gọi provider hoặc đổi pricing.
 
 ## Sửa P2 installation tại SQL creation
 
@@ -16,7 +16,7 @@ Sau bootstrap advisory và trước mọi INSERT, SQL prepare buộc có registr
 
 Test mới gọi prepare **trực tiếp bằng runtime LOGIN**, không wrapper/history gate Python: existing registration/recover thật; fixture migrator riêng tạo missing/null/mismatch và các mode không hợp lệ; kiểm nguyên rows/mirrors/audit và journal bytes sau refusal. Đối chứng new-install trực tiếp tạo cặp receipt thật rồi login. Kiểm populated/provisioned `0037` cả cặp receipt thật và existing registration, quyền đọc definer thiếu trước upgrade, cùng pristine round-trip và history downgrade fence. Kết quả lượt P2 tách khỏi số `0037` ở phần lịch sử dưới.
 
-**P2 tại code `d222fb1`: 626/626 API pass**, 0 failure/error/skip, 3 warning hiện có, **834,11 s**; **202** file API giữ SHA-256 trong suite cuối. Gồm C2c-1/bootstrap 125 + nền 477 + schema 24; collect **1402**, **776 not-run**. Bỏ riêng guard SQL mới → **1 expected failure / 0 errors**, khôi phục bytes trước suite cuối. Compileall/diff check pass; [inventory P2 theo source/node](c2c1-p2-test-inventory.json), [lệnh thực chạy](dev-setup.md#sửa-p2-installation-pr-36-cô-lập). Đã dọn project/volume/credentials thử sau kiểm ownership, giữ evidence ngoài repo. Không chạy lại web, ConPTY hay dump/restore drill trong P2; các số `0037` dưới đây là lịch sử. PR vẫn chưa merge, cần người review lại; safety pending tới C4.
+**P2 tại code `d222fb1`: 626/626 API pass**, 0 failure/error/skip, 3 warning hiện có, **834,11 s**; **202** file API giữ SHA-256 trong suite cuối. Gồm C2c-1/bootstrap 125 + nền 477 + schema 24; collect **1402**, **776 not-run**. Bỏ riêng guard SQL mới → **1 expected failure / 0 errors**, khôi phục bytes trước suite cuối. Compileall/diff check pass; [inventory P2 theo source/node](c2c1-p2-test-inventory.json), [lệnh thực chạy](dev-setup.md#sửa-p2-installation-pr-36-cô-lập). Đã dọn project/volume/credentials thử sau kiểm ownership, giữ evidence ngoài repo. Không chạy lại web, ConPTY hay dump/restore drill trong P2; các số `0037` dưới đây là lịch sử. PR sau đó đã review lại và merge; [kết quả reviewer](reviews/pr36-c2c1-bootstrap.md) tách khỏi số của coding agent; safety pending tới C4.
 
 ## Boundary SQL và schema
 

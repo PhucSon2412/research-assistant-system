@@ -139,6 +139,8 @@ class Invitation(Base):
     closed_by_recovery_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     recovery_end_kind: Mapped[str | None] = mapped_column(Text)
     closure_reason: Mapped[str | None] = mapped_column(Text)
+    creation_transaction_id: Mapped[int | None] = mapped_column(BigInteger)
+    acceptance_transaction_id: Mapped[int | None] = mapped_column(BigInteger)
 
 
 class UserSession(Base):
