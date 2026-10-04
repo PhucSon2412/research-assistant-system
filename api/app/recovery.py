@@ -400,7 +400,8 @@ def record_auth_endings(db: Session, path: Path | None, tokens: list[PasswordRes
         raise RecoveryError("journal_out_of_sync")
     if state is not None and (state.torn is not None or (state.open_recovery is not None and not during_recovery)):
         raise RecoveryError("recovery_in_progress")
-    records, mirrors = [], []
+    records, legacy_mirrors = [], []
+    routines = db.scalar(text("SELECT to_regprocedure('ras_auth_closure_mirror(text,text,text)') IS NOT NULL"))
     if auth_changes:
         if state is None or state.torn is not None:
             raise RecoveryError("auth_journal_unavailable")
@@ -417,13 +418,20 @@ def record_auth_endings(db: Session, path: Path | None, tokens: list[PasswordRes
             else journal.next_record(records[-1], kind, body)
         records.append(record)
         is_session = kind == SESSION_REVOCATION
-        mirrors.append(_mirror(record, "import" if during_recovery else "revoke" if is_session else "close",
-                               "imported" if during_recovery else "session_revoked" if is_session else
-                               "invitation_ended" if kind == INVITATION_CLOSURE else "reset_token_ended",
-                               None, confirmed=False, session_id=row.id if is_session else None,
-                               session_user_id=row.user_id if is_session else None))
-    db.add_all(mirrors)
+        via = "import" if during_recovery else "revoke" if is_session else "close"
+        result = "imported" if during_recovery else "session_revoked" if is_session else "invitation_ended" if kind == INVITATION_CLOSURE else "reset_token_ended"
+        if routines:
+            db.execute(text("SELECT ras_auth_closure_mirror(:line,:via,:result)"),
+                       {"line": record.line, "via": via, "result": result})
+        else:
+            # Pre-0035 recovery/migration compatibility only. Runtime has no raw grant.
+            mirror = _mirror(record, via, result, None, confirmed=False,
+                             session_id=row.id if is_session else None, session_user_id=row.user_id if is_session else None)
+            legacy_mirrors.append(mirror)
+            db.add(mirror)
     db.flush()  # CHECK and target trigger run BEFORE any byte is appended.
+    db.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
+    db.execute(text("SET CONSTRAINTS ALL DEFERRED"))
     written = False
     if state is not None:
         try:
@@ -433,10 +441,10 @@ def record_auth_endings(db: Session, path: Path | None, tokens: list[PasswordRes
             pass
     if written:
         for record in records:
-            if record.kind in journal.AUTH_KINDS:
+            if routines or record.kind in journal.AUTH_KINDS:
                 db.execute(text("SELECT ras_auth_confirm(:seq)"), {"seq": record.seq})
-        for row in mirrors:
-            row.journal_confirmed = True
+        for mirror in legacy_mirrors:
+            mirror.journal_confirmed = True
         db.flush()
     return [Journaled(record, written) for record in records]
 
@@ -610,8 +618,12 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
                               .with_for_update().execution_options(populate_existing=True))
     if record.kind == SESSION_REVOCATION:
         db.execute(text("SELECT ras_auth_lock_users(:ids)"), {"ids": [uuid.UUID(record.body["user_id"])]})
-        session_row = db.scalar(select(UserSession).where(UserSession.id == uuid.UUID(record.body["session_id"]))
-                                .with_for_update().execution_options(populate_existing=True))
+        routines = db.scalar(text("SELECT to_regprocedure('ras_auth_session_lock(uuid,uuid[])') IS NOT NULL"))
+        if routines:
+            db.execute(text("SELECT ras_auth_session_lock(:uid,:ids)"),
+                       {"uid": uuid.UUID(record.body["user_id"]), "ids": [uuid.UUID(record.body["session_id"])]})
+        stmt = select(UserSession).where(UserSession.id == uuid.UUID(record.body["session_id"]))
+        session_row = db.scalar((stmt if routines else stmt.with_for_update()).execution_options(populate_existing=True))
         if session_row is not None and str(session_row.user_id) != record.body["user_id"]:
             raise RecoveryError("record_names_another_session_user")
     if record.kind == REVIEW_CLOSURE:
@@ -633,6 +645,9 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
             _apply_invitation_closure(invitation_row, record.body, apply=False)
         if record.kind == RESET_TOKEN_CLOSURE:
             _apply_reset_token_closure(token_row, record.body, apply=False)
+        if record.kind == SESSION_REVOCATION and session_row is not None:
+            if (session_row.revoked_at,session_row.revoked_reason) != (datetime.fromisoformat(record.body["revoked_at"]),record.body["reason_code"]):
+                raise RecoveryError("session_revocation_conflict")
         if record.kind in journal.AUTH_KINDS:
             db.execute(text("SELECT ras_auth_project(:uid)"), {"uid": uuid.UUID(record.body["user_id"])})
             db.commit()
@@ -657,7 +672,11 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
         if session_row is not None:
             stamp = datetime.fromisoformat(record.body["revoked_at"])
             if session_row.revoked_at is None:
-                session_row.revoked_at, session_row.revoked_reason = stamp, record.body["reason_code"]
+                if routines:
+                    db.execute(text("SELECT ras_auth_session_close(:id,:uid,:at,:reason)"), {
+                        "id": session_row.id, "uid": session_row.user_id, "at": stamp, "reason": record.body["reason_code"]})
+                else:
+                    session_row.revoked_at, session_row.revoked_reason = stamp, record.body["reason_code"]
                 result = "session_revoked"
             elif (session_row.revoked_at, session_row.revoked_reason) != (stamp, record.body["reason_code"]):
                 raise RecoveryError("session_revocation_conflict")
@@ -665,9 +684,13 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
                 result = "session_already_revoked"
     else:
         result = record.kind
-    db.add(_mirror(record, via, result, tombstone_id, confirmed=True, review_request_id=request_id,
-                   session_id=uuid.UUID(record.body["session_id"]) if record.kind == SESSION_REVOCATION else None,
-                   session_user_id=uuid.UUID(record.body["user_id"]) if record.kind == SESSION_REVOCATION else None))
+    if record.kind == SESSION_REVOCATION and routines:
+        db.execute(text("SELECT ras_auth_closure_mirror(:line,:via,:result)"), {"line": record.line,"via":via,"result":result})
+        db.execute(text("SELECT ras_auth_confirm(:seq)"), {"seq": record.seq})
+    else:
+        db.add(_mirror(record, via, result, tombstone_id, confirmed=True, review_request_id=request_id,
+                       session_id=uuid.UUID(record.body["session_id"]) if record.kind == SESSION_REVOCATION else None,
+                       session_user_id=uuid.UUID(record.body["user_id"]) if record.kind == SESSION_REVOCATION else None))
     db.flush()
     if record.kind in journal.AUTH_KINDS:
         db.execute(text("SELECT ras_auth_project(:uid)"), {"uid": uuid.UUID(record.body["user_id"])})

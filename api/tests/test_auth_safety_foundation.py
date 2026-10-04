@@ -646,8 +646,8 @@ def test_0034_upgrade_preserves_auth_history_roles_and_pending(empty_db_url, jou
         with owner.connect() as conn:
             before = [conn.execute(text(q)).all() for q in snapshot_queries]
         journal_before = journal_path.read_bytes()
-        upgrade(empty_db_url)
-        upgrade(empty_db_url)
+        upgrade(empty_db_url, "0034")
+        upgrade(empty_db_url, "0034")
         with owner.connect() as conn:
             assert [conn.execute(text(q)).all() for q in snapshot_queries] == before
             assert conn.scalar(text("SELECT version_num FROM alembic_version")) == "0034"

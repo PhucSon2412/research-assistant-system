@@ -28,6 +28,49 @@ def require_writer(db: Session) -> None:
         raise ApiError(503, "service_recovering")
 
 
+def require_final(db: Session, *, writer: bool = False, pending_endings=()) -> None:
+    """Final gate on this transaction, AFTER all row locks; never a second connection.
+
+    The shared journal lock is retained until commit/rollback. No User lock may
+    follow it. Read committed observes hold/journal changes that won while waiting.
+    """
+    from app.api.errors import ApiError
+    from app.config import get_settings
+    from app import recovery
+    try:
+        db.execute(text(f"SET LOCAL lock_timeout = {int(get_settings().recovery.gate_lock_timeout_ms)}"))
+        lock = "pg_advisory_xact_lock" if writer else "pg_advisory_xact_lock_shared"
+        db.execute(text(f"SELECT {lock}(:key)"), {"key": recovery.JOURNAL_LOCK})
+        state = journal.read(get_settings().recovery.journal_path)
+        view = list(recovery._db_view(db))
+        # Only this transaction's queued closures are awaiting their mirror. The
+        # binding/closure constraints are forced BEFORE append in record_auth_endings.
+        # Other unjournaled rows, unconfirmed records, holds and file changes remain fatal.
+        from app.models import UserSession, PasswordResetToken, Invitation
+        from sqlalchemy import func
+        for rows in pending_endings:
+            if not rows:
+                continue
+            kind = type(rows[0])
+            slot, column = {UserSession: (7, RevocationJournalRecord.session_id),
+                            PasswordResetToken: (8, RevocationJournalRecord.reset_token_id),
+                            Invitation: (9, RevocationJournalRecord.invitation_id)}[kind]
+            ids = {row.id for row in rows}
+            waiting = db.scalar(select(func.count()).select_from(kind).where(kind.id.in_(ids),
+                ~select(RevocationJournalRecord.seq).where(column == kind.id).exists()))
+            view[slot] -= waiting
+        if not recovery.compare(state, tuple(view)).open or cutover(db) != "ready":
+            raise ApiError(503, "service_recovering")
+    except ApiError:
+        raise
+    except Exception:
+        raise ApiError(503, "service_recovering") from None
+
+
+def account_live(db: Session, user_id: uuid.UUID) -> bool:
+    return bool(db.scalar(text("SELECT ras_auth_account_live(:uid)"), {"uid": user_id}))
+
+
 @dataclass(frozen=True)
 class Change:
     user_id: uuid.UUID

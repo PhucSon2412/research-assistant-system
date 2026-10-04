@@ -9,6 +9,20 @@ import {
 const COOKIE = "ras_session=synthetic-session; ras_csrf=synthetic-csrf";
 const ORIGIN = "http://127.0.0.1:3000";
 
+test("proxy preserves real Origin and never synthesises missing Origin", async () => {
+  const api = await upstream(echo);
+  const config = loadProxyConfig({ API_INTERNAL_URL: api.base });
+  try {
+    for (const origin of [undefined, "null", "https://evil.test", ORIGIN]) {
+      const headers = { cookie: COOKIE, "x-csrf-token": "synthetic-csrf", referer: `${ORIGIN}/login` };
+      if (origin !== undefined) headers.origin = origin;
+      await proxyRequest(new Request(`${ORIGIN}/api/auth/login`, { method: "POST", headers, body: "{}" }), ["auth", "login"], config);
+      assert.equal(api.seen.at(-1).headers.origin, origin);
+      assert.equal(api.seen.at(-1).headers.referer, undefined);
+    }
+  } finally { await api.close(); }
+});
+
 async function upstream(handler) {
   const seen = [];
   const server = createServer((req, res) => {

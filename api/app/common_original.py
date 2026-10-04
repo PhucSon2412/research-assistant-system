@@ -226,7 +226,7 @@ def prepare_common_original(db: Session, principal: Principal, storage: Original
                           ApiError(409, "common_file_integrity_failed"))
         # Last check before the first byte, under the lock publish/revoke take first.
         db.execute(select(LibraryItem.id).where(LibraryItem.id == target.item_id).with_for_update(read=True))
-        if not session_is_live(db, principal.session_id, now=clock(), idle=settings.auth.session_idle):
+        if not session_is_live(db, principal.session_id, now=clock(), idle=settings.auth.session_idle, clock=clock):
             db.rollback()
             raise ApiError(401, "session_expired", clear_session=True)
         again = db.execute(common_original_rows(principal).where(SourceFile.id == target.file_id)).first()

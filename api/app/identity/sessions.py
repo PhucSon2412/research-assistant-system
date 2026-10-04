@@ -1,35 +1,29 @@
-"""Session management: issue, resolve (validate + touch), revoke.
-
-Separate from authentication (``login.py`` checks who you are) and from
-authorisation (``app/authz.py`` decides what you may see). Every API request
-resolves its session here; nothing is trusted from the web tier.
-"""
-
+"""Runtime session routines; generation/receipt/head auth is shared with login."""
 from __future__ import annotations
-
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-
-from sqlalchemy import select, update
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
-
-from app.config import AuthLifetimes
+from app.clock import utcnow
+from app.config import AuthLifetimes, get_settings
 from app.identity.tokens import generate_token, hash_token, plausible_token
 from app.identity.session_commit import PENDING
+from app.identity.predicates import lock_users, live_clause, session_live
+from app.auth_safety import require_writer, require_final, account_live
+from app.api.errors import ApiError
 from app.models import User, UserSession
-from app.models.enums import SessionRevokeReason, UserStatus
+from app.models.enums import SessionRevokeReason
 
 
 @dataclass(frozen=True)
 class IssuedSession:
     session_id: uuid.UUID
-    # Raw values go to the browser cookies only; never log or store them.
     token: str
     csrf_token: str
     absolute_expires_at: datetime
 
-    def __repr__(self) -> str:  # keep raw tokens out of accidental logging
+    def __repr__(self):
         return f"IssuedSession(session_id={self.session_id})"
 
 
@@ -45,154 +39,93 @@ class SessionContext:
     idle_expires_at: datetime
 
 
-def issue_session(db: Session, *, user_id: uuid.UUID, now: datetime, lifetimes: AuthLifetimes) -> IssuedSession:
-    """Add a session row to the caller's transaction (caller commits)."""
-    from app.auth_safety import require_writer
+def issue_session(db: Session, *, user_id, now, lifetimes: AuthLifetimes) -> IssuedSession:
+    # Caller entry checks integrity before locks, then commits through commit_auth.
     require_writer(db)
-    # key_share=True means FOR NO KEY UPDATE on PostgreSQL: serialises auth,
-    # but remains compatible with audit/token FKs' KEY SHARE. Sort multiple users first.
-    db.scalar(select(User.id).where(User.id == user_id).with_for_update(key_share=True))
+    lock_users(db, [user_id])
+    if not account_live(db, user_id):
+        raise ApiError(401, "session_expired")
+    generation = db.scalar(select(User.credential_generation).where(User.id == user_id))
     token, token_hash = generate_token()
-    csrf_token, csrf_hash = generate_token()
-    row = UserSession(
-        user_id=user_id,
-        token_hash=token_hash,
-        csrf_token_hash=csrf_hash,
-        created_at=now,
-        last_activity_at=now,
-        absolute_expires_at=now + lifetimes.session_absolute,
-    )
-    db.add(row)
-    db.flush()
-    return IssuedSession(
-        session_id=row.id, token=token, csrf_token=csrf_token, absolute_expires_at=row.absolute_expires_at
-    )
+    csrf, csrf_hash = generate_token()
+    sid = uuid.uuid4()
+    expires = now + lifetimes.session_absolute
+    db.execute(text("SELECT ras_auth_session_create(:id,:uid,:gen,:token,:csrf,:at,:expires)"),
+               {"id": sid, "uid": user_id, "gen": generation, "token": token_hash,
+                "csrf": csrf_hash, "at": now, "expires": expires})
+    return IssuedSession(sid, token, csrf, expires)
 
 
-def resolve_session(db: Session, raw_token: str | None, *, now: datetime, idle: timedelta) -> SessionContext | None:
-    """Validate the session and record activity in one atomic statement.
-
-    Valid iff not revoked, user active, ``now < last_activity_at + idle`` and
-    ``now < absolute_expires_at``. Exactly at a boundary the session is
-    expired. Caller commits.
-    """
-    from app.auth_safety import require_writer
+def resolve_session(db: Session, raw_token, *, now, idle: timedelta, clock=utcnow) -> SessionContext | None:
     require_writer(db)
     if not plausible_token(raw_token):
         return None
-    stmt = (
-        update(UserSession)
-        .where(
-            UserSession.token_hash == hash_token(raw_token),  # type: ignore[arg-type]
-            UserSession.revoked_at.is_(None),
-            UserSession.absolute_expires_at > now,
-            UserSession.last_activity_at > now - idle,
-            UserSession.user_id == User.id,
-            User.status == UserStatus.ACTIVE.value,
-        )
-        .values(last_activity_at=now)
-        .returning(
-            UserSession.id,
-            UserSession.user_id,
-            UserSession.csrf_token_hash,
-            UserSession.absolute_expires_at,
-            User.role,
-            User.email,
-            User.display_name,
-        )
-        .execution_options(synchronize_session=False)
-    )
-    row = db.execute(stmt).one_or_none()
+    row = db.scalar(select(UserSession).where(UserSession.token_hash == hash_token(raw_token)))
     if row is None:
         return None
-    return SessionContext(
-        session_id=row.id,
-        user_id=row.user_id,
-        role=row.role,
-        email=row.email,
-        display_name=row.display_name,
-        csrf_token_hash=row.csrf_token_hash,
-        absolute_expires_at=row.absolute_expires_at,
-        idle_expires_at=min(now + idle, row.absolute_expires_at),
-    )
+    lock_users(db, [row.user_id])
+    at = clock()
+    if not db.scalar(text("SELECT ras_auth_session_activity(:id,:uid,:at,:idle,NULL)"),
+                     {"id": row.id, "uid": row.user_id, "at": at, "idle": idle}):
+        return None
+    require_final(db)
+    at = clock()
+    if not session_live(db, row.id, at, idle):
+        return None
+    db.refresh(row)
+    user = db.get(User, row.user_id, populate_existing=True)
+    return SessionContext(row.id, row.user_id, user.role, user.email, user.display_name,
+                          row.csrf_token_hash, row.absolute_expires_at,
+                          min(row.last_activity_at + idle, row.absolute_expires_at))
 
 
-def session_is_live(db: Session, session_id: uuid.UUID, *, now: datetime, idle: timedelta) -> bool:
-    """Re-check an already resolved session without touching it (same validity rule).
-
-    Used before serving bytes that were prepared after the request's first
-    check, so a logout, revocation or deactivation committed meanwhile wins.
-    """
-    return db.scalar(
-        select(UserSession.id).join(User, User.id == UserSession.user_id).where(
-            UserSession.id == session_id,
-            UserSession.revoked_at.is_(None),
-            UserSession.absolute_expires_at > now,
-            UserSession.last_activity_at > now - idle,
-            User.status == UserStatus.ACTIVE.value,
-        )
-    ) is not None
+def session_is_live(db, session_id, *, now, idle, clock=None) -> bool:
+    # Item locks may already be held: final READ takes no User/session row locks.
+    require_final(db)
+    return session_live(db, session_id, clock() if clock else now, idle)
 
 
-def rotate_csrf(db: Session, session_id: uuid.UUID) -> str:
-    """New CSRF token for a live session whose CSRF cookie was lost."""
-    from app.auth_safety import require_writer
+def rotate_csrf(db, session_id, *, user_id=None, clock=utcnow, idle=None) -> str:
+    if db.info.get("auth_lock_transaction") is not db.get_transaction() or not db.info.get("auth_locked_users"):
+        require_writer(db)
+    row = db.get(UserSession, session_id, populate_existing=True)
+    if row is None or (user_id is not None and row.user_id != user_id):
+        raise ApiError(401, "session_expired")
+    lock_users(db, [row.user_id])
+    csrf, digest = generate_token()
+    if not db.scalar(text("SELECT ras_auth_session_activity(:id,:uid,:at,:idle,:csrf)"),
+                     {"id": session_id, "uid": row.user_id, "at": clock(),
+                      "idle": idle or get_settings().auth.session_idle, "csrf": digest}):
+        raise ApiError(401, "session_expired")
+    require_final(db)
+    if not session_live(db, session_id, clock(), idle or get_settings().auth.session_idle):
+        raise ApiError(401, "session_expired")
+    return csrf
+
+
+def revoke_session(db, *, session_id, user_id, reason: SessionRevokeReason, now) -> bool:
     require_writer(db)
-    csrf_token, csrf_hash = generate_token()
-    db.execute(
-        update(UserSession)
-        .where(UserSession.id == session_id)
-        .values(csrf_token_hash=csrf_hash)
-        .execution_options(synchronize_session=False)
-    )
-    return csrf_token
-
-
-def revoke_session(
-    db: Session, *, session_id: uuid.UUID, user_id: uuid.UUID, reason: SessionRevokeReason, now: datetime
-) -> bool:
-    """Revoke one of ``user_id``'s own sessions. False if not theirs/not live."""
-    db.scalar(select(User.id).where(User.id == user_id).with_for_update(key_share=True))
-    row = db.scalar(select(UserSession).where(UserSession.id == session_id, UserSession.user_id == user_id,
-                    UserSession.revoked_at.is_(None)).with_for_update().execution_options(populate_existing=True))
-    if row is None:
+    lock_users(db, [user_id])
+    if not db.scalar(text("SELECT ras_auth_session_close(:id,:uid,:at,:reason)"),
+                     {"id": session_id, "uid": user_id, "at": now, "reason": reason.value}):
         return False
-    row.revoked_at, row.revoked_reason = now, reason.value
+    row = db.get(UserSession, session_id, populate_existing=True)
     db.info.setdefault(PENDING, []).append(row)
     return True
 
 
-def revoke_user_sessions(
-    db: Session,
-    *,
-    user_id: uuid.UUID,
-    reason: SessionRevokeReason,
-    now: datetime,
-    keep_session_id: uuid.UUID | None = None,
-) -> int:
-    db.scalar(select(User.id).where(User.id == user_id).with_for_update(key_share=True))
-    stmt = select(UserSession).where(UserSession.user_id == user_id, UserSession.revoked_at.is_(None))
+def revoke_user_sessions(db, *, user_id, reason, now, keep_session_id=None) -> int:
+    require_writer(db)
+    lock_users(db, [user_id])
+    stmt = select(UserSession.id).where(UserSession.user_id == user_id, UserSession.revoked_at.is_(None))
     if keep_session_id is not None:
         stmt = stmt.where(UserSession.id != keep_session_id)
-    rows = list(db.scalars(stmt.order_by(UserSession.id).with_for_update().execution_options(populate_existing=True)))
-    for row in rows:
-        row.revoked_at, row.revoked_reason = now, reason.value
-    db.info.setdefault(PENDING, []).extend(rows)
-    return len(rows)
+    ids = list(db.scalars(stmt.order_by(UserSession.id)))
+    return sum(revoke_session(db, session_id=sid, user_id=user_id, reason=reason, now=now) for sid in ids)
 
 
-def list_live_sessions(
-    db: Session, *, user_id: uuid.UUID, now: datetime, idle: timedelta
-) -> list[UserSession]:
-    return list(
-        db.scalars(
-            select(UserSession)
-            .where(
-                UserSession.user_id == user_id,
-                UserSession.revoked_at.is_(None),
-                UserSession.absolute_expires_at > now,
-                UserSession.last_activity_at > now - idle,
-            )
-            .order_by(UserSession.created_at.desc())
-        )
-    )
+def list_live_sessions(db, *, user_id, now, idle, clock=None) -> list[UserSession]:
+    require_final(db)
+    now = clock() if clock else now
+    return list(db.scalars(select(UserSession).where(UserSession.user_id == user_id, live_clause(now, idle))
+                           .order_by(UserSession.created_at.desc()).execution_options(populate_existing=True)))

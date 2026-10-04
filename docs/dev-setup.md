@@ -1,6 +1,6 @@
-# Môi trường phát triển và schema (M1a–C1)
+# Môi trường phát triển và schema (M1a–C2a)
 
-**Trạng thái hiện hành:** PR #32 đã merge `a5c75b8`; head **mã nguồn** C1 `0034` (nền `0033`, sửa status fence reset token `0034`), [schema/quyền/replay/guard](c1-auth-safety-foundation.md) chỉ được thử cô lập, vẫn pending tới C4. Không truy vấn/nâng DB hoặc restart dev; source không là revision DB dev. [Runbook invitation](#journal-invitation-m6c-2b2b2) và các lệnh milestone cũ dưới đây là chứng cứ lịch sử, không lệnh vận hành C1 trên dev. [C1 auth safety cô lập](#c1-auth-safety-cô-lập) ghi đúng lệnh đã chạy.
+**Trạng thái hiện hành:** PR #32 đã merge `a5c75b8`; C1 head `0034`; [C2a trên nhánh review](c2a-login-session-predicates.md) có head **mã nguồn** `0035`, chưa merge; nền `0033/0034` giữ nguyên, [schema/quyền/replay/guard](c1-auth-safety-foundation.md) chỉ được thử cô lập, vẫn pending tới C4. Không truy vấn/nâng DB hoặc restart dev; source không là revision DB dev. [Runbook invitation](#journal-invitation-m6c-2b2b2) và các lệnh milestone cũ dưới đây là chứng cứ lịch sử, không lệnh vận hành C1/C2a trên dev. [C1 auth safety cô lập](#c1-auth-safety-cô-lập) ghi đúng lệnh đã chạy.
 
 **Vận hành auth restore hoàn chỉnh C2–C4 — chưa triển khai:**
 
@@ -8,7 +8,64 @@
 
 [Mục lục](README.md) · [Mô hình dữ liệu](data-model.md) · [Roadmap](roadmap.md)
 
+## Docker khi auth safety còn pending
+
+Source hiện hành chủ động trả `auth_safety_pending` từ `auth_safety.cutover` khi phiên bản nền hợp lệ. Gate chặn nghiệp vụ tới C4; hoàn tất migration hoặc journal reconciliation không đồng nghĩa hệ thống được phép phục vụ. Không có lệnh `recover` mở safety pending trong C1–C3.
+
+Compose dùng `/readyz` làm healthcheck API và `web.depends_on.api.condition = service_healthy`. Vì vậy, khi pending, `docker compose up -d --build --wait` báo API `unhealthy` và web có thể còn `Created`, dù process API đã khởi động thành công và `/healthz` trả `200`. Worker/beat có thể chạy process nhưng vẫn phải tuân gate. Các hướng dẫn `up --wait` và demo healthy ở milestone trước C1 dưới đây là chứng cứ lịch sử, không cam kết source C1–C3 hiện chạy được nghiệp vụ trên dev.
+
+Chẩn đoán chỉ đọc:
+
+```powershell
+docker compose ps -a
+docker compose logs --tail 20 api migrate recovery-init
+docker compose exec -T api python -m app.cli.recovery status
+```
+
+`status` trả mã thoát khác 0 khi gate đóng; đây cũng là kết quả chẩn đoán. Kiểm `/healthz` và `/readyz` riêng. Nếu reason khác `auth_safety_pending` (ví dụ journal không khớp hoặc DB chưa migrate), điều tra lỗi đó theo runbook tương ứng; không quy mọi lỗi `unhealthy` cho pending.
+
+**Chứng cứ ngày 2026-10-04:** sau khi chủ dự án báo lỗi Docker trên dev, orchestrator chỉ đọc trạng thái/log và gọi health/status: API `running`, startup complete; `/healthz` **200**, `/readyz` **503**; `gate=auth_safety_pending`, journal và DB cùng seq **1**, không unconfirmed/unjournaled records hay recovery đang mở. `migrate` và `recovery-init` thoát **0**, init bỏ qua DB đã đăng ký; web còn `Created`. Không đọc/sửa `.env`, sửa DB/journal, restart hoặc mở gate. Chứng cứ này không xác nhận revision DB dev hay độ an toàn production.
+
+Không cần tăng timeout hoặc đổi healthcheck để làm trạng thái này xanh: readiness vẫn phải báo chưa sẵn sàng khi safety pending. Không downgrade/xóa volume để tránh gate. Tiếp tục thử C2/C3 trong môi trường cô lập; chỉ mở phục vụ ở C4 sau khi writer/caller, recovery và cutover đã được kiểm chứng.
+
+## C2a login/session cô lập
+
+Ngày 2026-10-04, base sau fetch `c98bd33` chứa `c647d6e`, source head `0034` → `0035`, giữ nguyên migration đã merge. Container PostgreSQL riêng `ras-c2a-test-20261004`, label `ras.task=c2a-20261004`, port `127.0.0.1:58435`; runtime/recovery LOGIN khác nhau, definer NOLOGIN. Journal/credentials/runner/XML/log tổng hợp ở `C:\Users\ADMIN\AppData\Local\Temp\ras-c2a-20261004`, ngoài repo. Conda ras interpreter và pip đã xác minh. Không `.env`, compose dev, object store dev hoặc provider.
+
+Runner host ngoài repo đặt `RAS_TEST_DATABASE_ADMIN_URL`, mật khẩu test roles và key embedding trống **trước pytest**, thêm root/API sys.path, chặn sync/async HTTPTransport. Các commands sau đã thực chạy từ root; runner là evidence của phiên thử, không script vận hành/deploy:
+
+```powershell
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$env:TEMP\ras-c2a-20261004\counterchecks.py"
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$env:TEMP\ras-c2a-20261004\runner.py" api --collect-only -q > "$env:TEMP\ras-c2a-20261004\collect.log"
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$env:TEMP\ras-c2a-20261004\runner.py" api/tests/test_c2a_login_sessions.py api/tests/test_c2a_migration.py api/tests/test_c2a_origin.py api/tests/test_auth_safety_foundation.py api/tests/test_migrations.py api/tests/test_config.py -q --tb=short --maxfail=4 --junitxml="$env:TEMP\ras-c2a-20261004\final.xml"
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$env:TEMP\ras-c2a-20261004\runner.py" api/tests/test_c2a_login_sessions.py -q --tb=short --maxfail=4 --junitxml="$env:TEMP\ras-c2a-20261004\final-session.xml"
+npm test --prefix web
+npm run typecheck --prefix web
+npm run build --prefix web
+```
+
+Lượt đầy đủ đầu **367 passed / 378,62 s**; sau ba đối chứng tuần tự và khôi phục bytes, lượt đầy đủ cuối **367 passed / 379,77 s**, exit 0, không failure/error/skip. **131 C2a + 236 hồi quy thực chạy lại**, gồm ORM/schema. Sau đó chỉ bổ sung import tên enum dùng trong annotation của `sessions.py`, chạy lại nhóm session/login **63/63 / 123,72 s**; không đổi logic predicate/writer. Compileall/diff check xanh. Web **43/43**, typecheck/build thành công. Ba warning API và warning module type web hiện có; không nâng dependency ngoài phạm vi.
+
+Collect **1186** nodes, đối chiếu JUnit **367 unique** pass, còn **819 chưa chạy**; inventory chuẩn hóa prefix rootdir và UUID sinh ngẫu nhiên trong parameter ID, không gộp test khác. [Inventory theo file/node](c2a-test-inventory.json), [lỗi các lượt chuẩn bị/race/giới hạn và bàn giao](c2a-login-session-predicates.md). Runner inventory đầu mismatch prefix `tests/` so với `api/tests/`; sửa harness, không tính lỗi đối chiếu đó là test fail/pass.
+
+Fixture writer chỉ thay boundary cutover; pending production thật giữ nguyên. Chưa Docker smoke API/web/Celery/beat mới, MinIO streaming drill, full business HTTP/proxy/browser hay restore/cutover C4. Fault injection không chứng minh mất điện hoặc journal production độc lập. C2b/C2c/C2d và operator/delivery C3 còn mở. Đã dọn container/volume sở hữu sau kiểm label; năm container dev ghi trước task giữ nguyên ID/image/StartedAt qua đối chiếu chỉ đọc. Evidence ngoài repo được giữ.
+
+### Sửa P2 listing PR #34
+
+Parent `a8cb586`, source vẫn `0035`, pending tới C4. Container PostgreSQL riêng `ras-c2a-p2-test-20261004` có label `ras.task=c2a-p2-20261004`, port `127.0.0.1:58436`; fixture provision runtime/recovery LOGIN và NOLOGIN definer thật. Conda ras Python 3.12.14/pip 26.2.1 đã xác minh. Runner ngoài repo như lượt trước, test URL tường minh và HTTP transports bị chặn, không `.env`/dev/provider. Lệnh đã chạy:
+
+```powershell
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$env:TEMP\ras-c2a-p2-20261004\runner.py" api/tests/test_c2a_login_sessions.py -q -k session_listing_rechecks --tb=short --junitxml="$env:TEMP\ras-c2a-p2-20261004\before.xml"
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$env:TEMP\ras-c2a-p2-20261004\runner.py" api/tests/test_c2a_login_sessions.py -q -k session_listing_rechecks --tb=short --junitxml="$env:TEMP\ras-c2a-p2-20261004\targeted.xml"
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$env:TEMP\ras-c2a-p2-20261004\runner.py" api --collect-only -q > "$env:TEMP\ras-c2a-p2-20261004\collect.log"
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$env:TEMP\ras-c2a-p2-20261004\runner.py" api/tests/test_c2a_login_sessions.py api/tests/test_c2a_migration.py api/tests/test_c2a_origin.py api/tests/test_auth_safety_foundation.py api/tests/test_migrations.py api/tests/test_config.py -q --tb=short --maxfail=4 --junitxml="$env:TEMP\ras-c2a-p2-20261004\final.xml"
+```
+
+Trước sửa **4 failed/1 passed / 11,12 s** đúng lỗi 200 thay vì 401; sau sửa **5 passed / 11,74 s**. Suite cuối **372 passed / 411,31 s**, không failure/error/skip, ba warning API hiện có. **136 C2a + 236 hồi quy thực chạy lại**, ORM/schema xanh. JUnit đối chiếu collect **1191**, **372 unique pass**, **819 chưa chạy**; [inventory](c2a-test-inventory.json) tách rõ lịch sử 367 và web 43 tại `a8cb586`, không chạy lại web trong P2. Code/test không đổi trong suite chính; dependency/migration/grants giữ nguyên. Compileall/diff check xanh. Đã dọn container/volume thử sau kiểm label; container dev ghi trước lượt thử giữ nguyên ID/image/StartedAt. Evidence/journal giữ ngoài repo; C2b/C2c/C2d và C4 integration vẫn mở.
+
 ## C1 auth safety cô lập
+
+Lệnh và số đo phần này là lịch sử C1; kết quả source C2a xem [nhóm C2a](#c2a-login-session-cô-lập).
 
 Sau review P2 PR #33, dùng DB Compose riêng `rasc1reset3136add3`, context/journal/credentials ngoài repo `ras-c1-reset-uxjegtuu`, PostgreSQL 16/pgvector thật. Giữ nguyên `0033`, thêm `0034` vì chưa xác minh đủ DB lâu dài đã áp revision cũ. Không truy vấn/nâng/restart dev hoặc đọc `.env`. Đã chạy các lệnh sau từ root bằng Conda ras; nhóm đầu trên code `0033` trước sửa exit 1 đúng bốn ca lỗi, không tính là suite pass:
 

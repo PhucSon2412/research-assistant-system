@@ -1,5 +1,11 @@
 # Chiến lược kiểm thử
 
+## C2a login/session/predicate
+
+Sau sửa P2 listing PR #34, nhánh review source `0035`, safety pending tới C4. **372/372 pass** trên PostgreSQL/journal/runtime LOGIN thật: C2a **136**, C1 foundation **154**, migrations **28**, config **54**. Năm ca listing mới phủ caller live/revoked/idle/absolute/generation sau dependency thật. Web không đổi; **43/43**, typecheck/build tại `a8cb586` là lịch sử, không chạy lại trong P2. Chỉ fixture scoped thay cutover; chain/hold/receipt/DB guard vẫn thật, HTTP pending riêng không patch. Ba đối chứng tuần tự bắt đúng guard bỏ latest mirror/Origin/raw session grant, khôi phục bytes trước suite chính. [Bằng chứng, lỗi các lượt chuẩn bị, race và giới hạn](c2a-login-session-predicates.md#kiểm-chứng-và-giới-hạn), [inventory file/node](c2a-test-inventory.json), [lệnh thực chạy](dev-setup.md#c2a-login-session-cô-lập).
+
+Collect toàn API **1191 nodes**, nhóm đã chạy **372**, còn **819 chưa chạy** trên source này. Không đổi expectation cũ thành 503/skip; full business API/proxy/browser với cutover thật vẫn thuộc C4, final caller integration thuộc C2d. Số C1/PR #31 trong các phần lịch sử dưới đây không tự là pass mới.
+
 ## C1 auth safety foundation
 
 **Sau review P2 PR #33 (0034): 236 passed, 0 failed/error/skip, 256,21 s**, ba warning hiện có (Starlette/httpx, hai computed defaults Alembic), ORM/schema khớp. Foundation **154** (146 direct + 8 HTTP pending), migrations **28**, config **54**; không code/mutant khi suite chính chạy. PostgreSQL 16/pgvector thật trong project DB riêng `rasc1reset3136add3`, journal/credentials tạm ngoài repo, Conda ras. Không đọc `.env`, truy vấn/migrate/restart dev, gọi provider hoặc đổi pricing. Safety vẫn pending. [Lệnh thực chạy](dev-setup.md#c1-auth-safety-cô-lập).
