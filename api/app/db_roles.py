@@ -71,6 +71,7 @@ def provision(engine, *, runtime: str, recovery: str, definer: str):
         conn.execute(text(f"GRANT INSERT ON auth_change_receipts,auth_safety_heads,sessions,password_reset_tokens,revocation_journal_records TO {df}"))
         conn.execute(text(f"GRANT UPDATE ON users,sessions,password_reset_tokens,auth_safety_heads,auth_safety_state,revocation_journal_records TO {df}"))
         conn.execute(text(f"GRANT SELECT,INSERT ON bootstrap_state TO {df}"))
+        conn.execute(text(f"GRANT SELECT ON recovery_registrations TO {df}"))
         conn.execute(text(f"GRANT INSERT ON users,audit_events TO {df}"))
         conn.execute(text(f"GRANT EXECUTE ON FUNCTION ras_auth_phc_valid(text,integer) TO {df}"))
         # Triggers execute under the caller; SELECT is already granted. Trigger functions don't expose mutation.
