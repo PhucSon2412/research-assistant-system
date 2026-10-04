@@ -1,5 +1,7 @@
 # C2c-1: bootstrap runtime và initial receipt
 
+**Cập nhật bàn giao:** [C2c-2 invitation](c2c2-invitation-runtime.md) đã triển khai trên nhánh review, chưa merge (`0039`, base merge PR #36 `d1b53e6`). Các mô tả caller invitation chưa chuyển dưới đây là lịch sử C2c-1. Bootstrap/guard `0037`–`0038` không đổi; C2d/C3/C4 còn mở, safety pending tới C4.
+
 [Mục lục](README.md) · [Task](tasks/m6c2b2c2c1-bootstrap-initial-receipts.md) · [C2b](c2b-reset-status.md) · [Inventory](c2c1-test-inventory.json)
 
 **PR #36 đã merge tại `d1b53e653197af0d11f79cbdda0df514cb0af69a`; safety pending tới C4.** Base triển khai `1d3e55825901dc81feb892f27a436bbb57b511f2` là merge PR #35, chứa `f2ba336`. Head source `0036` → `0037` → `0038` (sửa P2 SQL installation); không suy revision DB dev. Task tiếp theo: [C2c-2 invitation lifecycle](tasks/m6c2b2c2c2-invitation-lifecycle.md). Ghi chú review độc lập chưa commit được giữ để đưa vào PR tiếp theo; không coi chúng đã nằm trong merge #36. Chỉ thử PostgreSQL pgvector 16/journal tổng hợp cô lập, Conda `ras`; không đọc/sửa `.env`, dùng dữ liệu hay tác động stack dev, gọi provider hoặc đổi pricing.

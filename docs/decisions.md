@@ -1,5 +1,15 @@
 # Nhật ký quyết định
 
+## Triển khai C2c-2 trên nhánh review (2026-10-04)
+
+Theo [phạm vi orchestrator giao](tasks/m6c2b2c2c2-invitation-lifecycle.md), coding agent thêm `0039` trên base PR #36 `d1b53e6` (`0038`), giữ migration đã merge và docs orchestrator. [Hợp đồng/bàn giao](c2c2-invitation-runtime.md) · [Inventory](c2c2-test-inventory.json). Chưa merge; safety pending tới C4. Đây là lựa chọn triển khai trong phạm vi được giao, không ghi chủ dự án trực tiếp chọn routine/marker/SQL.
+
+Invitation protected và routine có allowlist runtime/recovery; SQL prepare riêng tạo User role user với hai initial receipt và accepted closure trong một batch. Marker issuance/acceptance transaction phục vụ binding NULL-safe; deferred pair/audit được ép kiểm trước append. Không tái dùng bootstrap hoặc đổi bảo vệ `0038`. Recovery chỉ áp closure và bỏ đọc marker mới ở snapshot cũ; upgrade không xác minh legacy.
+
+Admin lấy User trước email/invitation; accept không khóa User có sẵn. Backfill sửa thứ tự User → email → token → session → invitation → journal. Actor và TTL được kiểm lại sau append/fsync ngay trước commit trong `commit_auth`; thay đổi chung này áp cả actor C2a/C2b và có hồi quy tương ứng. Hash/delivery không giữ transaction. Bù backend dùng binding của known issuance, không request flag và không cần Admin còn hiệu lực; giữ closure/accepted đã thắng. Lỗi API không chứng minh message chưa được gửi hoặc account chưa commit khi mất reply.
+
+C2d resource final callers, C3 operator/approval/delivery và C4 cutover/storage/full drill còn mở. Không `.env`, dev stack hoặc provider. Số đo C2c-1 và review dưới đây giữ nguyên lịch sử, không cộng vào kiểm chứng C2c-2.
+
 ## Giao C2c-2 sau merge PR #36 (2026-10-04)
 
 **Nguồn và trạng thái:** chủ dự án báo PR #36 đã merge và yêu cầu prompt tiếp theo. Fetch xác minh `origin/main` tại `d1b53e653197af0d11f79cbdda0df514cb0af69a`, chứa `d222fb1`/`48137e4`; tree commit trùng nhánh C2c-1, head source `0038`. Không truy vấn revision DB dev. Giữ ba docs review chưa commit (`decisions`, `testing`, review PR #36), bổ sung bàn giao để coding agent đưa vào PR tiếp; không coi phần chưa commit đã có trong merge #36. Reviewer 126 pass + ca tái hiện 1 pass và coding agent 626 pass là các lượt riêng, không cộng thành full suite.

@@ -1,6 +1,34 @@
 # Môi trường phát triển và schema (M1a–C2c-1)
 
-**C2c-1 đã merge PR #36 `d1b53e6`:** [bootstrap runtime/initial receipt](c2c1-bootstrap-receipts.md), head source `0038`; [lệnh cô lập](#c2c-1-bootstrap-cô-lập) và số đo bên dưới là chứng cứ lịch sử. Giao [C2c-2 invitation lifecycle](tasks/m6c2b2c2c2-invitation-lifecycle.md), chưa triển khai/chưa có lệnh kiểm mới. Safety pending tới C4; không suy revision DB dev hoặc chạy lệnh lịch sử để mở traffic.
+**C2c-2 đang review, chưa merge:** [invitation runtime/initial receipt](c2c2-invitation-runtime.md), source `0039`, base PR #36 `d1b53e6` (`0038`). [Lệnh cô lập](#c2c-2-invitation-cô-lập) · [Inventory](c2c2-test-inventory.json). Safety pending tới C4; không suy revision DB dev hoặc chạy lệnh lịch sử để mở traffic.
+
+## C2c-2 invitation cô lập
+
+Conda ras interpreter/pip đã xác minh, không cài thêm dependency hoặc tạo venv. Chỉ container standalone PostgreSQL pgvector 16 **`ras-c2c2-db-20261004`**, label **`ras.task=c2c2-20261004`**, bind **`127.0.0.1:58442`**; không Compose/project dev, API/web/worker/beat hoặc MinIO. Dữ liệu/journal hoàn toàn tổng hợp. Runtime/recovery LOGIN và definer NOLOGIN thật. Setup kiểm tên chưa tồn tại và port trống; restore test kiểm lại label/port/URL trước `docker exec` vào đúng container thử.
+
+Runner/JUnit/log/source hashes ở `%TEMP%/ras-c2c2-20261004`, ngoài repo. Runner xóa biến `RAS_*` kế thừa rồi đặt admin URL và `RAS_DB__*` explicit bằng SQLAlchemy URL, cùng credentials riêng; prerequisite `c1_migrator` NOLOGIN không membership. Explicit admin URL có trước import fixture nên không fallback `.env`. Chặn external HTTPTransport sync/async. Chỉ fixture scoped thay cutover; routine/receipt/head/integrity/clock/commit đều thật. Runner giữ SHA-256 mọi file Python/SQL trong API trước/sau suite, không sửa source/mutant trong lúc suite chạy.
+
+Lệnh thực chạy từ gốc repo, PowerShell, với runner cô lập đã chuẩn bị ngoài repo (không phải hướng dẫn nối DB dev):
+
+```powershell
+$py = 'C:\Users\ADMIN\.conda\envs\ras\python.exe'
+$c2c2Evidence = Join-Path $env:TEMP 'ras-c2c2-20261004'
+& $py (Join-Path $c2c2Evidence 'runner.py') `
+  api/tests/test_c2c2_invitations.py api/tests/test_c2c2_migration.py api/tests/test_c2c2_restore.py `
+  api/tests/test_invitations.py api/tests/test_c2c1_bootstrap.py api/tests/test_c2c1_installation.py `
+  api/tests/test_c2c1_migration.py api/tests/test_bootstrap.py api/tests/test_auth_safety_foundation.py `
+  api/tests/test_c2a_login_sessions.py api/tests/test_c2a_origin.py api/tests/test_c2a_migration.py `
+  api/tests/test_c2b_reset_status.py api/tests/test_c2b_migration.py api/tests/test_config.py `
+  api/tests/test_migrations.py api/tests/test_schema_constraints.py `
+  -q --junitxml=(Join-Path $c2c2Evidence 'final.xml')
+& $py (Join-Path $c2c2Evidence 'runner.py') api --collect-only -q
+```
+
+Collect đầu thiếu repo root trong `sys.path` của runner (`scripts` không import được): 1554 collected/1 error; sửa runner ngoài repo, lượt sau **1556 collected/0 errors**. Lượt 800 đầu ở `2b69f85` có **795 pass/5 fail**: recovery đọc marker mới trên snapshot `0034`–`0037`. Sửa phần đọc closure, không sửa migration cũ hoặc hạ assertion; nhóm nâng cấp + dump/restore **10/10 pass** tại `b8a0967`. Kết quả suite cuối và node mapping nằm trong inventory; không cộng lượt chọn trùng nhau thành full API.
+
+**Suite cuối tại `b8a0967`: 800/800 pass, 0 fail/error/skip, 3 warning hiện có, 1167,00 s**, ORM/schema xanh. Collect 1556, 756 not-run; JUnit/node/source inventory khớp, **208** file API Python/SQL giữ hash. Compileall, diff check, head `0039` và merged `0033`–`0038` không đổi đều pass. Năm đối chứng tuần tự bỏ grant/pair/final TTL/final actor/compensation đều test fail đúng assertion, không setup error; khôi phục đúng bytes trước suite cuối. Real pg_dump trước accept → hai lần restore vào DB mới với bản sao journal hiện hành riêng → hold/recover hai lần mỗi DB bằng recovery LOGIN; không dựng account/receipt/accepted FK, journal nguồn không đổi.
+
+Cleanup kiểm lại đúng tên/label/port/image/mount của container thử rồi `docker rm -f -v ras-c2c2-db-20261004`; container và volume anonymous đã xóa. Xóa credentials tổng hợp `credentials.json`/`postgres.env` đúng thư mục evidence ngoài repo; giữ scripts/JUnit/log/manifest. Không cleanup dev. Không object-store/full backup artifact/proxy/cutover drill; fault fsync Python không chứng minh độ bền mất điện. Test/drill invitation `0032` vẫn là lịch sử không tương thích actor/binding C2, chưa chạy lại, cần port trước C4. Web không sửa, test/typecheck/build/browser không chạy lại. Safety pending tới C4.
 
 ## Sửa P2 installation PR #36, cô lập
 

@@ -2,7 +2,7 @@
 
 [Mục lục](README.md) · [Quyết định](decisions.md#quyết-định-triển-khai-m6c-2b2b2-2026-10-03) · [Runbook](dev-setup.md#journal-invitation-m6c-2b2b2)
 
-**Bàn giao hiện hành:** PR #36 bootstrap/initial receipt đã merge `d1b53e6`, head source `0038`. [Task C2c-2](tasks/m6c2b2c2c2-invitation-lifecycle.md) chuyển invitation sang runtime/receipt, Admin final checks và bù delivery; chưa triển khai. Lock order và raw writer mô tả dưới đây là lịch sử `0032`, không tự áp cho Admin actor mới. Coding phải đối chiếu C2a/C2b, recovery và task trước khi thay boundary; safety pending tới C4.
+**Bàn giao hiện hành:** [C2c-2](c2c2-invitation-runtime.md) đã triển khai trên nhánh review, chưa merge, source `0039` trên base PR #36 `d1b53e6`. Invitation protected/routines, accept hai initial receipt cùng closure, Admin clock cuối và backend binding cho bù. [Inventory](c2c2-test-inventory.json). Lock order/raw writer, tests/drill `0032` bên dưới là lịch sử; các caller cũ không có actor hoặc dùng `compensation=True` chưa tương thích C2 và không được coi là runbook hiện hành. Safety pending tới C4.
 
 **Yêu cầu của chủ dự án:** bảo vệ link đã nhận/thu hồi trước restore backup cũ, với journal độc lập hiện hành; giữ bảo vệ session/reset của PR #29/#30. PR #30 đã merge tại `ce67ce8`, revision `0031`; PR #31 đã merge tại `3f21794`, thêm `0032`. Đây là hợp đồng/chứng cứ lịch sử invitation. [C1 `0033`](c1-auth-safety-foundation.md), theo nền được ủy quyền sau PR #32, thêm receipt/generation/replay hạn chế và gate pending; accept/reinvite writer đầy đủ thuộc C2, operator/delivery C3. Invitation closure không dựng User hoặc chứng minh credential/status đã commit.
 

@@ -1,8 +1,10 @@
 # Chiến lược kiểm thử
 
-## Bàn giao C2c-2 sau merge PR #36
+## C2c-2 invitation runtime
 
-PR #36 đã merge `d1b53e6`, head source `0038`. [Task C2c-2](tasks/m6c2b2c2c2-invitation-lifecycle.md) giao runtime invitation, initial pair/accepted closure, final actor/clock, delivery compensation và fault/restore. **Chưa triển khai/chưa chạy test C2c-2** ở lượt viết prompt; các số C2c-1 dưới đây là lịch sử theo source, không là baseline full suite của task mới. Kiểm HTTP nghiệp vụ invitation trong fixture C2 với quyền/receipt/gate thật; pending riêng không mock. Full integration/cutover C4 vẫn riêng, không biến expectation nghiệp vụ thành 503 để coi là hồi quy pass.
+C2c-2 đã triển khai trên nhánh review, chưa merge, source `0039` trên base PR #36 `d1b53e6` (`0038`). [Hợp đồng](c2c2-invitation-runtime.md) · [Inventory node/source/JUnit](c2c2-test-inventory.json) · [Lệnh cô lập](dev-setup.md#c2c-2-invitation-cô-lập). Nhóm mới kiểm raw grants/routine SQL/NULL-safe pair/audit/UUID history, login/initial status proof thật, clock sau hash/DB lock wait/append/response, Admin sau dependency, accept/reinvite/bù races, adapter không giữ transaction/lock, fault 6×4 và dump/restore hai lần. Năm đối chứng phát hiện đúng grant/pair/TTL/actor/compensation rồi khôi phục bytes trước suite cuối.
+
+**Suite cuối tại `b8a0967`: 800/800 pass, 0 fail/error/skip, 3 warning hiện có, 1167,00 s**, ORM/schema xanh. Collect **1556 node**, **756 not-run**; **208** file API Python/SQL giữ SHA-256, node JUnit/collect khớp. Lượt đầu tại `2b69f85`: **795 pass/5 fail**, cùng lỗi recovery đọc marker `0039` trên snapshot cũ. Sửa phần đọc closure; giữ migrations/assertions cũ, nhóm nâng cấp + dump/restore **10 pass** trước suite cuối. Inventory giữ riêng mọi lượt trước, không cộng thành full API. HTTP invitation dùng runtime/receipt thật, chỉ cutover được thay scoped; pending riêng không mock. Safety pending tới C4. Full integration/proxy/object-store/cutover C4 và web không chạy lại; các số C2c-1 dưới đây là lịch sử theo source.
 
 ## C2c-1 bootstrap runtime
 

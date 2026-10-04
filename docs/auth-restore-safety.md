@@ -1,6 +1,6 @@
 # Chống rollback credential và trạng thái tài khoản (M6c-2b2c0)
 
-**C2c-1 đã merge PR #36 `d1b53e6`:** [bootstrap runtime và initial receipt](c2c1-bootstrap-receipts.md), source `0038`, chặn tạo lại Admin từ snapshot thiếu account khi journal còn complete intent. Giao [C2c-2 invitation lifecycle](tasks/m6c2b2c2c2-invitation-lifecycle.md), chưa triển khai; C2d/C3/C4 còn riêng, safety pending tới C4. Không có force/recreate/operator rescue trong C2c-1.
+**C2c-2 đang review, chưa merge:** [invitation runtime/initial receipt](c2c2-invitation-runtime.md), source `0039`, base PR #36 `d1b53e6` (`0038`). Accepted closure replay chỉ đóng link, không dựng User/receipt/accepted FK; prefix chưa có closure không chứng minh link đã đóng. [Inventory](c2c2-test-inventory.json). C2d/C3/C4 còn riêng, safety pending tới C4. Bootstrap không dùng để rescue/enable hoặc tạo Admin thứ hai.
 
 [Mục lục](README.md) · [Quyết định](decisions.md#m6c-2b2c0-thiết-kế-auth-sau-restore-2026-10-03) · [Task coding](#chia-pr-coding) · [Ma trận kiểm thử](#ma-trận-kiểm-thử)
 
