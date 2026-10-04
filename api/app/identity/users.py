@@ -27,7 +27,35 @@ from app.config import get_settings
 from app.identity.predicates import lock_users, session_live
 from app.identity.tokens import digest_matches
 from app.identity.session_commit import AUTH_PENDING
-from app.models import AuthSafetyHead, UserSession
+from app.models import AuthChangeReceipt, AuthSafetyHead, RevocationJournalRecord, UserSession
+
+
+def _initial_status_verified(db: Session, user_id: uuid.UUID) -> bool:
+    """Require a committed initial permission, independently of later restrictions.
+
+    The caller holds the User lock. Receipts are immutable; commit_auth still
+    checks the real journal/integrity gate after all row locks, before staging.
+    Journal intent alone (including a replayed initial decision) is insufficient.
+    """
+    receipt = AuthChangeReceipt
+    record = RevocationJournalRecord
+    head = AuthSafetyHead
+    return db.scalar(select(receipt.operation_id).join(record,
+        (record.auth_operation_id == receipt.operation_id)
+        & (record.auth_user_id == receipt.user_id)
+        & (record.auth_domain == receipt.domain)
+        & (record.auth_generation == receipt.generation)
+        & (record.auth_decision == receipt.decision)
+        & (record.auth_reason_code == receipt.reason_code)
+        & (record.auth_recorded_at == receipt.recorded_at)
+    ).join(head, head.user_id == receipt.user_id).where(
+        receipt.user_id == user_id,
+        receipt.domain == "status",
+        receipt.decision == "active",
+        receipt.reason_code.in_(("bootstrap", "invitation_accept", "verified_initial_status")),
+        record.journal_confirmed.is_(True),
+        record.seq <= head.status_seq,
+    ).limit(1)) is not None
 
 
 def list_users(db: Session) -> list[User]:
@@ -63,8 +91,7 @@ def set_user_status(
     if user is None:
         db.rollback()
         raise NotFound()
-    head = db.get(AuthSafetyHead, user_id, populate_existing=True)
-    if status is UserStatus.ACTIVE and (head is None or head.status_operation_id is None):
+    if status is UserStatus.ACTIVE and not _initial_status_verified(db, user_id):
         db.rollback()
         raise ApiError(409, "initial_status_verification_required")
     at = clock()

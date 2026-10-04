@@ -3,6 +3,8 @@ import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from dataclasses import replace
+from types import SimpleNamespace
 import pytest
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
@@ -19,9 +21,86 @@ from app.identity.session_commit import commit_auth
 from app.models import User, PasswordResetToken, UserSession, AuthChangeReceipt, AuthSafetyHead
 from app.models.enums import UserStatus, SessionRevokeReason
 from tests.test_auth_safety_foundation import foundation, runtime, append_changes, changes, user, run_recover, NOW, SECRET
-from tests.test_c2a_login_sessions import world, sign_in, add_other, transition
+from tests.test_c2a_login_sessions import sign_in, transition
 
 NEW = "C2b-new-private-password-marker-456!"
+
+
+@pytest.fixture
+def world(foundation, runtime, monkeypatch, app_env):
+    w = foundation
+    values = changes(w)
+    values[-1] = replace(values[-1], reason_code="verified_initial_status")
+    append_changes(w, values, engine=runtime)
+    run_recover(w)
+    app_env(runtime.url)
+    w.settings = get_settings()
+    w.runtime = runtime
+    w.clock = lambda: NOW
+    # Only the pending boundary is replaced; initial receipts/guards remain real.
+    monkeypatch.setattr(auth_safety, "cutover", lambda db: "ready")
+    return w
+
+
+def add_other(w, role="user", *, initial_reason="invitation_accept"):
+    from app.identity.passwords import hash_password
+    uid = uuid.uuid4()
+    with Session(w.engine) as db:
+        db.add(User(id=uid, email=f"{uid.hex}@example.test", role=role,
+                    password_verifier=hash_password(SECRET), password_changed_at=NOW))
+        db.commit()
+    other = SimpleNamespace(**vars(w)); other.uid = uid
+    values = changes(other, decision="active" if initial_reason else None)
+    if initial_reason:
+        values[-1] = replace(values[-1], reason_code=initial_reason)
+    append_changes(other, values, engine=w.runtime)
+    return other
+
+
+@pytest.mark.parametrize("history", ["credential_only", "admin_enable", "uncommitted_initial"])
+def test_disable_cannot_supply_initial_status_proof(world, history):
+    from app.identity.errors import InvalidCredentials
+    w = world; actor = sign_in(w); target = add_other(w, initial_reason=None)
+    if history != "credential_only":
+        change = auth_safety.Change(target.uid, "status",
+            "verified_initial_status" if history == "uncommitted_initial" else "admin_enable",
+            NOW, decision="active")
+        append_changes(target, [change], engine=w.runtime, rollback=history == "uncommitted_initial")
+        run_recover(w)
+    before = user(target)
+    assert before.credential_state == "usable"
+    if history == "credential_only":
+        assert before.status_safety == "held"
+    with pytest.raises(ApiError, match="initial_status_verification_required"):
+        status(w, target, actor, UserStatus.ACTIVE)
+    status(w, target, actor, UserStatus.DISABLED)
+    with Session(w.runtime) as db:
+        receipts = db.scalar(text("SELECT count(*) FROM auth_change_receipts"))
+        audits = db.scalar(text("SELECT count(*) FROM audit_events"))
+    journal_before = w.path.read_bytes()
+    with pytest.raises(ApiError, match="initial_status_verification_required") as denied:
+        status(w, target, actor, UserStatus.ACTIVE)
+    assert denied.value.status_code == 409
+    assert w.path.read_bytes() == journal_before
+    after = user(target)
+    assert after.status == "disabled" and after.credential_operation_id == before.credential_operation_id
+    with Session(w.runtime) as db:
+        assert db.scalar(text("SELECT count(*) FROM auth_change_receipts")) == receipts
+        assert db.scalar(text("SELECT count(*) FROM audit_events")) == audits
+        assert db.scalar(select(UserSession.id).where(UserSession.user_id == target.uid)) is None
+    with pytest.raises(InvalidCredentials):
+        sign_in(target, email=f"{target.uid.hex}@example.test")
+    assert recovery.evaluate_integrity(w.settings, w.runtime).open
+
+
+@pytest.mark.parametrize("initial_reason", ["bootstrap", "invitation_accept", "verified_initial_status"])
+def test_verified_initial_status_survives_disable_enable(world, initial_reason):
+    w = world; actor = sign_in(w); target = add_other(w, initial_reason=initial_reason)
+    status(w, target, actor, UserStatus.DISABLED)
+    status(w, target, actor, UserStatus.ACTIVE)
+    # Historical initial receipt is sufficient even when latest reason is admin_enable.
+    assert user(target).status == "active"
+    assert sign_in(target, email=f"{target.uid.hex}@example.test").session_id
 
 
 def issue(w, *, clock=None, quarantine=False):

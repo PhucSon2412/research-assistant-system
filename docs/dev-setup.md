@@ -1,6 +1,6 @@
-# Môi trường phát triển và schema (M1a–C2a)
+# Môi trường phát triển và schema (M1a–C2b)
 
-**Trạng thái hiện hành:** PR #32 đã merge `a5c75b8`; C1 head `0034`; [C2a trên nhánh review](c2a-login-session-predicates.md) có head **mã nguồn** `0035`, chưa merge; nền `0033/0034` giữ nguyên, [schema/quyền/replay/guard](c1-auth-safety-foundation.md) chỉ được thử cô lập, vẫn pending tới C4. Không truy vấn/nâng DB hoặc restart dev; source không là revision DB dev. [Runbook invitation](#journal-invitation-m6c-2b2b2) và các lệnh milestone cũ dưới đây là chứng cứ lịch sử, không lệnh vận hành C1/C2a trên dev. [C1 auth safety cô lập](#c1-auth-safety-cô-lập) ghi đúng lệnh đã chạy.
+**Trạng thái hiện hành:** PR #32 đã merge `a5c75b8`; C1 head `0034`; [C2a](c2a-login-session-predicates.md) đã merge PR #34 `78e0880`, head **mã nguồn** `0035`; [C2b](c2b-reset-status.md) đang review PR #35, source `0036`, chưa merge; nền `0033/0034` giữ nguyên, [schema/quyền/replay/guard](c1-auth-safety-foundation.md) chỉ được thử cô lập, vẫn pending tới C4. Không truy vấn/nâng DB hoặc restart dev; source không là revision DB dev. [Runbook invitation](#journal-invitation-m6c-2b2b2) và các lệnh milestone cũ dưới đây là chứng cứ lịch sử, không lệnh vận hành C1/C2a trên dev. [C1 auth safety cô lập](#c1-auth-safety-cô-lập) ghi đúng lệnh đã chạy.
 
 **Vận hành auth restore hoàn chỉnh C2–C4 — chưa triển khai:**
 
@@ -1417,3 +1417,18 @@ Lệnh shell thực dùng cùng JUnit path trên, output chuyển vào `verified
 Đối chứng tuần tự 2/2: bỏ actor guard cuối → 1 failure; bỏ status predicate quarantine → 3 failure. Khôi phục đúng bytes/SHA trước suite cuối. Lỗi chuẩn bị: fixture HTTP chưa có Origin allowlist (49 pass/1 fail, sửa fixture rồi nhóm mở rộng 51 pass); full chọn đầu thiếu NOLOGIN `c1_migrator` ở DB thử (467 pass/1 fail, tạo role rồi chạy lại toàn bộ 471). Docs stdin PowerShell lần đầu thiếu UTF-8 dừng ở assert trước write; sửa encoding rồi ghi đúng. Cleanup label Go-template quoting lần đầu lỗi, dừng trước xóa; đọc JSON labels và xác minh đúng task rồi mới `docker rm -f -v` container thử. Không giảm guard để làm test xanh.
 
 Đã dọn đúng container/volume cô lập, giữ evidence ngoài repo. Chín container dev giữ ID/image qua snapshot đầu/cuối; năm container trọng yếu giữ StartedAt qua các lần inspect chỉ đọc. Không đọc/sửa `.env`, truy vấn DB/journal dev, gọi provider hay chạy worker/MinIO/drill mới. C2c/C2d/C3 và full business HTTP/proxy/restore/cutover C4 còn mở. Fault injection driver/append/fsync không chứng minh mất điện hoặc độ bền production.
+
+### Sửa P2 initial status PR #35, cô lập
+
+Runner `%TEMP%/ras-c2b-p2-test-20261004/runner.py` giống runner C2b bên trên nhưng admin URL tổng hợp dùng port `58438`, evidence/journal riêng; chặn HTTP provider sync/async. Conda ras interpreter/pip đã kiểm, PostgreSQL pgvector 16 có role prerequisite `c1_migrator NOLOGIN`, chỉ fixture pending boundary được thay. Lệnh thực chạy từ gốc repo:
+
+```powershell
+$py = "$env:USERPROFILE\.conda\envs\ras\python.exe"
+& $py "$env:TEMP\ras-c2b-p2-test-20261004\runner.py" api/tests/test_c2b_reset_status.py -q -k 'initial_status_proof or verified_initial_status_survives' --junitxml="$env:TEMP\ras-c2b-p2-test-20261004\before.xml"
+& $py "$env:TEMP\ras-c2b-p2-test-20261004\runner.py" api/tests/test_c2b_reset_status.py api/tests/test_c2b_migration.py api/tests/test_c2a_login_sessions.py api/tests/test_migrations.py -q --junitxml="$env:TEMP\ras-c2b-p2-test-20261004\after.xml"
+& $py "$env:TEMP\ras-c2b-p2-test-20261004\runner.py" api --collect-only -q
+& $py -m compileall -q api/app/identity/users.py api/tests/test_c2b_reset_status.py
+git -c core.safecrlf=false diff --check
+```
+
+Output pytest thực được redirect vào `before.log`/`after.log`/`collect.log` cùng thư mục. Trước sửa 3 fail/3 pass đúng P2; sau sửa **201 pass / 384,23 s**, gồm 105 C2b và 96 login/migration/ORM, 0 failure/error/skip. Lệnh đầu suite đầy đủ dùng nhầm `test_c2b_migrations.py`, không chạy test; sửa thành tên singular như trên. Collect **1296**, **1095 chưa chạy lại trong P2**; 471 cũ là lịch sử. [Chi tiết và inventory](c2b-reset-status.md#sửa-p2-pr-35-initial-status-độc-lập). Web không đổi/không chạy lại. Đã dọn đúng container/volume thử sau kiểm label, dev ID/image/StartedAt giữ nguyên qua inspect chỉ đọc. Safety pending tới C4; chưa merge PR #35.
