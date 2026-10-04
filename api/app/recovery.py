@@ -65,7 +65,7 @@ from pathlib import Path
 
 from sqlalchemy import Engine, func, select, text, update, or_
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from app import journal
 from app.audit import record_event
@@ -613,7 +613,7 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
         invitation_routines = db.scalar(text("SELECT to_regprocedure('ras_auth_invitation_lock(uuid[])') IS NOT NULL"))
         if invitation_routines:
             db.execute(text("SELECT ras_auth_invitation_lock(:ids)"), {"ids": [iid]})
-        stmt = select(Invitation).where(Invitation.id == iid)
+        stmt = select(Invitation).options(*_invitation_recovery_columns()).where(Invitation.id == iid)
         invitation_row = db.scalar((stmt if invitation_routines else stmt.with_for_update())
                                    .execution_options(populate_existing=True))
     if record.kind == RESET_TOKEN_CLOSURE:
@@ -776,8 +776,15 @@ def _unjournaled_reset_tokens(db: Session) -> list[PasswordResetToken]:
         .order_by(PasswordResetToken.user_id, PasswordResetToken.id)))
 
 
+def _invitation_recovery_columns():
+    # Closure replay/backfill also runs on pre-0039 snapshots. Issuance/pair
+    # transaction markers are irrelevant to recovery and must never lazy-load.
+    return (defer(Invitation.creation_transaction_id, raiseload=True),
+            defer(Invitation.acceptance_transaction_id, raiseload=True))
+
+
 def _unjournaled_invitations(db: Session) -> list[Invitation]:
-    return list(db.scalars(select(Invitation).where(
+    return list(db.scalars(select(Invitation).options(*_invitation_recovery_columns()).where(
         or_(Invitation.accepted_at.is_not(None), Invitation.revoked_at.is_not(None),
             Invitation.closed_by_recovery_at.is_not(None)),
         ~select(RevocationJournalRecord.seq).where(RevocationJournalRecord.invitation_id == Invitation.id).exists())
@@ -1205,7 +1212,8 @@ def _verify(engine: Engine, path: Path) -> None:
             raise RecoveryError("invitations_not_journaled")
         for record in journal.read(path).records:
             if record.kind == INVITATION_CLOSURE:
-                _apply_invitation_closure(db.get(Invitation, uuid.UUID(record.body["invitation_id"])),
+                _apply_invitation_closure(db.get(Invitation, uuid.UUID(record.body["invitation_id"]),
+                                                options=_invitation_recovery_columns()),
                                           record.body, apply=False)
             if record.kind == RESET_TOKEN_CLOSURE:
                 _apply_reset_token_closure(db.get(PasswordResetToken, uuid.UUID(record.body["token_id"])),
