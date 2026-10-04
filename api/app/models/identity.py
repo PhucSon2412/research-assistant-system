@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Computed, Integer, Index, Text, func, text
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Computed, Integer, Index, Text, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -92,6 +92,7 @@ class BootstrapState(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), unique=True
     )
     completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    creation_transaction_id: Mapped[int | None] = mapped_column(BigInteger)
 
 
 class Invitation(Base):

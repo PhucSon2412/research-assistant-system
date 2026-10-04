@@ -1,6 +1,63 @@
-# Môi trường phát triển và schema (M1a–C2b)
+# Môi trường phát triển và schema (M1a–C2c-1)
 
-**Trạng thái hiện hành:** PR #32 đã merge `a5c75b8`; C1 head `0034`; [C2a](c2a-login-session-predicates.md) đã merge PR #34 `78e0880`, head **mã nguồn** `0035`; [C2b](c2b-reset-status.md) đang review PR #35, source `0036`, chưa merge; nền `0033/0034` giữ nguyên, [schema/quyền/replay/guard](c1-auth-safety-foundation.md) chỉ được thử cô lập, vẫn pending tới C4. Không truy vấn/nâng DB hoặc restart dev; source không là revision DB dev. [Runbook invitation](#journal-invitation-m6c-2b2b2) và các lệnh milestone cũ dưới đây là chứng cứ lịch sử, không lệnh vận hành C1/C2a trên dev. [C1 auth safety cô lập](#c1-auth-safety-cô-lập) ghi đúng lệnh đã chạy.
+**Cập nhật C2c-1:** [nhánh review](c2c1-bootstrap-receipts.md) thêm source `0038`, bootstrap runtime/initial receipt; [lệnh cô lập](#c2c-1-bootstrap-cô-lập). C2c-2 chưa chuyển, safety pending tới C4. Trạng thái C2b bên dưới là baseline trước task này, không là revision DB dev.
+
+## Sửa P2 installation PR #36, cô lập
+
+Ngày 2026-10-04, sửa theo [prompt review](reviews/pr36-c2c1-bootstrap.md), từ source `64cf342`/`0037`; thêm `0038` và giữ `0037`. Conda interpreter/pip đã xác minh; không cài thêm dependency hoặc tạo venv. Project Compose **`rasc2c1p2_20261004`**, PostgreSQL pgvector 16 riêng bind **`127.0.0.1:56438`**; runtime/recovery LOGIN và NOLOGIN definer thật, prerequisite đối chứng `c1_migrator` không membership. Setup/credentials/runner/JUnit/log ở `%TEMP%/ras-c2c1-p2-20261004`, ngoài repo. Không đọc/sửa `.env`, truy vấn/nâng/restart dev hoặc gọi provider.
+
+Runner tự lấy credentials tổng hợp từ file riêng để đặt explicit `RAS_TEST_DATABASE_ADMIN_URL` **trước pytest**, dùng URL parts, root/API sys.path; chặn HTTPTransport sync/async và kiểm hash Python/SQL API trước/sau. Chỉ fixture `auth_safety.cutover` thay kết quả; integrity/hold/SQL/grants/receipt/commit giữ thật. Các lệnh thực chạy từ root:
+
+```powershell
+$py = 'C:\Users\ADMIN\.conda\envs\ras\python.exe'
+$p2Evidence = Join-Path $env:TEMP 'ras-c2c1-p2-20261004'
+& $py -c "import sys; print(sys.executable)"
+& $py -m pip --version
+& $py "$p2Evidence\setup.py"
+docker compose --project-name rasc2c1p2_20261004 --file "$p2Evidence\compose.yaml" up -d --wait db
+& $py "$p2Evidence\runner.py" api/tests/test_c2c1_installation.py -k direct_existing -q --tb=short --junitxml="$p2Evidence\before.xml"
+& $py "$p2Evidence\runner.py" api/tests/test_c2c1_installation.py -q --tb=short --junitxml="$p2Evidence\after.xml"
+& $py "$p2Evidence\runner.py" api/tests/test_c2c1_migration.py -q --tb=short --junitxml="$p2Evidence\migration.xml"
+& $py "$p2Evidence\countercheck.py"
+& $py "$p2Evidence\prerequisite.py"
+& $py -m compileall -q api/app api/migrations api/tests
+git diff --check
+& $py "$p2Evidence\runner.py" api --collect-only -q > "$p2Evidence\collect.log"
+& $py "$p2Evidence\runner.py" api/tests/test_c2c1_installation.py api/tests/test_c2c1_bootstrap.py api/tests/test_c2c1_migration.py api/tests/test_bootstrap.py api/tests/test_c2b_reset_status.py api/tests/test_c2b_migration.py api/tests/test_c2a_login_sessions.py api/tests/test_c2a_migration.py api/tests/test_c2a_origin.py api/tests/test_auth_safety_foundation.py api/tests/test_migrations.py api/tests/test_schema_constraints.py api/tests/test_config.py -q --tb=short --junitxml="$p2Evidence\final.xml" > "$p2Evidence\final.log"
+```
+
+Trước sửa **1 fail đúng P2** (prepare không raise), sau sửa nhóm installation **26 pass**, migration **5 pass**; không cộng các lượt chọn với suite cuối. Bỏ riêng guard SQL mới → **1 failure / 0 errors**, rồi khôi phục nguyên bytes trước suite cuối. Ca existing đi qua `register_existing`/recover thật; malformed registration/genesis do migrator setup riêng, routine chạy runtime. Kiểm new-install trực tiếp + cặp receipt/login thật. Inventory cuối tách source/lượt lịch sử; ConPTY/pg_dump restore ở `0037` bên dưới không chạy lại trong P2. Safety pending tới C4, không có thao tác vận hành trên dev hoặc lệnh mở gate.
+
+**Suite cuối tại code `d222fb1`: 626/626 pass / 834,11 s**, 0 failure/error/skip, 3 warning hiện có, ORM/schema xanh; **202** file API giữ SHA-256. Collect **1402**, **776 chưa chạy** ngoài nhóm chọn trên source `0038`. [Inventory P2](c2c1-p2-test-inventory.json) khớp node/JUnit, tách lịch sử và source. Compileall/diff check pass. Sau kiểm labels project/container/volume đều `rasc2c1p2_20261004`, đã `docker compose --project-name rasc2c1p2_20261004 --file "$p2Evidence\compose.yaml" down -v`; xóa `credentials.json` và `compose.yaml` dùng một lần, giữ scripts/JUnit/log ngoài repo. Không cleanup dev.
+
+## C2c-1 bootstrap cô lập
+
+Ngày 2026-10-04, fetch/base `1d3e558`, chứa PR #35 và `f2ba336`; head source `0036` → `0037`. Compose riêng `rasc2c1_20261004`, chỉ PostgreSQL `pgvector/pgvector:pg16`, bind `127.0.0.1:56437`; fixture mỗi test tạo/drop DB mới. Runtime/recovery LOGIN thật và NOLOGIN definer; role đối chứng `c1_migrator` NOLOGIN không có membership runtime. Compose/credentials/runner/ConPTY/counterchecks/JUnit/log ngoài repo `%TEMP%/ras-c2c1-20261004`. Không `.env` hoặc tài nguyên dev. Interpreter và pip đều ở Conda ras; `pywinpty 3.0.5` chỉ cài vào Conda này để kiểm Windows ConPTY, không thêm venv hoặc dependency production.
+
+Các commands sau đã chạy từ root. Script/env dưới đây là evidence của phiên thử tổng hợp, không script vận hành production; cần dựng tài nguyên cô lập và secrets mới để lặp lại. Không dùng test patch để mở readiness:
+
+```powershell
+$taskRoot = Join-Path $env:TEMP 'ras-c2c1-20261004'
+. "$taskRoot\test-env.ps1" # explicit isolated admin URL, generated disposable role credentials
+$env:PYTHONPATH = (Get-Location).Path
+& C:\Users\ADMIN\.conda\envs\ras\python.exe -m pip --version
+docker compose --project-name rasc2c1_20261004 --file "$taskRoot\compose.yaml" up -d --wait db
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$taskRoot\runner.py" api --collect-only -q
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$taskRoot\runner.py" -p tests.conftest "$taskRoot\test_conpty.py" -q --tb=short --junitxml="$taskRoot\conpty.xml"
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$taskRoot\runner.py" -p tests.conftest "$taskRoot\test_real_restore.py" -q --tb=short --junitxml="$taskRoot\real-restore.xml"
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$taskRoot\counterchecks.py"
+& C:\Users\ADMIN\.conda\envs\ras\python.exe "$taskRoot\runner.py" api/tests/test_c2c1_bootstrap.py api/tests/test_c2c1_migration.py api/tests/test_bootstrap.py api/tests/test_c2b_reset_status.py api/tests/test_c2b_migration.py api/tests/test_c2a_login_sessions.py api/tests/test_c2a_migration.py api/tests/test_c2a_origin.py api/tests/test_auth_safety_foundation.py api/tests/test_migrations.py api/tests/test_schema_constraints.py api/tests/test_config.py -q --tb=short --junitxml="$taskRoot\final-after-setup.xml"
+```
+
+Runner buộc admin URL tường minh trước fixture, chặn external sync/async HTTPTransport và kiểm SHA-256 API source không đổi trong từng lượt. Writer fixture chỉ thay kết quả `auth_safety.cutover` từng test; integrity/hold/journal/routines/receipt/commit thật. ConPTY scoped success thay riêng boundary đó trong process test-only chạy CLI module thật; mismatch và pending chạy CLI `-m` không patch. Stdin CLI runtime thật cũng có nhóm pending không patch, không session/link.
+
+Restore bổ sung thực chạy `pg_dump -Fc` trước bootstrap rồi `pg_restore` vào DB fixture mới trong đúng container đã kiểm label project, journal nguồn giữ hiện hành ngoài dump. Bootstrap nguồn dùng runtime, còn hold/recover hai lần ở DB restore dùng **recovery LOGIN thật**; report reconciliation complete nhưng safety pending, không User/receipt/singleton và recovery không EXEC prepare. Không chạy hai DB writer đồng thời vào journal đó hoặc dùng object store/paper. Đây là drill DB bootstrap cô lập, không thay full backup/restore/proxy C4.
+
+Lượt cuối tại code `51f5714`: **597/597 API pass / 764,18 s**, 0 failure/error/skip, 3 warning hiện có; 199 file API giữ nguyên SHA-256. ConPTY **3/3**, restore **1/1**, đối chứng **3/3** guard bị phát hiện; collect **1373**, **776 not-run**. Compileall và diff check pass. Đã dọn container/network/volume thử sau kiểm label; xóa `test-env.ps1` và Compose credentials dùng một lần, giữ evidence ngoài repo.
+
+[Inventory node/lượt chạy](c2c1-test-inventory.json) giữ lỗi chuẩn bị và kết quả cuối riêng. Full HTTP/proxy/cutover C4, invitation lifecycle C2c-2, resource final callers C2d và operator C3 chưa kiểm hoàn chỉnh; web không đổi/không chạy. Không phép thử nào chứng minh mất điện, provider charge, latency hoặc storage production. Không cleanup dev.
+
+**Baseline main trước C2c-1:** PR #32/#33 đã merge; C1 head `0034`; [C2a](c2a-login-session-predicates.md) đã merge PR #34 `78e0880` (`0035`); [C2b](c2b-reset-status.md) đã merge PR #35 `1d3e558`, chứa `f2ba336`, head **mã nguồn** `0036`. [Task C2c-1 bootstrap/initial receipt](tasks/m6c2b2c2c1-bootstrap-initial-receipts.md) khi đó chưa triển khai; invocation và lệnh của các lượt kiểm bên dưới là lịch sử. Nền `0033`–`0036` chỉ thử cô lập, safety pending tới C4. Không truy vấn/nâng DB hoặc restart dev; source không là revision DB dev. [Runbook invitation](#journal-invitation-m6c-2b2b2) và các lệnh milestone cũ không phải lệnh vận hành auth mới trên dev. [C1 auth safety cô lập](#c1-auth-safety-cô-lập) ghi đúng lệnh đã chạy.
 
 **Vận hành auth restore hoàn chỉnh C2–C4 — chưa triển khai:**
 
@@ -65,7 +122,7 @@ Trước sửa **4 failed/1 passed / 11,12 s** đúng lỗi 200 thay vì 401; sa
 
 ## C1 auth safety cô lập
 
-Lệnh và số đo phần này là lịch sử C1; kết quả source C2a xem [nhóm C2a](#c2a-login-session-cô-lập).
+Lệnh và số đo phần này là lịch sử C1; kết quả source C2a xem [nhóm C2a](#c2a-loginsession-cô-lập).
 
 Sau review P2 PR #33, dùng DB Compose riêng `rasc1reset3136add3`, context/journal/credentials ngoài repo `ras-c1-reset-uxjegtuu`, PostgreSQL 16/pgvector thật. Giữ nguyên `0033`, thêm `0034` vì chưa xác minh đủ DB lâu dài đã áp revision cũ. Không truy vấn/nâng/restart dev hoặc đọc `.env`. Đã chạy các lệnh sau từ root bằng Conda ras; nhóm đầu trên code `0033` trước sửa exit 1 đúng bốn ca lỗi, không tính là suite pass:
 

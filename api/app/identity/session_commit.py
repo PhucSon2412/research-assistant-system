@@ -55,6 +55,7 @@ def commit_auth(db: Session):
     actor = db.info.pop("auth_actor", None)
     actor_role = db.info.pop("auth_actor_role", None)
     reset_guard = db.info.pop("auth_reset_guard", None)
+    bootstrap_guard = db.info.pop("auth_bootstrap_guard", None)
     if invitations:
         ended_at = invitations[0].accepted_at or invitations[0].revoked_at
     elif tokens:
@@ -73,6 +74,8 @@ def commit_auth(db: Session):
             _check_actor(db, actor, rows, actor_role)
         if reset_guard:
             reset_guard(db)
+        if bootstrap_guard:
+            bootstrap_guard(db)
         batch = recovery.record_auth_endings(db, get_settings().recovery.journal_path, tokens, rows,
                                              invitations=invitations, auth_changes=changes)
         commit_attempted = True

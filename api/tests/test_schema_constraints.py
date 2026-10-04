@@ -116,12 +116,21 @@ def test_new_user_defaults_to_non_admin(conn: Connection) -> None:
 
 def test_bootstrap_state_is_a_singleton(conn: Connection) -> None:
     a, b = add_user(conn), add_user(conn)
-    conn.execute(text("INSERT INTO bootstrap_state (admin_user_id) VALUES (:a)"), {"a": a})
+    # Intermediate singleton requires transaction provenance and is still
+    # uncommittable without the real initial pair (positive runtime test C2c-1).
+    assert "bootstrap needs its creation transaction" in expect_error(
+        conn, "INSERT INTO bootstrap_state (admin_user_id) VALUES (:a)", {"a": a}
+    )
+    conn.execute(text("INSERT INTO bootstrap_state (admin_user_id,creation_transaction_id)"
+                      " VALUES (:a,txid_current())"), {"a": a})
     assert "pk_bootstrap_state" in expect_error(
-        conn, "INSERT INTO bootstrap_state (admin_user_id) VALUES (:b)", {"b": b}
+        conn, "INSERT INTO bootstrap_state (admin_user_id,creation_transaction_id) VALUES (:b,txid_current())", {"b": b}
     )
     assert "ck_bootstrap_state_singleton" in expect_error(
-        conn, "INSERT INTO bootstrap_state (id, admin_user_id) VALUES (false, :b)", {"b": b}
+        conn, "INSERT INTO bootstrap_state (id, admin_user_id,creation_transaction_id) VALUES (false, :b,txid_current())", {"b": b}
+    )
+    assert "bootstrap needs its initial receipt pair" in expect_error(
+        conn, "SET CONSTRAINTS trg_auth_bootstrap_pair IMMEDIATE"
     )
 
 

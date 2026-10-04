@@ -1,114 +1,110 @@
-"""One-time creation of the first Admin.
+"""Runtime bootstrap: hash outside transactions; bootstrap -> FK/audit -> journal.
 
-Concurrency: the transaction takes a PostgreSQL advisory lock, checks that no
-bootstrap has happened and no user exists, then inserts the Admin together
-with the singleton ``bootstrap_state`` row. Even without the lock, the
-singleton primary key lets only one transaction commit.
+Independent intent survives an absent/rolled-back account. No force/recreate or
+success after an uncertain commit. Recovery never recreates the initial account.
 """
-
 from __future__ import annotations
-
 import uuid
-from dataclasses import dataclass
-
+from dataclasses import dataclass, field
 from sqlalchemy import Engine, exists, select, text
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-
-from app.audit import record_event
-from app.config import PasswordPolicy
+from app import auth_safety, journal
+from app.api.errors import ApiError
+from app.clock import utcnow
+from app.config import PasswordPolicy, get_settings
 from app.identity.emails import normalise_email
-from app.identity.passwords import hash_password, validate_password
-from app.models import BootstrapState, User
-from app.models.enums import AuditActorType, AuditOutcome, UserRole, UserStatus
+from app.identity.passwords import hasher_for_policy, validate_password
+from app.identity.predicates import lock_users
+from app.identity.session_commit import AUTH_PENDING, commit_auth
+from app.models import BootstrapState, User, AuthChangeReceipt
 
 AUDIT_ACTION = "admin.bootstrap"
-# Arbitrary constant key for pg_advisory_xact_lock ("RASBOOT1" as int64).
 _ADVISORY_LOCK_KEY = 0x524153424F4F5431
 
 
 class BootstrapRefused(Exception):
-    """Bootstrap already happened (or users exist); nothing was created."""
+    """Existing account or independent history: bootstrap cannot repair it."""
 
 
 @dataclass(frozen=True)
 class BootstrapResult:
     user_id: uuid.UUID
-    email: str
+    email: str = field(repr=False)
 
 
-def bootstrap_admin(
-    engine: Engine,
-    *,
-    email: str,
-    password: str,
-    policy: PasswordPolicy,
-    display_name: str | None = None,
-) -> BootstrapResult:
-    from app.auth_safety import require_writer
-    with Session(engine) as gate_db:
-        require_writer(gate_db)
+def _history_is_new(state) -> bool:
+    # Even a complete credential-only prefix is intent. Recovery records carry
+    # no account creation; an existing/rebuilt genesis is never a new install.
+    return (state.records[0].body["mode"] == "new_install"
+            and all(r.kind in (journal.GENESIS, journal.RECOVERY_BEGIN, journal.RECOVERY_END)
+                    for r in state.records))
+
+
+def _require_new(db):
+    state = journal.read(get_settings().recovery.journal_path)
+    if (db.scalar(select(exists().select_from(User)))
+            or db.scalar(select(exists().select_from(BootstrapState)))
+            or not _history_is_new(state)):
+        raise BootstrapRefused("bootstrap unavailable for this installation")
+
+
+def bootstrap_admin(engine: Engine, *, email: str, password: str, policy: PasswordPolicy,
+                    display_name: str | None = None, clock=utcnow) -> BootstrapResult:
     email = normalise_email(email)
     validate_password(password, policy, email=email)
-    # Hash before opening the transaction to keep the lock window short.
-    verifier = hash_password(password)
+    with Session(engine) as db:
+        auth_safety.require_writer(db)
+        _require_new(db)
+        hash_policy = dict(db.execute(text("SELECT * FROM auth_hash_policies ORDER BY version DESC LIMIT 1")).mappings().one())
+        db.rollback()
+    verifier = hasher_for_policy(hash_policy).hash(password)
+    uid = uuid.uuid4()
+    with Session(engine) as db:
+        auth_safety.require_writer(db)
+        db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _ADVISORY_LOCK_KEY})
+        # Recheck after hashing/waiting: another bootstrap, hold or journal change.
+        auth_safety.require_writer(db)
+        _require_new(db)
+        at = clock()
+        db.execute(text("SELECT ras_auth_bootstrap_prepare(:uid,:email,:name,:verifier,:policy,:at)"),
+                   {"uid": uid, "email": email, "name": display_name, "verifier": verifier,
+                    "policy": hash_policy["version"], "at": at})
+        db.info[AUTH_PENDING] = [
+            auth_safety.Change(uid, "credential", "bootstrap", at,
+                               verifier=verifier, policy_version=hash_policy["version"]),
+            auth_safety.Change(uid, "status", "bootstrap", at, decision="active"),
+        ]
+        db.info["auth_bootstrap_guard"] = _guard_history
+        batch = commit_auth(db)
+        operations = {line.record.kind: uuid.UUID(line.record.body["operation_id"])
+                      for line in batch if line.record.kind in journal.AUTH_KINDS
+                      and line.record.body["user_id"] == str(uid)}
+        db.rollback()
+        # Postconditions in a fresh transaction, locks before final journal read.
+        db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _ADVISORY_LOCK_KEY})
+        lock_users(db, [uid])
+        auth_safety.require_final(db)
+        # SQL DEBUG result logging must never receive verifier/email columns.
+        user = db.execute(select(User.id, User.role, User.credential_operation_id,
+                                 User.status_operation_id).where(User.id == uid)).first()
+        singleton = db.get(BootstrapState, True, populate_existing=True)
+        if (not user or user.role != "admin" or not auth_safety.account_live(db, uid)
+                or not singleton or singleton.admin_user_id != uid
+                or singleton.completed_at != at or singleton.creation_transaction_id is None
+                or operations != {journal.CREDENTIAL_TRANSITION: user.credential_operation_id,
+                                  journal.ACCOUNT_STATUS_DECISION: user.status_operation_id}):
+            raise ApiError(503, "auth_outcome_uncertain")
+        for kind, operation in operations.items():
+            receipt = db.get(AuthChangeReceipt, operation)
+            domain = "credential" if kind == journal.CREDENTIAL_TRANSITION else "status"
+            if (not receipt or (receipt.user_id, receipt.domain, receipt.reason_code, receipt.recorded_at,
+                                receipt.transaction_id) != (uid, domain, "bootstrap", at,
+                                                            singleton.creation_transaction_id)):
+                raise ApiError(503, "auth_outcome_uncertain")
+        return BootstrapResult(uid, email)
 
-    try:
-        with Session(engine) as session, session.begin():
-            session.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _ADVISORY_LOCK_KEY})
-            already = session.scalar(select(exists().select_from(BootstrapState))) or session.scalar(
-                select(exists().select_from(User))
-            )
-            if already:
-                raise BootstrapRefused("bootstrap has already been completed")
 
-            user = User(
-                email=email,
-                display_name=display_name,
-                role=UserRole.ADMIN.value,
-                status=UserStatus.ACTIVE.value,
-                password_verifier=verifier,
-            )
-            session.add(user)
-            session.flush()
-            session.add(BootstrapState(admin_user_id=user.id))
-            record_event(
-                session,
-                action=AUDIT_ACTION,
-                outcome=AuditOutcome.SUCCESS,
-                actor_type=AuditActorType.SYSTEM,
-                target_type="user",
-                target_id=str(user.id),
-                details={"via": "cli"},
-            )
-            result = BootstrapResult(user_id=user.id, email=email)
-    except IntegrityError as exc:
-        # Lost a race that bypassed the advisory lock: the singleton row won.
-        # Any other constraint failure is a real error, not a refusal.
-        if _constraint_name(exc) not in _RACE_CONSTRAINTS:
-            raise
-        _record_refusal(engine)
-        raise BootstrapRefused("bootstrap has already been completed") from exc
-    except BootstrapRefused:
-        _record_refusal(engine)
-        raise
-    return result
-
-
-_RACE_CONSTRAINTS = {"pk_bootstrap_state", "uq_users_email"}
-
-
-def _constraint_name(exc: IntegrityError) -> str | None:
-    diag = getattr(exc.orig, "diag", None)
-    return getattr(diag, "constraint_name", None)
-
-
-def _record_refusal(engine: Engine) -> None:
-    with Session(engine) as session, session.begin():
-        record_event(
-            session,
-            action=AUDIT_ACTION,
-            outcome=AuditOutcome.DENIED,
-            actor_type=AuditActorType.SYSTEM,
-            details={"via": "cli", "reason": "already_bootstrapped"},
-        )
+def _guard_history(db):
+    # User/singleton now exist in this transaction: check the independent file.
+    if not _history_is_new(journal.read(get_settings().recovery.journal_path)):
+        raise BootstrapRefused("bootstrap unavailable for this installation")
