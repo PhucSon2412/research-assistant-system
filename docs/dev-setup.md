@@ -1391,3 +1391,29 @@ Fixture: dump **247.146 byte**, một object tổng hợp **41 byte** trong MinI
 Các lượt chuẩn bị drill từng dừng vì `compose run` tạo volume trước guard sở hữu, chờ `/readyz` trong hold và proxy gọi API trước `/healthz` sẵn sàng. Đã sửa harness theo các lưu ý ở trên, dọn đúng project cô lập rồi chạy lại; không nới guard hoặc bỏ kiểm tra. Lượt cuối hoàn tất toàn bộ 59 kiểm tra.
 
 **Bàn giao kiểm chứng:** [toàn inventory API](testing.md#invitation-journal-m6c-2b2b2) cuối **901/901** (289/217/395, JUnit đủ/không trùng), web **42/42** và typecheck/build, đối chứng **8/8**. Lượt full đầu 899 passed/2 failed và các lỗi chuẩn bị được báo riêng, đã sửa fixture rồi chạy lại toàn suite. Không code/mutant song song full cuối; 19 file nguồn giữ checksum. Sau kiểm quyền sở hữu, đã dọn `ras-invtest` và hai project drill; chín container dev giữ nguyên ID/image/StartedAt. Artifact/journal/log được giữ ngoài repo; không đọc/sửa `.env`, không gọi provider, không đổi `pricing_verified`, không nâng DB/restart dev.
+
+## C2b reset/status cô lập
+
+PR #34 đã merge `78e0880`, gồm P2 listing và hai cập nhật docs Docker pending của orchestrator (`d2a4be5`). Nhánh `feat/m6c2b2c2b-reset-status` từ main này, source head `0036`, chưa merge; safety pending tới C4. [Hợp đồng/helper/bàn giao](c2b-reset-status.md), [inventory theo node](c2b-test-inventory.json). Không suy revision dev từ source, không nâng/restart dev hoặc mở readiness.
+
+Lượt 2026-10-04 dùng Conda ras và PostgreSQL pgvector 16 riêng `ras-c2b-test-20261004`, label `ras.task=c2b-20261004`, port `127.0.0.1:58437`. Password/URL runtime/recovery/admin tổng hợp, runner/journal/log/JUnit ngoài repo tại `%TEMP%/ras-c2b-test-20261004`. Runner đặt `RAS_TEST_DATABASE_ADMIN_URL` tường minh trước fixtures, không fallback `.env`; chặn HTTPTransport sync/async và để provider key trống. Chỉ fixture `world` thay `auth_safety.cutover`; integrity/hold/SQL guards/journal/commit thật. Runtime LOGIN `c1_runtime`, recovery LOGIN `c1_recovery`, definer NOLOGIN; `c1_migrator` NOLOGIN tồn tại để kiểm deny membership/SET ROLE.
+
+Các lệnh kiểm đã chạy từ gốc repo; runner này là evidence ngoài repo, URL chỉ tới DB thử. DB/container đã dọn, nên không dùng các lệnh như smoke stack dev:
+
+```powershell
+$py = 'C:\Users\ADMIN\.conda\envs\ras\python.exe'
+$rasEvidence = Join-Path $env:TEMP 'ras-c2b-test-20261004'
+$rasJUnit = Join-Path $rasEvidence 'verified.xml'
+& $py -c "import sys; print(sys.executable)"
+& $py -m pip --version
+& $py (Join-Path $rasEvidence 'runner.py') api --collect-only -q
+& $py (Join-Path $rasEvidence 'runner.py') api/tests/test_c2b_reset_status.py api/tests/test_c2b_migration.py api/tests/test_auth_safety_foundation.py api/tests/test_c2a_login_sessions.py api/tests/test_c2a_migration.py api/tests/test_c2a_origin.py api/tests/test_config.py api/tests/test_migrations.py -q "--junitxml=$rasJUnit"
+& $py -m compileall -q api/app api/migrations api/tests
+git diff --check
+```
+
+Lệnh shell thực dùng cùng JUnit path trên, output chuyển vào `verified.log`. **471/471 pass / 595,41 s**, 0 fail/error/skip; 99 C2b + 372 C2a/C1/config/migration, ORM/schema xanh. Collect 1290 unique nodes, 819 chưa chạy; giữ expectations nghiệp vụ và không tính pending 503 thành full HTTP. 195 source file API giữ SHA-256 trước/sau lượt cuối. Web không sửa/không chạy lại; 43 pass/typecheck/build tại `a8cb586` là lịch sử.
+
+Đối chứng tuần tự 2/2: bỏ actor guard cuối → 1 failure; bỏ status predicate quarantine → 3 failure. Khôi phục đúng bytes/SHA trước suite cuối. Lỗi chuẩn bị: fixture HTTP chưa có Origin allowlist (49 pass/1 fail, sửa fixture rồi nhóm mở rộng 51 pass); full chọn đầu thiếu NOLOGIN `c1_migrator` ở DB thử (467 pass/1 fail, tạo role rồi chạy lại toàn bộ 471). Docs stdin PowerShell lần đầu thiếu UTF-8 dừng ở assert trước write; sửa encoding rồi ghi đúng. Cleanup label Go-template quoting lần đầu lỗi, dừng trước xóa; đọc JSON labels và xác minh đúng task rồi mới `docker rm -f -v` container thử. Không giảm guard để làm test xanh.
+
+Đã dọn đúng container/volume cô lập, giữ evidence ngoài repo. Chín container dev giữ ID/image qua snapshot đầu/cuối; năm container trọng yếu giữ StartedAt qua các lần inspect chỉ đọc. Không đọc/sửa `.env`, truy vấn DB/journal dev, gọi provider hay chạy worker/MinIO/drill mới. C2c/C2d/C3 và full business HTTP/proxy/restore/cutover C4 còn mở. Fault injection driver/append/fsync không chứng minh mất điện hoặc độ bền production.

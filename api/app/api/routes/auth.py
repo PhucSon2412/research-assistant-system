@@ -38,6 +38,7 @@ from app.identity.sessions import (
     rotate_csrf,
 )
 from app.identity.tokens import digest_matches, generate_token
+from app.auth_safety import require_final
 from app.models import User
 from app.models.enums import AuditActorType, AuditOutcome, SessionRevokeReason
 
@@ -271,12 +272,14 @@ def request_password_reset(
     now: datetime = Depends(get_now),
     settings: Settings = Depends(get_settings),
     delivery: DeliveryAdapter = Depends(get_delivery),
+    clock=Depends(get_clock),
 ) -> dict:
     """Generic acceptance, not a guarantee of delivery. Only a known committed
     token reaches the adapter. This does not claim to prevent timing enumeration."""
     if delivery.enabled:
         try:
-            issued = password_reset.request_reset(db, email=body.email, now=now, lifetime=settings.auth.password_reset)
+            issued = password_reset.request_reset(db, email=body.email, now=now,
+                lifetime=settings.auth.password_reset, clock=clock)
         except Exception:  # No account-dependent status/body or delivery after an uncertain commit.
             db.rollback()
             issued = None
@@ -288,7 +291,9 @@ def request_password_reset(
                 link=build_link(settings.http.public_base_url or "", "/reset-password", issued.token),
                 expires_at=issued.expires_at,
             )
-            background.add_task(_send_quietly, delivery, message, now)
+            engine = db.get_bind()
+            db.rollback()  # release the final read before any delivery I/O
+            background.add_task(_send_quietly, delivery, message, engine, issued.token_id, issued.user_id, clock)
     else:
         log.warning("password reset requested but no delivery channel is configured")
     return {"status": "accepted"}
@@ -301,10 +306,11 @@ def confirm_password_reset(
     db: Session = Depends(get_db),
     now: datetime = Depends(get_now),
     settings: Settings = Depends(get_settings),
+    clock=Depends(get_clock),
 ) -> dict:
     try:
         password_reset.confirm_reset(
-            db, raw_token=body.token, new_password=body.new_password, now=now, policy=settings.password
+            db, raw_token=body.token, new_password=body.new_password, now=now, policy=settings.password, clock=clock
         )
     except InvalidToken:
         raise ApiError(400, "invalid_token") from None
@@ -314,9 +320,15 @@ def confirm_password_reset(
     return {"status": "password_changed"}
 
 
-def _send_quietly(delivery: DeliveryAdapter, message: OutgoingMessage, now: datetime) -> None:
+def _send_quietly(delivery: DeliveryAdapter, message: OutgoingMessage, engine, token_id, user_id, clock) -> None:
     try:
-        delivery.send(message, now=now)
+        with Session(engine) as db:
+            require_final(db)
+            at = clock()
+            if not password_reset.token_live(db, token_id, user_id, at):
+                return
+            db.rollback()  # no journal/User lock across external adapter I/O
+        delivery.send(message, now=at)
     except Exception as exc:  # noqa: BLE001
         # Type only: the message holds the link (token) and the recipient.
         log.error("password reset delivery failed (%s)", type(exc).__name__)

@@ -20,6 +20,14 @@ from app.identity.session_commit import commit_auth
 from app.identity.reset_tokens import revoke_open_tokens
 from app.models import User
 from app.models.enums import AuditActorType, AuditOutcome, SessionRevokeReason, UserStatus
+from app import auth_safety
+from app.api.errors import ApiError
+from app.clock import utcnow
+from app.config import get_settings
+from app.identity.predicates import lock_users, session_live
+from app.identity.tokens import digest_matches
+from app.identity.session_commit import AUTH_PENDING
+from app.models import AuthSafetyHead, UserSession
 
 
 def list_users(db: Session) -> list[User]:
@@ -27,22 +35,44 @@ def list_users(db: Session) -> list[User]:
 
 
 def set_user_status(
-    db: Session, *, user_id: uuid.UUID, actor_id: uuid.UUID, status: UserStatus, now: datetime
+    db: Session, *, user_id: uuid.UUID, actor_id: uuid.UUID, status: UserStatus, now: datetime,
+    actor_session_id: uuid.UUID, csrf_token: str, clock=utcnow
 ) -> User:
     from app.auth_safety import require_writer
     require_writer(db)
     if user_id == actor_id:
         # Avoid an Admin locking themselves (possibly the only Admin) out.
         raise Forbidden()
-    user = db.scalar(select(User).where(User.id == user_id).with_for_update(key_share=True))
+    # Gather both Users before any token/session/journal lock, including lower target UUID.
+    lock_users(db, [actor_id, user_id])
+    actor = db.get(User, actor_id, populate_existing=True)
+    idle = get_settings().auth.session_idle
+    if not session_live(db, actor_session_id, clock(), idle, user_id=actor_id):
+        db.rollback()
+        raise ApiError(401, "session_expired", clear_session=True)
+    if actor is None or actor.role != "admin":
+        db.rollback()
+        raise ApiError(403, "admin_required")
+    session = db.get(UserSession, actor_session_id, populate_existing=True)
+    if not digest_matches(csrf_token, session.csrf_token_hash):
+        db.rollback()
+        raise ApiError(403, "csrf_failed")
+    db.info["auth_actor"] = (actor_session_id, actor_id, session.csrf_token_hash, clock, idle)
+    db.info["auth_actor_role"] = "admin"
+    user = db.get(User, user_id, populate_existing=True)
     if user is None:
         db.rollback()
         raise NotFound()
-    user.status = status.value
-    user.updated_at = now
+    head = db.get(AuthSafetyHead, user_id, populate_existing=True)
+    if status is UserStatus.ACTIVE and (head is None or head.status_operation_id is None):
+        db.rollback()
+        raise ApiError(409, "initial_status_verification_required")
+    at = clock()
     if status is UserStatus.DISABLED:
-        revoke_open_tokens(db, user_id, reason="user_disabled", now=now)
-        revoke_user_sessions(db, user_id=user_id, reason=SessionRevokeReason.USER_DISABLED, now=now)
+        revoke_open_tokens(db, user_id, reason="user_disabled", now=at)
+        revoke_user_sessions(db, user_id=user_id, reason=SessionRevokeReason.USER_DISABLED, now=at)
+    db.info[AUTH_PENDING] = [auth_safety.Change(user_id, "status",
+        "admin_disable" if status is UserStatus.DISABLED else "admin_enable", at, decision=status.value)]
     record_event(
         db,
         action="user.disable" if status is UserStatus.DISABLED else "user.enable",
@@ -52,5 +82,10 @@ def set_user_status(
         target_type="user",
         target_id=str(user_id),
     )
-    commit_auth(db)
+    batch = commit_auth(db)
+    operation = uuid.UUID(batch[0].record.body["operation_id"])
+    db.refresh(user)
+    if user.status_operation_id != operation or user.status != status.value or user.status_safety != "proven":
+        db.rollback()
+        raise ApiError(503, "auth_outcome_uncertain")
     return user

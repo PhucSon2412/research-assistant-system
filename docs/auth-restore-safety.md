@@ -4,6 +4,8 @@
 
 **Trạng thái: PR #33 đã merge `c98bd33`, head source `0034`; C1 chỉ thử cô lập và vẫn pending.** [Quyết định nền được ủy quyền](decisions.md#quyết-định-nền-c1-theo-ủy-quyền-2026-10-03) chọn A, baseline legacy có kiểm chứng, C1–C3 pending và tách quyền DB với trusted identity rehash. [Schema/quyền/replay/kiểm chứng C1 và bàn giao C2](c1-auth-safety-foundation.md) phân biệt phần đã triển khai với thiết kế C2–C4 dưới đây. [Origin và cách chia C2](decisions.md#chia-c2-và-chốt-origin-theo-ủy-quyền-2026-10-03) đã chốt; [C2a](c2a-login-session-predicates.md) đã triển khai trên nhánh review, head source `0035`, chưa merge; C2b/C2c/C2d còn mở. Operator/delivery/status recovery và cutover production còn mở theo milestone tương ứng; chưa CLI recovery User/Admin hoặc mở traffic. Khảo sát thiết kế gốc trên `3f2179487b1e7041af2b398f54c6ad4406510f96` (`0032`), base coding chứa PR #32 là `a5c75b88da72eaf3d8a28c0c00d82d12099f28a4`. PR #32 chỉ tài liệu; migration/kiểm trực tiếp thuộc PR C1.
 
+**Cập nhật C2:** PR #34 đã merge `78e0880` (C2a `0035`, sửa P2 và docs Docker pending). [C2b reset/status](c2b-reset-status.md) tiếp tục trên nhánh review với `0036`; safety vẫn pending tới C4, chưa mở delivery/operator C3 hoặc final callers C2d.
+
 Mục lục thiết kế:
 
 - [Hành vi và yêu cầu](#nguồn-yêu-cầu-và-hành-vi-hiện-có)

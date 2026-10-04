@@ -8,11 +8,12 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_now, require_admin
+from app.api.deps import get_db, get_now, get_clock, require_admin
+from app.api.cookies import CSRF_HEADER
 from app.api.errors import ApiError
 from app.audit import record_event
 from app.authz import Principal
@@ -128,9 +129,11 @@ def list_users(_: Principal = Depends(require_admin), db: Session = Depends(get_
     return {"users": [_user_out(u) for u in users.list_users(db)]}
 
 
-def _set_status(db: Session, admin: Principal, user_id: uuid.UUID, new_status: UserStatus, now: datetime) -> dict:
+def _set_status(db: Session, admin: Principal, user_id: uuid.UUID, new_status: UserStatus, now: datetime,
+                request: Request, clock) -> dict:
     try:
-        user = users.set_user_status(db, user_id=user_id, actor_id=admin.user_id, status=new_status, now=now)
+        user = users.set_user_status(db, user_id=user_id, actor_id=admin.user_id, status=new_status, now=now,
+            actor_session_id=admin.session_id, csrf_token=request.headers.get(CSRF_HEADER) or "", clock=clock)
     except NotFound:
         raise ApiError(404, "not_found") from None
     except Forbidden:
@@ -140,22 +143,26 @@ def _set_status(db: Session, admin: Principal, user_id: uuid.UUID, new_status: U
 
 @router.post("/users/{user_id}/disable")
 def disable_user(
+    request: Request,
     user_id: uuid.UUID,
     admin: Principal = Depends(require_admin),
     db: Session = Depends(get_db),
     now: datetime = Depends(get_now),
+    clock=Depends(get_clock),
 ) -> dict:
-    return _set_status(db, admin, user_id, UserStatus.DISABLED, now)
+    return _set_status(db, admin, user_id, UserStatus.DISABLED, now, request, clock)
 
 
 @router.post("/users/{user_id}/enable")
 def enable_user(
+    request: Request,
     user_id: uuid.UUID,
     admin: Principal = Depends(require_admin),
     db: Session = Depends(get_db),
     now: datetime = Depends(get_now),
+    clock=Depends(get_clock),
 ) -> dict:
-    return _set_status(db, admin, user_id, UserStatus.ACTIVE, now)
+    return _set_status(db, admin, user_id, UserStatus.ACTIVE, now, request, clock)
 
 
 @router.get("/dev-outbox")

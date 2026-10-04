@@ -11,7 +11,7 @@ from app import recovery, auth_safety
 from app.models import User, UserSession, AuthChangeReceipt
 from app.identity.passwords import hash_password
 from app.config import get_settings
-from tests.conftest import upgrade, register_new_install, alembic_config
+from tests.conftest import upgrade, register_new_install, alembic_config, HEAD_REVISION
 from tests.test_auth_safety_foundation import runtime_engine, append_changes, NOW, SECRET, user
 
 
@@ -37,7 +37,7 @@ def test_0034_populated_provisioned_upgrade_preserves_history_and_permissions(em
         journal_bytes=journal_path.read_bytes()
         upgrade(empty_db_url)
         with eng.connect() as conn:
-            assert conn.scalar(text('SELECT version_num FROM alembic_version'))=='0035'
+            assert conn.scalar(text('SELECT version_num FROM alembic_version'))==HEAD_REVISION
             assert conn.execute(text('SELECT row_to_json(h) FROM auth_safety_heads h')).scalars().all()==heads
             assert conn.execute(text('SELECT row_to_json(s) FROM auth_safety_state s')).scalars().all()==progress
             assert conn.execute(text('SELECT row_to_json(r) FROM auth_change_receipts r ORDER BY operation_id')).scalars().all()==receipts

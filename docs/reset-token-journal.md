@@ -56,6 +56,8 @@ Gate/status thêm `reset_tokens_not_journaled`, `unjournaled_reset_tokens`; repo
 
 **Hiện hành:** PR #31 đã merge `3f21794` (`0032`); [C1 `0033`](c1-auth-safety-foundation.md) thêm reset fence/purpose, receipt/generation và backfill NULL bằng `auth_safety_backfill`, chỉ thử cô lập/pending. Writer/predicate reset mới thuộc C2; closure reset vẫn không chứng minh verifier mới hoặc enable/disable đã commit. Receipt trong transaction là bằng chứng riêng; replay không dựng nó.
 
+[C2b reset/status](c2b-reset-status.md) chuyển normal reset/consume/disable/enable sang runtime routines, latest head/fence/receipt, clock và actor cuối trên source `0036` (nhánh review, chưa merge). Quarantine staging chỉ direct fixture; public delivery kiểm chứng và operator thuộc C3. Safety pending tới C4.
+
 ## Giới hạn và việc kế tiếp
 
 - Tại PR #30 invitation chưa bảo vệ (M6c-2b2b2 mở rộng sau đó); membership/xóa paper riêng là task sau.
