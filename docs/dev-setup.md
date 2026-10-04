@@ -1,4 +1,4 @@
-# Môi trường phát triển và schema (M1a–C2b)
+# Môi trường phát triển và schema (M1a–C2c-1)
 
 **Cập nhật C2c-1:** [nhánh review](c2c1-bootstrap-receipts.md) thêm source `0037`, bootstrap runtime/initial receipt; [lệnh cô lập](#c2c-1-bootstrap-cô-lập). C2c-2 chưa chuyển, safety pending tới C4. Trạng thái C2b bên dưới là baseline trước task này, không là revision DB dev.
 
@@ -25,9 +25,11 @@ Runner buộc admin URL tường minh trước fixture, chặn external sync/asy
 
 Restore bổ sung thực chạy `pg_dump -Fc` trước bootstrap rồi `pg_restore` vào DB fixture mới trong đúng container đã kiểm label project, journal nguồn giữ hiện hành ngoài dump. Bootstrap nguồn dùng runtime, còn hold/recover hai lần ở DB restore dùng **recovery LOGIN thật**; report reconciliation complete nhưng safety pending, không User/receipt/singleton và recovery không EXEC prepare. Không chạy hai DB writer đồng thời vào journal đó hoặc dùng object store/paper. Đây là drill DB bootstrap cô lập, không thay full backup/restore/proxy C4.
 
-[Inventory node/lượt chạy](c2c1-test-inventory.json) giữ lỗi chuẩn bị và kết quả cuối riêng. Full HTTP/proxy/cutover C4, invitation lifecycle C2c-2, resource final callers C2d và operator C3 chưa kiểm hoàn chỉnh; web không đổi/không chạy. Không phép thử nào chứng minh mất điện, provider charge, latency hoặc storage production. Tài nguyên DB/container/volume thử chỉ dọn sau khi kiểm label đúng project; không cleanup dev.
+Lượt cuối tại code `51f5714`: **597/597 API pass / 764,18 s**, 0 failure/error/skip, 3 warning hiện có; 199 file API giữ nguyên SHA-256. ConPTY **3/3**, restore **1/1**, đối chứng **3/3** guard bị phát hiện; collect **1373**, **776 not-run**. Compileall và diff check pass. Đã dọn container/network/volume thử sau kiểm label; xóa `test-env.ps1` và Compose credentials dùng một lần, giữ evidence ngoài repo.
 
-**Trạng thái hiện hành:** PR #32/#33 đã merge; C1 head `0034`; [C2a](c2a-login-session-predicates.md) đã merge PR #34 `78e0880` (`0035`); [C2b](c2b-reset-status.md) đã merge PR #35 `1d3e558`, chứa `f2ba336`, head **mã nguồn** `0036`. [Task C2c-1 bootstrap/initial receipt](tasks/m6c2b2c2c1-bootstrap-initial-receipts.md) chưa triển khai; invocation và lệnh của các lượt kiểm bên dưới là lịch sử. Nền `0033`–`0036` chỉ thử cô lập, safety pending tới C4. Không truy vấn/nâng DB hoặc restart dev; source không là revision DB dev. [Runbook invitation](#journal-invitation-m6c-2b2b2) và các lệnh milestone cũ không phải lệnh vận hành auth mới trên dev. [C1 auth safety cô lập](#c1-auth-safety-cô-lập) ghi đúng lệnh đã chạy.
+[Inventory node/lượt chạy](c2c1-test-inventory.json) giữ lỗi chuẩn bị và kết quả cuối riêng. Full HTTP/proxy/cutover C4, invitation lifecycle C2c-2, resource final callers C2d và operator C3 chưa kiểm hoàn chỉnh; web không đổi/không chạy. Không phép thử nào chứng minh mất điện, provider charge, latency hoặc storage production. Không cleanup dev.
+
+**Baseline main trước C2c-1:** PR #32/#33 đã merge; C1 head `0034`; [C2a](c2a-login-session-predicates.md) đã merge PR #34 `78e0880` (`0035`); [C2b](c2b-reset-status.md) đã merge PR #35 `1d3e558`, chứa `f2ba336`, head **mã nguồn** `0036`. [Task C2c-1 bootstrap/initial receipt](tasks/m6c2b2c2c1-bootstrap-initial-receipts.md) khi đó chưa triển khai; invocation và lệnh của các lượt kiểm bên dưới là lịch sử. Nền `0033`–`0036` chỉ thử cô lập, safety pending tới C4. Không truy vấn/nâng DB hoặc restart dev; source không là revision DB dev. [Runbook invitation](#journal-invitation-m6c-2b2b2) và các lệnh milestone cũ không phải lệnh vận hành auth mới trên dev. [C1 auth safety cô lập](#c1-auth-safety-cô-lập) ghi đúng lệnh đã chạy.
 
 **Vận hành auth restore hoàn chỉnh C2–C4 — chưa triển khai:**
 

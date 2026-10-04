@@ -6,7 +6,7 @@
 
 **Trạng thái: PR #33 đã merge `c98bd33` (C1 `0034`), PR #34 đã merge `78e0880` (C2a `0035`), PR #35 đã merge `1d3e558`, chứa `f2ba336` (C2b `0036`). Safety vẫn pending tới C4, chỉ thử cô lập.** [Quyết định nền được ủy quyền](decisions.md#quyết-định-nền-c1-theo-ủy-quyền-2026-10-03) chọn A, baseline legacy có kiểm chứng, C1–C3 pending và tách quyền DB với trusted identity rehash. [Schema/quyền/replay/kiểm chứng C1 và bàn giao C2](c1-auth-safety-foundation.md) phân biệt phần đã triển khai với thiết kế C2–C4 dưới đây. [Origin và cách chia C2](decisions.md#chia-c2-và-chốt-origin-theo-ủy-quyền-2026-10-03) đã chốt; [C2a](c2a-login-session-predicates.md) và [C2b](c2b-reset-status.md) đã merge. [C2c được chia hai PR](decisions.md#chia-c2c-sau-merge-pr-35-2026-10-04), bắt đầu [C2c-1 bootstrap/initial receipt](tasks/m6c2b2c2c1-bootstrap-initial-receipts.md); invitation lifecycle C2c-2 và C2d còn mở. Operator/delivery/status recovery và cutover production còn mở theo milestone tương ứng; chưa CLI recovery User/Admin hoặc mở traffic. Khảo sát thiết kế gốc trên `3f2179487b1e7041af2b398f54c6ad4406510f96` (`0032`), base coding chứa PR #32 là `a5c75b88da72eaf3d8a28c0c00d82d12099f28a4`. PR #32 chỉ tài liệu; migration/kiểm trực tiếp thuộc PR C1.
 
-**Cập nhật C2:** PR #34/#35 đã merge (C2a `0035`, C2b `0036`, gồm các sửa P2). [Task C2c-1](tasks/m6c2b2c2c1-bootstrap-initial-receipts.md) chưa triển khai; safety vẫn pending tới C4, chưa mở delivery/operator C3 hoặc final callers C2d.
+**Baseline C2 trước task C2c-1:** PR #34/#35 đã merge (C2a `0035`, C2b `0036`, gồm các sửa P2). [Task C2c-1](tasks/m6c2b2c2c1-bootstrap-initial-receipts.md) khi đó chưa triển khai; safety vẫn pending tới C4, chưa mở delivery/operator C3 hoặc final callers C2d.
 
 Mục lục thiết kế:
 

@@ -63,6 +63,8 @@ Giữ `python -m app.cli.bootstrap_admin --email …`, getpass hai lần và `--
 
 ## Kiểm chứng và phần tiếp theo
 
+Code được kiểm tại `51f5714`: **597/597 API pass**, 0 failure/error/skip, 3 warning hiện có, **764,18 s**; **199** file API giữ nguyên SHA-256 trong lượt cuối. Windows ConPTY **3/3**, dump/restore thật **1/1**; đối chứng **3/3** guard bị test phát hiện (4 expected failures). Collect toàn API **1373**, còn **776 chưa chạy** trên source này. Compileall và diff check pass; web không đổi/không chạy lại. Đã kiểm label rồi dọn container/network/volume thử, xóa credentials dùng một lần; evidence giữ ngoài repo.
+
 Kết quả từng lượt, commands và node pass/fail/not-run tại [inventory](c2c1-test-inventory.json), [testing](testing.md#c2c-1-bootstrap-runtime) và [dev-setup](dev-setup.md#c2c-1-bootstrap-cô-lập). Writer fixture chỉ thay `auth_safety.cutover` ở từng test; integrity/hold/SQL/receipt/commit giữ thật. CLI stdin và Windows ConPTY thật chạy bằng runtime LOGIN; pending CLI/HTTP không patch là nhóm riêng. Đối chứng tuần tự history guard/pair constraint/singleton grants được khôi phục bytes trước suite cuối; suite giữ hash API source cố định và chặn external sync/async HTTP transport.
 
 Đã kiểm cả dump/restore DB thật: snapshot trước bootstrap → runtime tạo Admin → restore snapshot vào DB mới với journal hiện hành → hold/recover hai lần bằng recovery LOGIN. Không User/verifier/receipt/singleton được dựng lại, recovery không có EXEC creation, report vẫn safety pending và retry runtime bị history guard từ chối. Chỉ một DB writer active vào file tại mỗi bước; không thay drill backup/object-store/proxy C4.
