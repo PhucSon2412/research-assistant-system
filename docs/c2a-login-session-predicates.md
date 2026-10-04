@@ -2,7 +2,7 @@
 
 [Mục lục](README.md) · [Task gốc](tasks/m6c2b2c2a-login-session-predicates.md) · [Thiết kế](auth-restore-safety.md) · [C1](c1-auth-safety-foundation.md)
 
-**Trạng thái: triển khai trên nhánh `feat/m6c2b2c2a-login-session`, chờ review, chưa merge; safety pending tới C4.** Base sau fetch là `c98bd3335e634e61c1c213e694fefe7eef0c107b`, chứa merge PR #33 và code cuối `c647d6e`. Head source trước task `0034`, sau task `0035`; không suy revision DB dev từ source. Giữ các docs bàn giao chưa commit của orchestrator trong PR này. Origin/cách chia C2 là quyết định orchestrator theo ủy quyền; các chi tiết triển khai dưới đây do coding agent chọn trong phạm vi task, không phải quyết định trực tiếp mới của chủ dự án.
+**Trạng thái: đã merge PR #34 tại `78e0880` (gồm sửa P2 và docs pending Docker); safety pending tới C4.** [C2b reset/status](c2b-reset-status.md) tiếp tục từ main này. Base sau fetch là `c98bd3335e634e61c1c213e694fefe7eef0c107b`, chứa merge PR #33 và code cuối `c647d6e`. Head source trước task `0034`, sau task `0035`; không suy revision DB dev từ source. Giữ các docs bàn giao chưa commit của orchestrator trong PR này. Origin/cách chia C2 là quyết định orchestrator theo ủy quyền; các chi tiết triển khai dưới đây do coding agent chọn trong phạm vi task, không phải quyết định trực tiếp mới của chủ dự án.
 
 ## Predicate và ranh giới
 

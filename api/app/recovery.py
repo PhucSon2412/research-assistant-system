@@ -614,8 +614,12 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
                                    .execution_options(populate_existing=True))
     if record.kind == RESET_TOKEN_CLOSURE:
         db.execute(text("SELECT ras_auth_lock_users(:ids)"), {"ids": [uuid.UUID(record.body["user_id"])]})
-        token_row = db.scalar(select(PasswordResetToken).where(PasswordResetToken.id == uuid.UUID(record.body["token_id"]))
-                              .with_for_update().execution_options(populate_existing=True))
+        token_routines = db.scalar(text("SELECT to_regprocedure('ras_auth_token_lock(uuid,uuid[])') IS NOT NULL"))
+        if token_routines:
+            db.execute(text("SELECT ras_auth_token_lock(:uid,:ids)"),
+                       {"uid": uuid.UUID(record.body["user_id"]), "ids": [uuid.UUID(record.body["token_id"])]})
+        stmt = select(PasswordResetToken).where(PasswordResetToken.id == uuid.UUID(record.body["token_id"]))
+        token_row = db.scalar((stmt if token_routines else stmt.with_for_update()).execution_options(populate_existing=True))
     if record.kind == SESSION_REVOCATION:
         db.execute(text("SELECT ras_auth_lock_users(:ids)"), {"ids": [uuid.UUID(record.body["user_id"])]})
         routines = db.scalar(text("SELECT to_regprocedure('ras_auth_session_lock(uuid,uuid[])') IS NOT NULL"))
@@ -666,7 +670,16 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
     elif record.kind == INVITATION_CLOSURE:
         result = _apply_invitation_closure(invitation_row, record.body)
     elif record.kind == RESET_TOKEN_CLOSURE:
-        result = _apply_reset_token_closure(token_row, record.body)
+        if token_routines and token_row is not None and token_row.used_at is None and token_row.revoked_at is None:
+            db.execute(text("SELECT ras_auth_token_close(:id,:uid,:kind,:reason,:at)"),
+                       {"id": token_row.id, "uid": uuid.UUID(record.body["user_id"]),
+                        "kind": record.body["end_kind"], "reason": record.body["reason_code"],
+                        "at": datetime.fromisoformat(record.body["ended_at"])})
+            db.refresh(token_row)
+            _apply_reset_token_closure(token_row, record.body, apply=False)
+            result = "reset_token_ended"
+        else:
+            result = _apply_reset_token_closure(token_row, record.body, apply=not token_routines)
     elif record.kind == SESSION_REVOCATION:
         result = "recorded_session_absent"
         if session_row is not None:
@@ -684,7 +697,7 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
                 result = "session_already_revoked"
     else:
         result = record.kind
-    if record.kind == SESSION_REVOCATION and routines:
+    if (record.kind == SESSION_REVOCATION and routines) or (record.kind == RESET_TOKEN_CLOSURE and token_routines):
         db.execute(text("SELECT ras_auth_closure_mirror(:line,:via,:result)"), {"line": record.line,"via":via,"result":result})
         db.execute(text("SELECT ras_auth_confirm(:seq)"), {"seq": record.seq})
     else:

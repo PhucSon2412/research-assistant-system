@@ -1,5 +1,17 @@
 # Nhật ký quyết định
 
+## Sửa initial status độc lập, P2 PR #35 (2026-10-04)
+
+**Nguồn:** review tái hiện credential-only recovery của account legacy vẫn held, nhưng disable rồi enable vượt điều kiện chỉ kiểm có status operation. Điều kiện cũ không đúng baseline đã chốt; một quyết định hạn chế không chứng minh initial status.
+
+Enable nay đọc receipt lịch sử active với reason `bootstrap`, `invitation_accept` hoặc `verified_initial_status`, đúng User/domain/generation/decision/reason/time và mirror confirmed nằm trong head hiện hành. Receipt bất biến dưới User lock; commit nền vẫn kiểm journal/integrity thật cuối, không thêm khóa sau journal. Không chấp nhận `admin_disable`, `admin_enable` hoặc initial intent thiếu receipt. Account đã có chứng cứ initial status tiếp tục disable/enable bình thường; credential-only recovery không tự enable. Không thêm operator/approval C3, migration hoặc mở pending.
+
+## Triển khai C2b sau merge PR #34 (2026-10-04)
+
+**Nguồn:** chủ dự án cho phép merge PR #34 sau sửa P2 và đưa docs Docker pending vào PR, rồi tiếp tục C2b. Merge `78e0880` đã chứa commit docs `d2a4be5`; nhánh C2b bắt đầu từ main này, source `0036`. Không xin lại nền C1/Origin/cách chia C2 đã chốt theo ủy quyền. Chi tiết routine/clock/helper do coding agent chọn trong phạm vi reset + disable/enable; không là quyết định mới của chủ dự án về operator hoặc delivery production.
+
+[Hợp đồng và bàn giao C2b](c2b-reset-status.md): status-live và reset fence dùng latest confirmed head/receipt; User(s) → tokens UUID → sessions UUID → journal, clock mới cuối; trusted Argon2 ngoài transaction; credential/status receipt và closure/audit cùng batch. Commit không rõ kết quả không success/delivery. Actor Admin và CSRF/session kiểm dưới khóa và cuối journal. Enable không unquarantine hoặc mở lại token/session, enable cần chứng cứ initial status độc lập với mọi event hạn chế; approval/operator initial status thuộc C3. Quarantine issuance chỉ staging private được direct fixture kiểm, public request luôn normal; không thêm approval boolean hay chọn kênh production. C3 phải authorize delivery kiểm chứng trước expose. Pending tới C4, không tác động stack dev hoặc gọi provider.
+
 ## Sửa caller cuối của session listing, P2 PR #34 (2026-10-04)
 
 **Nguồn:** phản hồi review P2 PR #34 trong task hiện tại. Đã tái hiện bằng PostgreSQL/runtime/journal thật: dependency A thành công, transaction khác thu hồi A commit, handler vẫn trả `200` và session B. `list_live_sessions` lọc session B live không là bằng chứng actor A còn quyền. Tài liệu C2a được sửa để nêu rõ ranh giới đó.
