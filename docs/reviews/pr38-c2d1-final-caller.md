@@ -1,6 +1,8 @@
 # Review PR #38: C2d-1 final caller reads
 
-## Trạng thái sau review
+## Trạng thái sau review (lịch sử giao task)
+
+Docs review/orchestrator được giữ và đưa cùng PR C2d-2a. Triển khai mới xem [bàn giao C2d-2a](../c2d2a-resource-json-reads.md); phần bên dưới ghi nguyên trạng khảo sát trước triển khai, không cộng kết quả review vào suite mới.
 
 Chủ dự án báo đã merge; fetch ngày 2026-10-05 xác minh `origin/main=d06664e53383071237c21e802f439fda348a1afd`, chứa source review `97c49d8`; head mã nguồn `0039`. Kết luận/phép đo bên dưới là lịch sử tại thời điểm review, không phải lượt kiểm lại sau merge. Review và các cập nhật docs của orchestrator vẫn chưa commit, coding agent tiếp giữ và đưa vào PR. [Task C2d-2a](../tasks/m6c2b2c2d2a-resource-json-reads.md) mới giao, chưa triển khai; safety pending tới C4.
 

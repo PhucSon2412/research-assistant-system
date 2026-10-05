@@ -6,7 +6,11 @@
 
 Kiểm core caller sau dependency, clock sau query và DB wait, current role, A/B/Admin, private extraction, common tuple/flags/original, SQL count/page, scope churn và các thứ tự reader/writer có Event/quan sát wait thật. Chuyển fixture GET library và tách read assertions collection/discovery/citation khỏi writer/storage/provider tests cũ. Bỏ final guard/clock/current Admin/SQL scope/common tuple/resource recheck đều bị đối chứng bắt; bytes nguồn khôi phục trước suite cuối. Số thực chạy và các lượt chuẩn bị ghi riêng trong inventory, không cộng lượt chồng nhau thành full API. Safety pending tới C4; các writer/proxy/storage/drill chưa chạy được ghi not-run.
 
-## Kế hoạch kiểm C2d-2a, chưa chạy
+**Suite cuối tại code `37b7484`: 538/538 pass, 0 failure/error/skip, 1052.260 s; collect 1953 unique nodes, 1415 not-run, 3 warning hiện có.** C2d-2a 301 (13 pending HTTP thật), C2d-1 93, C2a login/session 68, citation 64, library GET 9, collection GET 1, discovery GET 1 và ORM/schema 1. JUnit khớp chính xác 538 node đã chọn, không thiếu/trùng; SHA-256 213 API Python/SQL file giữ nguyên trong suite. Không cộng các lượt chồng nhau vào kết quả cuối.
+
+Đối chứng 6/6 expected failures (không errors); web 44/44, typecheck/build đạt, browser not-run. Lượt đầy đủ 537 pass/1 fail ở test citation config đã sửa môi trường test rồi chạy lại; các lượt chuẩn bị và suite bị dừng không cộng vào 538. Chi tiết/source/hash/node/failure riêng ở inventory.
+
+## Lịch sử giao task C2d-2a trước triển khai
 
 [Prompt 13 GET library/collections/discovery](tasks/m6c2b2c2d2a-resource-json-reads.md) yêu cầu runtime/journal/head/receipt/clock thật, caller cuối và SQL ACL trước count/page, các nhánh empty/metadata-only/private extraction, current Admin sources, common tuple/file flags và resource races. Tách pending thật khỏi fixture cutover scoped; giữ assertion nghiệp vụ, không bypass protected auth hoặc đổi writer ngoài scope. Inventory phải ghi chính xác route/node/source/JUnit và not-run; test resource/core guard không hoãn tới C4.
 

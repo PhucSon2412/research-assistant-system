@@ -1113,5 +1113,6 @@
     "/library/items/{item_id}/metadata-candidates",
     "/library/items/{item_id}/coverage",
     "/library/items/{item_id}/references"
-  ]
+  ],
+  "tested_code_commit": "37b7484582184da029b121e78ac30932bceac316"
 }

@@ -2,7 +2,7 @@
 
 ## Task C2d-2a sau PR #38
 
-**Đã chốt theo ủy quyền, chưa triển khai:** [prompt C2d-2a](tasks/m6c2b2c2d2a-resource-json-reads.md) chuyển 13 GET JSON library/collections/discovery. Đầu ra: final caller/head/receipt/clock trên cùng transaction, SQL ACL trước count/page, current role/flags và kiểm resource khi revoke/membership/tombstone đổi; test runtime/race/pending và inventory route chính xác. Không migration nếu schema hiện có đủ.
+**Đã triển khai trên nhánh review:** [prompt C2d-2a](tasks/m6c2b2c2d2a-resource-json-reads.md) chuyển đúng 13 GET JSON library/collections/discovery. [Bàn giao](c2d2a-resource-json-reads.md) và [inventory kiểm](c2d2a-test-inventory.json) ghi final caller/head/receipt/clock cùng transaction, SQL ACL trước count/page, current role/flags, resource recheck và retry hữu hạn. Không migration; head source giữ `0039`. Chưa merge.
 
 Review/publication GET tách thành C2d-2b vì có grant private tạm và formatter dùng chung với writer. Writer/file/provider, C3 operator và C4 cutover vẫn riêng. [Lý do/phạm vi](decisions.md#giao-c2d-2a-sau-merge-pr-38-2026-10-05). Safety pending tới C4.
 
