@@ -299,6 +299,11 @@ def test_citation_policy_config_and_env(monkeypatch):
                     {"reconcile_max_batches": 0}):
         with pytest.raises(ValidationError):
             CitationPolicy(**invalid)
+    # This config test selects the URL mode independently of the isolated
+    # integration runner's DB-parts environment. Settings forbids both modes.
+    for name in tuple(os.environ):
+        if name.startswith("RAS_DB__"):
+            monkeypatch.delenv(name)
     monkeypatch.setenv("RAS_DATABASE_URL", "postgresql+psycopg://u:p@localhost/x")
     monkeypatch.setenv("RAS_CITATIONS__RECONCILE_BATCH_SIZE", "7")
     monkeypatch.setenv("RAS_CITATIONS__ENABLED", "false")
