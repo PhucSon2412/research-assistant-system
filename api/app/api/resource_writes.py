@@ -31,14 +31,20 @@ class Mutation:
 def _actor(db: Session, principal: Principal, csrf_token: str,
            clock: Callable[[], datetime], idle: timedelta) -> Principal:
     # Scalar reads bypass old ORM/profile/role identities. No row lock or touch.
-    row = db.execute(select(User.role, User.email, User.display_name, UserSession.csrf_token_hash)
+    row = db.execute(select(User.role, User.email, User.display_name, UserSession.csrf_token_hash,
+        UserSession.last_activity_at, UserSession.absolute_expires_at)
         .join(UserSession, UserSession.user_id == User.id)
         .where(User.id == principal.user_id, UserSession.id == principal.session_id)).one_or_none()
-    at = clock()  # after waits, resource SQL, and profile/CSRF SQL
-    if row is None or not session_live(db, principal.session_id, at, idle, user_id=principal.user_id):
+    if row is None or not session_live(db, principal.session_id, clock(), idle, user_id=principal.user_id):
         raise ApiError(401, "session_expired", clear_session=True)
     if not digest_matches(csrf_token, row.csrf_token_hash):
         raise ApiError(403, "csrf_failed")
+    # Predicate SQL itself may be slow. User + journal locks keep auth state
+    # stable for the write; sample time again after ALL SQL/checks. This also
+    # tightens the postcommit proof without adding locks or touching activity.
+    at = clock()  # after waits, resource SQL, and profile/CSRF SQL
+    if row.absolute_expires_at <= at or row.last_activity_at <= at - idle:
+        raise ApiError(401, "session_expired", clear_session=True)
     return Principal(principal.user_id, row.role, principal.session_id, row.email, row.display_name)
 
 

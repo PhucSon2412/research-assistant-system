@@ -626,3 +626,26 @@ def test_postcommit_scope_loss_no_stale_private_payload(writes,monkeypatch,key):
         elif key=='rename': assert conn.scalar(text('SELECT name FROM collections WHERE id=:i'),{'i':b.collection})=='NEW-NAME'
         else: assert conn.scalar(text('SELECT count(*) FROM collection_items WHERE collection_id=:i AND item_id=:p'),{'i':b.collection,'p':b.ids.item})==1
     api_pool_clean()
+
+
+@pytest.mark.parametrize('key', ROUTES)
+def test_clock_after_final_predicate_before_commit(writes,monkeypatch,key):
+    b=writes;before=business(b);audit=audits(b);live=resource_writes.session_live;commit=Session.commit
+    predicates=[];commits=[]
+    def slow_predicate(db,*args,**kw):
+        result=live(db,*args,**kw);predicates.append(1)
+        if len(predicates)==3:
+            # The real final predicate completed using its input time, but SQL
+            # latency crossed idle expiry before control returned to the writer.
+            b.at=NOW+timedelta(minutes=30)
+        return result
+    def recorded_commit(db):
+        if db.get_bind() is get_engine(): commits.append(1)
+        return commit(db)
+    monkeypatch.setattr(resource_writes,'session_live',slow_predicate)
+    monkeypatch.setattr(Session,'commit',recorded_commit)
+    r=request(b,key)
+    assert r.status_code==401 and r.json()=={'error':'session_expired'},r.text
+    assert len(commits)==1  # only dependency activity; no business commit started
+    assert business(b)==before and audits(b)==audit
+    api_pool_clean()
