@@ -4,6 +4,8 @@
 
 Base fetch ngày 2026-10-05: `d06664e53383071237c21e802f439fda348a1afd`, merge PR #38; nhánh `feat/m6c2b2c2d2a-resource-json-reads`. Không migration, head source `0039`; không suy revision DB dev. Giữ docs orchestrator/review #38 cùng PR. **Safety pending tới C4**, chỉ kiểm cô lập.
 
+**Review độc lập PR #39 tại `5d291c0`: 313/313 test GET/ORM chọn pass**, thêm 1 ca ID ngoài repo pass và web 44/44 pass. Không phát hiện điểm chặn merge trong phạm vi C2d-2a; PR chưa merge. [Phạm vi/chứng cứ/giới hạn](reviews/pr39-c2d2a-resource-reads.md). Giữ riêng với 538/6 đối chứng của agent bên dưới; không coi là full inventory/cutover.
+
 ## Boundary và transaction
 
 13 handler GET gọi riêng [`resource_json`](../api/app/api/resource_reads.py); `_read_*` giữ SQL ACL, shape, ordering/pagination và formatter cũ. Writer/PATCH, collection CRUD, search/RAG/file/review/publication không đi qua boundary mới. `_item_out`, `_out`, các gate SQL và helper citations dùng chung không được gắn auth guard hoặc đổi transaction của writer.
@@ -21,7 +23,7 @@ Thứ tự:
 
 Các SELECT ở READ COMMITTED không tự tạo snapshot nhất quán. Khóa bảo vệ quyền của rows/flags trong response; shared journal chặn auth/common revoke đã tuân thủ journal protocol; parent collection và citation advisory bảo vệ scope liên quan. So hai quan sát phát hiện churn không được các khóa này bao phủ (ví dụ thêm item mới làm count/page đổi). Không tuyên bố snapshot toàn thư viện, chống DBA ghi SQL ngoài protocol hoặc count bất biến khi có dữ liệu mới sau boundary.
 
-`401 session_expired` + clear cookie khi exact caller/predicate/TTL mất hiệu lực; sources current role không Admin → `403 forbidden`; integrity/hold/pending hoặc resource lock timeout → `503 service_recovering`. Resource không còn quyền → `404 not_found`, kể cả mất trong lượt đọc lại; auth được kiểm lại trước trả lỗi đó. Khóa tài nguyên dùng timeout config `recovery.gate_lock_timeout_ms`, không giá trị timeout rải rác. Malformed/missing IDs vẫn 404; shape của mọi 200 giữ nguyên.
+`401 session_expired` + clear cookie khi exact caller/predicate/TTL mất hiệu lực; sources current role không Admin → `403 forbidden`; integrity/hold/pending hoặc resource lock timeout → `503 service_recovering`. Resource không còn quyền → `404 not_found`, kể cả mất trong lượt đọc lại; auth được kiểm lại trước trả lỗi đó. Khóa tài nguyên dùng timeout config `recovery.gate_lock_timeout_ms`, không giá trị timeout rải rác. UUID string sai ở library/discovery vẫn 404; path `collection_id` khai báo UUID nên sai định dạng vẫn `422 invalid_request`, UUID hợp lệ vắng/ngoài quyền trả 404. Shape của mọi 200 giữ nguyên.
 
 ## Map từng route
 

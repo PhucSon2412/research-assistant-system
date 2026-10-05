@@ -20,6 +20,7 @@ Khi có thay đổi quyết định, cập nhật tài liệu liên quan cùng t
 
 | Tài liệu | Nội dung |
 | --- | --- |
+| [Review PR #39](reviews/pr39-c2d2a-resource-reads.md) | 313 test chọn độc lập + 1 contract ID và 44 web pass; không phát hiện điểm chặn C2d-2a; PR chưa merge, safety pending |
 | [Bàn giao C2d-2a](c2d2a-resource-json-reads.md) | 13 GET, resource locks/requery/clock, bounded scope churn; safety pending |
 | [Inventory kiểm C2d-2a](c2d2a-test-inventory.json) | Source/node/JUnit, đối chứng, lỗi chuẩn bị, cleanup và not-run |
 | [Prompt coding C2d-2a](tasks/m6c2b2c2d2a-resource-json-reads.md) | 13 GET library/collections/discovery: caller/clock/current role, SQL ACL trước count/page và resource boundary; đã triển khai trên nhánh review, xem [bàn giao](c2d2a-resource-json-reads.md) |

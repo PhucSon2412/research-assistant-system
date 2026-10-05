@@ -1,5 +1,11 @@
 # Chiến lược kiểm thử
 
+## Review độc lập PR #39
+
+Source `5d291c0`, base `d06664e`, migration `0039` giữ nguyên: **313/313 test GET/ORM chọn pass**, 0 failure/error/skip, **692,695 s**, 3 warning hiện có; gồm C2d-2a 301 (13 pending thật), library GET 9, collection GET 1, discovery GET 1, ORM/schema 1. Thêm **1 ca ID ngoài repo pass**; web `npm test --prefix web` **44/44 pass**. JUnit khớp chính xác 313 node unique, hash 213 API Python/SQL file không đổi; inventory AST 63/63 route, 13 boundary mới.
+
+[Review, lỗi tooling, cleanup và giới hạn](reviews/pr39-c2d2a-resource-reads.md). Không phát hiện điểm chặn merge trong phạm vi C2d-2a; PR chưa merge. Không cộng với 538 hoặc 6 đối chứng của agent; reviewer chưa chạy 1640 node API còn lại, web typecheck/build/browser, storage/provider/drill/cutover hay đối chứng source. PostgreSQL/runtime/recovery/journal riêng, chỉ cutover fixture scoped; không `.env`, dữ liệu dev hoặc operational pricing/safety. Safety pending tới C4.
+
 ## C2d-2a resource JSON reads
 
 [Bàn giao 13 GET](c2d2a-resource-json-reads.md) · [Inventory source/node/JUnit](c2d2a-test-inventory.json). Nghiệp vụ dùng cutover scoped, runtime/recovery LOGIN và predicate/receipt/head/journal/SQL thật; pending HTTP của cả 13 GET có nhóm riêng, health sống/ready đóng. Account qua bootstrap/invitation/login thật; resource/rights setup đặc quyền riêng, không grant/bypass runtime.

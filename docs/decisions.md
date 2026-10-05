@@ -1,5 +1,15 @@
 # Nhật ký quyết định
 
+## Review PR #39 C2d-2a (2026-10-05)
+
+Reviewer fetch/xác minh source `5d291c0` khớp nhánh remote, base `d06664e`, head source `0039`, không migration. Đối chiếu 13 GET với task và inventory: boundary read-only riêng, SQL ACL trước count/page, item/collection/citation rồi journal, caller/role/clock mới, resource requery và retry hữu hạn; không mở private cho Admin hay chuyển writer ngoài scope. **Không phát hiện điểm chặn merge trong phạm vi C2d-2a; có thể merge PR #39.** PR chưa merge; reviewer không merge/push/comment. [Review/chứng cứ/giới hạn](reviews/pr39-c2d2a-resource-reads.md).
+
+Kiểm độc lập **313/313 pass** (301 C2d-2a, 9 library GET, 1 collection GET, 1 discovery GET, 1 ORM/schema), 0 failure/error/skip, **692,695 s**, 3 warning hiện có; thêm **1 ca ID ngoài repo pass** và **web 44/44 pass**. JUnit đúng 313 node đã chọn, 213 file API giữ hash, caller inventory khớp 63/63 route. Runtime/journal/PostgreSQL thử riêng, chỉ fixture cutover scoped, external HTTP bị chặn; không cộng với suite 538/đối chứng 6 của agent hoặc báo 1640 node còn lại đã chạy.
+
+Sửa nhỏ trong bàn giao: collection path UUID sai trả `422 invalid_request`, library/discovery string UUID sai và UUID hợp lệ vắng/ngoài quyền trả 404 theo route hiện hành. Không đổi code/status API. Test ID ngoài repo đầu giả định key `detail` mặc định thay vì handler `fields`, nên 1 fail expectation; sửa test reviewer rồi 1 pass, ghi riêng trong báo cáo. Container/anonymous volume thử và credentials đã dọn sau kiểm ownership; metadata 9 container dev giữ nguyên, không query DB dev/`.env`/provider hoặc đổi pricing/safety.
+
+Docs review còn chưa commit, coding agent giữ và đưa cùng PR. Safety pending tới C4; C2d-2b/writer/file/provider/tổng hồi quy và C3/C4 còn riêng.
+
 ## Triển khai C2d-2a trên nhánh review (2026-10-05)
 
 Fetch lại xác minh base `d06664e53383071237c21e802f439fda348a1afd`, chứa merge PR #38; source migration giữ `0039`. Giữ docs orchestrator/review chưa commit trong cùng PR. [Hợp đồng/boundary từng GET](c2d2a-resource-json-reads.md), [inventory](c2d2a-test-inventory.json); các lựa chọn dưới do coding agent trong phạm vi task, không là quyết định trực tiếp mới của chủ dự án.
