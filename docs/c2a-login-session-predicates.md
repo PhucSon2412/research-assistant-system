@@ -1,5 +1,9 @@
 # C2a: login/session, predicate và bàn giao
 
+## Trạng thái sau C2c-2
+
+PR #37 đã merge `ca4a623`, head mã nguồn `0039`. Bảng helper/inventory C2a bên dưới ghi source tại C2a; các dòng reset/status/bootstrap/invitation chưa chuyển khi đó là **lịch sử**, đã được chuyển trong C2b/C2c. [Bàn giao C2c-2](c2c2-invitation-runtime.md) và [task C2d-1](tasks/m6c2b2c2d1-final-caller-reads.md) là nguồn tiếp để xây inventory caller hiện hành. [C2d-1 đã triển khai trên nhánh review](c2d1-final-caller-reads.md), có caller inventory hiện hành; không coi final checks toàn hệ thống đã hoàn tất. Safety pending tới C4.
+
 [Mục lục](README.md) · [Task gốc](tasks/m6c2b2c2a-login-session-predicates.md) · [Thiết kế](auth-restore-safety.md) · [C1](c1-auth-safety-foundation.md)
 
 **Trạng thái: đã merge PR #34 tại `78e0880` (gồm sửa P2 và docs pending Docker); safety pending tới C4.** [C2b reset/status](c2b-reset-status.md) tiếp tục từ main này. Base sau fetch là `c98bd3335e634e61c1c213e694fefe7eef0c107b`, chứa merge PR #33 và code cuối `c647d6e`. Head source trước task `0034`, sau task `0035`; không suy revision DB dev từ source. Giữ các docs bàn giao chưa commit của orchestrator trong PR này. Origin/cách chia C2 là quyết định orchestrator theo ủy quyền; các chi tiết triển khai dưới đây do coding agent chọn trong phạm vi task, không phải quyết định trực tiếp mới của chủ dự án.

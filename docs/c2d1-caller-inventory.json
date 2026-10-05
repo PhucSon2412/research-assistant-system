@@ -1,0 +1,1069 @@
+{
+  "base": "ca4a623ea9cd4d2f8454659a1d66c48dbf8093d0",
+  "source_migration": "0039",
+  "scope": "Every route decorator in actual API source, including public auth. Internal identity/resource/provider/job helpers are mapped in handoff.",
+  "safety": "pending until C4",
+  "route_count": 63,
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/admin/invitations",
+      "function": "create_invitation",
+      "source": "api/app/api/routes/admin.py",
+      "line": 64,
+      "dependencies": [
+        "require_admin",
+        "get_db",
+        "get_now",
+        "get_settings",
+        "get_delivery",
+        "get_clock"
+      ],
+      "group": "admin",
+      "final_status": "C2b/C2c writer guards; list_users/dev_outbox C2d-1",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/invitations",
+      "function": "list_invitations",
+      "source": "api/app/api/routes/admin.py",
+      "line": 100,
+      "dependencies": [
+        "require_admin",
+        "get_db",
+        "get_clock"
+      ],
+      "group": "admin",
+      "final_status": "C2b/C2c writer guards; list_users/dev_outbox C2d-1",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/invitations/{invitation_id}/revoke",
+      "function": "revoke_invitation",
+      "source": "api/app/api/routes/admin.py",
+      "line": 108,
+      "dependencies": [
+        "require_admin",
+        "get_db",
+        "get_now",
+        "get_clock"
+      ],
+      "group": "admin",
+      "final_status": "C2b/C2c writer guards; list_users/dev_outbox C2d-1",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/users",
+      "function": "list_users",
+      "source": "api/app/api/routes/admin.py",
+      "line": 125,
+      "dependencies": [
+        "require_admin",
+        "get_db",
+        "get_settings",
+        "get_clock"
+      ],
+      "group": "admin",
+      "final_status": "completed C2d-1",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/users/{user_id}/disable",
+      "function": "disable_user",
+      "source": "api/app/api/routes/admin.py",
+      "line": 146,
+      "dependencies": [
+        "require_admin",
+        "get_db",
+        "get_now",
+        "get_clock"
+      ],
+      "group": "admin",
+      "final_status": "C2b/C2c writer guards; list_users/dev_outbox C2d-1",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/users/{user_id}/enable",
+      "function": "enable_user",
+      "source": "api/app/api/routes/admin.py",
+      "line": 158,
+      "dependencies": [
+        "require_admin",
+        "get_db",
+        "get_now",
+        "get_clock"
+      ],
+      "group": "admin",
+      "final_status": "C2b/C2c writer guards; list_users/dev_outbox C2d-1",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/dev-outbox",
+      "function": "dev_outbox",
+      "source": "api/app/api/routes/admin.py",
+      "line": 170,
+      "dependencies": [
+        "require_admin",
+        "get_db",
+        "get_delivery",
+        "get_settings",
+        "get_clock"
+      ],
+      "group": "admin",
+      "final_status": "completed C2d-1",
+      "direct_transaction_calls": [
+        "db.rollback"
+      ],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/csrf",
+      "function": "csrf",
+      "source": "api/app/api/routes/auth.py",
+      "line": 88,
+      "dependencies": [
+        "get_db",
+        "get_now",
+        "get_settings",
+        "get_clock"
+      ],
+      "group": "auth",
+      "final_status": "C2a/C2b/C2c final guards; current_session C2d-1",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/login",
+      "function": "login_route",
+      "source": "api/app/api/routes/auth.py",
+      "line": 118,
+      "dependencies": [
+        "get_db",
+        "get_now",
+        "get_settings",
+        "get_clock"
+      ],
+      "group": "auth",
+      "final_status": "C2a/C2b/C2c final guards; current_session C2d-1",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/logout",
+      "function": "logout",
+      "source": "api/app/api/routes/auth.py",
+      "line": 138,
+      "dependencies": [
+        "get_auth_write_context",
+        "get_db",
+        "get_now",
+        "get_settings",
+        "get_clock"
+      ],
+      "group": "auth",
+      "final_status": "C2a/C2b/C2c final guards; current_session C2d-1",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/session",
+      "function": "current_session",
+      "source": "api/app/api/routes/auth.py",
+      "line": 155,
+      "dependencies": [
+        "get_session_context",
+        "get_db",
+        "get_settings",
+        "get_clock"
+      ],
+      "group": "auth",
+      "final_status": "completed C2d-1",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/sessions",
+      "function": "my_sessions",
+      "source": "api/app/api/routes/auth.py",
+      "line": 171,
+      "dependencies": [
+        "get_session_context",
+        "get_db",
+        "get_now",
+        "get_settings",
+        "get_clock"
+      ],
+      "group": "auth",
+      "final_status": "C2a/C2b/C2c final guards; current_session C2d-1",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/sessions/{session_id}/revoke",
+      "function": "revoke_my_session",
+      "source": "api/app/api/routes/auth.py",
+      "line": 198,
+      "dependencies": [
+        "get_auth_write_context",
+        "get_db",
+        "get_now",
+        "get_settings",
+        "get_clock"
+      ],
+      "group": "auth",
+      "final_status": "C2a/C2b/C2c final guards; current_session C2d-1",
+      "direct_transaction_calls": [
+        "db.rollback"
+      ],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/sessions/revoke-others",
+      "function": "revoke_other_sessions",
+      "source": "api/app/api/routes/auth.py",
+      "line": 223,
+      "dependencies": [
+        "get_auth_write_context",
+        "get_db",
+        "get_now",
+        "get_clock"
+      ],
+      "group": "auth",
+      "final_status": "C2a/C2b/C2c final guards; current_session C2d-1",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/invitations/inspect",
+      "function": "inspect_invitation",
+      "source": "api/app/api/routes/auth.py",
+      "line": 238,
+      "dependencies": [
+        "get_db",
+        "get_clock"
+      ],
+      "group": "auth",
+      "final_status": "C2a/C2b/C2c final guards; current_session C2d-1",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/invitations/accept",
+      "function": "accept_invitation",
+      "source": "api/app/api/routes/auth.py",
+      "line": 249,
+      "dependencies": [
+        "get_clock",
+        "get_db",
+        "get_now",
+        "get_settings"
+      ],
+      "group": "auth",
+      "final_status": "C2a/C2b/C2c final guards; current_session C2d-1",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/password-reset/request",
+      "function": "request_password_reset",
+      "source": "api/app/api/routes/auth.py",
+      "line": 274,
+      "dependencies": [
+        "get_db",
+        "get_now",
+        "get_settings",
+        "get_delivery",
+        "get_clock"
+      ],
+      "group": "auth",
+      "final_status": "C2a/C2b/C2c final guards; current_session C2d-1",
+      "direct_transaction_calls": [
+        "db.rollback"
+      ],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/password-reset/confirm",
+      "function": "confirm_password_reset",
+      "source": "api/app/api/routes/auth.py",
+      "line": 309,
+      "dependencies": [
+        "get_db",
+        "get_now",
+        "get_settings",
+        "get_clock"
+      ],
+      "group": "auth",
+      "final_status": "C2a/C2b/C2c final guards; current_session C2d-1",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/collections",
+      "function": "list_collections",
+      "source": "api/app/api/routes/collections.py",
+      "line": 51,
+      "dependencies": [
+        "get_principal",
+        "get_db"
+      ],
+      "group": "json-resource",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/collections",
+      "function": "create_collection",
+      "source": "api/app/api/routes/collections.py",
+      "line": 58,
+      "dependencies": [
+        "get_principal",
+        "get_db"
+      ],
+      "group": "json-resource",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [
+        "db.commit"
+      ],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "PATCH",
+      "path": "/collections/{collection_id}",
+      "function": "rename_collection",
+      "source": "api/app/api/routes/collections.py",
+      "line": 68,
+      "dependencies": [
+        "get_principal",
+        "get_db"
+      ],
+      "group": "json-resource",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [
+        "db.commit"
+      ],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "DELETE",
+      "path": "/collections/{collection_id}",
+      "function": "delete_collection",
+      "source": "api/app/api/routes/collections.py",
+      "line": 79,
+      "dependencies": [
+        "get_principal",
+        "get_db"
+      ],
+      "group": "json-resource",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [
+        "db.commit",
+        "db.rollback"
+      ],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/collections/{collection_id}/items",
+      "function": "list_collection_items",
+      "source": "api/app/api/routes/collections.py",
+      "line": 92,
+      "dependencies": [
+        "get_principal",
+        "get_db"
+      ],
+      "group": "json-resource",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/collections/{collection_id}/items",
+      "function": "add_collection_item",
+      "source": "api/app/api/routes/collections.py",
+      "line": 122,
+      "dependencies": [
+        "get_principal",
+        "get_db"
+      ],
+      "group": "json-resource",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [
+        "db.commit"
+      ],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "DELETE",
+      "path": "/collections/{collection_id}/items/{item_id}",
+      "function": "remove_collection_item",
+      "source": "api/app/api/routes/collections.py",
+      "line": 135,
+      "dependencies": [
+        "get_principal",
+        "get_db"
+      ],
+      "group": "json-resource",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [
+        "db.commit"
+      ],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/discovery/topics",
+      "function": "list_topics",
+      "source": "api/app/api/routes/discovery.py",
+      "line": 26,
+      "dependencies": [
+        "get_principal",
+        "get_db"
+      ],
+      "group": "json-resource",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/discovery/papers",
+      "function": "list_papers",
+      "source": "api/app/api/routes/discovery.py",
+      "line": 31,
+      "dependencies": [
+        "get_principal",
+        "get_db"
+      ],
+      "group": "json-resource",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/discovery/papers/{paper_id}/citing-items",
+      "function": "citing_items",
+      "source": "api/app/api/routes/discovery.py",
+      "line": 59,
+      "dependencies": [
+        "get_principal",
+        "get_db"
+      ],
+      "group": "json-resource",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/discovery/sources",
+      "function": "source_status",
+      "source": "api/app/api/routes/discovery.py",
+      "line": 94,
+      "dependencies": [
+        "require_admin",
+        "get_db"
+      ],
+      "group": "json-resource",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/library/items",
+      "function": "list_items",
+      "source": "api/app/api/routes/library.py",
+      "line": 134,
+      "dependencies": [
+        "get_principal",
+        "get_db"
+      ],
+      "group": "json-resource",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/library/items/count",
+      "function": "count_items",
+      "source": "api/app/api/routes/library.py",
+      "line": 162,
+      "dependencies": [
+        "get_principal",
+        "get_db"
+      ],
+      "group": "json-resource",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/library/items/{item_id}",
+      "function": "get_item",
+      "source": "api/app/api/routes/library.py",
+      "line": 170,
+      "dependencies": [
+        "get_principal",
+        "get_db"
+      ],
+      "group": "json-resource",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/library/items/{item_id}/chunks",
+      "function": "get_chunks",
+      "source": "api/app/api/routes/library.py",
+      "line": 228,
+      "dependencies": [
+        "get_principal",
+        "get_db"
+      ],
+      "group": "json-resource",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/library/items/{item_id}/metadata-candidates",
+      "function": "get_metadata_candidates",
+      "source": "api/app/api/routes/library.py",
+      "line": 253,
+      "dependencies": [
+        "get_principal",
+        "get_db"
+      ],
+      "group": "json-resource",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/library/items/{item_id}/coverage",
+      "function": "get_coverage",
+      "source": "api/app/api/routes/library.py",
+      "line": 269,
+      "dependencies": [
+        "get_principal",
+        "get_db"
+      ],
+      "group": "json-resource",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/library/items/{item_id}/references",
+      "function": "get_references",
+      "source": "api/app/api/routes/library.py",
+      "line": 295,
+      "dependencies": [
+        "get_principal",
+        "get_db"
+      ],
+      "group": "json-resource",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "PATCH",
+      "path": "/library/items/{item_id}",
+      "function": "update_item",
+      "source": "api/app/api/routes/library.py",
+      "line": 316,
+      "dependencies": [
+        "get_principal",
+        "get_db",
+        "get_now"
+      ],
+      "group": "json-resource",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [
+        "db.commit",
+        "db.rollback"
+      ],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/pending-publications",
+      "function": "list_pending",
+      "source": "api/app/api/routes/publications.py",
+      "line": 223,
+      "dependencies": [
+        "require_admin",
+        "get_db"
+      ],
+      "group": "publication-write",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/pending-publications/{item_id}",
+      "function": "get_pending",
+      "source": "api/app/api/routes/publications.py",
+      "line": 236,
+      "dependencies": [
+        "require_admin",
+        "get_db"
+      ],
+      "group": "publication-write",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/common-copies",
+      "function": "list_copies",
+      "source": "api/app/api/routes/publications.py",
+      "line": 244,
+      "dependencies": [
+        "require_admin",
+        "get_db",
+        "get_now"
+      ],
+      "group": "publication-write",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/common-copies/{item_id}",
+      "function": "get_copy",
+      "source": "api/app/api/routes/publications.py",
+      "line": 267,
+      "dependencies": [
+        "require_admin",
+        "get_db",
+        "get_now"
+      ],
+      "group": "publication-write",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/common-copies/{item_id}/publish",
+      "function": "publish_copy",
+      "source": "api/app/api/routes/publications.py",
+      "line": 273,
+      "dependencies": [
+        "require_admin",
+        "get_db",
+        "get_now",
+        "_storage",
+        "require_trusted_origin"
+      ],
+      "group": "publication-write",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/common-copies/{item_id}/index",
+      "function": "index_copy",
+      "source": "api/app/api/routes/publications.py",
+      "line": 286,
+      "dependencies": [
+        "require_admin",
+        "get_db",
+        "get_now",
+        "require_trusted_origin"
+      ],
+      "group": "publication-write",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/common-copies/{item_id}/revoke",
+      "function": "revoke_copy",
+      "source": "api/app/api/routes/publications.py",
+      "line": 300,
+      "dependencies": [
+        "require_admin",
+        "get_db",
+        "get_now",
+        "get_settings",
+        "require_trusted_origin"
+      ],
+      "group": "publication-write",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/rag/ask",
+      "function": "ask",
+      "source": "api/app/api/routes/rag.py",
+      "line": 32,
+      "dependencies": [
+        "get_principal",
+        "get_db",
+        "get_settings"
+      ],
+      "group": "rag-provider",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/review-requests/notice",
+      "function": "notice",
+      "source": "api/app/api/routes/reviews.py",
+      "line": 249,
+      "dependencies": [
+        "get_principal",
+        "get_settings"
+      ],
+      "group": "review-write-file",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/review-requests",
+      "function": "list_own",
+      "source": "api/app/api/routes/reviews.py",
+      "line": 254,
+      "dependencies": [
+        "get_principal",
+        "get_db"
+      ],
+      "group": "review-write-file",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/review-requests",
+      "function": "submit",
+      "source": "api/app/api/routes/reviews.py",
+      "line": 271,
+      "dependencies": [
+        "get_principal",
+        "get_db",
+        "get_now",
+        "get_settings",
+        "require_trusted_origin"
+      ],
+      "group": "review-write-file",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [
+        "db.commit",
+        "db.rollback"
+      ],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/review-requests/{request_id}",
+      "function": "get_own",
+      "source": "api/app/api/routes/reviews.py",
+      "line": 317,
+      "dependencies": [
+        "get_principal",
+        "get_db"
+      ],
+      "group": "review-write-file",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/review-requests/{request_id}/withdraw",
+      "function": "withdraw",
+      "source": "api/app/api/routes/reviews.py",
+      "line": 322,
+      "dependencies": [
+        "get_principal",
+        "get_db",
+        "get_now",
+        "require_trusted_origin"
+      ],
+      "group": "review-write-file",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [
+        "db.rollback"
+      ],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/review-requests",
+      "function": "admin_list",
+      "source": "api/app/api/routes/reviews.py",
+      "line": 374,
+      "dependencies": [
+        "require_admin",
+        "get_db"
+      ],
+      "group": "review-write-file",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/review-requests/{request_id}",
+      "function": "admin_get",
+      "source": "api/app/api/routes/reviews.py",
+      "line": 393,
+      "dependencies": [
+        "require_admin",
+        "get_db"
+      ],
+      "group": "review-write-file",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/review-requests/{request_id}/files/{file_id}/original",
+      "function": "admin_original",
+      "source": "api/app/api/routes/reviews.py",
+      "line": 413,
+      "dependencies": [
+        "require_admin",
+        "get_db",
+        "_storage"
+      ],
+      "group": "review-write-file",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [
+        "db.commit",
+        "db.rollback"
+      ],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/review-requests/{request_id}/reject",
+      "function": "admin_reject",
+      "source": "api/app/api/routes/reviews.py",
+      "line": 486,
+      "dependencies": [
+        "require_admin",
+        "get_db",
+        "get_now",
+        "require_trusted_origin"
+      ],
+      "group": "review-write-file",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [
+        "db.rollback"
+      ],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/admin/review-requests/{request_id}/approve",
+      "function": "admin_approve",
+      "source": "api/app/api/routes/reviews.py",
+      "line": 512,
+      "dependencies": [
+        "require_admin",
+        "get_db",
+        "get_now",
+        "_storage",
+        "require_trusted_origin"
+      ],
+      "group": "review-write-file",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/search",
+      "function": "search_route",
+      "source": "api/app/api/routes/search.py",
+      "line": 37,
+      "dependencies": [
+        "get_principal",
+        "get_db",
+        "get_settings"
+      ],
+      "group": "search-provider",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/search/chunks/{chunk_id}",
+      "function": "open_source_chunk",
+      "source": "api/app/api/routes/search.py",
+      "line": 44,
+      "dependencies": [
+        "get_principal",
+        "get_db"
+      ],
+      "group": "search-provider",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/uploads/notice",
+      "function": "notice",
+      "source": "api/app/api/routes/uploads.py",
+      "line": 58,
+      "dependencies": [
+        "get_principal",
+        "get_settings"
+      ],
+      "group": "file-upload",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "POST",
+      "path": "/uploads/intents",
+      "function": "create_intent",
+      "source": "api/app/api/routes/uploads.py",
+      "line": 63,
+      "dependencies": [
+        "get_principal",
+        "get_db",
+        "get_now",
+        "get_settings"
+      ],
+      "group": "file-upload",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [
+        "db.commit"
+      ],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "PUT",
+      "path": "/uploads/original",
+      "function": "upload_original",
+      "source": "api/app/api/routes/uploads.py",
+      "line": 147,
+      "dependencies": [
+        "get_principal",
+        "get_db",
+        "get_now",
+        "get_settings",
+        "_storage"
+      ],
+      "group": "file-upload",
+      "final_status": "open C2d",
+      "direct_transaction_calls": [
+        "db.commit",
+        "db.rollback"
+      ],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/files/{file_id}/original",
+      "function": "download_original",
+      "source": "api/app/api/routes/uploads.py",
+      "line": 244,
+      "dependencies": [
+        "get_principal",
+        "get_db",
+        "get_clock",
+        "get_settings",
+        "_storage"
+      ],
+      "group": "file-upload",
+      "final_status": "private final missing; common final session exists, binding/postcommit drill open",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/healthz",
+      "function": "healthz",
+      "source": "api/app/main.py",
+      "line": 45,
+      "dependencies": [],
+      "group": "health-readiness",
+      "final_status": "health alive; readiness checks real recovery/pending gate",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    },
+    {
+      "method": "GET",
+      "path": "/readyz",
+      "function": "readyz",
+      "source": "api/app/main.py",
+      "line": 51,
+      "dependencies": [],
+      "group": "health-readiness",
+      "final_status": "health alive; readiness checks real recovery/pending gate",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+    }
+  ],
+  "source_sha256": {
+    "api/app/api/routes/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "api/app/api/routes/admin.py": "24e26c2f6f3779098cbcae0bfee4ce5c5e90d11a799f15381d872683234b2ba0",
+    "api/app/api/routes/auth.py": "792e7c9f86099296ed9dbd3e97cf7a2e98096fd968bff2502de060453db0a8c1",
+    "api/app/api/routes/collections.py": "8d014aed105b6e835d96d00d24317e9750f89088200fb4aa9a95218cda4a6f00",
+    "api/app/api/routes/discovery.py": "280be63d5811b2157b894a2bb8ca45fed7d92485e80b2cb835e48a064a2390fb",
+    "api/app/api/routes/library.py": "01d67e95e27167fcceab22fedf954eb3de7dfb5315c0b99fc781c64be20abe97",
+    "api/app/api/routes/publications.py": "1fa378c18791ab64044f81e794378e78251ec27addd5716b829784d8fbb872a9",
+    "api/app/api/routes/rag.py": "fa890ce04f01282e215198acf7016e6537c9afe58a06f90950b0b3521df4c84b",
+    "api/app/api/routes/reviews.py": "8b5cb817c465f20af4da0aaa0dc5205d3ba0e55502efbdf5baf14322f3809570",
+    "api/app/api/routes/search.py": "5b8c8b1c8afa24821d041d7bd9a765915b5ea8baf10d873c8a8d6803816321e7",
+    "api/app/api/routes/uploads.py": "4cae5e01afd3544699ec89e044d8d49ba8a1e4f5bcbed9a464501ac257aad74a",
+    "api/app/main.py": "b53f13e8e5dbdbed1de23410c7967298a9e1123a7411730f5d93f4721421f93e"
+  }
+}
