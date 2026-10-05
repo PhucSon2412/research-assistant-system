@@ -9,8 +9,10 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_principal
+from app.api.deps import get_clock, get_db, get_principal
 from app.api.errors import ApiError
+from app.api.resource_reads import resource_json
+from app.config import Settings, get_settings
 from app.authz import Principal, common_fulltext_items_clause, visible_items_clause
 from app.models import Collection, CollectionItem, LibraryItem
 from app.models.enums import ContentStatus, Visibility
@@ -48,7 +50,15 @@ def _out(collection: Collection) -> dict:
 
 
 @router.get("")
-def list_collections(principal: Principal = Depends(get_principal), db: Session = Depends(get_db)) -> dict:
+def list_collections(principal: Principal = Depends(get_principal), db: Session = Depends(get_db),
+    clock=Depends(get_clock), settings: Settings = Depends(get_settings),
+) -> dict:
+    return resource_json(db, principal, clock=clock, idle=settings.auth.session_idle,
+        read=lambda current: _read_list_collections(principal=current, db=db),
+        collection_ids=lambda data: [row["id"] for row in data["collections"]])
+
+
+def _read_list_collections(principal: Principal, db: Session) -> dict:
     rows = db.scalars(select(Collection).where(Collection.owner_user_id == principal.user_id)
                       .order_by(Collection.created_at, Collection.id)).all()
     return {"collections": [_out(row) for row in rows]}
@@ -91,7 +101,17 @@ def delete_collection(collection_id: uuid.UUID, principal: Principal = Depends(g
 @router.get("/{collection_id}/items")
 def list_collection_items(collection_id: uuid.UUID, limit: int = Query(20, ge=1, le=100),
                           offset: int = Query(0, ge=0, le=100_000),
-                          principal: Principal = Depends(get_principal), db: Session = Depends(get_db)) -> dict:
+                          principal: Principal = Depends(get_principal), db: Session = Depends(get_db),
+    clock=Depends(get_clock), settings: Settings = Depends(get_settings),
+) -> dict:
+    return resource_json(db, principal, clock=clock, idle=settings.auth.session_idle,
+        read=lambda current: _read_list_collection_items(collection_id=collection_id, limit=limit, offset=offset, principal=current, db=db),
+        item_ids=lambda data: [row["id"] for row in data["items"]], collection_ids=lambda data: [collection_id])
+
+
+def _read_list_collection_items(collection_id: uuid.UUID, limit: int,
+                          offset: int,
+                          principal: Principal, db: Session) -> dict:
     collection = _owned(db, principal, collection_id)
     clause = (CollectionItem.collection_id == collection.id, visible_items_clause(principal))
     total = db.scalar(select(func.count()).select_from(CollectionItem)

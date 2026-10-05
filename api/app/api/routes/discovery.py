@@ -12,8 +12,10 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_principal, require_admin
+from app.api.deps import get_clock, get_db, get_principal, require_admin
 from app.api.errors import ApiError
+from app.api.resource_reads import resource_json
+from app.config import Settings, get_settings
 from app.authz import Principal, m2a_private_derivatives_clause
 from app.citations import RELATION_NOTE, fresh_linked_clause, hidden_discovery_clause
 from app.models import LibraryItem, ReferenceCitationLink, ReferenceEntry
@@ -23,7 +25,14 @@ router = APIRouter(prefix="/discovery", tags=["discovery"])
 
 
 @router.get("/topics")
-def list_topics(_: Principal = Depends(get_principal), db: Session = Depends(get_db)) -> dict:
+def list_topics(principal: Principal = Depends(get_principal), db: Session = Depends(get_db),
+    clock=Depends(get_clock), settings: Settings = Depends(get_settings),
+) -> dict:
+    return resource_json(db, principal, clock=clock, idle=settings.auth.session_idle,
+        read=lambda current: _read_list_topics(principal=current, db=db))
+
+
+def _read_list_topics(principal: Principal, db: Session) -> dict:
     return {"topics": db.scalars(select(DiscoverySource.topic).order_by(DiscoverySource.topic)).all()}
 
 
@@ -31,7 +40,18 @@ def list_topics(_: Principal = Depends(get_principal), db: Session = Depends(get
 def list_papers(topic: str | None = None,
                 limit: int = Query(default=20, ge=1, le=100),
                 offset: int = Query(default=0, ge=0, le=100_000),
-                _: Principal = Depends(get_principal), db: Session = Depends(get_db)) -> dict:
+                principal: Principal = Depends(get_principal), db: Session = Depends(get_db),
+    clock=Depends(get_clock), settings: Settings = Depends(get_settings),
+) -> dict:
+    return resource_json(db, principal, clock=clock, idle=settings.auth.session_idle,
+        read=lambda current: _read_list_papers(topic=topic, limit=limit, offset=offset, principal=current, db=db),
+        citations=True)
+
+
+def _read_list_papers(topic: str | None,
+                limit: int,
+                offset: int,
+                principal: Principal, db: Session) -> dict:
     ids = select(DiscoveryPaper.id).where(DiscoveryPaper.content_status == "metadata_only", ~hidden_discovery_clause())
     if topic:
         ids = ids.join(DiscoveryPaperTopic, DiscoveryPaperTopic.paper_id == DiscoveryPaper.id).where(DiscoveryPaperTopic.topic == topic)
@@ -59,7 +79,18 @@ def list_papers(topic: str | None = None,
 def citing_items(paper_id: str,
                  limit: int = Query(default=20, ge=1, le=100),
                  offset: int = Query(default=0, ge=0, le=100_000),
-                 principal: Principal = Depends(get_principal), db: Session = Depends(get_db)) -> dict:
+                 principal: Principal = Depends(get_principal), db: Session = Depends(get_db),
+    clock=Depends(get_clock), settings: Settings = Depends(get_settings),
+) -> dict:
+    return resource_json(db, principal, clock=clock, idle=settings.auth.session_idle,
+        read=lambda current: _read_citing_items(paper_id=paper_id, limit=limit, offset=offset, principal=current, db=db),
+        item_ids=lambda data: [row["id"] for row in data["items"]], citations=True)
+
+
+def _read_citing_items(paper_id: str,
+                 limit: int,
+                 offset: int,
+                 principal: Principal, db: Session) -> dict:
     try:
         parsed = uuid.UUID(paper_id)
     except ValueError:
@@ -91,7 +122,15 @@ def citing_items(paper_id: str,
 
 
 @router.get("/sources")
-def source_status(_: Principal = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
+def source_status(principal: Principal = Depends(require_admin), db: Session = Depends(get_db),
+    clock=Depends(get_clock), settings: Settings = Depends(get_settings),
+) -> dict:
+    return resource_json(db, principal, clock=clock, idle=settings.auth.session_idle,
+        read=lambda current: _read_source_status(principal=current, db=db),
+        admin=True)
+
+
+def _read_source_status(principal: Principal, db: Session) -> dict:
     rows = db.scalars(select(DiscoverySource).order_by(DiscoverySource.topic)).all()
     return {"sources": [{"topic": r.topic, "state": r.state, "window_from": r.window_from,
                          "window_until": r.window_until, "has_resumption_token": bool(r.resumption_token),

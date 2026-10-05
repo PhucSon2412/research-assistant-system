@@ -1,5 +1,21 @@
 # Chiến lược kiểm thử
 
+## C2d-2a resource JSON reads
+
+[Bàn giao 13 GET](c2d2a-resource-json-reads.md) · [Inventory source/node/JUnit](c2d2a-test-inventory.json). Nghiệp vụ dùng cutover scoped, runtime/recovery LOGIN và predicate/receipt/head/journal/SQL thật; pending HTTP của cả 13 GET có nhóm riêng, health sống/ready đóng. Account qua bootstrap/invitation/login thật; resource/rights setup đặc quyền riêng, không grant/bypass runtime.
+
+Kiểm core caller sau dependency, clock sau query và DB wait, current role, A/B/Admin, private extraction, common tuple/flags/original, SQL count/page, scope churn và các thứ tự reader/writer có Event/quan sát wait thật. Chuyển fixture GET library và tách read assertions collection/discovery/citation khỏi writer/storage/provider tests cũ. Bỏ final guard/clock/current Admin/SQL scope/common tuple/resource recheck đều bị đối chứng bắt; bytes nguồn khôi phục trước suite cuối. Số thực chạy và các lượt chuẩn bị ghi riêng trong inventory, không cộng lượt chồng nhau thành full API. Safety pending tới C4; các writer/proxy/storage/drill chưa chạy được ghi not-run.
+
+## Kế hoạch kiểm C2d-2a, chưa chạy
+
+[Prompt 13 GET library/collections/discovery](tasks/m6c2b2c2d2a-resource-json-reads.md) yêu cầu runtime/journal/head/receipt/clock thật, caller cuối và SQL ACL trước count/page, các nhánh empty/metadata-only/private extraction, current Admin sources, common tuple/file flags và resource races. Tách pending thật khỏi fixture cutover scoped; giữ assertion nghiệp vụ, không bypass protected auth hoặc đổi writer ngoài scope. Inventory phải ghi chính xác route/node/source/JUnit và not-run; test resource/core guard không hoãn tới C4.
+
+Lượt giao ngày 2026-10-05 chỉ khảo sát source/Git và tạo/cập nhật docs. Không chạy API/web/Compose/provider hoặc truy vấn revision DB dev; các kết quả C2d-1 bên dưới là lịch sử độc lập. Safety pending tới C4.
+
+## Review độc lập PR #38
+
+Source `97c49d8`, base `ca4a623`, source migration `0039` không đổi: **182/182 test chọn pass**, 0 failure/error/skip, **410,748 s**, 3 warning hiện có. Gồm C2d-1 93 (5 pending thật), login/session C2a 68, HTTP invitation/outbox 20 và ORM/schema 1; runtime/head/receipt/integrity/clock/commit thật trên PostgreSQL cô lập, chỉ fixture cutover scoped. Runner giữ SHA-256 210 file API; inventory route khớp 63/63. [Review/evidence/cleanup và giới hạn](reviews/pr38-c2d1-final-caller.md). Không phát hiện điểm chặn merge trong phạm vi C2d-1, PR sau đó đã merge `d06664e`; không cộng với 490 của agent, không chạy lại full inventory/web/storage/drill/cutover hoặc đối chứng. Safety pending tới C4.
+
 ## C2d-1 final caller reads
 
 [Bàn giao](c2d1-final-caller-reads.md) · [Inventory source/node/JUnit](c2d1-test-inventory.json) · [Caller inventory](c2d1-caller-inventory.json). Chỉ pending cutover scoped ở nghiệp vụ; runtime/recovery LOGIN, SQL, journal, binding/receipt/head/clock/commit đều thật. Helper/ba route có core guards ngay ở C2d-1; resource/provider/full C2d/C3/C4 còn riêng.

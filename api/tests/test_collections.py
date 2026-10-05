@@ -16,12 +16,42 @@ from app.models import Collection
 from tests.test_ingest_worker import upload
 from tests.test_private_index import fake_provider, settings_with_fake_key
 from tests.test_uploads import upload_api
+from tests.resource_fixtures import resource_api, resource_world, installation
 
 
 def _create(browser, name="Reading") -> str:
     response = browser.post("/collections", {"name": name})
     assert response.status_code == 201, response.text
     return response.json()["collection"]["id"]
+
+
+def test_collection_get_runtime_owner_acl_count_page(resource_api):
+    """GET contract split from CRUD/pipeline tests; memberships are schema setup."""
+    h=resource_api
+    aid=h.create_user("a@example.org"); bid=h.create_user("b@example.org")
+    a,b,admin=h.user_browser("a@example.org"),h.user_browser("b@example.org"),h.admin_browser()
+    own=h.add_item(owner=aid,title="A private")
+    foreign=h.add_item(owner=bid,title="B secret")
+    common=h.add_item(owner=None,title="Common metadata")
+    with h.engine.begin() as conn:
+        cid=conn.scalar(text("INSERT INTO collections(owner_user_id,name) VALUES(:u,'Reading') RETURNING id"),{"u":aid})
+        for item in (foreign,common,own):
+            conn.execute(text("INSERT INTO collection_items(collection_id,item_id) VALUES(:c,:i)"),{"c":cid,"i":item})
+    assert a.get("/collections").json()["collections"][0]["name"]=="Reading"
+    seen=[]
+    for offset in range(3):
+        response=a.get(f"/collections/{cid}/items?limit=1&offset={offset}")
+        assert response.status_code==200,response.text
+        data=response.json(); assert data["total"]==2
+        seen.extend(i["title"] for i in data["items"])
+        assert all(not i["fulltext_search_available"] and not i["rag_available"] for i in data["items"])
+        assert "B secret" not in response.text
+    assert sorted(seen)==["A private","Common metadata"]
+    for other in (b,admin):
+        assert other.get("/collections").json()=={"collections":[]}
+        for identifier in (cid,uuid.uuid4()):
+            response=other.get(f"/collections/{identifier}/items")
+            assert response.status_code==404 and response.json()=={"error":"not_found"}
 
 
 def _add(browser, collection, item):

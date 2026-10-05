@@ -1,6 +1,6 @@
 # Tài liệu dự án
 
-**PR #37 đã merge `ca4a623` (C2c-2, head mã nguồn `0039`).** [Hợp đồng invitation](c2c2-invitation-runtime.md) · [Inventory](c2c2-test-inventory.json) · [Review độc lập](reviews/pr37-c2c2-invitation.md). **C2d-1 đã triển khai trên nhánh review:** [helper và ba route đọc ngắn](c2d1-final-caller-reads.md) · [inventory](c2d1-test-inventory.json). Chưa merge; [cách chia C2d](decisions.md#chia-c2d-sau-merge-pr-37-2026-10-05). Safety vẫn pending tới C4. C2d resource/file/provider, C3 operator và C4 cutover còn mở; head source không là revision DB dev. Các số đo bên dưới giữ theo source lịch sử.
+**PR #38 đã merge `d06664e` (C2d-1, head mã nguồn `0039`).** [Helper và ba route đọc ngắn](c2d1-final-caller-reads.md) · [Inventory](c2d1-test-inventory.json) · [Review độc lập](reviews/pr38-c2d1-final-caller.md). Task tiếp **[C2d-2a — 13 GET JSON library/collections/discovery](tasks/m6c2b2c2d2a-resource-json-reads.md)**, đã triển khai trên nhánh review, xem [bàn giao](c2d2a-resource-json-reads.md); [phạm vi đã chốt](decisions.md#giao-c2d-2a-sau-merge-pr-38-2026-10-05). Review/publication metadata C2d-2b, writer/file/provider và C3/C4 còn riêng. Safety vẫn pending tới C4; head source không là revision DB dev. Các số đo bên dưới giữ theo source lịch sử.
 
 **Baseline main đã merge trước C2c-1:** PR #33 đã merge `c98bd33` (C1 `0034`), PR #34 đã merge `78e0880` (C2a `0035`), [C2b reset/status](c2b-reset-status.md) đã merge PR #35 `1d3e558`, chứa sửa P2 `f2ba336`; head source `0036`. Safety vẫn pending tới C4. C2b P2: **201/201**, collect 1296 và 1095 chưa chạy lại; suite 471 tại `bdec9ea` là lịch sử; web không đổi (43/43, typecheck/build tại `a8cb586`); [inventory theo source](c2b-test-inventory.json). [C2c-1 bootstrap/initial receipt](tasks/m6c2b2c2c1-bootstrap-initial-receipts.md) được giao tiếp; invitation lifecycle C2c-2 và final callers C2d chưa triển khai. [Cách chia C2c](decisions.md#chia-c2c-sau-merge-pr-35-2026-10-04) bổ sung cho [Origin/cách chia C2 đã chốt](decisions.md#chia-c2-và-chốt-origin-theo-ủy-quyền-2026-10-03). Operator/delivery C3 và cutover C4 vẫn riêng. Không truy vấn/nâng DB hoặc restart dev; head source không là revision DB dev.
 
@@ -20,10 +20,14 @@ Khi có thay đổi quyết định, cập nhật tài liệu liên quan cùng t
 
 | Tài liệu | Nội dung |
 | --- | --- |
+| [Bàn giao C2d-2a](c2d2a-resource-json-reads.md) | 13 GET, resource locks/requery/clock, bounded scope churn; safety pending |
+| [Inventory kiểm C2d-2a](c2d2a-test-inventory.json) | Source/node/JUnit, đối chứng, lỗi chuẩn bị, cleanup và not-run |
+| [Prompt coding C2d-2a](tasks/m6c2b2c2d2a-resource-json-reads.md) | 13 GET library/collections/discovery: caller/clock/current role, SQL ACL trước count/page và resource boundary; đã triển khai trên nhánh review, xem [bàn giao](c2d2a-resource-json-reads.md) |
+| [Review PR #38](reviews/pr38-c2d1-final-caller.md) | 182 test chọn độc lập pass, không phát hiện điểm chặn trong phạm vi C2d-1; PR đã merge `d06664e`, safety pending |
 | [Bàn giao C2d-1](c2d1-final-caller-reads.md) | Helper/session/Admin users/DevOutbox, final transaction/clock/commit boundary và phần C2d còn mở |
 | [Inventory kiểm C2d-1](c2d1-test-inventory.json) | Source/node/JUnit, đối chứng, lỗi chuẩn bị và not-run |
 | [Inventory caller C2d-1](c2d1-caller-inventory.json) | Từng route method/path/function/dependency và map quyền/I/O/commit/khóa trong bàn giao |
-| [Prompt coding C2d-1](tasks/m6c2b2c2d1-final-caller-reads.md) | Helper final caller + session/Admin users/DevOutbox; runtime, clock, gate, kiểm sau commit và inventory phần C2d còn lại; đã triển khai trên nhánh review, giữ prompt gốc |
+| [Prompt coding C2d-1](tasks/m6c2b2c2d1-final-caller-reads.md) | Helper final caller + session/Admin users/DevOutbox; runtime, clock, gate, kiểm sau commit và inventory phần C2d còn lại; đã merge PR #38, giữ prompt gốc |
 | [Review PR #37](reviews/pr37-c2c2-invitation.md) | Review C2c-2: 198 kiểm chọn + 1 ORM/schema độc lập đạt; PR đã merge `ca4a623`, safety pending |
 | [Prompt coding C2c-2](tasks/m6c2b2c2c2-invitation-lifecycle.md) | Phạm vi invitation đã triển khai và merge PR #37; giữ làm lịch sử task |
 | [Bàn giao C2c-2](c2c2-invitation-runtime.md) | Boundary runtime/recovery, binding/receipt, clock/locks, delivery, fault/restore và caller C2d còn mở |

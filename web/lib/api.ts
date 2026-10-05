@@ -109,6 +109,7 @@ const MESSAGES: Record<string, string> = {
   revocation_pending_recovery:
     "Nhật ký đã ghi việc thu hồi nhưng database chưa áp dụng; hệ thống tạm ngừng phục vụ tới khi quản trị viên chạy phục hồi.",
   service_recovering: "Hệ thống đang tạm ngừng phục vụ để kiểm tra/phục hồi dữ liệu thu hồi. Thử lại sau.",
+  resource_scope_changed: "Danh sách hoặc quyền truy cập đã thay đổi trong lúc tải. Hãy tải lại trang.",
   review_closure_unavailable: "Không ghi được việc đóng yêu cầu; yêu cầu vẫn đang mở. Thử lại ngay.",
   review_journal_unavailable:
     "Yêu cầu đã đóng nhưng không ghi được nhật ký; hệ thống tạm ngừng phục vụ tới khi quản trị viên sửa nhật ký.",

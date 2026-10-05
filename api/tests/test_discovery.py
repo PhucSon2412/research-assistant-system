@@ -10,6 +10,7 @@ from sqlalchemy import text
 
 from app.config import DiscoveryPolicy
 from app.discovery import DiscoveryError, parse_page, run_sync
+from tests.resource_fixtures import resource_api, resource_world, installation
 
 PAGE_ONE = b'''<?xml version="1.0"?>
 <OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/">
@@ -35,6 +36,34 @@ ARXIV_LICENSE = b"http://arxiv.org/licenses/nonexclusive-distrib/1.0/"
 
 def policy(**kwargs) -> DiscoveryPolicy:
     return DiscoveryPolicy(topics=["cs.AI", "cs.LG"], max_pages_per_topic=2, **kwargs)
+
+
+def test_discovery_get_runtime_metadata_contract(resource_api,monkeypatch):
+    """Read contract from checkpoint test; no search/RAG/writer HTTP bypass."""
+    h=resource_api
+    monkeypatch.setattr("app.discovery._reserve_request",lambda db,policy:None)
+    result=run_sync(h.engine,policy(),fetcher=lambda params,_: (
+        PAGE_TWO if params.get("resumptionToken") else PAGE_ONE),now=h.clock.now)
+    assert result["pages"]==4 and h.scalar("SELECT count(*) FROM discovery_papers")==2
+    h.create_user("a@example.org"); h.create_user("b@example.org")
+    for browser in (h.user_browser("a@example.org"),h.user_browser("b@example.org"),h.admin_browser()):
+        assert browser.get("/discovery/topics").json()=={"topics":["cs.AI","cs.LG"]}
+        seen=[]
+        for offset in range(3):
+            r=browser.get(f"/discovery/papers?topic=cs.AI&limit=1&offset={offset}")
+            assert r.status_code==200,r.text
+            assert r.json()["total"]==2
+            seen.extend(i["title"] for i in r.json()["items"])
+            assert all(i["content_status"]=="metadata_only" for i in r.json()["items"])
+        assert sorted(seen)==["Discovery Alpha","Discovery Beta"]
+        assert browser.get("/discovery/papers?topic=unknown").json()["total"]==0
+    assert h.user_browser("a@example.org").get("/discovery/sources").status_code==403
+    status=h.admin_browser().get("/discovery/sources")
+    assert status.status_code==200 and len(status.json()["sources"])==2
+    assert all("resumption_token" not in row for row in status.json()["sources"])
+    assert "page-two" not in status.text
+    for table in ("library_items","source_files","chunks","index_entries"):
+        assert h.scalar(f"SELECT count(*) FROM {table}")==0
 
 
 def test_parser_safety_and_missing_fields():

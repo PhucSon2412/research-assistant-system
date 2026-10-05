@@ -1,0 +1,90 @@
+{
+  "base": "d06664e53383071237c21e802f439fda348a1afd",
+  "branch": "feat/m6c2b2c2d2a-resource-json-reads",
+  "source_migration": "0039",
+  "migration_changes": false,
+  "safety": "pending until C4",
+  "status": "final suite pending",
+  "collected": 0,
+  "counterexamples": [
+    {
+      "name": "final-guard",
+      "node": "api/tests/test_c2d2a_resource_reads.py::test_auth_changes_after_real_dependency[revoke-list]",
+      "counts": {
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0
+      },
+      "junit_sha256": "7e30019eb83182fb8ae5246ad3d08f42b8cc8259dc573d816bf1263890796f26",
+      "restored_source_sha256": "77ab6351698186a267120d98ae863fd8ddbe5ffb292028dfbdef1f5bc916f037"
+    },
+    {
+      "name": "final-clock",
+      "node": "api/tests/test_c2d2a_resource_reads.py::test_clock_after_last_resource_query[idle-1800-401-list]",
+      "counts": {
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0
+      },
+      "junit_sha256": "238666bcd19264faaa1c3d765ae87e090aa3c5d2d40f62a6524bc9243ab33682",
+      "restored_source_sha256": "77ab6351698186a267120d98ae863fd8ddbe5ffb292028dfbdef1f5bc916f037"
+    },
+    {
+      "name": "current-admin",
+      "node": "api/tests/test_c2d2a_resource_reads.py::test_current_role_rebuilds_flags_and_sources[sources]",
+      "counts": {
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0
+      },
+      "junit_sha256": "65469508c4eb8599d51ff27ec71beab2afca5e2b50b5f198d71053a95f8ded85",
+      "restored_source_sha256": "77ab6351698186a267120d98ae863fd8ddbe5ffb292028dfbdef1f5bc916f037"
+    },
+    {
+      "name": "sql-scope-before-page",
+      "node": "api/tests/test_library_acl.py::test_pagination_is_filtered_before_limit_and_offset",
+      "counts": {
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0
+      },
+      "junit_sha256": "7bf8849e553c4b2004bce5dbaf7a7478d9710a05eedcd41e375fc201a253fb64",
+      "restored_source_sha256": "1babcf7dceee1fd70692b67e434694d035575be2a798c53ae8f4c3d6496c7268"
+    },
+    {
+      "name": "common-tuple",
+      "node": "api/tests/test_c2d2a_resource_reads.py::test_common_metadata_flags_original_and_derived_tuple[False-True-False-True-False]",
+      "counts": {
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0
+      },
+      "junit_sha256": "b9570ba3c32d9e9f7b8cf9c4460ca2cefced5aabb0003878c69bd5ba74757737",
+      "restored_source_sha256": "1babcf7dceee1fd70692b67e434694d035575be2a798c53ae8f4c3d6496c7268"
+    },
+    {
+      "name": "resource-recheck",
+      "node": "api/tests/test_c2d2a_resource_reads.py::test_common_revoke_between_candidate_and_final[list]",
+      "counts": {
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0
+      },
+      "junit_sha256": "3d2b7b63a27ca6471b41f2b16236f0ed7f958f04c969be3fb39ac97ee07f8048",
+      "restored_source_sha256": "77ab6351698186a267120d98ae863fd8ddbe5ffb292028dfbdef1f5bc916f037"
+    }
+  ],
+  "web": {
+    "passed": 44,
+    "failed": 0,
+    "typecheck": "passed",
+    "build": "passed",
+    "browser": "not-run"
+  }
+}

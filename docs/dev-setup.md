@@ -1,6 +1,12 @@
-# Môi trường phát triển và schema (M1a–C2d-1)
+# Môi trường phát triển và schema (M1a–C2d-2a)
 
-**PR #37 đã merge `ca4a623` (C2c-2, head mã nguồn `0039`).** [Bàn giao](c2c2-invitation-runtime.md) · [Lệnh cô lập](#c2c-2-invitation-cô-lập) · [Inventory](c2c2-test-inventory.json). [C2d-1](c2d1-final-caller-reads.md) đã triển khai trên nhánh review; lệnh và kết quả cô lập bên dưới, không phải runbook mở dev. Safety pending tới C4; không suy revision DB dev hoặc chạy lệnh lịch sử để mở traffic. Dev chỉ được đối chiếu ID/image/StartedAt bằng metadata chỉ đọc; không truy vấn/nâng/restart DB dev.
+## C2d-2a cô lập
+
+[Hợp đồng/boundary](c2d2a-resource-json-reads.md) · [Inventory](c2d2a-test-inventory.json). Conda ras interpreter/pip đã kiểm; PostgreSQL standalone `ras-c2d2a-db-20261005`, label `ras.task=c2d2a-20261005`, bind `127.0.0.1:58445`. Explicit admin URL và `RAS_DB__*` thử trước import fixture; runtime/recovery LOGIN thật, definer/migrator NOLOGIN. Runner ngoài repo `%TEMP%/ras-c2d2a-20261005/runner.py` chặn HTTPTransport sync/async, kiểm hash API Python/SQL trước/sau suite; credentials/journal/JUnit ngoài repo. Chỉ fixture cutover scoped ở nghiệp vụ, pending thật kiểm riêng; không `.env`, query/nâng/restart dev, provider hoặc đổi pricing/safety.
+
+Lệnh đã chạy: Python/pip xác minh Conda; runner `api --collect-only -q`, các node C2d-2a/GET contract và đối chứng tuần tự (inventory giữ node/lệnh/JUnit); `npm test --prefix web`, `npm run typecheck --prefix web`, `npm run build --prefix web`; compileall/diff check. Suite cuối dùng `final_suite.py` ngoài repo để chọn chính xác GET và nhóm hồi quy; không tính toàn file mixed writer là đã chạy. Những lệnh này chỉ là chứng cứ môi trường cô lập, không lệnh mở readiness hoặc vận hành dev. Chi tiết kết quả/cleanup theo inventory và bàn giao.
+
+**PR #38 đã merge `d06664e` (C2d-1, head mã nguồn `0039`).** [Bàn giao](c2d1-final-caller-reads.md) · [Lệnh cô lập](#c2d-1-final-caller-reads-cô-lập) · [Inventory](c2d1-test-inventory.json). [C2d-2a — 13 route GET JSON](tasks/m6c2b2c2d2a-resource-json-reads.md) mới giao, chưa triển khai/chạy kiểm; chưa có lệnh C2d-2a được xác minh. Các lệnh/kết quả cô lập bên dưới là chứng cứ C2d-1, không phải runbook mở dev. Safety pending tới C4; không suy revision DB dev hoặc chạy lệnh lịch sử để mở traffic. Không truy vấn/nâng/restart DB dev.
 
 ## C2d-1 final caller reads cô lập
 

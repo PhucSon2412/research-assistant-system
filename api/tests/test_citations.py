@@ -27,6 +27,7 @@ from tests.test_pdf_ingest import BODY_LINE, pdf_bytes, upload_pdf
 from tests.test_private_index import fake_provider, settings_with_fake_key
 from tests.test_search import indexed
 from tests.test_uploads import upload_api  # noqa: F401  (fixture)
+from tests.resource_fixtures import (resource_api, resource_world, installation, source, derived, common_copy)
 
 NOW = datetime(2026, 9, 29, 12, tzinfo=UTC)
 
@@ -129,6 +130,52 @@ def two_users(api):
     api.create_user("cite-a@example.org")
     api.create_user("cite-b@example.org")
     return api.user_browser("cite-a@example.org"), api.user_browser("cite-b@example.org"), api.admin_browser()
+
+
+def test_reference_get_runtime_same_bytes_owner_reverse_and_freshness(resource_api):
+    """Preserve bibliography/reverse-count ACL without old upload/provider fixtures."""
+    h=resource_api; w=h.world
+    aid=h.create_user("cite-a@example.org"); bid=h.create_user("cite-b@example.org")
+    a,b,admin=h.user_browser("cite-a@example.org"),h.user_browser("cite-b@example.org"),h.admin_browser()
+    with Session(h.engine) as db:
+        from app.models import DiscoverySource
+        db.add(DiscoverySource(topic="cs.AI",window_from=h.clock.now.date()));db.flush()
+        _write_page(db,"cs.AI",parse_page(oai_page(SEED),100000),h.clock.now);db.commit()
+        target=db.scalar(text("SELECT id FROM discovery_papers WHERE remote_id='2609.00011'"))
+    ids_a,ids_b=source(w,aid,"A PRIVATE"),source(w,bid,"B PRIVATE")
+    refs=[derived(w,ids_a,"A BODY"),derived(w,ids_b,"B BODY")]
+    common=common_copy(w)
+    with Session(h.engine) as db:
+        reconcile_references(db,now=h.clock.now);db.commit()
+    assert h.scalar("SELECT count(DISTINCT checksum_sha256) FROM source_files WHERE id IN (:a,:b)",
+                    a=ids_a.file,b=ids_b.file)==1
+    for browser,own,foreign in ((a,ids_a,ids_b),(b,ids_b,ids_a)):
+        listing=browser.get(f"/library/items/{own.item}/references")
+        assert listing.status_code==200,listing.text
+        entry=listing.json()["references"][0]
+        assert entry["evidence_kind"]=="bibliography_entry" and entry["citation_link"]["linked"]
+        assert entry["citation_link"]["target"]["label"]=="metadata-only"
+        assert "does not mean agreement" in listing.json()["citation_relation_note"]
+        for suffix in ("","/chunks","/coverage","/references","/metadata-candidates"):
+            r=browser.get(f"/library/items/{foreign.item}{suffix}")
+            assert r.status_code==404 and r.json()=={"error":"not_found"}
+            assert admin.get(f"/library/items/{own.item}{suffix}").status_code==404
+        reverse=browser.get(f"/discovery/papers/{target}/citing-items?limit=1")
+        assert reverse.status_code==200,reverse.text
+        assert reverse.json()["total"]==1
+        assert reverse.json()["items"]==[{"id":str(own.item),"title":"A PRIVATE" if browser is a else "B PRIVATE","linked_references":1}]
+        assert str(common.item) not in reverse.text and str(foreign.item) not in reverse.text
+    assert admin.get(f"/discovery/papers/{target}/citing-items").json()["total"]==0
+    with h.engine.begin() as conn:
+        conn.execute(text("UPDATE reference_entries SET raw_citation='new text' WHERE id=:r"),{"r":refs[0]})
+    assert a.get(f"/library/items/{ids_a.item}/references").json()["references"][0]["citation_link"]["status"]=="not_reconciled"
+    assert a.get(f"/discovery/papers/{target}/citing-items").json()["total"]==0
+    with Session(h.engine) as db:
+        _write_page(db,"cs.AI",parse_page(oai_page(deleted=[("2609.00011","2026-10-05")]),100000),h.clock.now)
+        db.commit()
+    link=b.get(f"/library/items/{ids_b.item}/references").json()["references"][0]["citation_link"]
+    assert link["target"] is None and not link["linked"]
+    assert b.get(f"/discovery/papers/{target}/citing-items").status_code==404
 
 
 # ---------------------------------------------------------------- unit

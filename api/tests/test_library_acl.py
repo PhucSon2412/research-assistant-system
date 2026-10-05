@@ -11,6 +11,7 @@ import uuid
 import pytest
 
 from tests.helpers import Harness
+from tests.resource_fixtures import resource_api, resource_world, installation
 
 A_EMAIL, B_EMAIL = "a@example.org", "b@example.org"
 
@@ -31,8 +32,8 @@ class World:
 
 
 @pytest.fixture
-def w(api: Harness) -> World:
-    return World(api)
+def w(resource_api: Harness) -> World:
+    return World(resource_api)
 
 
 def titles(browser, **params) -> list[str]:
