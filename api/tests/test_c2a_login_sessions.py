@@ -572,15 +572,19 @@ def test_authenticated_principals_preserve_private_item_file_chunk_acl(world):
             ctx=resolve_session(db,issued.token,now=NOW,idle=w.settings.auth.session_idle,clock=w.clock)
             db.commit()
             p=Principal(ctx.user_id,ctx.role,ctx.session_id,ctx.email,ctx.display_name)
-            result=list_items(scope=Scope.ALL,limit=20,offset=0,principal=p,db=db)
+            result=list_items(scope=Scope.ALL,limit=20,offset=0,principal=p,db=db,
+                              clock=w.clock,settings=w.settings)
             assert result['total']==(1 if allowed else 0)
             files=list(db.scalars(select(SourceFile.id).join(LibraryItem,LibraryItem.id==SourceFile.item_id)
                                  .where(m2a_private_derivatives_clause(p))))
             assert files==([fid] if allowed else [])
             if allowed:
-                assert get_chunks(str(item_id),limit=20,offset=0,principal=p,db=db)['chunks'][0]['text']=='private body marker'
+                assert get_chunks(str(item_id),limit=20,offset=0,principal=p,db=db,
+                                  clock=w.clock,settings=w.settings)['chunks'][0]['text']=='private body marker'
             else:
-                with pytest.raises(ApiError,match='not_found'):get_chunks(str(item_id),limit=20,offset=0,principal=p,db=db)
+                with pytest.raises(ApiError,match='not_found'):
+                    get_chunks(str(item_id),limit=20,offset=0,principal=p,db=db,
+                               clock=w.clock,settings=w.settings)
 
 
 def test_final_helper_fresh_clock_and_cross_user_receipt_guard(world):

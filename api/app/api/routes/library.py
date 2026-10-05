@@ -24,8 +24,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_now, get_principal
+from app.api.deps import get_clock, get_db, get_now, get_principal
 from app.api.errors import ApiError
+from app.api.resource_reads import resource_json
+from app.config import Settings, get_settings
 from app.audit import record_event
 from app.authz import (Principal, can_edit_item, common_derivatives_clause, common_fulltext_items_clause,
                        common_original_clause, m2a_private_derivatives_clause, visible_items_clause)
@@ -137,6 +139,19 @@ def list_items(
     offset: int = Query(default=0, ge=0, le=100_000),
     principal: Principal = Depends(get_principal),
     db: Session = Depends(get_db),
+    clock=Depends(get_clock), settings: Settings = Depends(get_settings),
+) -> dict:
+    return resource_json(db, principal, clock=clock, idle=settings.auth.session_idle,
+        read=lambda current: _read_list_items(scope=scope, limit=limit, offset=offset, principal=current, db=db),
+        item_ids=lambda data: [row["id"] for row in data["items"]])
+
+
+def _read_list_items(
+    scope: Scope,
+    limit: int,
+    offset: int,
+    principal: Principal,
+    db: Session,
 ) -> dict:
     where = _scope_clause(principal, scope)
     total = db.scalar(select(func.count()).select_from(LibraryItem).where(where))
@@ -160,14 +175,30 @@ def list_items(
 
 @router.get("/items/count")
 def count_items(
-    scope: Scope = Scope.ALL, principal: Principal = Depends(get_principal), db: Session = Depends(get_db)
+    scope: Scope = Scope.ALL, principal: Principal = Depends(get_principal), db: Session = Depends(get_db),
+    clock=Depends(get_clock), settings: Settings = Depends(get_settings),
+) -> dict:
+    return resource_json(db, principal, clock=clock, idle=settings.auth.session_idle,
+        read=lambda current: _read_count_items(scope=scope, principal=current, db=db))
+
+
+def _read_count_items(
+    scope: Scope, principal: Principal, db: Session
 ) -> dict:
     total = db.scalar(select(func.count()).select_from(LibraryItem).where(_scope_clause(principal, scope)))
     return {"total": total, "scope": scope.value}
 
 
 @router.get("/items/{item_id}")
-def get_item(item_id: str, principal: Principal = Depends(get_principal), db: Session = Depends(get_db)) -> dict:
+def get_item(item_id: str, principal: Principal = Depends(get_principal), db: Session = Depends(get_db),
+    clock=Depends(get_clock), settings: Settings = Depends(get_settings),
+) -> dict:
+    return resource_json(db, principal, clock=clock, idle=settings.auth.session_idle,
+        read=lambda current: _read_get_item(item_id=item_id, principal=current, db=db),
+        item_ids=lambda data: [data["item"]["id"]])
+
+
+def _read_get_item(item_id: str, principal: Principal, db: Session) -> dict:
     item = _get_visible_item(db, principal, item_id)
     versions = db.scalars(
         select(PaperVersion).where(PaperVersion.item_id == item.id).order_by(PaperVersion.received_at)
@@ -231,6 +262,19 @@ def get_chunks(
     offset: int = Query(default=0, ge=0, le=100_000),
     principal: Principal = Depends(get_principal),
     db: Session = Depends(get_db),
+    clock=Depends(get_clock), settings: Settings = Depends(get_settings),
+) -> dict:
+    return resource_json(db, principal, clock=clock, idle=settings.auth.session_idle,
+        read=lambda current: _read_get_chunks(item_id=item_id, limit=limit, offset=offset, principal=current, db=db),
+        item_ids=lambda data: [item_id])
+
+
+def _read_get_chunks(
+    item_id: str,
+    limit: int,
+    offset: int,
+    principal: Principal,
+    db: Session,
 ) -> dict:
     item = _get_derivative_item(db, principal, item_id)
     rows = db.execute(select(Chunk, Section.kind).join(Section, Chunk.section_id == Section.id)
@@ -254,6 +298,17 @@ def get_metadata_candidates(
     item_id: str,
     principal: Principal = Depends(get_principal),
     db: Session = Depends(get_db),
+    clock=Depends(get_clock), settings: Settings = Depends(get_settings),
+) -> dict:
+    return resource_json(db, principal, clock=clock, idle=settings.auth.session_idle,
+        read=lambda current: _read_get_metadata_candidates(item_id=item_id, principal=current, db=db),
+        item_ids=lambda data: [item_id])
+
+
+def _read_get_metadata_candidates(
+    item_id: str,
+    principal: Principal,
+    db: Session,
 ) -> dict:
     item = _get_derivative_item(db, principal, item_id)
     rows = db.scalars(select(MetadataCandidate).join(LibraryItem, MetadataCandidate.item_id == LibraryItem.id)
@@ -267,7 +322,16 @@ def get_metadata_candidates(
 
 @router.get("/items/{item_id}/coverage")
 def get_coverage(item_id: str, principal: Principal = Depends(get_principal),
-                 db: Session = Depends(get_db)) -> dict:
+                 db: Session = Depends(get_db),
+    clock=Depends(get_clock), settings: Settings = Depends(get_settings),
+) -> dict:
+    return resource_json(db, principal, clock=clock, idle=settings.auth.session_idle,
+        read=lambda current: _read_get_coverage(item_id=item_id, principal=current, db=db),
+        item_ids=lambda data: [item_id])
+
+
+def _read_get_coverage(item_id: str, principal: Principal,
+                 db: Session) -> dict:
     item = _get_derivative_item(db, principal, item_id)
     rows = db.scalars(select(PdfPage).join(LibraryItem, PdfPage.item_id == LibraryItem.id)
         .where(PdfPage.item_id == item.id, _derived_rows(principal, PdfPage))
@@ -293,7 +357,16 @@ def get_coverage(item_id: str, principal: Principal = Depends(get_principal),
 
 @router.get("/items/{item_id}/references")
 def get_references(item_id: str, principal: Principal = Depends(get_principal),
-                   db: Session = Depends(get_db)) -> dict:
+                   db: Session = Depends(get_db),
+    clock=Depends(get_clock), settings: Settings = Depends(get_settings),
+) -> dict:
+    return resource_json(db, principal, clock=clock, idle=settings.auth.session_idle,
+        read=lambda current: _read_get_references(item_id=item_id, principal=current, db=db),
+        item_ids=lambda data: [item_id], citations=True)
+
+
+def _read_get_references(item_id: str, principal: Principal,
+                   db: Session) -> dict:
     item = _get_derivative_item(db, principal, item_id)
     rows = db.execute(select(ReferenceEntry, ReferenceCitationLink, DiscoveryPaper,
                              hidden_discovery_clause().label("target_hidden"))

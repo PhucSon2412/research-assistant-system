@@ -43,3 +43,18 @@ test("review-closure journal errors never claim the grant is still open when it 
     assert.doesNotMatch(describeError(new ApiError(503, code)), /vẫn đang mở/);
   }
 });
+
+test("resource scope churn asks the reader to reload without rendering stale rows", async () => {
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: "resource_scope_changed" }),
+    { status: 409, headers: { "content-type": "application/json" } });
+  try {
+    await assert.rejects(api("/library/items"), err => {
+      assert.equal(err.status, 409);
+      assert.match(describeError(err), /đã thay đổi.*tải lại trang/);
+      return true;
+    });
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});

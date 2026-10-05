@@ -1,10 +1,14 @@
 # C2d-1: kiểm cuối caller ở ba route đọc
 
+**Trạng thái hiện hành (2026-10-05): PR #38 đã merge `d06664e`, source vẫn `0039`.** Task tiếp [C2d-2a — 13 GET library/collections/discovery](tasks/m6c2b2c2d2a-resource-json-reads.md) đã triển khai trên nhánh review, xem [bàn giao](c2d2a-resource-json-reads.md). Nội dung triển khai/đo dưới đây giữ theo source lịch sử; safety pending tới C4 và không suy revision DB dev.
+
 [Mục lục](README.md) · [Task](tasks/m6c2b2c2d1-final-caller-reads.md) · [Inventory kiểm thử](c2d1-test-inventory.json) · [Inventory từng route](c2d1-caller-inventory.json)
 
 Triển khai trên `feat/m6c2b2c2d1-final-caller-reads`, base fetch `ca4a623ea9cd4d2f8454659a1d66c48dbf8093d0` (PR #37), có ancestor `9f26535`. Không migration: head source vẫn `0039`, không suy revision DB dev. Giữ và đưa cùng PR toàn bộ docs orchestrator/review/task còn chưa commit. Safety **pending tới C4**; hoàn tất C2d-1 không hoàn tất C2/T14 toàn hệ thống.
 
 ## Hợp đồng và transaction
+
+**Review độc lập PR #38 tại `97c49d8`: 182/182 test chọn pass**, gồm C2d-1 93, login/session 68, invitation/outbox 20 và ORM/schema 1; 0 failure/error/skip. Không phát hiện điểm chặn merge trong phạm vi C2d-1; PR sau đó đã merge `d06664e`; safety vẫn pending. [Báo cáo/giới hạn](reviews/pr38-c2d1-final-caller.md). Không cộng với số 490 và đối chứng của agent bên dưới hoặc coi là full inventory/cutover.
 
 [`identity/final_caller.py`](../api/app/identity/final_caller.py) nhận đúng session ID/User ID đã xác thực; bỏ qua role/email cũ. Gọi `auth_safety.require_final` trên transaction hiện hành để giữ journal shared; lấy scalar columns allowlist (không ORM identity map/verifier/digest/token), đọc clock sau lock wait và profile query, rồi kiểm `session_live(..., user_id=...)`. Predicate SQL `0035` buộc latest confirmed credential/status head, receipt đủ binding, session generation và idle/absolute expiry. Không mở held/quarantine/legacy; helper không touch, issue, commit, rollback hoặc lấy User/session row lock.
 

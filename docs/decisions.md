@@ -1,5 +1,45 @@
 # Nhật ký quyết định
 
+## Review PR #39 C2d-2a (2026-10-05)
+
+Reviewer fetch/xác minh source `5d291c0` khớp nhánh remote, base `d06664e`, head source `0039`, không migration. Đối chiếu 13 GET với task và inventory: boundary read-only riêng, SQL ACL trước count/page, item/collection/citation rồi journal, caller/role/clock mới, resource requery và retry hữu hạn; không mở private cho Admin hay chuyển writer ngoài scope. **Không phát hiện điểm chặn merge trong phạm vi C2d-2a; có thể merge PR #39.** PR chưa merge; reviewer không merge/push/comment. [Review/chứng cứ/giới hạn](reviews/pr39-c2d2a-resource-reads.md).
+
+Kiểm độc lập **313/313 pass** (301 C2d-2a, 9 library GET, 1 collection GET, 1 discovery GET, 1 ORM/schema), 0 failure/error/skip, **692,695 s**, 3 warning hiện có; thêm **1 ca ID ngoài repo pass** và **web 44/44 pass**. JUnit đúng 313 node đã chọn, 213 file API giữ hash, caller inventory khớp 63/63 route. Runtime/journal/PostgreSQL thử riêng, chỉ fixture cutover scoped, external HTTP bị chặn; không cộng với suite 538/đối chứng 6 của agent hoặc báo 1640 node còn lại đã chạy.
+
+Sửa nhỏ trong bàn giao: collection path UUID sai trả `422 invalid_request`, library/discovery string UUID sai và UUID hợp lệ vắng/ngoài quyền trả 404 theo route hiện hành. Không đổi code/status API. Test ID ngoài repo đầu giả định key `detail` mặc định thay vì handler `fields`, nên 1 fail expectation; sửa test reviewer rồi 1 pass, ghi riêng trong báo cáo. Container/anonymous volume thử và credentials đã dọn sau kiểm ownership; metadata 9 container dev giữ nguyên, không query DB dev/`.env`/provider hoặc đổi pricing/safety.
+
+Docs review còn chưa commit, coding agent giữ và đưa cùng PR. Safety pending tới C4; C2d-2b/writer/file/provider/tổng hồi quy và C3/C4 còn riêng.
+
+## Triển khai C2d-2a trên nhánh review (2026-10-05)
+
+Fetch lại xác minh base `d06664e53383071237c21e802f439fda348a1afd`, chứa merge PR #38; source migration giữ `0039`. Giữ docs orchestrator/review chưa commit trong cùng PR. [Hợp đồng/boundary từng GET](c2d2a-resource-json-reads.md), [inventory](c2d2a-test-inventory.json); các lựa chọn dưới do coding agent trong phạm vi task, không là quyết định trực tiếp mới của chủ dự án.
+
+13 GET dùng boundary riêng: candidate đã lọc SQL → item UUID trang SHARE → owned collection UUID SHARE → citation shared khi cần → final caller/journal shared → hai lượt SQL ACL/DTO mới → final caller/clock sau SQL. Role/flags dùng Principal proof mới; expire identity map, cấm pending writes/autoflush. Parent collection bảo vệ membership theo writer hiện có; không khóa toàn thư viện hoặc lấy User/session/resource lock sau journal. Common revoke tuân thủ journal exclusive; count đọc lại dưới shared journal. Citation advisory chặn discovery writer commit tombstone/link trong lúc dựng DTO. Giữ metadata/fulltext/provider/download là các gate riêng.
+
+Page/count/scope hoặc role/profile đổi thì nhả transaction, bỏ DTO/proof, thử lại một lần; còn churn trả `409 resource_scope_changed`, UI hướng dẫn tải lại. Không coi nhiều SELECT READ COMMITTED là snapshot nhất quán; bảo vệ quyền rows/flags bằng khóa/gate và phát hiện churn còn lại bằng hai quan sát bằng nhau. Resource lock timeout tái dùng config recovery. Không sửa formatter writer, migration, quyền DB hoặc pricing/safety.
+
+Account/session qua runtime bootstrap/invitation/login/receipt thật; resource setup có schema thật bằng đặc quyền cô lập. Common approval/publication/revoke trong setup/race dùng đặc quyền và journal thật vì writer đó còn ngoài C2d-2a; không mở runtime grant hay báo writer HTTP đã chuyển. Indexed search-only test được dựng với processing permission hợp lệ rồi chỉnh permission bằng setup đặc quyền để kiểm read gate riêng. Các corruptions auth/tuple có ghi rõ, không bypass sản phẩm. Suite cuối và các lỗi chuẩn bị/đối chứng tách trong inventory; safety pending tới C4.
+
+Review/publication GET C2d-2b, JSON writers, file/upload/storage, provider/search/RAG/worker, tổng HTTP/restore/cutover và C3/C4 còn riêng. Không merge hoặc thao tác dev; response đã qua final boundary có thể tiếp tục gửi sau nhả khóa.
+
+## Giao C2d-2a sau merge PR #38 (2026-10-05)
+
+**Đã xác nhận trạng thái:** chủ dự án báo merge PR #38. `git fetch origin` xác minh `origin/main=d06664e53383071237c21e802f439fda348a1afd`, chứa `97c49d8`; cây committed local trùng main và head source `0039`. Không truy vấn revision DB dev. [Review PR #38](reviews/pr38-c2d1-final-caller.md) 182 test chọn là lượt lịch sử riêng với 490 của agent, không cộng thành full suite. Review/docs orchestrator còn chưa commit, agent tiếp giữ và đưa cùng PR.
+
+**Đã chốt theo ủy quyền:** giao **C2d-2a** với [prompt riêng](tasks/m6c2b2c2d2a-resource-json-reads.md): 7 GET library (list/count/detail/chunks/metadata-candidates/coverage/references), 2 GET collections (list/items), 4 GET discovery (topics/papers/citing-items/sources). Mục tiêu giữ contract hiện hành, dùng final caller đã merge với clock/current head/receipt/role, SQL ACL trước count/page và xác nhận resource/flags ở điểm quyết định cuối. Private extraction trước index vẫn đọc được cho owner; common `metadata_only` không mở text. Khóa/requery/retry cụ thể do coding agent chọn theo lock map thực tế và chứng minh qua test; không khóa toàn scope hoặc I/O dưới journal lock.
+
+**Lý do chia:** đây là read path không cần storage/provider/journal business writes. JSON GET review/publication tách **C2d-2b** (9 route theo inventory hiện hành) để kiểm grant private tạm và formatter dùng chung với writer riêng; chưa giao prompt C2d-2b. Library/collection writes, upload/file, review/promotion/publication/common-index writers, search/RAG/provider và tổng hồi quy tiếp tục riêng. Không âm thầm thêm final shared guard vào helper writer hoặc gọi toàn C2d hoàn tất sau 13 GET.
+
+**Giới hạn:** C1/Origin/runtime trust boundary đã chốt, không xin lại; safety pending tới C4. Không thao tác dev/`.env`/provider/pricing hoặc sửa ready cho Compose. Lượt giao chỉ khảo sát và viết/kiểm docs; chưa triển khai/chạy kiểm C2d-2a. C3 operator/legacy recovery/initial status/delivery và C4 storage/cutover chưa nằm trong task.
+
+## Review PR #38 C2d-1 (2026-10-05)
+
+Reviewer xác minh base `ca4a623` (merge PR #37), source `97c49d8`, head source `0039`, không migration; code/test API không khác code `13af731` của suite agent. Đối chiếu helper và ba route với task: exact session–User/receipt/head, current role/profile, fresh clock, shared final transaction và DevOutbox kiểm sau audit commit/snapshot. **Không phát hiện điểm chặn merge trong phạm vi C2d-1; có thể merge PR #38**, reviewer không merge/push/comment PR. [Review và giới hạn](reviews/pr38-c2d1-final-caller.md).
+
+Kiểm độc lập **182/182 pass**, 0 failure/error/skip: C2d-1 93, login/session 68, HTTP invitation/outbox 20, ORM/schema 1; **410,748 s**, 3 warning hiện có. Inventory route source khớp 63/63. Không cộng với 490 hoặc bốn đối chứng của agent, không tuyên bố full API/web/provider/storage/restore/cutover đạt. Runtime/journal/PostgreSQL thử riêng, hash 210 file API giữ nguyên; không `.env`, dev data, provider/pricing flag hoặc app code thay đổi. DB thử/anonymous volume và credentials tổng hợp đã dọn sau kiểm ownership, evidence ngoài repo.
+
+Giữ safety pending tới C4. Phần C2d JSON resource/file/writer/provider và C3/C4 vẫn mở theo inventory; response đã qua final boundary có thể tiếp tục gửi sau khi nhả khóa. Đây là kết luận review phần đã giao, không xác nhận auth toàn hệ thống hoặc cho phép mở traffic.
+
 ## Triển khai C2d-1 trên nhánh review (2026-10-05)
 
 Theo [task đã giao](tasks/m6c2b2c2d1-final-caller-reads.md), fetch xác minh base PR #37 `ca4a623` chứa `9f26535`; giữ head source `0039`, không migration hoặc suy revision DB dev. Giữ các docs orchestrator chưa commit. [Bàn giao](c2d1-final-caller-reads.md), [inventory kiểm](c2d1-test-inventory.json), [từng caller](c2d1-caller-inventory.json). Các lựa chọn triển khai dưới đây do coding agent trong phạm vi task, không là quyết định trực tiếp mới của chủ dự án.

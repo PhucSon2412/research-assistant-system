@@ -1,7 +1,7 @@
 {
-  "base": "ca4a623ea9cd4d2f8454659a1d66c48dbf8093d0",
+  "base": "d06664e53383071237c21e802f439fda348a1afd",
   "source_migration": "0039",
-  "scope": "Every route decorator in actual API source, including public auth. Internal identity/resource/provider/job helpers are mapped in handoff.",
+  "scope": "Current source route inventory: only 13 GET library/collections/discovery moved in C2d-2a; writers and other C2d callers retain separate status.",
   "safety": "pending until C4",
   "route_count": 63,
   "routes": [
@@ -326,22 +326,25 @@
       "path": "/collections",
       "function": "list_collections",
       "source": "api/app/api/routes/collections.py",
-      "line": 51,
+      "line": 53,
       "dependencies": [
         "get_principal",
-        "get_db"
+        "get_db",
+        "get_clock",
+        "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "open C2d",
+      "final_status": "C2d-2a resource_json: permitted page locks, current caller/role, fresh resource SQL and final clock; bounded scope retry",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2a-resource-json-reads.md",
+      "boundary_helper": "app.api.resource_reads.resource_json"
     },
     {
       "method": "POST",
       "path": "/collections",
       "function": "create_collection",
       "source": "api/app/api/routes/collections.py",
-      "line": 58,
+      "line": 68,
       "dependencies": [
         "get_principal",
         "get_db"
@@ -358,7 +361,7 @@
       "path": "/collections/{collection_id}",
       "function": "rename_collection",
       "source": "api/app/api/routes/collections.py",
-      "line": 68,
+      "line": 78,
       "dependencies": [
         "get_principal",
         "get_db"
@@ -375,7 +378,7 @@
       "path": "/collections/{collection_id}",
       "function": "delete_collection",
       "source": "api/app/api/routes/collections.py",
-      "line": 79,
+      "line": 89,
       "dependencies": [
         "get_principal",
         "get_db"
@@ -393,22 +396,25 @@
       "path": "/collections/{collection_id}/items",
       "function": "list_collection_items",
       "source": "api/app/api/routes/collections.py",
-      "line": 92,
+      "line": 102,
       "dependencies": [
         "get_principal",
-        "get_db"
+        "get_db",
+        "get_clock",
+        "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "open C2d",
+      "final_status": "C2d-2a resource_json: permitted page locks, current caller/role, fresh resource SQL and final clock; bounded scope retry",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2a-resource-json-reads.md",
+      "boundary_helper": "app.api.resource_reads.resource_json"
     },
     {
       "method": "POST",
       "path": "/collections/{collection_id}/items",
       "function": "add_collection_item",
       "source": "api/app/api/routes/collections.py",
-      "line": 122,
+      "line": 142,
       "dependencies": [
         "get_principal",
         "get_db"
@@ -425,7 +431,7 @@
       "path": "/collections/{collection_id}/items/{item_id}",
       "function": "remove_collection_item",
       "source": "api/app/api/routes/collections.py",
-      "line": 135,
+      "line": 155,
       "dependencies": [
         "get_principal",
         "get_db"
@@ -442,172 +448,205 @@
       "path": "/discovery/topics",
       "function": "list_topics",
       "source": "api/app/api/routes/discovery.py",
-      "line": 26,
+      "line": 28,
       "dependencies": [
         "get_principal",
-        "get_db"
+        "get_db",
+        "get_clock",
+        "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "open C2d",
+      "final_status": "C2d-2a resource_json: permitted page locks, current caller/role, fresh resource SQL and final clock; bounded scope retry",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2a-resource-json-reads.md",
+      "boundary_helper": "app.api.resource_reads.resource_json"
     },
     {
       "method": "GET",
       "path": "/discovery/papers",
       "function": "list_papers",
       "source": "api/app/api/routes/discovery.py",
-      "line": 31,
+      "line": 40,
       "dependencies": [
         "get_principal",
-        "get_db"
+        "get_db",
+        "get_clock",
+        "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "open C2d",
+      "final_status": "C2d-2a resource_json: permitted page locks, current caller/role, fresh resource SQL and final clock; bounded scope retry",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2a-resource-json-reads.md",
+      "boundary_helper": "app.api.resource_reads.resource_json"
     },
     {
       "method": "GET",
       "path": "/discovery/papers/{paper_id}/citing-items",
       "function": "citing_items",
       "source": "api/app/api/routes/discovery.py",
-      "line": 59,
+      "line": 79,
       "dependencies": [
         "get_principal",
-        "get_db"
+        "get_db",
+        "get_clock",
+        "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "open C2d",
+      "final_status": "C2d-2a resource_json: permitted page locks, current caller/role, fresh resource SQL and final clock; bounded scope retry",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2a-resource-json-reads.md",
+      "boundary_helper": "app.api.resource_reads.resource_json"
     },
     {
       "method": "GET",
       "path": "/discovery/sources",
       "function": "source_status",
       "source": "api/app/api/routes/discovery.py",
-      "line": 94,
+      "line": 125,
       "dependencies": [
         "require_admin",
-        "get_db"
+        "get_db",
+        "get_clock",
+        "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "open C2d",
+      "final_status": "C2d-2a resource_json: permitted page locks, current caller/role, fresh resource SQL and final clock; bounded scope retry",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2a-resource-json-reads.md",
+      "boundary_helper": "app.api.resource_reads.resource_json"
     },
     {
       "method": "GET",
       "path": "/library/items",
       "function": "list_items",
       "source": "api/app/api/routes/library.py",
-      "line": 134,
+      "line": 136,
       "dependencies": [
         "get_principal",
-        "get_db"
+        "get_db",
+        "get_clock",
+        "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "open C2d",
+      "final_status": "C2d-2a resource_json: permitted page locks, current caller/role, fresh resource SQL and final clock; bounded scope retry",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2a-resource-json-reads.md",
+      "boundary_helper": "app.api.resource_reads.resource_json"
     },
     {
       "method": "GET",
       "path": "/library/items/count",
       "function": "count_items",
       "source": "api/app/api/routes/library.py",
-      "line": 162,
+      "line": 177,
       "dependencies": [
         "get_principal",
-        "get_db"
+        "get_db",
+        "get_clock",
+        "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "open C2d",
+      "final_status": "C2d-2a resource_json: permitted page locks, current caller/role, fresh resource SQL and final clock; bounded scope retry",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2a-resource-json-reads.md",
+      "boundary_helper": "app.api.resource_reads.resource_json"
     },
     {
       "method": "GET",
       "path": "/library/items/{item_id}",
       "function": "get_item",
       "source": "api/app/api/routes/library.py",
-      "line": 170,
+      "line": 193,
       "dependencies": [
         "get_principal",
-        "get_db"
+        "get_db",
+        "get_clock",
+        "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "open C2d",
+      "final_status": "C2d-2a resource_json: permitted page locks, current caller/role, fresh resource SQL and final clock; bounded scope retry",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2a-resource-json-reads.md",
+      "boundary_helper": "app.api.resource_reads.resource_json"
     },
     {
       "method": "GET",
       "path": "/library/items/{item_id}/chunks",
       "function": "get_chunks",
       "source": "api/app/api/routes/library.py",
-      "line": 228,
+      "line": 259,
       "dependencies": [
         "get_principal",
-        "get_db"
+        "get_db",
+        "get_clock",
+        "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "open C2d",
+      "final_status": "C2d-2a resource_json: permitted page locks, current caller/role, fresh resource SQL and final clock; bounded scope retry",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2a-resource-json-reads.md",
+      "boundary_helper": "app.api.resource_reads.resource_json"
     },
     {
       "method": "GET",
       "path": "/library/items/{item_id}/metadata-candidates",
       "function": "get_metadata_candidates",
       "source": "api/app/api/routes/library.py",
-      "line": 253,
+      "line": 297,
       "dependencies": [
         "get_principal",
-        "get_db"
+        "get_db",
+        "get_clock",
+        "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "open C2d",
+      "final_status": "C2d-2a resource_json: permitted page locks, current caller/role, fresh resource SQL and final clock; bounded scope retry",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2a-resource-json-reads.md",
+      "boundary_helper": "app.api.resource_reads.resource_json"
     },
     {
       "method": "GET",
       "path": "/library/items/{item_id}/coverage",
       "function": "get_coverage",
       "source": "api/app/api/routes/library.py",
-      "line": 269,
+      "line": 324,
       "dependencies": [
         "get_principal",
-        "get_db"
+        "get_db",
+        "get_clock",
+        "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "open C2d",
+      "final_status": "C2d-2a resource_json: permitted page locks, current caller/role, fresh resource SQL and final clock; bounded scope retry",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2a-resource-json-reads.md",
+      "boundary_helper": "app.api.resource_reads.resource_json"
     },
     {
       "method": "GET",
       "path": "/library/items/{item_id}/references",
       "function": "get_references",
       "source": "api/app/api/routes/library.py",
-      "line": 295,
+      "line": 359,
       "dependencies": [
         "get_principal",
-        "get_db"
+        "get_db",
+        "get_clock",
+        "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "open C2d",
+      "final_status": "C2d-2a resource_json: permitted page locks, current caller/role, fresh resource SQL and final clock; bounded scope retry",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2a-resource-json-reads.md",
+      "boundary_helper": "app.api.resource_reads.resource_json"
     },
     {
       "method": "PATCH",
       "path": "/library/items/{item_id}",
       "function": "update_item",
       "source": "api/app/api/routes/library.py",
-      "line": 316,
+      "line": 389,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -693,8 +732,7 @@
         "require_admin",
         "get_db",
         "get_now",
-        "_storage",
-        "require_trusted_origin"
+        "_storage"
       ],
       "group": "publication-write",
       "final_status": "open C2d",
@@ -710,8 +748,7 @@
       "dependencies": [
         "require_admin",
         "get_db",
-        "get_now",
-        "require_trusted_origin"
+        "get_now"
       ],
       "group": "publication-write",
       "final_status": "open C2d",
@@ -728,8 +765,7 @@
         "require_admin",
         "get_db",
         "get_now",
-        "get_settings",
-        "require_trusted_origin"
+        "get_settings"
       ],
       "group": "publication-write",
       "final_status": "open C2d",
@@ -792,8 +828,7 @@
         "get_principal",
         "get_db",
         "get_now",
-        "get_settings",
-        "require_trusted_origin"
+        "get_settings"
       ],
       "group": "review-write-file",
       "final_status": "open C2d",
@@ -827,8 +862,7 @@
       "dependencies": [
         "get_principal",
         "get_db",
-        "get_now",
-        "require_trusted_origin"
+        "get_now"
       ],
       "group": "review-write-file",
       "final_status": "open C2d",
@@ -895,8 +929,7 @@
       "dependencies": [
         "require_admin",
         "get_db",
-        "get_now",
-        "require_trusted_origin"
+        "get_now"
       ],
       "group": "review-write-file",
       "final_status": "open C2d",
@@ -915,8 +948,7 @@
         "require_admin",
         "get_db",
         "get_now",
-        "_storage",
-        "require_trusted_origin"
+        "_storage"
       ],
       "group": "review-write-file",
       "final_status": "open C2d",
@@ -1065,5 +1097,22 @@
     "api/app/api/routes/search.py": "5b8c8b1c8afa24821d041d7bd9a765915b5ea8baf10d873c8a8d6803816321e7",
     "api/app/api/routes/uploads.py": "4cae5e01afd3544699ec89e044d8d49ba8a1e4f5bcbed9a464501ac257aad74a",
     "api/app/main.py": "b53f13e8e5dbdbed1de23410c7967298a9e1123a7411730f5d93f4721421f93e"
-  }
+  },
+  "previous_base": "ca4a623ea9cd4d2f8454659a1d66c48dbf8093d0",
+  "c2d2a_get_routes": [
+    "/collections",
+    "/collections/{collection_id}/items",
+    "/discovery/topics",
+    "/discovery/papers",
+    "/discovery/papers/{paper_id}/citing-items",
+    "/discovery/sources",
+    "/library/items",
+    "/library/items/count",
+    "/library/items/{item_id}",
+    "/library/items/{item_id}/chunks",
+    "/library/items/{item_id}/metadata-candidates",
+    "/library/items/{item_id}/coverage",
+    "/library/items/{item_id}/references"
+  ],
+  "tested_code_commit": "37b7484582184da029b121e78ac30932bceac316"
 }
