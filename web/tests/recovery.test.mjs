@@ -2,6 +2,30 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ApiError, api, describeError } from "../lib/api.ts";
 
+test("uncertain resource commit asks for checking state and never retries", async () => {
+  const message = describeError(new ApiError(503, "resource_write_outcome_uncertain"));
+  assert.match(message, /Chưa xác nhận.*Kiểm tra lại.*không tự gửi lại/);
+  assert.doesNotMatch(message, /chưa lưu|không.*được ghi nhận/);
+  const previousFetch = globalThis.fetch;
+  const previousDocument = globalThis.document;
+  globalThis.document = { cookie: "ras_csrf=synthetic-resource-csrf" };
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    return new Response(JSON.stringify({ error: "resource_write_outcome_uncertain" }),
+      { status: 503, headers: { "content-type": "application/json" } });
+  };
+  try {
+    await assert.rejects(api("/collections", { method: "POST", body: { name: "Reading" } }),
+      err => err instanceof ApiError && err.code === "resource_write_outcome_uncertain");
+    assert.equal(calls, 1);
+  } finally {
+    globalThis.fetch = previousFetch;
+    globalThis.document = previousDocument;
+  }
+  assert.match(describeError(new ApiError(503, "resource_write_response_unavailable")), /đã được lưu/);
+});
+
 test("uncertain auth transaction never claims password reset or disable succeeded", () => {
   assert.match(describeError(new ApiError(503, "auth_outcome_uncertain")), /Chưa xác định.*Kiểm tra/);
   assert.match(describeError(new ApiError(503, "session_journal_unavailable")), /Phiên đã bị thu hồi/);

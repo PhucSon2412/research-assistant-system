@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_clock, get_db, get_principal
 from app.api.errors import ApiError
 from app.api.resource_reads import resource_json
+from app.api.resource_writes import Mutation, resource_write
+from app.api.cookies import CSRF_HEADER
 from app.config import Settings, get_settings
 from app.authz import Principal, common_fulltext_items_clause, visible_items_clause
 from app.models import Collection, CollectionItem, LibraryItem
@@ -65,37 +67,49 @@ def _read_list_collections(principal: Principal, db: Session) -> dict:
 
 
 @router.post("", status_code=201)
-def create_collection(body: CollectionInput, principal: Principal = Depends(get_principal),
-                      db: Session = Depends(get_db)) -> dict:
-    row = Collection(owner_user_id=principal.user_id, name=body.name)
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    return {"collection": _out(row)}
+def create_collection(body: CollectionInput, request: Request, principal: Principal = Depends(get_principal),
+                      db: Session = Depends(get_db), clock=Depends(get_clock),
+                      settings: Settings = Depends(get_settings)) -> dict:
+    def mutate(current):
+        row = Collection(id=uuid.uuid4(), owner_user_id=current.user_id, name=body.name)
+        db.add(row)
+        return _collection_mutation(db, row.id)
+    return resource_write(db, principal, csrf_token=request.headers.get(CSRF_HEADER) or "",
+        clock=clock, idle=settings.auth.session_idle, mutate=mutate)
+
+
+def _collection_mutation(db: Session, collection_id: uuid.UUID) -> Mutation:
+    return Mutation(check=lambda current: _owned(db, current, collection_id),
+        read=lambda current: {"collection": _out(_owned(db, current, collection_id))},
+        collection_ids=lambda data: [collection_id])
 
 
 @router.patch("/{collection_id}")
 def rename_collection(collection_id: uuid.UUID, body: CollectionInput,
-                      principal: Principal = Depends(get_principal), db: Session = Depends(get_db)) -> dict:
-    row = _owned(db, principal, collection_id, lock=True)
-    row.name = body.name
-    row.updated_at = func.now()
-    db.commit()
-    db.refresh(row)
-    return {"collection": _out(row)}
+                      request: Request, principal: Principal = Depends(get_principal), db: Session = Depends(get_db),
+                      clock=Depends(get_clock), settings: Settings = Depends(get_settings)) -> dict:
+    def mutate(current):
+        row = _owned(db, current, collection_id, lock=True)
+        row.name = body.name
+        row.updated_at = func.now()
+        return _collection_mutation(db, collection_id)
+    return resource_write(db, principal, csrf_token=request.headers.get(CSRF_HEADER) or "",
+        clock=clock, idle=settings.auth.session_idle, mutate=mutate)
 
 
 @router.delete("/{collection_id}", status_code=204)
-def delete_collection(collection_id: uuid.UUID, principal: Principal = Depends(get_principal),
-                      db: Session = Depends(get_db)) -> None:
-    row = _owned(db, principal, collection_id, lock=True)
-    try:
+def delete_collection(collection_id: uuid.UUID, request: Request, principal: Principal = Depends(get_principal),
+                      db: Session = Depends(get_db), clock=Depends(get_clock),
+                      settings: Settings = Depends(get_settings)) -> None:
+    def mutate(current):
+        row = _owned(db, current, collection_id, lock=True)
         db.execute(delete(CollectionItem).where(CollectionItem.collection_id == row.id))
         db.delete(row)
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
+        # The SQL owner proof of the deleted row is protected by its UPDATE lock
+        # through commit. Requiring it to exist after flush would reject deletion.
+        return Mutation(check=lambda current: None)
+    return resource_write(db, principal, csrf_token=request.headers.get(CSRF_HEADER) or "",
+        clock=clock, idle=settings.auth.session_idle, mutate=mutate)
 
 
 @router.get("/{collection_id}/items")
@@ -140,23 +154,43 @@ def _read_list_collection_items(collection_id: uuid.UUID, limit: int,
 
 @router.post("/{collection_id}/items", status_code=201)
 def add_collection_item(collection_id: uuid.UUID, body: MembershipInput,
-                        principal: Principal = Depends(get_principal), db: Session = Depends(get_db)) -> dict:
-    _owned(db, principal, collection_id, lock=True)
-    item = db.scalar(select(LibraryItem).where(LibraryItem.id == body.item_id, visible_items_clause(principal)))
-    if item is None:
-        raise ApiError(404, "not_found")
-    db.execute(insert(CollectionItem).values(collection_id=collection_id, item_id=body.item_id)
-               .on_conflict_do_nothing(index_elements=["collection_id", "item_id"]))
-    db.commit()
-    return {"item_id": str(body.item_id)}
+                        request: Request, principal: Principal = Depends(get_principal), db: Session = Depends(get_db),
+                        clock=Depends(get_clock), settings: Settings = Depends(get_settings)) -> dict:
+    def read(current):
+        _owned(db, current, collection_id)
+        found = db.scalar(select(CollectionItem.item_id).join(LibraryItem,
+            LibraryItem.id == CollectionItem.item_id).where(CollectionItem.collection_id == collection_id,
+            CollectionItem.item_id == body.item_id, visible_items_clause(current)))
+        if found is None:
+            raise ApiError(404, "not_found")
+        return {"item_id": str(found)}
+
+    def mutate(current):
+        # Same direction as resource_json and search/RAG: item before collection.
+        item = db.scalar(select(LibraryItem.id).where(LibraryItem.id == body.item_id,
+            visible_items_clause(current)).with_for_update(read=True))
+        if item is None:
+            raise ApiError(404, "not_found")
+        _owned(db, current, collection_id, lock=True)
+        db.execute(insert(CollectionItem).values(collection_id=collection_id, item_id=body.item_id)
+            .on_conflict_do_nothing(index_elements=["collection_id", "item_id"]))
+        return Mutation(check=read, read=read, item_ids=lambda data: [data["item_id"]],
+            collection_ids=lambda data: [collection_id])
+    return resource_write(db, principal, csrf_token=request.headers.get(CSRF_HEADER) or "",
+        clock=clock, idle=settings.auth.session_idle, mutate=mutate)
 
 
 @router.delete("/{collection_id}/items/{item_id}", status_code=204)
 def remove_collection_item(collection_id: uuid.UUID, item_id: uuid.UUID,
-                           principal: Principal = Depends(get_principal), db: Session = Depends(get_db)) -> None:
-    _owned(db, principal, collection_id, lock=True)
-    result = db.execute(delete(CollectionItem).where(CollectionItem.collection_id == collection_id,
-                                                      CollectionItem.item_id == item_id))
-    if not result.rowcount:
-        raise ApiError(404, "not_found")
-    db.commit()
+                           request: Request, principal: Principal = Depends(get_principal), db: Session = Depends(get_db),
+                           clock=Depends(get_clock), settings: Settings = Depends(get_settings)) -> None:
+    def mutate(current):
+        _owned(db, current, collection_id, lock=True)
+        result = db.execute(delete(CollectionItem).where(CollectionItem.collection_id == collection_id,
+            CollectionItem.item_id == item_id))
+        if not result.rowcount:
+            raise ApiError(404, "not_found")
+        # Owner may remove even a hidden/revoked item; never query its payload.
+        return Mutation(check=lambda current: _owned(db, current, collection_id))
+    return resource_write(db, principal, csrf_token=request.headers.get(CSRF_HEADER) or "",
+        clock=clock, idle=settings.auth.session_idle, mutate=mutate)

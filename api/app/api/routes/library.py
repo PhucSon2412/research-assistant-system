@@ -16,17 +16,18 @@ permit external processing.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from enum import StrEnum
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_clock, get_db, get_now, get_principal
+from app.api.deps import get_clock, get_db, get_principal
 from app.api.errors import ApiError
 from app.api.resource_reads import resource_json
+from app.api.resource_writes import Mutation, resource_write
+from app.api.cookies import CSRF_HEADER
 from app.config import Settings, get_settings
 from app.audit import record_event
 from app.authz import (Principal, can_edit_item, common_derivatives_clause, common_fulltext_items_clause,
@@ -389,29 +390,33 @@ def _read_get_references(item_id: str, principal: Principal,
 def update_item(
     item_id: str,
     body: ItemPatch,
+    request: Request,
     principal: Principal = Depends(get_principal),
     db: Session = Depends(get_db),
-    now: datetime = Depends(get_now),
+    clock=Depends(get_clock), settings: Settings = Depends(get_settings),
 ) -> dict:
-    item = _get_visible_item(db, principal, item_id, for_update=True)
-    if not can_edit_item(principal, item):
-        # The item is visible (common) but not editable by a User.
-        db.rollback()
-        raise ApiError(403, "forbidden")
-    changed = sorted(body.model_fields_set)
-    if "title" in body.model_fields_set:
-        item.title = body.title
-    item.updated_at = now
-    record_event(
-        db,
-        action="library.item.update",
-        outcome=AuditOutcome.SUCCESS,
-        actor_type=AuditActorType.USER,
-        actor_user_id=principal.user_id,
-        target_type="library_item",
-        target_id=str(item.id),
-        details={"fields": changed},
-    )
-    db.commit()
-    return {"item": _item_out(item, principal, _searchable_common(db, principal, [item]),
-                              _searchable_common(db, principal, [item], external_processing=True))}
+    def check(current):
+        item = _get_visible_item(db, current, item_id)
+        if not can_edit_item(current, item):
+            raise ApiError(403, "forbidden")
+
+    def read(current):
+        item = _get_visible_item(db, current, item_id)
+        return {"item": _item_out(item, current, _searchable_common(db, current, [item]),
+            _searchable_common(db, current, [item], external_processing=True))}
+
+    def mutate(current):
+        item = _get_visible_item(db, current, item_id, for_update=True)
+        if not can_edit_item(current, item):
+            raise ApiError(403, "forbidden")
+        if "title" in body.model_fields_set:
+            item.title = body.title
+        item.updated_at = clock()
+        record_event(db, action="library.item.update", outcome=AuditOutcome.SUCCESS,
+            actor_type=AuditActorType.USER, actor_user_id=current.user_id,
+            target_type="library_item", target_id=str(item.id),
+            details={"fields": sorted(body.model_fields_set)})
+        return Mutation(check, read, item_ids=lambda data: [data["item"]["id"]])
+
+    return resource_write(db, principal, csrf_token=request.headers.get(CSRF_HEADER) or "",
+        clock=clock, idle=settings.auth.session_idle, mutate=mutate)
