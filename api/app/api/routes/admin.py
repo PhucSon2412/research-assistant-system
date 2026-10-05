@@ -20,6 +20,8 @@ from app.authz import Principal
 from app.config import Settings, get_settings
 from app.delivery import DeliveryAdapter, DevOutbox, get_delivery
 from app.identity import invitations, users
+from app.identity.final_caller import final_caller
+from app.identity.session_commit import commit_activity
 from app.identity.emails import EmailFormatError
 from app.identity.errors import AccountExists, Forbidden, InvitationConflict, NotFound
 from app.models import Invitation, User
@@ -120,8 +122,12 @@ def revoke_invitation(
 
 
 @router.get("/users")
-def list_users(_: Principal = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
-    return {"users": [_user_out(u) for u in users.list_users(db)]}
+def list_users(admin: Principal = Depends(require_admin), db: Session = Depends(get_db),
+               settings: Settings = Depends(get_settings), clock=Depends(get_clock)) -> dict:
+    rows = [_user_out(u) for u in users.list_users(db)]
+    final_caller(db, session_id=admin.session_id, user_id=admin.user_id,
+                 clock=clock, idle=settings.auth.session_idle, admin=True)
+    return {"users": rows}
 
 
 def _set_status(db: Session, admin: Principal, user_id: uuid.UUID, new_status: UserStatus, now: datetime,
@@ -164,12 +170,13 @@ def enable_user(
 def dev_outbox(
     admin: Principal = Depends(require_admin),
     db: Session = Depends(get_db),
-    now: datetime = Depends(get_now),
     delivery: DeliveryAdapter = Depends(get_delivery),
+    settings: Settings = Depends(get_settings),
+    clock=Depends(get_clock),
 ) -> dict:
     """Development only (RAS_DELIVERY__MODE=dev_outbox, which the settings
     refuse outside RAS_ENVIRONMENT=development). 404 otherwise."""
-    if not isinstance(delivery, DevOutbox):
+    if settings.environment != "development" or not isinstance(delivery, DevOutbox):
         raise ApiError(404, "not_found")
     record_event(
         db,
@@ -178,7 +185,21 @@ def dev_outbox(
         actor_type=AuditActorType.USER,
         actor_user_id=admin.user_id,
     )
-    db.commit()
+    # Flush the audit FK before the final shared journal lock. No link is read
+    # until both the audit commit and a new transaction's authority check pass.
+    try:
+        db.flush()
+    except Exception:
+        db.rollback()
+        raise ApiError(503, "auth_unavailable") from None
+    final_caller(db, session_id=admin.session_id, user_id=admin.user_id,
+                 clock=clock, idle=settings.auth.session_idle, admin=True)
+    commit_activity(db)
+    caller = final_caller(db, session_id=admin.session_id, user_id=admin.user_id,
+                          clock=clock, idle=settings.auth.session_idle, admin=True)
+    entries = delivery.entries(now=caller.checked_at)
+    caller = final_caller(db, session_id=admin.session_id, user_id=admin.user_id,
+                          clock=clock, idle=settings.auth.session_idle, admin=True)
     return {
         "messages": [
             {
@@ -189,6 +210,6 @@ def dev_outbox(
                 "created_at": e.created_at.isoformat(),
                 "expires_at": e.message.expires_at.isoformat(),
             }
-            for e in delivery.entries(now=now)
+            for e in entries if e.message.expires_at > caller.checked_at
         ]
     }
