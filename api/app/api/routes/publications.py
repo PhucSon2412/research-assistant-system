@@ -5,8 +5,8 @@ collections, files, search, chunks, RAG), for the Admin too; so is a
 ``revoked`` one. A ``listed`` (published) copy shows its *metadata* on the
 normal library routes; its original opens on ``/files/{id}/original`` only
 when its rights permit download without conditions (M6b-2b1,
-``original_download``). ``content_status`` stays ``metadata_only`` and
-chunk/search/RAG still refuse it.
+``original_download``). Indexed full text opens only through the exact
+search gate; RAG additionally needs external-processing rights.
 
 - ``/admin/pending-publications``: read-only view of pending copies (M6b-1).
 - ``/admin/common-copies``: every reviewed copy by state, with the recorded
@@ -18,8 +18,8 @@ chunk/search/RAG still refuse it.
   without one is removed at cleanup.
 
 No route here returns file bytes, object keys or extracted text, or calls a
-provider: ``index`` only queues a durable job for the worker. An indexed copy
-is still served by no chunk, search or RAG route.
+provider: ``index`` only queues a durable job for the worker. Publication,
+indexing, download, search and RAG remain separate permission gates.
 """
 
 from __future__ import annotations
@@ -33,8 +33,9 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_now, require_admin, require_trusted_origin
+from app.api.deps import get_clock, get_db, get_now, require_admin, require_trusted_origin
 from app.api.errors import ApiError
+from app.api.review_publication_reads import review_publication_json
 from app.authz import Principal, pending_publication_clause, review_copy_admin_clause
 from app import common_index
 from app.common_original import common_original_rows
@@ -51,14 +52,12 @@ copies_router = APIRouter(prefix="/admin/common-copies", tags=["review"])
 PENDING_NOTE = ("Bản chung đã có quyền do Admin ghi nhận nhưng chưa công bố: User khác không thấy metadata, "
                 "file, kết quả tìm kiếm, chunk hay RAG của bản này. Chưa có index; công bố là bước riêng.")
 LISTED_NOTE = ("Đã công bố metadata: mọi tài khoản thấy tiêu đề và version trong thư viện. File gốc chỉ tải được khi "
-               "quyền đã ghi cho phép tải và không có điều kiện sử dụng (hệ thống chưa thi hành được điều kiện dạng "
-               "text); mỗi lần tải đều kiểm lại quyền và SHA-256. Toàn văn chưa khả dụng: chưa có tìm kiếm toàn văn, "
-               "chunk hay hỏi đáp cho bản này, kể cả khi quyền đã ghi cho phép. Admin có thể lập chỉ mục khi quyền "
-               "cho tìm kiếm toàn văn và gửi qua provider, không kèm điều kiện; đã lập chỉ mục vẫn chưa mở tìm "
-               "kiếm/hỏi đáp.")
-REVOKED_NOTE = ("Đã thu hồi: không route nào phục vụ bản này từ lúc thu hồi commit. Cleanup xóa object chung, dữ "
-                "liệu phát sinh và metadata (tiêu đề, URL nguồn, tên file, nguồn/giấy phép/bằng chứng/điều kiện) trừ "
-                "trường có căn cứ giữ riêng; bản riêng của User không đổi.")
+               "gate tải cho phép; mỗi lần tải kiểm lại quyền và SHA-256. Toàn văn/chunk/tìm kiếm chỉ khả dụng khi "
+               "đã lập chỉ mục và gate tìm kiếm mở; hỏi đáp còn cần quyền xử lý qua provider. Admin có thể lập chỉ "
+               "mục khi quyền cho tìm kiếm toàn văn và gửi qua provider, không kèm điều kiện.")
+REVOKED_NOTE = ("Đã thu hồi: các route nội dung thông thường chặn bản này từ lúc thu hồi commit. Admin còn xem "
+                "lịch sử quyết định. Cleanup xóa object chung, dữ liệu phát sinh và metadata trừ trường có căn cứ "
+                "giữ riêng; lịch sử sau cleanup chỉ chứa metadata được giữ theo policy. Bản riêng của User không đổi.")
 NOTES = {PublicationState.PENDING.value: PENDING_NOTE, PublicationState.LISTED.value: LISTED_NOTE,
          PublicationState.REVOKED.value: REVOKED_NOTE}
 
@@ -219,8 +218,14 @@ def _full_out(db: Session, admin: Principal, row: tuple, now: datetime) -> dict:
     return out
 
 
-@router.get("")
-def list_pending(
+def _copy_out(db: Session, admin: Principal, item_id: uuid.UUID, now: datetime) -> dict:
+    row = db.execute(_rows(review_copy_admin_clause(admin)).where(LibraryItem.id == item_id)).first()
+    if row is None:
+        raise ApiError(404, "not_found")
+    return _full_out(db, admin, row, now)
+
+
+def _read_list_pending(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0, le=100_000),
     admin: Principal = Depends(require_admin),
@@ -232,41 +237,77 @@ def list_pending(
     return {"items": [_out(*row) for row in rows], "total": total, "limit": limit, "offset": offset}
 
 
-@router.get("/{item_id}")
-def get_pending(item_id: str, admin: Principal = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
+def _read_get_pending(item_id: str, admin: Principal = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
     row = db.execute(_rows(pending_publication_clause(admin)).where(LibraryItem.id == _parse_id(item_id))).first()
     if row is None:
         raise ApiError(404, "not_found")
     return {"item": _out(*row)}
 
 
-@copies_router.get("")
-def list_copies(
+def _read_list_copies(
     state: Literal["pending", "listed", "revoked"] = "pending",
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0, le=100_000),
     admin: Principal = Depends(require_admin),
     db: Session = Depends(get_db),
-    now: datetime = Depends(get_now),
+    *, clock,
 ) -> dict:
     stmt = _rows(review_copy_admin_clause(admin)).where(LibraryItem.publication_state == state)
     total = db.scalar(select(func.count()).select_from(stmt.subquery()))
     rows = db.execute(stmt.order_by(LibraryItem.updated_at.desc(), LibraryItem.id).limit(limit).offset(offset)).all()
-    return {"items": [_full_out(db, admin, row, now) for row in rows], "total": total, "state": state,
+    items = [_full_out(db, admin, row, clock()) for row in rows]
+    _read_cleanup_clock(items, clock)
+    return {"items": items, "total": total, "state": state,
             "limit": limit, "offset": offset}
 
 
-def _copy_out(db: Session, admin: Principal, item_id: uuid.UUID, now: datetime) -> dict:
-    row = db.execute(_rows(review_copy_admin_clause(admin)).where(LibraryItem.id == item_id)).first()
-    if row is None:
-        raise ApiError(404, "not_found")
-    return _full_out(db, admin, row, now)
+def _read_get_copy(item_id: str, admin: Principal = Depends(require_admin), db: Session = Depends(get_db),
+                  *, clock) -> dict:
+    item = _copy_out(db, admin, _parse_id(item_id), clock())
+    _read_cleanup_clock([item], clock)
+    return {"item": item}
+
+
+def _read_cleanup_clock(items: list[dict], clock) -> None:
+    # GET-only decoration after all auxiliary SQL. Shared POST formatters keep
+    # their existing transaction/clock contract and never enter the boundary.
+    at = clock()
+    for item in items:
+        tombstone = item.get("tombstone")
+        if tombstone is not None:
+            tombstone["overdue"] = (tombstone["purged_at"] is None
+                                    and at > datetime.fromisoformat(tombstone["purge_due_at"]))
+
+
+@router.get("")
+def list_pending(limit: int = Query(default=20, ge=1, le=100), offset: int = Query(default=0, ge=0, le=100_000),
+                 admin: Principal = Depends(require_admin), db: Session = Depends(get_db),
+                 settings: Settings = Depends(get_settings), clock=Depends(get_clock)) -> dict:
+    return review_publication_json(db, admin, clock=clock, idle=settings.auth.session_idle,
+        admin=True, pending=True, read=lambda p: _read_list_pending(limit, offset, p, db))
+
+
+@router.get("/{item_id}")
+def get_pending(item_id: str, admin: Principal = Depends(require_admin), db: Session = Depends(get_db),
+                settings: Settings = Depends(get_settings), clock=Depends(get_clock)) -> dict:
+    return review_publication_json(db, admin, clock=clock, idle=settings.auth.session_idle,
+        admin=True, pending=True, read=lambda p: _read_get_pending(item_id, p, db))
+
+
+@copies_router.get("")
+def list_copies(state: Literal["pending", "listed", "revoked"] = "pending",
+                limit: int = Query(default=20, ge=1, le=100), offset: int = Query(default=0, ge=0, le=100_000),
+                admin: Principal = Depends(require_admin), db: Session = Depends(get_db),
+                settings: Settings = Depends(get_settings), clock=Depends(get_clock)) -> dict:
+    return review_publication_json(db, admin, clock=clock, idle=settings.auth.session_idle,
+        admin=True, read=lambda p: _read_list_copies(state, limit, offset, p, db, clock=clock))
 
 
 @copies_router.get("/{item_id}")
 def get_copy(item_id: str, admin: Principal = Depends(require_admin), db: Session = Depends(get_db),
-             now: datetime = Depends(get_now)) -> dict:
-    return {"item": _copy_out(db, admin, _parse_id(item_id), now)}
+             settings: Settings = Depends(get_settings), clock=Depends(get_clock)) -> dict:
+    return review_publication_json(db, admin, clock=clock, idle=settings.auth.session_idle,
+        admin=True, read=lambda p: _read_get_copy(item_id, p, db, clock=clock))
 
 
 @copies_router.post("/{item_id}/publish", dependencies=[Depends(require_trusted_origin)])

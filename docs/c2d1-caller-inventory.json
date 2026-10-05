@@ -1,7 +1,7 @@
 {
-  "base": "d06664e53383071237c21e802f439fda348a1afd",
+  "base": "f229141e6db46f7df663cb1d14335530a4d5e9dd",
   "source_migration": "0039",
-  "scope": "Current source route inventory: only 13 GET library/collections/discovery moved in C2d-2a; writers and other C2d callers retain separate status.",
+  "scope": "Current route inventory: C2d-1 reads, 13 C2d-2a GET and exactly 9 C2d-2b review/publication JSON GET completed on review branch; writer/file/provider status remains separate.",
   "safety": "pending until C4",
   "route_count": 63,
   "routes": [
@@ -665,69 +665,79 @@
       "path": "/admin/pending-publications",
       "function": "list_pending",
       "source": "api/app/api/routes/publications.py",
-      "line": 223,
+      "line": 283,
       "dependencies": [
         "require_admin",
-        "get_db"
+        "get_db",
+        "get_settings",
+        "get_clock"
       ],
-      "group": "publication-write",
-      "final_status": "open C2d",
+      "group": "review-publication-json-read",
+      "final_status": "C2d-2b final caller/current Admin/fresh clock + exact SQL scope/grant/history/resource recheck",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2b-review-publication-json-reads.md#map-từng-route",
+      "boundary_helper": "app.api.review_publication_reads.review_publication_json"
     },
     {
       "method": "GET",
       "path": "/admin/pending-publications/{item_id}",
       "function": "get_pending",
       "source": "api/app/api/routes/publications.py",
-      "line": 236,
+      "line": 291,
       "dependencies": [
         "require_admin",
-        "get_db"
+        "get_db",
+        "get_settings",
+        "get_clock"
       ],
-      "group": "publication-write",
-      "final_status": "open C2d",
+      "group": "review-publication-json-read",
+      "final_status": "C2d-2b final caller/current Admin/fresh clock + exact SQL scope/grant/history/resource recheck",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2b-review-publication-json-reads.md#map-từng-route",
+      "boundary_helper": "app.api.review_publication_reads.review_publication_json"
     },
     {
       "method": "GET",
       "path": "/admin/common-copies",
       "function": "list_copies",
       "source": "api/app/api/routes/publications.py",
-      "line": 244,
+      "line": 298,
       "dependencies": [
         "require_admin",
         "get_db",
-        "get_now"
+        "get_settings",
+        "get_clock"
       ],
-      "group": "publication-write",
-      "final_status": "open C2d",
+      "group": "review-publication-json-read",
+      "final_status": "C2d-2b final caller/current Admin/fresh clock + exact SQL scope/grant/history/resource recheck",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2b-review-publication-json-reads.md#map-từng-route",
+      "boundary_helper": "app.api.review_publication_reads.review_publication_json"
     },
     {
       "method": "GET",
       "path": "/admin/common-copies/{item_id}",
       "function": "get_copy",
       "source": "api/app/api/routes/publications.py",
-      "line": 267,
+      "line": 307,
       "dependencies": [
         "require_admin",
         "get_db",
-        "get_now"
+        "get_settings",
+        "get_clock"
       ],
-      "group": "publication-write",
-      "final_status": "open C2d",
+      "group": "review-publication-json-read",
+      "final_status": "C2d-2b final caller/current Admin/fresh clock + exact SQL scope/grant/history/resource recheck",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2b-review-publication-json-reads.md#map-từng-route",
+      "boundary_helper": "app.api.review_publication_reads.review_publication_json"
     },
     {
       "method": "POST",
       "path": "/admin/common-copies/{item_id}/publish",
       "function": "publish_copy",
       "source": "api/app/api/routes/publications.py",
-      "line": 273,
+      "line": 314,
       "dependencies": [
         "require_admin",
         "get_db",
@@ -744,7 +754,7 @@
       "path": "/admin/common-copies/{item_id}/index",
       "function": "index_copy",
       "source": "api/app/api/routes/publications.py",
-      "line": 286,
+      "line": 327,
       "dependencies": [
         "require_admin",
         "get_db",
@@ -760,7 +770,7 @@
       "path": "/admin/common-copies/{item_id}/revoke",
       "function": "revoke_copy",
       "source": "api/app/api/routes/publications.py",
-      "line": 300,
+      "line": 341,
       "dependencies": [
         "require_admin",
         "get_db",
@@ -793,37 +803,43 @@
       "path": "/review-requests/notice",
       "function": "notice",
       "source": "api/app/api/routes/reviews.py",
-      "line": 249,
+      "line": 303,
       "dependencies": [
         "get_principal",
-        "get_settings"
+        "get_db",
+        "get_settings",
+        "get_clock"
       ],
-      "group": "review-write-file",
-      "final_status": "open C2d",
+      "group": "review-publication-json-read",
+      "final_status": "C2d-2b final caller/current Admin/fresh clock + exact SQL scope/grant/history/resource recheck",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2b-review-publication-json-reads.md#map-từng-route",
+      "boundary_helper": "app.api.review_publication_reads.review_publication_json"
     },
     {
       "method": "GET",
       "path": "/review-requests",
       "function": "list_own",
       "source": "api/app/api/routes/reviews.py",
-      "line": 254,
+      "line": 310,
       "dependencies": [
         "get_principal",
-        "get_db"
+        "get_db",
+        "get_settings",
+        "get_clock"
       ],
-      "group": "review-write-file",
-      "final_status": "open C2d",
+      "group": "review-publication-json-read",
+      "final_status": "C2d-2b final caller/current Admin/fresh clock + exact SQL scope/grant/history/resource recheck",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2b-review-publication-json-reads.md#map-từng-route",
+      "boundary_helper": "app.api.review_publication_reads.review_publication_json"
     },
     {
       "method": "POST",
       "path": "/review-requests",
       "function": "submit",
       "source": "api/app/api/routes/reviews.py",
-      "line": 271,
+      "line": 342,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -843,22 +859,25 @@
       "path": "/review-requests/{request_id}",
       "function": "get_own",
       "source": "api/app/api/routes/reviews.py",
-      "line": 317,
+      "line": 319,
       "dependencies": [
         "get_principal",
-        "get_db"
+        "get_db",
+        "get_settings",
+        "get_clock"
       ],
-      "group": "review-write-file",
-      "final_status": "open C2d",
+      "group": "review-publication-json-read",
+      "final_status": "C2d-2b final caller/current Admin/fresh clock + exact SQL scope/grant/history/resource recheck",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2b-review-publication-json-reads.md#map-từng-route",
+      "boundary_helper": "app.api.review_publication_reads.review_publication_json"
     },
     {
       "method": "POST",
       "path": "/review-requests/{request_id}/withdraw",
       "function": "withdraw",
       "source": "api/app/api/routes/reviews.py",
-      "line": 322,
+      "line": 388,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -876,37 +895,43 @@
       "path": "/admin/review-requests",
       "function": "admin_list",
       "source": "api/app/api/routes/reviews.py",
-      "line": 374,
+      "line": 326,
       "dependencies": [
         "require_admin",
-        "get_db"
+        "get_db",
+        "get_settings",
+        "get_clock"
       ],
-      "group": "review-write-file",
-      "final_status": "open C2d",
+      "group": "review-publication-json-read",
+      "final_status": "C2d-2b final caller/current Admin/fresh clock + exact SQL scope/grant/history/resource recheck",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2b-review-publication-json-reads.md#map-từng-route",
+      "boundary_helper": "app.api.review_publication_reads.review_publication_json"
     },
     {
       "method": "GET",
       "path": "/admin/review-requests/{request_id}",
       "function": "admin_get",
       "source": "api/app/api/routes/reviews.py",
-      "line": 393,
+      "line": 335,
       "dependencies": [
         "require_admin",
-        "get_db"
+        "get_db",
+        "get_settings",
+        "get_clock"
       ],
-      "group": "review-write-file",
-      "final_status": "open C2d",
+      "group": "review-publication-json-read",
+      "final_status": "C2d-2b final caller/current Admin/fresh clock + exact SQL scope/grant/history/resource recheck",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d2b-review-publication-json-reads.md#map-từng-route",
+      "boundary_helper": "app.api.review_publication_reads.review_publication_json"
     },
     {
       "method": "GET",
       "path": "/admin/review-requests/{request_id}/files/{file_id}/original",
       "function": "admin_original",
       "source": "api/app/api/routes/reviews.py",
-      "line": 413,
+      "line": 450,
       "dependencies": [
         "require_admin",
         "get_db",
@@ -925,7 +950,7 @@
       "path": "/admin/review-requests/{request_id}/reject",
       "function": "admin_reject",
       "source": "api/app/api/routes/reviews.py",
-      "line": 486,
+      "line": 523,
       "dependencies": [
         "require_admin",
         "get_db",
@@ -943,7 +968,7 @@
       "path": "/admin/review-requests/{request_id}/approve",
       "function": "admin_approve",
       "source": "api/app/api/routes/reviews.py",
-      "line": 512,
+      "line": 549,
       "dependencies": [
         "require_admin",
         "get_db",

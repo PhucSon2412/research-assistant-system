@@ -2,11 +2,13 @@
 
 [Mục lục](../README.md) · [Task](../tasks/m6c2b2c2d2a-resource-json-reads.md) · [Bàn giao](../c2d2a-resource-json-reads.md) · [Inventory agent](../c2d2a-test-inventory.json)
 
+**Cập nhật sau review (2026-10-05): PR #39 đã merge `f229141`; docs review được commit `e89815d`.** Review/source/test bên dưới là lịch sử của lượt kiểm độc lập, không có lần chạy lại trong lượt giao [C2d-2b](../tasks/m6c2b2c2d2b-review-publication-json-reads.md). Safety pending tới C4.
+
 ## Kết luận
 
 Ngày 2026-10-05, fetch và review source `5d291c05ce63ac2e35f96b510a811ee44a7017d2`, base `origin/main=d06664e53383071237c21e802f439fda348a1afd` (merge PR #38). Local HEAD khớp nhánh remote; working tree sạch trước review. Không migration, head source `0039`, không truy vấn revision DB dev.
 
-**Không phát hiện điểm chặn merge trong phạm vi 13 GET của C2d-2a; có thể merge PR #39.** Reviewer không merge, push hoặc đăng comment PR. Chỉ sửa/cập nhật docs trong lượt review; các docs chưa commit cần được coding agent giữ và đưa vào PR. Safety pending tới C4; kết luận không phủ toàn C2d/T14 hoặc cutover production.
+**Không phát hiện điểm chặn merge trong phạm vi 13 GET của C2d-2a; có thể merge PR #39.** Reviewer không merge, push hoặc đăng comment PR. Chỉ sửa/cập nhật docs trong lượt review; các docs khi đó chưa commit được coding agent giữ, commit `e89815d` và đưa vào merge PR #39. Safety pending tới C4; kết luận không phủ toàn C2d/T14 hoặc cutover production.
 
 Có một sửa nhỏ về tài liệu: câu “Malformed/missing IDs vẫn 404” trong bàn giao quá rộng. UUID sai ở `/collections/{collection_id}/items` vẫn trả `422 invalid_request` (validation trường path); UUID hợp lệ không có/ngoài quyền trả 404. Library item/discovery citing-item tự parse string nên UUID sai trả 404. Hành vi code không đổi trong PR; reviewer đã sửa câu mô tả, không yêu cầu đổi API.
 

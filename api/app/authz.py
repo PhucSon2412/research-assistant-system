@@ -34,7 +34,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import ColumnElement, and_, false, or_, select, text, tuple_
+from sqlalchemy import ColumnElement, and_, false, or_, select, text, true, tuple_
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.models import AccessRights, CommonPublication, LibraryItem, PaperVersion, ReviewRequest, SourceFile
@@ -213,6 +213,15 @@ def common_original_clause(principal: Principal) -> ColumnElement[bool]:
         PaperVersion.item_id == LibraryItem.id,
         live_rights,
     )
+
+
+def review_history_admin_clause(principal: Principal) -> ColumnElement[bool]:
+    """Admin workflow history only; private payload still requires the exact grant.
+
+    Open but inactive and closed requests retain their thin DTO and workflow
+    count. This clause grants no private item/version/file/declaration reads.
+    """
+    return true() if principal.is_admin else false()
 
 
 def review_grant_clause(principal: Principal) -> ColumnElement[bool]:

@@ -34,10 +34,12 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_now, get_principal, require_admin, require_trusted_origin
+from app.api.deps import get_clock, get_db, get_now, get_principal, require_admin, require_trusted_origin
 from app.api.errors import ApiError
+from app.api.review_publication_reads import review_publication_json
 from app.audit import record_event
-from app.authz import Principal, m2a_private_derivatives_clause, review_grant_clause
+from app.authz import (Principal, m2a_private_derivatives_clause, review_grant_clause,
+                      review_history_admin_clause)
 from app.config import Settings, get_settings
 from app.models import AccessRights, LibraryItem, PaperVersion, ReviewRequest, SourceFile, User
 from app.models.enums import AuditActorType, AuditOutcome, ReviewRejectReason, ReviewStatus, RightsAudience
@@ -245,13 +247,12 @@ def _owned_request(db: Session, principal: Principal, request_id: str, *, lock: 
     return row
 
 
-@router.get("/notice")
-def notice(principal: Principal = Depends(get_principal), settings: Settings = Depends(get_settings)) -> dict:
+# Read-only wrappers: never attach the boundary to shared POST formatters.
+def _read_notice(principal: Principal = Depends(get_principal), settings: Settings = Depends(get_settings)) -> dict:
     return {"version": settings.review.notice_version, "text": NOTICE}
 
 
-@router.get("")
-def list_own(
+def _read_list_own(
     item_id: str | None = None,
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0, le=100_000),
@@ -265,6 +266,76 @@ def list_own(
     rows = db.execute(stmt.order_by(ReviewRequest.submitted_at.desc(), ReviewRequest.id)
                       .limit(limit).offset(offset)).all()
     return {"requests": [_owner_out(*row) for row in rows], "total": total, "limit": limit, "offset": offset}
+
+
+def _read_get_own(request_id: str, principal: Principal = Depends(get_principal), db: Session = Depends(get_db)) -> dict:
+    return {"request": _owner_out(*_owned_request(db, principal, request_id))}
+
+
+def _read_admin_list(
+    status: Literal["open", "closed"] = "open",
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0, le=100_000),
+    admin: Principal = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict:
+    where = (ReviewRequest.status == ReviewStatus.OPEN.value if status == "open"
+             else ReviewRequest.status != ReviewStatus.OPEN.value)
+    total = db.scalar(select(func.count()).select_from(ReviewRequest).where(where, review_history_admin_clause(admin)))
+    rows = db.scalars(select(ReviewRequest).where(where, review_history_admin_clause(admin))
+                      .order_by(ReviewRequest.submitted_at.desc(), ReviewRequest.id).limit(limit).offset(offset)).all()
+    granted = {g[0].id: g for g in db.execute(_granted(admin).where(ReviewRequest.id.in_([r.id for r in rows])))} \
+        if rows else {}
+    return {"requests": [_admin_out(r, granted.get(r.id)) for r in rows], "total": total,
+            "limit": limit, "offset": offset, "status": status}
+
+
+def _read_admin_get(request_id: str, admin: Principal = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
+    parsed = _parse_id(request_id)
+    rr = db.scalar(select(ReviewRequest).where(ReviewRequest.id == parsed, review_history_admin_clause(admin)))
+    if rr is None:
+        raise ApiError(404, "not_found")
+    return {"request": _admin_out(rr, db.execute(_granted(admin).where(ReviewRequest.id == parsed)).first(),
+                                  _pending_item_id(db, rr))}
+
+
+@router.get("/notice")
+def notice(principal: Principal = Depends(get_principal), db: Session = Depends(get_db),
+           settings: Settings = Depends(get_settings), clock=Depends(get_clock)) -> dict:
+    return review_publication_json(db, principal, clock=clock, idle=settings.auth.session_idle,
+        review=True, read=lambda p: _read_notice(p, settings))
+
+
+@router.get("")
+def list_own(item_id: str | None = None, limit: int = Query(default=20, ge=1, le=100),
+             offset: int = Query(default=0, ge=0, le=100_000), principal: Principal = Depends(get_principal),
+             db: Session = Depends(get_db), settings: Settings = Depends(get_settings),
+             clock=Depends(get_clock)) -> dict:
+    return review_publication_json(db, principal, clock=clock, idle=settings.auth.session_idle,
+        review=True, read=lambda p: _read_list_own(item_id, limit, offset, p, db))
+
+
+@router.get("/{request_id}")
+def get_own(request_id: str, principal: Principal = Depends(get_principal), db: Session = Depends(get_db),
+            settings: Settings = Depends(get_settings), clock=Depends(get_clock)) -> dict:
+    return review_publication_json(db, principal, clock=clock, idle=settings.auth.session_idle,
+        review=True, read=lambda p: _read_get_own(request_id, p, db))
+
+
+@admin_router.get("")
+def admin_list(status: Literal["open", "closed"] = "open", limit: int = Query(default=20, ge=1, le=100),
+               offset: int = Query(default=0, ge=0, le=100_000), admin: Principal = Depends(require_admin),
+               db: Session = Depends(get_db), settings: Settings = Depends(get_settings),
+               clock=Depends(get_clock)) -> dict:
+    return review_publication_json(db, admin, clock=clock, idle=settings.auth.session_idle,
+        review=True, admin=True, read=lambda p: _read_admin_list(status, limit, offset, p, db))
+
+
+@admin_router.get("/{request_id}")
+def admin_get(request_id: str, admin: Principal = Depends(require_admin), db: Session = Depends(get_db),
+              settings: Settings = Depends(get_settings), clock=Depends(get_clock)) -> dict:
+    return review_publication_json(db, admin, clock=clock, idle=settings.auth.session_idle,
+        review=True, admin=True, read=lambda p: _read_admin_get(request_id, p, db))
 
 
 @router.post("", status_code=201, dependencies=[Depends(require_trusted_origin)])
@@ -311,11 +382,6 @@ def submit(
            item_id=str(item.id), version_id=str(version.id), source_file_id=str(source.id))
     db.commit()
     return {"request": _owner_out(rr, item, version, source)}
-
-
-@router.get("/{request_id}")
-def get_own(request_id: str, principal: Principal = Depends(get_principal), db: Session = Depends(get_db)) -> dict:
-    return {"request": _owner_out(*_owned_request(db, principal, request_id))}
 
 
 @router.post("/{request_id}/withdraw", dependencies=[Depends(require_trusted_origin)])
@@ -368,35 +434,6 @@ def _pending_item_id(db: Session, rr: ReviewRequest) -> uuid.UUID | None:
     if rr.status != ReviewStatus.APPROVED.value:
         return None
     return db.scalar(select(AccessRights.item_id).where(AccessRights.origin_review_request_id == rr.id))
-
-
-@admin_router.get("")
-def admin_list(
-    status: Literal["open", "closed"] = "open",
-    limit: int = Query(default=20, ge=1, le=100),
-    offset: int = Query(default=0, ge=0, le=100_000),
-    admin: Principal = Depends(require_admin),
-    db: Session = Depends(get_db),
-) -> dict:
-    where = (ReviewRequest.status == ReviewStatus.OPEN.value if status == "open"
-             else ReviewRequest.status != ReviewStatus.OPEN.value)
-    total = db.scalar(select(func.count()).select_from(ReviewRequest).where(where))
-    rows = db.scalars(select(ReviewRequest).where(where)
-                      .order_by(ReviewRequest.submitted_at.desc(), ReviewRequest.id).limit(limit).offset(offset)).all()
-    granted = {g[0].id: g for g in db.execute(_granted(admin).where(ReviewRequest.id.in_([r.id for r in rows])))} \
-        if rows else {}
-    return {"requests": [_admin_out(r, granted.get(r.id)) for r in rows], "total": total,
-            "limit": limit, "offset": offset, "status": status}
-
-
-@admin_router.get("/{request_id}")
-def admin_get(request_id: str, admin: Principal = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
-    parsed = _parse_id(request_id)
-    rr = db.get(ReviewRequest, parsed)
-    if rr is None:
-        raise ApiError(404, "not_found")
-    return {"request": _admin_out(rr, db.execute(_granted(admin).where(ReviewRequest.id == parsed)).first(),
-                                  _pending_item_id(db, rr))}
 
 
 def _deny_reason(rr: ReviewRequest | None, file_id: uuid.UUID) -> str | None:

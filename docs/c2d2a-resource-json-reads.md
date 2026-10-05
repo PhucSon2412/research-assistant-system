@@ -1,10 +1,12 @@
 # C2d-2a: final caller và quyền ở 13 GET JSON
 
+**Trạng thái hiện hành (2026-10-05): PR #39 đã merge `f229141`, chứa code `5d291c0` và docs review `e89815d`; source `0039`.** Task tiếp [C2d-2b — 9 GET review/publication](tasks/m6c2b2c2d2b-review-publication-json-reads.md), đã triển khai trên nhánh review, chưa merge. Các kết quả bên dưới giữ theo source lịch sử; safety pending tới C4.
+
 [Mục lục](README.md) · [Task](tasks/m6c2b2c2d2a-resource-json-reads.md) · [C2d-1](c2d1-final-caller-reads.md) · [Inventory kiểm](c2d2a-test-inventory.json) · [Caller inventory](c2d1-caller-inventory.json)
 
 Base fetch ngày 2026-10-05: `d06664e53383071237c21e802f439fda348a1afd`, merge PR #38; nhánh `feat/m6c2b2c2d2a-resource-json-reads`. Không migration, head source `0039`; không suy revision DB dev. Giữ docs orchestrator/review #38 cùng PR. **Safety pending tới C4**, chỉ kiểm cô lập.
 
-**Review độc lập PR #39 tại `5d291c0`: 313/313 test GET/ORM chọn pass**, thêm 1 ca ID ngoài repo pass và web 44/44 pass. Không phát hiện điểm chặn merge trong phạm vi C2d-2a; PR chưa merge. [Phạm vi/chứng cứ/giới hạn](reviews/pr39-c2d2a-resource-reads.md). Giữ riêng với 538/6 đối chứng của agent bên dưới; không coi là full inventory/cutover.
+**Review độc lập PR #39 tại `5d291c0`: 313/313 test GET/ORM chọn pass**, thêm 1 ca ID ngoài repo pass và web 44/44 pass. Không phát hiện điểm chặn merge trong phạm vi C2d-2a tại thời điểm review; PR #39 nay đã merge `f229141`. [Phạm vi/chứng cứ/giới hạn](reviews/pr39-c2d2a-resource-reads.md). Giữ riêng với 538/6 đối chứng của agent bên dưới; không coi là full inventory/cutover.
 
 ## Boundary và transaction
 

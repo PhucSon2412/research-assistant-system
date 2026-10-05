@@ -1,14 +1,44 @@
 # Nhật ký quyết định
 
+## Triển khai C2d-2b trên nhánh review (2026-10-05)
+
+Theo prompt đã giao và yêu cầu chủ dự án, fetch xác minh main chứa merge PR #39 `f229141`, tạo nhánh `feat/m6c2b2c2d2b-review-publication-json-reads`; giữ docs orchestrator chưa commit. Code kiểm tại `749a31d`, không migration, source head `0039`. [Bàn giao](c2d2b-review-publication-json-reads.md) · [Inventory](c2d2b-test-inventory.json). Chưa merge; safety pending tới C4.
+
+Boundary riêng `review_publication_json` cho đúng 9 GET; request SHARE UUID → private item SHARE UUID theo exact grant → shared journal, common item SHARE theo pending/review-copy clause → journal. Cleanup tombstone → item không bị đảo: reader không khóa tombstone. Current proof/Admin/profile và clock sau toàn bộ SQL; SQL ACL trước count/page, expire/no-autoflush và DTO/scopes đọc lại, rollback/retry một lần hoặc `409 resource_scope_changed`. Không gắn guard vào formatter dùng chung POST hay thay writer/storage transaction.
+
+`review_history_admin_clause` giữ thin workflow/count closed/inactive; private target/email/declaration/URL vẫn chỉ qua request open + exact tuple/checksum/epoch/owner. Owner giữ lịch sử riêng; Admin common-copy giữ revoked metadata còn theo policy, không rehydrate sau scrub. Aux DTO được requery dưới item boundary; duplicate hint/count ngoài trang vẫn là quan sát READ COMMITTED. Note listed/revoked được sửa theo gate search/RAG/download và history hiện hành; POST dùng chung notes nhận câu chữ mới, không đổi writer guard.
+
+**Suite cuối tại code `749a31d`: 734/734 pass**, 0 failure/error/skip, 1458.049 s; collect 2213 unique nodes, **1479 not-run**, 3 warning hiện có. Gồm C2d-2b 260 (9 pending HTTP thật), C2d-2a 301 (13 GET), C2d-1 93, C2a login/session 68, library GET 9, collection GET 1, discovery GET 1 và ORM/schema 1. JUnit khớp chính xác 734 node đã chọn, không thiếu/trùng; SHA-256 215 API Python/SQL file không đổi trong suite.
+
+Kiểm bổ sung riêng **9/9 pass**, 21.287 s, không cộng vào 734: plugin ngoài repo quan sát transaction final inactive sau response và `app.db.get_engine().pool.checkedout() == 0` cho đủ 9 GET. Assertion pool trong success test gốc thuộc fixture Engine; probe này kiểm chính Engine HTTP API.
+
+**9/9 đối chứng** đều có đúng 1 assertion failure, 0 error/skip và source khôi phục đúng byte/hash trước suite cuối; không tính là pass thêm. Lượt chuẩn bị riêng có lỗi resource fixture/storage/observer; lượt 260/260 trước commit cũng chồng nhau, giữ trong inventory và không cộng vào suite cuối. Không có lượt test bị dừng.
+
+Runtime auth/journal thật, resource setup đặc quyền cô lập, originals tổng hợp; không mở runtime grants/predicate bypass. 9 pending HTTP giữ gate thật; web/whole mixed writer files/full HTTP/storage/provider/restore/drill/C3/C4 not-run. Không dev/`.env`/provider/pricing hoặc safety ready. Đã kiểm tuyệt đối đường dẫn/ID/label/port và volume chỉ thuộc container thử trước khi dọn; xóa container cô lập, một anonymous volume và hai file credentials/postgres.env tổng hợp. Chín container dev giữ nguyên ID/image/StartedAt qua snapshot metadata chỉ đọc; không query DB dev. Evidence/JUnit/log/scripts và journal tổng hợp giữ ngoài repo.
+
+## Giao C2d-2b sau merge PR #39 (2026-10-05)
+
+Chủ dự án xác nhận PR #39 đã merge và yêu cầu prompt tiếp. Fetch xác minh `origin/main=f229141e6db46f7df663cb1d14335530a4d5e9dd`, chứa `e89815d` (docs review) và code `5d291c0`; cây source local khớp main, migration source giữ `0039`. Không truy vấn revision DB dev. Review và số test PR #39 dưới đây là chứng cứ lịch sử theo source, không phải phép chạy mới.
+
+**Chốt theo ủy quyền:** [C2d-2b](tasks/m6c2b2c2d2b-review-publication-json-reads.md) chuyển đúng **9 GET JSON**: notice/list/detail của owner review (3), Admin review list/detail (2), Admin pending list/detail (2), Admin common-copy list/detail (2). GET original review và mọi POST/writer/storage/provider còn riêng. Coding agent thực hiện, kiểm thử, docs/inventory, commit/push và PR tiếng Việt; không merge.
+
+Giữ `review_grant_clause` cho private payload của Admin; request closed/inactive có thể trả thin metadata theo contract hiện hành, không còn private title/file/declaration/email/URL. Admin common-copy history gồm revoked có thể đọc metadata quyết định còn được phép; không lấy lại trường đã scrub hoặc mở nội dung. Boundary riêng/refactor có test, không áp mù `visible_items_clause` của helper C2d-2a cho grant private/pending/revoked. Review khóa request → private item → journal; common read đối chiếu item/rights và cleanup tombstone → item, không thêm vòng khóa ngược. Current Admin/caller/clock sau SQL, ACL trước count/page và recheck resource cùng transaction là điều kiện hoàn thành.
+
+Khảo sát thấy docstring/`LISTED_NOTE` publication còn nói indexed common chưa mở search/RAG và `REVOKED_NOTE` nói không route nào phục vụ; prompt yêu cầu sửa câu chữ đúng gates thực từ PR #24/#25 và Admin history, giữ writer transaction ngoài phạm vi. Scope/lock implementation chi tiết do coding agent chọn và ghi chứng cứ. Không thêm migration nếu source hiện có đủ.
+
+Lượt giao này **chỉ khảo sát source và sửa/kiểm docs**, chưa code/test C2d-2b, không dev/`.env`/provider/pricing. C1/Origin/runtime nền không xin lại; safety pending tới C4, C3 operator/delivery/initial status và C4 storage/cutover còn mở.
+
+Kiểm tài liệu lượt giao: **53 Markdown, 787 liên kết nội bộ, 0 lỗi/control characters**; đối chiếu AST đúng 9 GET trong prompt và head source `0039`; `git diff --check` sạch. Python/pip đã xác minh tại Conda ras, không cài dependency. Không chạy API/web suite; các con số test PR #39 không là phép kiểm C2d-2b.
+
 ## Review PR #39 C2d-2a (2026-10-05)
 
-Reviewer fetch/xác minh source `5d291c0` khớp nhánh remote, base `d06664e`, head source `0039`, không migration. Đối chiếu 13 GET với task và inventory: boundary read-only riêng, SQL ACL trước count/page, item/collection/citation rồi journal, caller/role/clock mới, resource requery và retry hữu hạn; không mở private cho Admin hay chuyển writer ngoài scope. **Không phát hiện điểm chặn merge trong phạm vi C2d-2a; có thể merge PR #39.** PR chưa merge; reviewer không merge/push/comment. [Review/chứng cứ/giới hạn](reviews/pr39-c2d2a-resource-reads.md).
+Reviewer fetch/xác minh source `5d291c0` khớp nhánh remote, base `d06664e`, head source `0039`, không migration. Đối chiếu 13 GET với task và inventory: boundary read-only riêng, SQL ACL trước count/page, item/collection/citation rồi journal, caller/role/clock mới, resource requery và retry hữu hạn; không mở private cho Admin hay chuyển writer ngoài scope. **Không phát hiện điểm chặn merge trong phạm vi C2d-2a; có thể merge PR #39.** PR còn mở tại thời điểm review; sau đó chủ dự án merge ở `f229141`. Reviewer không merge/push/comment. [Review/chứng cứ/giới hạn](reviews/pr39-c2d2a-resource-reads.md).
 
 Kiểm độc lập **313/313 pass** (301 C2d-2a, 9 library GET, 1 collection GET, 1 discovery GET, 1 ORM/schema), 0 failure/error/skip, **692,695 s**, 3 warning hiện có; thêm **1 ca ID ngoài repo pass** và **web 44/44 pass**. JUnit đúng 313 node đã chọn, 213 file API giữ hash, caller inventory khớp 63/63 route. Runtime/journal/PostgreSQL thử riêng, chỉ fixture cutover scoped, external HTTP bị chặn; không cộng với suite 538/đối chứng 6 của agent hoặc báo 1640 node còn lại đã chạy.
 
 Sửa nhỏ trong bàn giao: collection path UUID sai trả `422 invalid_request`, library/discovery string UUID sai và UUID hợp lệ vắng/ngoài quyền trả 404 theo route hiện hành. Không đổi code/status API. Test ID ngoài repo đầu giả định key `detail` mặc định thay vì handler `fields`, nên 1 fail expectation; sửa test reviewer rồi 1 pass, ghi riêng trong báo cáo. Container/anonymous volume thử và credentials đã dọn sau kiểm ownership; metadata 9 container dev giữ nguyên, không query DB dev/`.env`/provider hoặc đổi pricing/safety.
 
-Docs review còn chưa commit, coding agent giữ và đưa cùng PR. Safety pending tới C4; C2d-2b/writer/file/provider/tổng hồi quy và C3/C4 còn riêng.
+Docs review được coding agent commit `e89815d` và đã nằm trong merge PR #39. Safety pending tới C4; C2d-2b/writer/file/provider/tổng hồi quy và C3/C4 còn riêng.
 
 ## Triển khai C2d-2a trên nhánh review (2026-10-05)
 
