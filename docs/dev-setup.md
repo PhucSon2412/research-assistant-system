@@ -1,6 +1,37 @@
-# Môi trường phát triển và schema (M1a–C2c-1)
+# Môi trường phát triển và schema (M1a–C2d-1)
 
-**C2c-2 đang review, chưa merge:** [invitation runtime/initial receipt](c2c2-invitation-runtime.md), source `0039`, base PR #36 `d1b53e6` (`0038`). [Lệnh cô lập](#c2c-2-invitation-cô-lập) · [Inventory](c2c2-test-inventory.json). Safety pending tới C4; không suy revision DB dev hoặc chạy lệnh lịch sử để mở traffic.
+**PR #37 đã merge `ca4a623` (C2c-2, head mã nguồn `0039`).** [Bàn giao](c2c2-invitation-runtime.md) · [Lệnh cô lập](#c2c-2-invitation-cô-lập) · [Inventory](c2c2-test-inventory.json). [C2d-1](c2d1-final-caller-reads.md) đã triển khai trên nhánh review; lệnh và kết quả cô lập bên dưới, không phải runbook mở dev. Safety pending tới C4; không suy revision DB dev hoặc chạy lệnh lịch sử để mở traffic. Dev chỉ được đối chiếu ID/image/StartedAt bằng metadata chỉ đọc; không truy vấn/nâng/restart DB dev.
+
+## C2d-1 final caller reads cô lập
+
+Ngày 2026-10-05, base `ca4a623`, code `13af731`, head source giữ `0039`. Conda ras interpreter/pip đã xác minh, không cài dependency hoặc tạo venv. Container standalone `ras-c2d1-db-20261005`, label `ras.task=c2d1-20261005`, PostgreSQL pgvector 16, bind `127.0.0.1:58443`; explicit URL/DB parts và credentials tổng hợp trước import fixture, không fallback `.env`. Runner chặn sync/async HTTPTransport, so hash API source trước/sau suite. Chỉ cutover được scoped ở HTTP nghiệp vụ; pending có nhóm gate thật riêng.
+
+Lệnh đã thực chạy từ repo root trong PowerShell; scripts/evidence tổng hợp ngoài repo, container đã dọn. Các lệnh này không nối dev:
+
+```powershell
+$py = "$env:USERPROFILE\.conda\envs\ras\python.exe"
+$c2d1Evidence = Join-Path $env:TEMP 'ras-c2d1-20261005'
+& $py (Join-Path $c2d1Evidence 'setup.py')
+& $py (Join-Path $c2d1Evidence 'counterfactual.py')
+& $py (Join-Path $c2d1Evidence 'runner.py') api --collect-only -q
+& $py (Join-Path $c2d1Evidence 'runner.py') `
+  api/tests/test_c2d1_final_caller.py api/tests/test_c2a_login_sessions.py `
+  api/tests/test_c2b_reset_status.py api/tests/test_c2c2_invitations.py `
+  api/tests/test_invitations.py api/tests/test_config.py `
+  api/tests/test_migrations.py::test_orm_models_match_migrated_schema `
+  -q --tb=short "--junitxml=$c2d1Evidence\final.xml"
+& $py -m compileall -q api/app api/tests
+& $py -m alembic -c api/alembic.ini heads
+& $py (Join-Path $c2d1Evidence 'cleanup.py')
+```
+
+**Suite cuối tại code `13af731`: 490/490 pass, 0 fail/error/skip, 1009.010 s; collect 1649, 1159 not-run.** Gồm C2d-1 93 (pending thật 5), C2a login/session 68, C2b reset/status 103, C2c-2 invitation 151, HTTP invitation/outbox 20, config 54 và ORM/schema 1. JUnit đủ 490 node unique, subset collect; SHA-256 210 API Python/SQL file không đổi trong suite. Web không đổi, test/typecheck/build/browser not-run.
+
+Lượt chuẩn bị đầu 76 pass/4 lỗi setup (3 owner-rebinding bị generation fence chặn, 1 production settings/cookie sai); lượt hai 91 pass/1 lỗi setup (runtime không được khóa bootstrap_state). Sửa riêng setup: corruption owner đặc quyền trong DB thử, settings cookie đúng, tài nguyên thử là private library item; không mở runtime grant hoặc hạ assertion. Race chọn sau sửa 3 pass. Lượt 489 tại `901960d` đã chủ động dừng trước sửa source vì tự review phát hiện cần giữ phép min idle/absolute của API cũ; không JUnit đầy đủ nên không tính là đạt. Bổ sung giữ tham chiếu ORM cũ và test expiry cap, nhóm chọn 2 pass; chạy lại đối chứng rồi suite cuối trên source đã sửa. Các lỗi read-only PowerShell/path, script dấu câu docs và chuyển log khi file còn mở cũng ghi trong inventory. Không cộng các lượt chồng nhau vào suite cuối.
+
+Bốn đối chứng **4/4** bị đúng assertions bắt, mỗi lượt 1 failure/0 errors: bỏ exact session/User binding, clock mới, current Admin role hoặc post-audit-commit guard trước đọc entries. Khôi phục đúng bytes/SHA-256 trong finally trước suite cuối; không sửa code/migration/mutant khi suite đang chạy. Race có Event/deadline và quan sát advisory wait thật, kiểm writer thắng/reader thắng cùng transaction và không thêm User/session row lock sau resource/journal.
+
+Đã kiểm ownership tên/label/image/port/mount rồi xóa đúng container thử và anonymous volume; credentials tổng hợp một lần đã xóa, evidence scripts/log/JUnit/source manifest/journal tổng hợp giữ ngoài repo. Đối chiếu chỉ đọc container dev trước/sau: ID/image/StartedAt nguyên vẹn; không query DB dev. Compileall, Alembic heads `0039`, merged-migration diff trống, diff check và link/control-character checks đạt. Không gọi provider, đổi pricing flag hoặc tác động stack dev. Không storage/proxy/full backup/cutover drill; safety pending tới C4. Response đã qua final boundary và bytes đã gửi không thu hồi; audit có thể đã commit khi hậu kiểm trả lỗi.
 
 ## C2c-2 invitation cô lập
 

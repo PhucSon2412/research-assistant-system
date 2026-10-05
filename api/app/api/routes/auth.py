@@ -27,6 +27,7 @@ from app.identity import invitations, password_reset
 from app.identity.errors import InvalidCredentials, InvalidToken
 from app.identity.login import login
 from app.identity.predicates import session_live
+from app.identity.final_caller import final_caller
 from app.identity.session_commit import commit_auth, commit_activity
 from app.identity.passwords import PasswordPolicyError
 from app.identity.sessions import (
@@ -151,7 +152,11 @@ def logout(
 
 
 @router.get("/session")
-def current_session(ctx: SessionContext = Depends(get_session_context)) -> dict:
+def current_session(ctx: SessionContext = Depends(get_session_context),
+                    db: Session = Depends(get_db), settings: Settings = Depends(get_settings),
+                    clock=Depends(get_clock)) -> dict:
+    ctx = final_caller(db, session_id=ctx.session_id, user_id=ctx.user_id,
+                       clock=clock, idle=settings.auth.session_idle)
     return {
         "user": user_out(ctx.user_id, ctx.email, ctx.display_name, ctx.role),
         "session": {

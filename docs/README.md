@@ -1,6 +1,6 @@
 # Tài liệu dự án
 
-**C2c-2 đang review, chưa merge:** [invitation runtime/initial receipt](c2c2-invitation-runtime.md), source `0039`, trên base PR #36 `d1b53e6` (`0038`); [inventory](c2c2-test-inventory.json). User mới/hai initial receipt/accepted closure cùng batch, Admin clock cuối và bù delivery theo binding. Safety vẫn pending tới C4; C2d/C3/C4 còn mở. Các số đo bên dưới là lịch sử; head source không là revision DB dev.
+**PR #37 đã merge `ca4a623` (C2c-2, head mã nguồn `0039`).** [Hợp đồng invitation](c2c2-invitation-runtime.md) · [Inventory](c2c2-test-inventory.json) · [Review độc lập](reviews/pr37-c2c2-invitation.md). **C2d-1 đã triển khai trên nhánh review:** [helper và ba route đọc ngắn](c2d1-final-caller-reads.md) · [inventory](c2d1-test-inventory.json). Chưa merge; [cách chia C2d](decisions.md#chia-c2d-sau-merge-pr-37-2026-10-05). Safety vẫn pending tới C4. C2d resource/file/provider, C3 operator và C4 cutover còn mở; head source không là revision DB dev. Các số đo bên dưới giữ theo source lịch sử.
 
 **Baseline main đã merge trước C2c-1:** PR #33 đã merge `c98bd33` (C1 `0034`), PR #34 đã merge `78e0880` (C2a `0035`), [C2b reset/status](c2b-reset-status.md) đã merge PR #35 `1d3e558`, chứa sửa P2 `f2ba336`; head source `0036`. Safety vẫn pending tới C4. C2b P2: **201/201**, collect 1296 và 1095 chưa chạy lại; suite 471 tại `bdec9ea` là lịch sử; web không đổi (43/43, typecheck/build tại `a8cb586`); [inventory theo source](c2b-test-inventory.json). [C2c-1 bootstrap/initial receipt](tasks/m6c2b2c2c1-bootstrap-initial-receipts.md) được giao tiếp; invitation lifecycle C2c-2 và final callers C2d chưa triển khai. [Cách chia C2c](decisions.md#chia-c2c-sau-merge-pr-35-2026-10-04) bổ sung cho [Origin/cách chia C2 đã chốt](decisions.md#chia-c2-và-chốt-origin-theo-ủy-quyền-2026-10-03). Operator/delivery C3 và cutover C4 vẫn riêng. Không truy vấn/nâng DB hoặc restart dev; head source không là revision DB dev.
 
@@ -20,7 +20,12 @@ Khi có thay đổi quyết định, cập nhật tài liệu liên quan cùng t
 
 | Tài liệu | Nội dung |
 | --- | --- |
-| [Prompt coding C2c-2](tasks/m6c2b2c2c2-invitation-lifecycle.md) | Phạm vi được giao; đã triển khai trên nhánh review, chưa merge |
+| [Bàn giao C2d-1](c2d1-final-caller-reads.md) | Helper/session/Admin users/DevOutbox, final transaction/clock/commit boundary và phần C2d còn mở |
+| [Inventory kiểm C2d-1](c2d1-test-inventory.json) | Source/node/JUnit, đối chứng, lỗi chuẩn bị và not-run |
+| [Inventory caller C2d-1](c2d1-caller-inventory.json) | Từng route method/path/function/dependency và map quyền/I/O/commit/khóa trong bàn giao |
+| [Prompt coding C2d-1](tasks/m6c2b2c2d1-final-caller-reads.md) | Helper final caller + session/Admin users/DevOutbox; runtime, clock, gate, kiểm sau commit và inventory phần C2d còn lại; đã triển khai trên nhánh review, giữ prompt gốc |
+| [Review PR #37](reviews/pr37-c2c2-invitation.md) | Review C2c-2: 198 kiểm chọn + 1 ORM/schema độc lập đạt; PR đã merge `ca4a623`, safety pending |
+| [Prompt coding C2c-2](tasks/m6c2b2c2c2-invitation-lifecycle.md) | Phạm vi invitation đã triển khai và merge PR #37; giữ làm lịch sử task |
 | [Bàn giao C2c-2](c2c2-invitation-runtime.md) | Boundary runtime/recovery, binding/receipt, clock/locks, delivery, fault/restore và caller C2d còn mở |
 | [Inventory C2c-2](c2c2-test-inventory.json) | Node/source/JUnit, pass/fail/not-run và đối chứng; tách các lượt lịch sử |
 | [Review PR #36](reviews/pr36-c2c1-bootstrap.md) | P2 installation mode ở SQL creation, tái hiện bằng runtime, prompt sửa và kết quả kiểm độc lập |

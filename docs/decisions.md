@@ -1,8 +1,34 @@
 # Nhật ký quyết định
 
+## Triển khai C2d-1 trên nhánh review (2026-10-05)
+
+Theo [task đã giao](tasks/m6c2b2c2d1-final-caller-reads.md), fetch xác minh base PR #37 `ca4a623` chứa `9f26535`; giữ head source `0039`, không migration hoặc suy revision DB dev. Giữ các docs orchestrator chưa commit. [Bàn giao](c2d1-final-caller-reads.md), [inventory kiểm](c2d1-test-inventory.json), [từng caller](c2d1-caller-inventory.json). Các lựa chọn triển khai dưới đây do coding agent trong phạm vi task, không là quyết định trực tiếp mới của chủ dự án.
+
+Helper final read giữ journal shared cùng transaction, scalar allowlist tránh identity map cũ, clock sau lock/profile query rồi SQL predicate exact session/User/latest head/receipt. Không touch hoặc commit/row lock; current Admin role kiểm riêng. Ba route giữ shape API. DevOutbox flush audit FK trước journal, kiểm trước commit và trên transaction mới trước đọc link; kiểm lại sau snapshot và lọc TTL bằng clock mới. Dùng commit_activity cho audit commit không event; lỗi/unknown outcome không success payload. Gate vẫn thật và fail-closed.
+
+Tự review đối chiếu `identity.sessions.resolve_session` phát hiện prototype helper phải giữ phép `min(last_activity_at + idle, absolute_expires_at)` của response cũ. Dừng lượt test source `901960d` trước sửa, thêm ca expiry cap và giữ tham chiếu ORM stale trong test profile; không tính lượt dừng là suite đạt. Các lượt chuẩn bị/đối chứng và source cuối tách rõ trong inventory.
+
+Response đã qua final boundary có thể tiếp tục gửi sau nhả khóa; audit đã commit có thể tồn tại dù hậu kiểm từ chối. Không có provider/storage/delivery I/O trong helper. Không dùng shared guard làm drop-in cho writer exclusive. Inventory đánh dấu resource/file/review/publication/search/RAG còn mở, worker dùng durable job/item rights không session giả; C3/C4 riêng, safety pending tới C4. Kết quả lịch sử PR #37 và lượt orchestrator bên dưới không được tính là test source C2d-1.
+
+## Chia C2d sau merge PR #37 (2026-10-05)
+
+**Đã xác nhận:** chủ dự án báo merge PR #37 và yêu cầu giao agent tiếp. Fetch xác minh `origin/main=ca4a623ea9cd4d2f8454659a1d66c48dbf8093d0`, chứa `9f26535`; head migration mã nguồn `0039`. Không truy vấn revision DB dev. Review độc lập trước merge có 198 test chọn + 1 ORM/schema pass; không cộng với 800 của coding agent. [Review và giới hạn](reviews/pr37-c2c2-invitation.md). Các docs review còn chưa commit sau merge được giữ để agent tiếp đưa vào PR, không mô tả chúng là đã có trong merge #37.
+
+**Chốt theo ủy quyền:** giao [C2d-1](tasks/m6c2b2c2d1-final-caller-reads.md) gồm helper final caller cùng `GET /auth/session`, `GET /admin/users`, `GET /admin/dev-outbox`; chưa triển khai. Phạm vi này kiểm được binding, latest head/receipt, clock mới, current Admin role, gate đúng transaction và kiểm sau commit audit trước khi mở rộng sang khóa resource/storage/provider. Khảo sát cho thấy ba route vẫn dùng context/role đầu request; DevOutbox có commit audit rồi đọc bằng clock cũ. Dependency entry đã nhả journal lock, nên không bảo vệ quyết định cuối ở route.
+
+Helper giữ shared journal lock trên transaction hiện tại, không lấy User/session row lock sau resource/journal, không touch session hoặc tự commit. Lấy thời gian mới sau chờ khóa và tại quyết định cuối; scope actor gắn đúng session–User, dữ liệu role/profile tải lại từ DB. DevOutbox vẫn chỉ dev/Admin, audit không chứa link và proof trước audit commit không thay proof sau commit. Các writer journal dùng exclusive lock/batch riêng, không giữ shared lock rồi nâng khóa. Response đã qua final boundary có thể tiếp tục gửi sau khi nhả khóa; bytes đã gửi không thu hồi được.
+
+**Đề xuất phần còn lại:** JSON resource (library/collections/discovery) → file/upload → review/promotion/publication/common-index writes → search/RAG/provider → tổng hồi quy C2d, chia theo inventory lock/I/O/commit thực tế. Task đầu phải cập nhật bảng caller hiện hành, gồm worker durable job/item rights không có session giả. Thứ tự/ranh giới PR sau có thể chỉnh theo phụ thuộc tìm được; không coi C2d-1 là toàn T14 hoặc toàn C2. [Roadmap](roadmap.md#chia-c2d-sau-pr-37).
+
+C1/Origin/runtime trust boundary đã chốt, không xin lại. Safety pending tới C4, chỉ thử cô lập; không đọc/sửa `.env`, nâng/restart dev, provider hoặc pricing gate. C3 operator/chứng cứ/initial status/Admin recovery/delivery; C4 storage/cutover/full drill còn riêng. Lượt giao task chỉ sửa và kiểm tài liệu, chưa chạy API/web hoặc triển khai C2d-1.
+
+## Review PR #37 C2c-2 (2026-10-04)
+
+Reviewer đối chiếu source `9f26535` (code `2b69f85`, recovery fix `b8a0967`, head `0039`) với task C2c-2 và base merge PR #36 `d1b53e6`. Không phát hiện điểm chặn merge trong phạm vi invitation/runtime/receipt/actor/delivery/replay; đề nghị có thể merge, PR còn mở tại thời điểm review. Kiểm độc lập **198 test chọn pass** và riêng **1 ORM/schema pass**, giữ source Python/SQL, PostgreSQL/runtime/recovery/journal cô lập và chặn external HTTP. Không cộng với 800 của agent hoặc coi là full inventory/cutover. [Phạm vi, chứng cứ và giới hạn](reviews/pr37-c2c2-invitation.md). Safety pending tới C4; không `.env`, thao tác dev, provider hoặc code application thay đổi trong lượt review. C2d final callers/integration là task sau merge; C3/C4 vẫn riêng.
+
 ## Triển khai C2c-2 trên nhánh review (2026-10-04)
 
-Theo [phạm vi orchestrator giao](tasks/m6c2b2c2c2-invitation-lifecycle.md), coding agent thêm `0039` trên base PR #36 `d1b53e6` (`0038`), giữ migration đã merge và docs orchestrator. [Hợp đồng/bàn giao](c2c2-invitation-runtime.md) · [Inventory](c2c2-test-inventory.json). Chưa merge; safety pending tới C4. Đây là lựa chọn triển khai trong phạm vi được giao, không ghi chủ dự án trực tiếp chọn routine/marker/SQL.
+Theo [phạm vi orchestrator giao](tasks/m6c2b2c2c2-invitation-lifecycle.md), coding agent thêm `0039` trên base PR #36 `d1b53e6` (`0038`), giữ migration đã merge và docs orchestrator. [Hợp đồng/bàn giao](c2c2-invitation-runtime.md) · [Inventory](c2c2-test-inventory.json). Chưa merge tại thời điểm báo cáo triển khai; PR #37 sau đó merge `ca4a623`, safety pending tới C4. Đây là lựa chọn triển khai trong phạm vi được giao, không ghi chủ dự án trực tiếp chọn routine/marker/SQL.
 
 Invitation protected và routine có allowlist runtime/recovery; SQL prepare riêng tạo User role user với hai initial receipt và accepted closure trong một batch. Marker issuance/acceptance transaction phục vụ binding NULL-safe; deferred pair/audit được ép kiểm trước append. Không tái dùng bootstrap hoặc đổi bảo vệ `0038`. Recovery chỉ áp closure và bỏ đọc marker mới ở snapshot cũ; upgrade không xác minh legacy.
 
