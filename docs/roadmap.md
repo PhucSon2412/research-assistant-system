@@ -1,8 +1,20 @@
 # Roadmap đề xuất
 
+## C2d-3 trên nhánh review
+
+[Sáu JSON writer library/collections](c2d3-library-collection-json-writes.md) đã triển khai tại `12ffccc`, đã kiểm cô lập, đang review. [Inventory](c2d3-test-inventory.json) giữ kết quả theo source và từng lượt; chưa merge, không coi toàn C2d/T14 hoàn tất. File/upload/intent, review/publication/index writers, search/RAG provider caller, worker integration và C3/C4 tiếp tục riêng. Safety pending tới C4.
+
+## Lịch sử giao task C2d-3 sau PR #40
+
+**Đã giao, chưa triển khai/chưa kiểm:** [prompt 6 JSON writer library/collections](tasks/m6c2b2c2d3-library-collection-json-writes.md) sau merge PR #40 `833db7c`, source `0039`. Một PATCH item và năm collection CRUD/membership; current actor/role/resource/clock trước commit, exclusive journal không upgrade, flush FK và item → collection, proof mới sau commit. Commit uncertain và postcommit denial không hứa chưa lưu. [Quyết định](decisions.md#giao-c2d-3-sau-merge-pr-40-2026-10-05).
+
+Đầu ra review riêng: code cho 6 writer, runtime/ACL/clock/race/pending/commit outcome tests, inventory/JUnit và handoff. Không bổ sung membership journal hoặc xóa paper. GET đã chuyển phải hồi quy; file/upload, review/publication writers, search/RAG provider callers, C3/C4 vẫn riêng. Safety pending tới C4; không thao tác dev hoặc mở readiness.
+
 ## Task C2d-2b sau PR #39
 
-**Đã triển khai trên nhánh review, chưa merge:** [prompt C2d-2b](tasks/m6c2b2c2d2b-review-publication-json-reads.md), đúng 9 GET JSON review/publication. Current caller/Admin/clock và SQL ACL trước count/page; private payload chỉ qua grant exact request/version/file, request đóng trả thin history theo contract, Admin common-copy history vẫn có bản revoked đã scrub. Review locks request → item → journal; không đảo với approve hoặc cleanup tombstone → item. [Phạm vi/quyết định](decisions.md#giao-c2d-2b-sau-merge-pr-39-2026-10-05).
+PR #40 đã merge `833db7c`. [Review độc lập](reviews/pr40-c2d2b-review-publication-reads.md): 261 test chọn pass, không phát hiện điểm chặn trong phạm vi C2d-2b; kết quả khác/cutover không suy từ phép kiểm này. Safety pending tới C4.
+
+**Đã merge PR #40 `833db7c`:** [prompt C2d-2b](tasks/m6c2b2c2d2b-review-publication-json-reads.md), đúng 9 GET JSON review/publication. Current caller/Admin/clock và SQL ACL trước count/page; private payload chỉ qua grant exact request/version/file, request đóng trả thin history theo contract, Admin common-copy history vẫn có bản revoked đã scrub. Review locks request → item → journal; không đảo với approve hoặc cleanup tombstone → item. [Phạm vi/quyết định](decisions.md#giao-c2d-2b-sau-merge-pr-39-2026-10-05).
 
 Phụ thuộc C2d-1 và C2d-2a đã merge, source `0039`. Đầu ra: 9 GET giữ contract, test runtime/race/clock/pending/đối chứng, handoff và inventory từng caller. Original review stream, writers/file/provider và C3/C4 còn riêng. [Bàn giao/kiểm chứng](c2d2b-review-publication-json-reads.md) và [inventory](c2d2b-test-inventory.json) ghi kết quả thực chạy trên môi trường cô lập. Safety pending tới C4; không merge/cutover trong task này.
 
@@ -16,13 +28,13 @@ Review/publication GET tách thành C2d-2b vì có grant private tạm và forma
 
 [Quyết định theo ủy quyền](decisions.md#chia-c2d-sau-merge-pr-37-2026-10-05) giao C2d-1 trước: helper final caller và `GET /auth/session`, `GET /admin/users`, `GET /admin/dev-outbox`. **C2d-1 đã merge PR #38 `d06664e`**; [bàn giao](c2d1-final-caller-reads.md) và [caller inventory](c2d1-caller-inventory.json). Kết quả agent/reviewer giữ riêng theo source, không cộng lịch sử. C2d-2a đã chốt ở mục trên; các nhóm khác dưới đây tiếp tục đề xuất theo inventory/source.
 
-Các PR còn lại **đề xuất**, sẽ chốt theo inventory/source sau C2d-1:
+Trạng thái từng PR theo inventory/source: C2d-2a/2b đã merge, C2d-3 đang review; các nhóm sau vẫn **đề xuất**, sẽ chốt riêng:
 
 | Phần tiếp | Đầu ra review riêng | Phụ thuộc |
 | --- | --- | --- |
 | JSON reads C2d-2a | 13 GET library/collections/discovery, phạm vi đã giao; caller/current role + SQL ACL trước count/page và kiểm resource cuối | Helper C2d-1 đã merge + caller inventory |
-| JSON reads C2d-2b | [Task đã giao](tasks/m6c2b2c2d2b-review-publication-json-reads.md): 9 GET review/publication, exact grant Admin/thin history và final caller; đã triển khai trên nhánh review, chưa merge | C2d-2a đã merge và inventory/shared formatter |
-| JSON writes | Library patch, collection CRUD/membership; actor/role trước commit và proof mới sau commit, flush FK/lock order rõ | Tách chiến lược write khỏi helper shared |
+| JSON reads C2d-2b | [Task đã giao](tasks/m6c2b2c2d2b-review-publication-json-reads.md): 9 GET review/publication, exact grant Admin/thin history và final caller; đã merge PR #40 `833db7c` | C2d-2a đã merge và inventory/shared formatter |
+| JSON writes C2d-3 | [Task đã giao](tasks/m6c2b2c2d3-library-collection-json-writes.md): 6 library/collection writers, actor/resource trước commit, fresh proof sau commit và FK/lock/uncertain contract; đang review | C2d-1/2a/2b đã merge; strategy ghi riêng |
 | File/upload | Final auth sau parser/storage, trước lưu/job/byte đầu; checksum/slot/disconnect và version/file | Helper + inventory lock/I/O |
 | Resource writes/journal | Actor/role cuối ở review/promotion/publication/common-index, exclusive journal và lỗi copy/commit | Lock map và các helper tương ứng |
 | Search/provider | Caller sau reservation commit trước embedding/rerank và final hit/chunk response; ACL trước top-k, accounting uncertain | Helper + boundary ledger/resource |
@@ -31,7 +43,7 @@ Các PR còn lại **đề xuất**, sẽ chốt theo inventory/source sau C2d-1
 
 Worker dùng durable job/item rights + recovery gate, không mang session giả hoặc buộc vào tuổi session trình duyệt. C3 operator/delivery/status recovery, C4 storage/cutover, journal membership/xóa riêng và backup scheduler còn riêng.
 
-**PR #38 và #39 đã merge** (`d06664e`/`f229141`, source `0039`). [C2d-1](c2d1-final-caller-reads.md) và [C2d-2a](c2d2a-resource-json-reads.md) có bàn giao riêng; task tiếp [C2d-2b](tasks/m6c2b2c2d2b-review-publication-json-reads.md) đã triển khai trên nhánh review, chưa merge. Safety pending tới C4; C2d phải hoàn tất core caller protections trước C3/C4. Phần C2b và các milestone bên dưới là lịch sử.
+**PR #38–#40 đã merge** (C2d-1/2a/2b, source `0039`). Các handoff giữ riêng; task tiếp [C2d-3](tasks/m6c2b2c2d3-library-collection-json-writes.md) đã kiểm, đang review. Safety pending tới C4; core caller protections phải hoàn tất trước C3/C4. Phần C2b và milestone bên dưới là lịch sử.
 
 **M6c-2b2b2, PR #31 đã merge `3f21794`:** base PR #30 đã merge `ce67ce8`, `0031`; invitation journal thêm `0032`. [Hợp đồng](invitation-journal.md) bảo vệ link đã kết thúc sau restore với journal hiện hành, không dựng lại account; full API **901/901**, web **42/42**, đối chứng **8/8**, drill **59/59** là chứng cứ lịch sử PR #31 (giới hạn ở tài liệu kiểm chứng).
 

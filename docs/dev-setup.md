@@ -1,8 +1,21 @@
-# Môi trường phát triển và schema (M1a–C2d-2b)
+# Môi trường phát triển và schema (M1a–C2d-3)
 
-**Trạng thái hiện hành (2026-10-05): PR #39 đã merge `f229141`; C2d-2b triển khai trên nhánh review, chưa merge; source migration `0039`.** [Bàn giao 9 GET](c2d2b-review-publication-json-reads.md) · [Inventory thực chạy](c2d2b-test-inventory.json). Safety pending tới C4; không chạy Compose up/migrate/recover trên dev để mở readiness. Source head không xác nhận revision DB dev; lệnh bên dưới là chứng cứ môi trường cô lập.
+## C2d-3 cô lập
+
+**Suite cuối tại code `12ffccc`: 1095/1095 pass**, 0 failure/error/skip, 2208.995 s; collect 2465 unique nodes, **1370 not-run**. Gồm C2d-3 252 (6 pending HTTP thật), C2d-1 93, C2d-2a 301, C2d-2b 260, login/session 68, reset/status 103, library ACL/CRUD 12, collection GET/CRUD 5 và ORM/schema 1. JUnit khớp đúng selection, không thiếu/trùng; SHA-256 217 API Python/SQL file không đổi. 10/10 đối chứng bị assertions bắt, khôi phục source bytes/hash; web 45/45, typecheck/build đạt.
+
+Đã kiểm ID/name/label/image/port/mount và consumer volume trước khi dọn đúng PostgreSQL cô lập cùng anonymous volume, xóa hai file credentials tổng hợp. Metadata ID/image/StartedAt của 24 container có trước task giữ nguyên, không query/nâng/restart DB dev. Evidence/journal/JUnit/log/scripts giữ ngoài repo. Không `.env`, provider/pricing hoặc safety ready.
+
+
+[Bàn giao](c2d3-library-collection-json-writes.md) · [Inventory](c2d3-test-inventory.json). Conda ras interpreter/pip đã xác minh, không venv/cài thêm. PostgreSQL standalone `ras-c2d3-db-20261005`, label `ras.task=c2d3-20261005`, bind `127.0.0.1:58449`, runtime/recovery LOGIN và definer/migrator NOLOGIN. Explicit admin URL/DB parts trước import fixture; HTTPTransport sync/async bị chặn, không fallback `.env`. Journal/credentials/evidence ở `%TEMP%/ras-c2d3-20261005`, ngoài repo.
+
+Lệnh thực chạy từ gốc repo bằng Conda Python: `setup.py`, `runner.py` cho các lượt smoke/expanded/targeted/late/fresh; `mutants.py`; `final_suite.py --collect`; `final_suite.py`, `quality.py`, `cleanup.py`, `final_inventory.py`. Scripts đó là evidence ngoài repo, không runbook dev. Đã chạy `python -m compileall -q api/app api/tests api/migrations`, `git diff --check`, `npm test --prefix web`, `npm run typecheck --prefix web`, `npm run build --prefix web`. Không query/restart/migrate dev hoặc provider/pricing/safety changes. Source head không là revision DB dev; safety pending tới C4.
+
+**Trạng thái hiện hành (2026-10-05): PR #40 đã merge `833db7c`; source migration `0039`.** [Bàn giao 9 GET](c2d2b-review-publication-json-reads.md) · [Inventory](c2d2b-test-inventory.json). Task tiếp [C2d-3 — 6 JSON writer](tasks/m6c2b2c2d3-library-collection-json-writes.md) đã giao, đã triển khai, đang review (chưa merge); chưa có lệnh vận hành mới. Safety pending tới C4; không chạy Compose up/migrate/recover trên dev để mở readiness. Source head không xác nhận revision DB dev; lệnh bên dưới là chứng cứ môi trường cô lập.
 
 ## C2d-2b cô lập
+
+Review độc lập PR #40 tại `11da731`: 261/261 test chọn pass (260 C2d-2b + 1 ORM/schema), 551,837 s; giữ riêng với kết quả agent dưới đây. PostgreSQL standalone `ras-pr40-review-db-20261005`, labels `ras.review=pr40-20261005`/`ras.task=c2d2b-review-20261005`, port 58448; explicit credentials ngoài repo, runtime/journal thật, external HTTP bị chặn. Đã dọn container/anonymous volume/credentials và kiểm metadata 9 container dev giữ nguyên. [Report, JUnit/source và giới hạn](reviews/pr40-c2d2b-review-publication-reads.md). Không lệnh vận hành dev/cutover mới; safety pending tới C4.
 
 Conda `C:\Users\ADMIN\.conda\envs\ras\python.exe` và pip `26.2.1` đã xác minh đúng môi trường; không cài thêm/venv. PostgreSQL standalone `ras-c2d2b-db-20261005`, image `pgvector/pgvector:pg16`, label `ras.task=c2d2b-20261005`, bind `127.0.0.1:58446`. Runtime/recovery LOGIN, migrator/definer NOLOGIN; credentials/admin URL/DB parts explicit trước fixture import. Runner chặn sync/async external HTTPTransport; không fallback `.env`, không query/nâng/restart dev, provider/pricing hoặc mở safety ready.
 
@@ -53,7 +66,7 @@ $c2d2aEvidence = Join-Path $env:TEMP 'ras-c2d2a-20261005'
 
 Đối chứng 6/6, web 44/44/typecheck/build đạt. Đã dọn container/anonymous volume thử sau ownership check, xóa credentials tổng hợp; evidence giữ ngoài repo. Sáu dev container giữ ID/image/StartedAt qua inspect chỉ đọc; không query DB dev. Chi tiết các lượt fail/giới hạn trong inventory.
 
-**PR #38 đã merge `d06664e` (C2d-1, head mã nguồn `0039`).** [Bàn giao](c2d1-final-caller-reads.md) · [Lệnh cô lập](#c2d-1-final-caller-reads-cô-lập) · [Inventory](c2d1-test-inventory.json). C2d-2a đã merge PR #39 và C2d-2b triển khai trên nhánh review, xem mục cô lập phía trên; các lệnh/kết quả bên dưới là chứng cứ lịch sử C2d-1, không phải runbook mở dev. Safety pending tới C4; không suy revision DB dev hoặc chạy lệnh lịch sử để mở traffic. Không truy vấn/nâng/restart DB dev.
+**PR #38 đã merge `d06664e` (C2d-1, head mã nguồn `0039`).** [Bàn giao](c2d1-final-caller-reads.md) · [Lệnh cô lập](#c2d-1-final-caller-reads-cô-lập) · [Inventory](c2d1-test-inventory.json). C2d-2a/2b đã merge PR #39/#40, xem mục cô lập phía trên; các lệnh/kết quả bên dưới là chứng cứ lịch sử C2d-1, không phải runbook mở dev. Safety pending tới C4; không suy revision DB dev hoặc chạy lệnh lịch sử để mở traffic. Không truy vấn/nâng/restart DB dev.
 
 ## C2d-1 final caller reads cô lập
 

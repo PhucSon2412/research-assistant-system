@@ -1,6 +1,6 @@
 # C2d-1: kiểm cuối caller ở ba route đọc
 
-**Trạng thái hiện hành (2026-10-05): PR #38/#39 đã merge `d06664e`/`f229141`, source vẫn `0039`.** [C2d-2a — 13 GET library/collections/discovery](c2d2a-resource-json-reads.md) đã merge; task tiếp [C2d-2b — 9 GET review/publication](tasks/m6c2b2c2d2b-review-publication-json-reads.md) đã triển khai trên nhánh review, chưa merge. Nội dung triển khai/đo dưới đây giữ theo source lịch sử; safety pending tới C4 và không suy revision DB dev.
+**Trạng thái hiện hành (2026-10-05): PR #38–#40 đã merge; source vẫn `0039`.** [C2d-2a](c2d2a-resource-json-reads.md) có 13 GET và [C2d-2b](c2d2b-review-publication-json-reads.md) có 9 GET đã chuyển. Task tiếp [C2d-3 — 6 JSON writer library/collections](tasks/m6c2b2c2d3-library-collection-json-writes.md) đã triển khai, đang review trên nhánh riêng (chưa merge). Nội dung triển khai/đo dưới đây giữ theo source lịch sử; safety pending tới C4 và không suy revision DB dev.
 
 [Mục lục](README.md) · [Task](tasks/m6c2b2c2d1-final-caller-reads.md) · [Inventory kiểm thử](c2d1-test-inventory.json) · [Inventory từng route](c2d1-caller-inventory.json)
 
