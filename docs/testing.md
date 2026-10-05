@@ -1,10 +1,24 @@
 # Chiến lược kiểm thử
 
+## C2d-2b review/publication JSON reads
+
+Base PR #39 `f229141`, nhánh `feat/m6c2b2c2d2b-review-publication-json-reads`; source migration `0039`, không migration. [Bàn giao](c2d2b-review-publication-json-reads.md) · [Inventory node/source/JUnit](c2d2b-test-inventory.json). Đã triển khai trên nhánh để review, chưa merge; safety pending tới C4.
+
+**Suite cuối tại code `749a31d`: 734/734 pass**, 0 failure/error/skip, 1458.049 s; collect 2213 unique nodes, **1479 not-run**, 3 warning hiện có. Gồm C2d-2b 260 (9 pending HTTP thật), C2d-2a 301 (13 GET), C2d-1 93, C2a login/session 68, library GET 9, collection GET 1, discovery GET 1 và ORM/schema 1. JUnit khớp chính xác 734 node đã chọn, không thiếu/trùng; SHA-256 215 API Python/SQL file không đổi trong suite.
+
+Kiểm bổ sung riêng **9/9 pass**, 21.287 s, không cộng vào 734: plugin ngoài repo quan sát transaction final inactive sau response và `app.db.get_engine().pool.checkedout() == 0` cho đủ 9 GET. Assertion pool trong success test gốc thuộc fixture Engine; probe này kiểm chính Engine HTTP API.
+
+**9/9 đối chứng** đều có đúng 1 assertion failure, 0 error/skip và source khôi phục đúng byte/hash trước suite cuối; không tính là pass thêm. Lượt chuẩn bị riêng có lỗi resource fixture/storage/observer; lượt 260/260 trước commit cũng chồng nhau, giữ trong inventory và không cộng vào suite cuối. Không có lượt test bị dừng.
+
+Runtime bootstrap/invitation/login/receipt/head/journal thật; chỉ cutover scoped trong fixture nghiệp vụ. 9 pending HTTP dùng gate thật, health 200/ready 503. Race có hai bên thắng bằng Event và PostgreSQL wait: request → private item → journal, common item → journal và cleanup tombstone → item; không khóa tombstone sau item. Closure/approval/publication/cleanup dùng helper thật và originals tổng hợp, không kiểm writer HTTP/storage.
+
+Web không đổi: tests/typecheck/build/browser not-run. Whole mixed review/approval/publication/common-original/closure files và 1479 node còn lại not-run; assertions JSON cần thiết được port vào nhóm runtime mới. Writer/file/provider/worker, tổng HTTP/proxy/restore/drill/cutover và C3/C4 còn riêng. Không dev/`.env`/provider/pricing/safety ready. Kết quả lịch sử dưới đây giữ theo source, không cộng vào suite mới.
+
 ## Review độc lập PR #39
 
 Source `5d291c0`, base `d06664e`, migration `0039` giữ nguyên: **313/313 test GET/ORM chọn pass**, 0 failure/error/skip, **692,695 s**, 3 warning hiện có; gồm C2d-2a 301 (13 pending thật), library GET 9, collection GET 1, discovery GET 1, ORM/schema 1. Thêm **1 ca ID ngoài repo pass**; web `npm test --prefix web` **44/44 pass**. JUnit khớp chính xác 313 node unique, hash 213 API Python/SQL file không đổi; inventory AST 63/63 route, 13 boundary mới.
 
-[Review, lỗi tooling, cleanup và giới hạn](reviews/pr39-c2d2a-resource-reads.md). Không phát hiện điểm chặn merge trong phạm vi C2d-2a; PR chưa merge. Không cộng với 538 hoặc 6 đối chứng của agent; reviewer chưa chạy 1640 node API còn lại, web typecheck/build/browser, storage/provider/drill/cutover hay đối chứng source. PostgreSQL/runtime/recovery/journal riêng, chỉ cutover fixture scoped; không `.env`, dữ liệu dev hoặc operational pricing/safety. Safety pending tới C4.
+[Review, lỗi tooling, cleanup và giới hạn](reviews/pr39-c2d2a-resource-reads.md). Không phát hiện điểm chặn merge trong phạm vi C2d-2a tại thời điểm review; PR #39 đã merge `f229141`. Không cộng với 538 hoặc 6 đối chứng của agent; reviewer chưa chạy 1640 node API còn lại, web typecheck/build/browser, storage/provider/drill/cutover hay đối chứng source. PostgreSQL/runtime/recovery/journal riêng, chỉ cutover fixture scoped; không `.env`, dữ liệu dev hoặc operational pricing/safety. Safety pending tới C4.
 
 ## C2d-2a resource JSON reads
 
