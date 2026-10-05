@@ -203,8 +203,8 @@ def test_profile_expiry_reload_and_no_final_touch(browser):
     expected = NOW + timedelta(minutes=1)
     def update(db, ctx):
         # Populate stale identities on the actual route connection deliberately.
-        db.get(User, ctx.user_id)
-        db.get(UserSession, ctx.session_id)
+        b.stale_user = db.get(User, ctx.user_id)
+        b.stale_session = db.get(UserSession, ctx.session_id)
         with b.w.engine.begin() as conn:
             conn.execute(text("UPDATE users SET email='new@example.test',display_name='new profile',role='user' WHERE id=:uid"), {'uid': ctx.user_id})
             conn.execute(text('UPDATE sessions SET last_activity_at=:at,absolute_expires_at=:end WHERE id=:sid'),
@@ -216,8 +216,24 @@ def test_profile_expiry_reload_and_no_final_touch(browser):
     assert response.json()['user'] == {'id': str(b.w.uid), 'email': 'new@example.test', 'display_name': 'new profile', 'role': 'user'}
     assert response.json()['session']['idle_expires_at'] == (expected+timedelta(minutes=30)).isoformat()
     assert response.json()['session']['absolute_expires_at'] == (NOW+timedelta(hours=7)).isoformat()
+    assert b.stale_user.email == 'admin@example.test'
+    assert b.stale_session.last_activity_at == NOW
     with Session(b.w.runtime) as db:
         assert db.get(UserSession, b.w.actor.session_id).last_activity_at == expected
+
+
+def test_current_session_idle_expiry_capped_by_absolute(browser):
+    b = browser
+    def update(db, ctx):
+        b.at = NOW + timedelta(hours=7, minutes=59)
+        with b.w.engine.begin() as conn:
+            conn.execute(text('UPDATE sessions SET last_activity_at=:at WHERE id=:sid'),
+                         {'at': b.at, 'sid': ctx.session_id})
+    b.after_dependency = update
+    response = b.client.get('/auth/session')
+    assert response.status_code == 200, response.text
+    session = response.json()['session']
+    assert session['idle_expires_at'] == session['absolute_expires_at'] == (NOW+timedelta(hours=8)).isoformat()
 
 
 @pytest.mark.parametrize('path', PATHS)

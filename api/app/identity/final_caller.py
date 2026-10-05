@@ -46,4 +46,5 @@ def final_caller(db: Session, *, session_id: uuid.UUID, user_id: uuid.UUID,
     if admin and row.role != "admin":
         raise ApiError(403, "forbidden")
     return FinalCaller(user_id, session_id, row.email, row.display_name, row.role,
-                       row.last_activity_at + idle, row.absolute_expires_at, at)
+                       min(row.last_activity_at + idle, row.absolute_expires_at),
+                       row.absolute_expires_at, at)
