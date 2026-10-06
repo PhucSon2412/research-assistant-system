@@ -1,6 +1,6 @@
 # Tài liệu dự án
 
-**C2d-4b — PUT original đang kiểm trên nhánh review:** [bàn giao](c2d4b-upload-original.md) · [task](tasks/m6c2b2c2d4b-upload-original.md). Consume intent trong giao dịch cuối, I/O ngoài khóa DB, fresh response proof và cleanup theo commit outcome. Download thuộc C2d-4c; safety pending tới C4.
+**C2d-4b — PUT original đã kiểm trên nhánh review:** [bàn giao](c2d4b-upload-original.md) · [task](tasks/m6c2b2c2d4b-upload-original.md). Consume intent trong giao dịch cuối, I/O ngoài khóa DB, fresh response proof và cleanup theo commit outcome. Download thuộc C2d-4c; safety pending tới C4.
 
 **Review PR #43 tại `f60645e`:** độc lập 167/167 API (đủ 155 test mới), 47/47 web và typecheck đạt; không phát hiện điểm chặn merge trong phạm vi notice/intent. [Report và giới hạn](reviews/pr43-c2d4a-upload-intents.md). PR đã merge `632ec68`; số review giữ theo source cũ, không phải kiểm C2d-4b.
 
@@ -37,6 +37,7 @@ Khi có thay đổi quyết định, cập nhật tài liệu liên quan cùng t
 | Tài liệu | Nội dung |
 | --- | --- |
 | [Bàn giao C2d-4b](c2d4b-upload-original.md) | Phase/lock map, SHA-256 readback, response proof mới, race/cancellation/uncertain, config/proxy và giới hạn |
+| [Test inventory C2d-4b](c2d4b-test-inventory.json) | Source `68950f3`, 808 API pass, collect 2.905/not-run 2.097, 51 web/typecheck/build, đối chứng và giới hạn |
 | [Prompt C2d-4b](tasks/m6c2b2c2d4b-upload-original.md) | Hợp đồng task PUT original; kết quả trên nhánh review ở handoff riêng |
 | [Review PR #43](reviews/pr43-c2d4a-upload-intents.md) | 167 API chọn độc lập, 47 web/typecheck; PR đã merge, số review giữ theo source cũ, không suy toàn upload/C2d hoàn tất |
 | [Bàn giao C2d-4a](c2d4a-upload-notice-intent.md) | Hai JSON route, binding/secret/clock/lock/commit boundary, mã lỗi và phạm vi lịch sử trước PUT C2d-4b; đã merge PR #43 |

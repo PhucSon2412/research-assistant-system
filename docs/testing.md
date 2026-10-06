@@ -2,9 +2,9 @@
 
 **C2d-4b nhánh review:** [handoff PUT original](c2d4b-upload-original.md) tách kiểm mới PostgreSQL/MinIO/journal/runtime, fresh actor/clock sau I/O, exact consent/consume, race, cancellation/thread ownership, integrity và commit uncertain. Production pending HTTP riêng không patch. Các số kiểm cuối và not-run ghi ở handoff/inventory mới, không cộng lịch sử PR #43; safety pending tới C4.
 
-## C2d-4b: kiểm dự kiến, chưa chạy
+## C2d-4b: source kiểm trên nhánh review
 
-[Task PUT original](tasks/m6c2b2c2d4b-upload-original.md#5-kiểm-thử-và-chứng-cứ) chốt runtime PostgreSQL/MinIO cô lập, fresh caller/binding/clock, consume một lần, I/O không giữ khóa, checksum readback và cleanup/cancel theo commit outcome. Cần proof response mới, worker-state race, pending thật và HTTP qua proxy streaming. Cấp credentials test tường minh để không fallback `.env`; không gọi provider. Chọn suite theo rủi ro và báo inventory/JUnit/source/not-run; các số PR #43 bên dưới không tính là C2d-4b đã kiểm. Safety pending tới C4.
+[Task PUT original](tasks/m6c2b2c2d4b-upload-original.md#5-kiểm-thử-và-chứng-cứ) chốt runtime PostgreSQL/MinIO cô lập, fresh caller/binding/clock, consume một lần, I/O không giữ khóa, checksum readback và cleanup/cancel theo commit outcome. Đã kiểm proof response mới, worker-state race, pending thật và HTTP qua proxy streaming; browser DOM chưa chạy. Cấp credentials test tường minh để không fallback `.env`; không gọi provider. Source `68950f3`: 808/808 API, collect 2.905, not-run 2.097; 51/51 web, typecheck/build đạt. [Inventory mới](c2d4b-test-inventory.json) đối chiếu node/JUnit/source/hash và lỗi các lượt trước; số PR #43 bên dưới là lịch sử riêng. Safety pending tới C4.
 
 ## Review độc lập PR #43
 

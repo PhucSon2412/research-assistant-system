@@ -1,6 +1,6 @@
 # Roadmap đề xuất
 
-**C2d-4b đang kiểm trên nhánh review:** [handoff PUT original](c2d4b-upload-original.md); không migration/grants, source `0039`. Kiểm runtime/MinIO/journal, race/cancellation/integrity, proof mới sau known commit và proxy streaming; kết quả cuối ghi riêng. Original download C2d-4c tiếp tục riêng, safety pending tới C4. Phần giao và kết quả lịch sử bên dưới giữ nguồn riêng.
+**C2d-4b đã kiểm trên nhánh review:** [handoff PUT original](c2d4b-upload-original.md); không migration/grants, source `0039`. Kiểm runtime/MinIO/journal, race/cancellation/integrity, proof mới sau known commit và proxy streaming; source `68950f3`: 808 API pass, 2.097 not-run, 51 web/typecheck/build; [inventory](c2d4b-test-inventory.json) ghi riêng. Original download C2d-4c tiếp tục riêng, safety pending tới C4. Phần giao và kết quả lịch sử bên dưới giữ nguồn riêng.
 
 ## C2d-4b sau merge PR #43
 

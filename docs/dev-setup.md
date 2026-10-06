@@ -1,10 +1,10 @@
-# Môi trường phát triển và schema (M1a–C2d-4a)
+# Môi trường phát triển và schema (M1a–C2d-4b)
 
 ## C2d-4b PUT original cô lập
 
 Base `632ec68`, source head `0039`; nhánh review, **safety pending tới C4**. [Boundary/config/giới hạn](c2d4b-upload-original.md). PostgreSQL `ras-c2d4b-db-20261006` port 58455, MinIO `ras-c2d4b-minio-20261006` port 59455, label `ras.task=c2d4b-20261006`; credentials/journal/evidence ở `%TEMP%/ras-c2d4b-20261006`, ngoài repo. Runner explicit DB/runtime/recovery/MinIO credentials trước import fixture và chặn external HTTP/urllib3. Không dùng `.env`/dev hoặc provider.
 
-Lệnh đã thực chạy bằng Conda ras: `python <evidence>/setup.py`; `python <evidence>/runner.py api --collect-only -q`; pytest preparation/refined với `--junitxml=<evidence>/...xml`. Các lượt chuẩn bị không tính thành kết quả cuối; source/hash/node và suite cuối sẽ ghi theo evidence. Đây là lệnh thử cô lập, không vận hành dev.
+Lệnh đã thực chạy bằng Conda ras: `python <evidence>/setup.py`; `python <evidence>/runner.py api --collect-only -q`; pytest preparation/refined với `--junitxml=<evidence>/...xml`. Suite cuối dùng `python <evidence>/final_suite.py`, ba selection rời nhau từ collect đầy đủ; source `68950f3`, 808 pass/2.097 not-run, [inventory/JUnit/hash](c2d4b-test-inventory.json). Web đã chạy `npm test --prefix web`, `npm run typecheck --prefix web`, `npm run build --prefix web`; 51 pass/typecheck/build đạt. Các lượt chuẩn bị không cộng vào kết quả cuối. Đây là lệnh thử cô lập, không vận hành dev.
 
 Runtime config mới: `RAS_FILES__UPLOAD_MAX_CONCURRENT`, `RAS_FILES__UPLOAD_BODY_TIMEOUT_SECONDS`, `RAS_STORAGE__CONNECT_TIMEOUT_SECONDS`, `RAS_STORAGE__READ_TIMEOUT_SECONDS`, `RAS_STORAGE__MAX_ATTEMPTS`. Settings có bounds/test; khi deploy container phải truyền env vào process/container, không chỉ đặt env trên host. Không đổi Compose/dev trong task này. Timeout SDK/socket/body không là tổng deadline request. Reconcile chỉ sau quiescence/grace, chưa có multipart cleanup riêng.
 

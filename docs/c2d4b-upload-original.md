@@ -2,7 +2,7 @@
 
 Base fetch `632ec683940a8bccc711c8a55743b0a3992c1d03`; GitHub CLI xác minh PR #43 MERGED, main chứa `f60645edf01d01794590db256d0ea4b5b1ef5c5e`. Nhánh `feat/m6c2b2c2d4b-upload-original` tạo từ `origin/main`; giữ toàn bộ docs chưa commit, gồm review PR #43 và task. Source migration `0039`, không migration/grants/claim lease mới hoặc suy revision DB dev. **Safety pending tới C4; chưa merge.**
 
-[Task](tasks/m6c2b2c2d4b-upload-original.md) · [Mục lục](README.md) · [Caller inventory](c2d1-caller-inventory.json)
+[Task](tasks/m6c2b2c2d4b-upload-original.md) · [Mục lục](README.md) · [Caller inventory](c2d1-caller-inventory.json) · [Test inventory](c2d4b-test-inventory.json)
 
 ## Đối chiếu hành vi và boundary
 
@@ -51,10 +51,24 @@ Proxy Next giữ body streaming, không buffer PDF; timeout 120 giây. Proxy l�
 
 ## Kiểm chứng theo source
 
-Đang hoàn tất kiểm cô lập; số cuối, selection/JUnit/source/hash/not-run sẽ được ghi sau khi chạy. Không dùng số lịch sử PR #43 làm pass C2d-4b.
+Source code cuối `68950f3357e740bed6030af53dc385bcef5de585`, base `632ec68`; commit sau chỉ docs/inventory. Fetch cuối main vẫn cùng base. Collect toàn API **2.905 node**, selection/JUnit unique **808/808 pass**, **0 fail/error/skip**, **2.097 not-run**. Ba process test cô lập chạy selection rời nhau trên cùng source, hash trước/sau của 262 file Python/SQL/web bằng nhau; không sửa code hoặc chạy mutants đồng thời suite.
+
+| Nhóm cuối | Pass |
+| --- | ---: |
+| PUT original: 220 ca mới + 9 legacy runtime | 229 |
+| Toàn C2d-4a notice/intent | 155 |
+| Hồi quy caller/clock/writer/login/Origin/config/migration/ORM | 424 |
+
+Web **51/51 pass**, typecheck và build đạt; web không đổi sau `6981643`. Smoke HTTP thật chạy Uvicorn cô lập và handler TS Node proxy streaming; form qua callback thật, **chưa browser DOM**. Pending không patch trả 503, health 200/readiness 503. AST parser/download và auth/authz/identity/models/migrations giữ base; ORM schema test đạt, không suy download boundary đã chuyển.
+
+Bốn đối chứng bỏ readback/response binding/keep uncertain/preput proof: **4/4 bị bắt**, mỗi ca đúng một failure, không error/skip; bytes/hash source khôi phục trước suite cuối. Hai lỗi sản phẩm được regression tái hiện trước sửa: notice reload 5 fail → 5 pass; cancel-all 2 fail → 12 pass gồm 10 abort cũ. Lượt chuẩn bị khác: 46 pass/1 fail do fixture dùng state item bất hợp lệ, sửa sang worker thật và progression hợp lệ rồi 49 pass; các lượt thêm 15 và 11 pass. Suite `0f7c579` đã có 806 pass nhưng giữ lịch sử riêng, không cộng vào 808.
+
+Một lượt prepare bị ngắt, collect ban đầu 2.879 + 1 lỗi import `scripts` (đã sửa runner sys.path), và lượt final đầu bị dừng để sửa notice. Lần chỉnh selection qua stdin dùng sai `__file__`/count cũ khiến run selection cũ khởi chạy, đã dừng đúng process thử; log bị ghi đè, không còn tổng hoàn chỉnh và không tính pass. Mutant lần đầu vướng anchor CRLF sau một guard đã bị bắt; restore source rồi chuẩn hóa anchor và chạy đủ bốn. [Inventory](c2d4b-test-inventory.json) giữ node, JUnit/source/log SHA, preparation và not-run riêng.
 
 Conda `C:\Users\ADMIN\.conda\envs\ras` interpreter/pip đã xác minh. PostgreSQL `ras-c2d4b-db-20261006` bind 58455 và MinIO `ras-c2d4b-minio-20261006` bind 59455, label `ras.task=c2d4b-20261006`; journal/credentials/evidence ngoài repo `%TEMP%/ras-c2d4b-20261006`. Credentials DB/admin/runtime/recovery/MinIO tường minh trước import fixture; runner chặn external httpx và urllib3 transport. Chỉ scoped cutover ở fixture nghiệp vụ; pending HTTP riêng không patch. Không đọc/sửa `.env`, tác động dev/provider/pricing/safety ready.
 
 Fixture `test_uploads.py` cũ tạo User qua SQL trực tiếp: đổi sang bootstrap/invitation/login runtime thật, giữ assertions private/ACL/format/composite FK/race. Expectation cũ xóa object khi commit exception mâu thuẫn task mới: đổi ca đó thành giữ orphan, không retry. Các file download được thử hồi quy không chứng minh C2d-4c hoàn tất.
+
+Đã dọn đúng hai container và hai volume thử sau kiểm ID/name/label/image/port/mount/sole consumer; 24 container có sẵn giữ nguyên ID/image/StartedAt. Ba file credentials sinh riêng đã xóa, journal/JUnit/log/evidence giữ ngoài repo. `git diff --check`, 49 Markdown/1.057 link và mọi caller contract-map file/anchor đạt. Warning hiện có: Starlette/httpx TestClient deprecation, Alembic computed default `users.status_domain`, Node module type; không đổi dependency trong task này.
 
 Full business API/cutover/C3/C4, provider/search/RAG, production durability và benchmark chưa thuộc kết quả này. Không consent journal xuyên restore, không thay nền C1/Origin. Bàn giao original download C2d-4c riêng sau review.

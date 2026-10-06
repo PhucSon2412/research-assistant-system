@@ -1,7 +1,7 @@
 {
-  "base": "99db5285dfa59dd3d26e86345e849393ed88ce33",
+  "base": "632ec683940a8bccc711c8a55743b0a3992c1d03",
   "source_migration": "0039",
-  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4. Final read clock corrected after predicate SQL; /auth/sessions uses the shared final caller. Details in docs/c2d-final-read-clock.md. C2d-4a adds GET upload notice final caller and POST intent actor/binding/TTL before commit plus fresh token proof after known commit. PUT/download stay open.",
+  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4. Final read clock corrected after predicate SQL; /auth/sessions uses the shared final caller. Details in docs/c2d-final-read-clock.md. C2d-4a adds GET upload notice final caller and POST intent actor/binding/TTL before commit plus fresh token proof after known commit. C2d-4b PUT original is implemented on review branch with unlocked staging, atomic consume and a new exact response proof. Original download C2d-4c and remaining callers stay open.",
   "safety": "pending until C4",
   "route_count": 63,
   "routes": [
@@ -1157,5 +1157,6 @@
     "PUT /uploads/original"
   ],
   "previous_tested_code_commit": "610e52d22292e16534c7c1771ca40fe6528b467a",
-  "c2d4b_code_commit": "pending final source verification"
+  "c2d4b_code_commit": "68950f3357e740bed6030af53dc385bcef5de585",
+  "previous_inventory_base": "99db5285dfa59dd3d26e86345e849393ed88ce33"
 }

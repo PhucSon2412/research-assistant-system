@@ -2,9 +2,9 @@
 
 ## Triển khai C2d-4b PUT original (2026-10-06)
 
-Theo task chủ dự án và [prompt đã giao](tasks/m6c2b2c2d4b-upload-original.md), fetch xác minh base `632ec68`, PR #43 MERGED/chứa `f60645e`. Không migration/grants/early claim; giữ docs review/task chưa commit. [Handoff](c2d4b-upload-original.md) ghi lock map, cleanup theo outcome và giới hạn thực tế; số kiểm cuối tách khỏi PR #43.
+Theo task chủ dự án và [prompt đã giao](tasks/m6c2b2c2d4b-upload-original.md), fetch xác minh base `632ec68`, PR #43 MERGED/chứa `f60645e`. Không migration/grants/early claim; giữ docs review/task chưa commit. [Handoff](c2d4b-upload-original.md) ghi lock map, cleanup theo outcome và giới hạn thực tế; source `68950f3` có 808 API pass (collect 2.905/2.097 not-run), 51 web/typecheck/build, bốn đối chứng guard; [inventory](c2d4b-test-inventory.json) tách khỏi PR #43.
 
-Agent chọn cách sở hữu tài nguyên trong phạm vi task: Session riêng cho từng proof/writer/response trong thread; HTTP task shield một attempt sở hữu slot/temp tới khi thread settle. Cancellation đặt stop trước acceptance; commit đã chạy/exception giữ object, không IDs/retry. Response item → job → intent → ack → version/file → journal shared, kiểm consumed binding/caller mới, không yêu cầu state received hoặc intent chưa hết hạn sau known consume.
+Agent chọn cách sở hữu tài nguyên trong phạm vi task: Session riêng cho từng proof/writer/response trong thread; HTTP task shield một attempt sở hữu slot/temp tới khi thread settle. Executor Future được shield trực tiếp để cancellation mọi Task không làm mất ownership của thread; contextvars giữ như to_thread. Cancellation đặt stop trước acceptance; commit đã chạy/exception giữ object, không IDs/retry. Response item → job → intent → ack → version/file → journal shared, kiểm consumed binding/caller mới, không yêu cầu state received hoặc intent chưa hết hạn sau known consume.
 
 Giá trị ban đầu cần đo được đưa vào config: upload 4 slot mỗi process, nhận body 90 giây, SDK connect/read 10/30 giây và 2 attempt. Không SLO/tổng deadline; disk/SDK/multipart/retries có thể khiến tổng vượt proxy 120 giây. Proxy/form nêu outcome chưa xác định và kiểm thư viện, không tự retry. Không thêm multipart sweeper hoặc consent journal xuyên restore.
 
