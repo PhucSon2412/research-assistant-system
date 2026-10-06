@@ -1,5 +1,43 @@
 # Nhật ký quyết định
 
+## Triển khai C2d-4a notice và intent (2026-10-06)
+
+**Nguồn:** task chủ dự án và [prompt](tasks/m6c2b2c2d4a-upload-notice-intent.md). Fetch xác minh `origin/main=99db528`, PR #42 MERGED/chứa `8f924c0`; nhánh `feat/m6c2b2c2d4a-upload-notice-intent`. Giữ toàn bộ docs chưa commit, gồm review PR #42. Source `0039`, không migration/grants, dev/`.env`/provider/pricing hoặc safety ready; **pending tới C4**.
+
+**Lựa chọn triển khai của coding agent trong scope được giao:** helper hẹp `api/upload_intents.py` cho secret/TTL, reuse `_actor` C2d-3 ở entry, không sửa writer/read helper khác. User NO KEY UPDATE → ack/intent/audit flush FK → journal exclusive trực tiếp → scalar binding + actor/predicate + clock sau SQL cuối → commit. Known commit mới lấy intent SHARE → ack SHARE → journal shared → scalar requery và proof/clock mới; không User/FK locks sau journal. Tương thích thứ tự intent UPDATE đầu tiên của PUT, nhưng không sửa/kiểm toàn PUT I/O.
+
+`StrictBool` + validator thay `Literal[True]` vì base còn chấp nhận số `1`; Origin dùng cùng helper trusted hiện hành, giữ middleware CSRF trước auth. Anonymous có Origin/CSRF hợp lệ nhận 401; thiếu CSRF có thể bị 403 trước auth, không hạ guard để ép 401. Không đổi chính sách notice, quyền Admin upload, file/quota/model hoặc thêm auth event cho consent. Token chỉ hash trong DB, audit chỉ IDs/mã/notice. Lifetime cấu hình từ clock mới, không gia hạn sau wait/commit.
+
+Tự review sau suite đầu 579 tại `27dd4c5` phát hiện validation metadata đang đứng trước current role guard. Regression mới tái hiện 409 thay vì Admin 403; chuyển validation notice/filename/size vào boundary sau current User ở `610e52d`, giữ schema validation trước handler. Regression 1/1 và ba guard mutants chạy lại đạt yêu cầu; selection 579 được chạy lại trên source sửa, không cộng suite cũ thành kết quả mới.
+
+Ba nhóm lỗi `upload_intent_unavailable`, `upload_intent_outcome_uncertain`, `upload_intent_response_unavailable` phân biệt trước commit, commit exception và DB hậu kiểm. `upload_intent_changed/expired` cùng các mã auth/gate không trả token; known commit rows có thể còn, cleanup local không chứng minh rollback remote. UI map đúng semantics và form không PUT/retry khi intent lỗi. [Handoff/lock map/giới hạn](c2d4a-upload-notice-intent.md). Các số kiểm được bổ sung theo source cuối, không cộng lịch sử PR #42.
+
+**Bàn giao:** C2d-4b PUT parser/storage/claim/save/job/commit uncertain/orphan; C2d-4c original private/common/review sau I/O/trước byte đầu/checksum/slot/disconnect. Writer/provider/C3/C4 vẫn mở; không bảo đảm vòng đời intent qua restore. Nhánh review chưa merge; không tự cutover hoặc restart dev.
+
+## Giao C2d-4a sau merge PR #42 (2026-10-06)
+
+**Đã xác nhận:** chủ dự án báo đã merge và yêu cầu prompt tiếp theo; fetch/GitHub CLI xác minh PR #42 MERGED, main/merge `99db5285dfa59dd3d26e86345e849393ed88ce33`, chứa head `8f924c0`. Source migration `0039`; không kiểm revision DB dev. [Review PR #42](reviews/pr42-final-read-clock.md) giữ kết quả theo source trước merge.
+
+**Phạm vi do orchestrator chốt theo ủy quyền:** [C2d-4a](tasks/m6c2b2c2d4a-upload-notice-intent.md) chuyển đúng `GET /uploads/notice` và `POST /uploads/intents`. Code hiện tại trả notice dựa dependency, tạo acknowledgement/intent bằng principal và `now` đầu request, commit trực tiếp rồi trả token/ORM trước khi có proof mới. Đây là đối chiếu source, chưa phải ca lỗi tái hiện hoặc kết quả kiểm thử task mới.
+
+Giữ hợp đồng xác nhận tường minh cho từng upload, JSON intent trước truyền file, token chỉ hash trong DB và role User tạo intent hiện hành. Chuyển final actor/current role/CSRF/gate/clock trước commit, flush FK trước journal exclusive, proof mới kiểm exact binding/unused/TTL trước trả token sau known commit. Lỗi commit không xác định hoặc hậu kiểm không trả token và không hứa mutation chưa lưu. Notice không phải acknowledgement. Không thêm journal cho intent hay suy restore bảo vệ intent.
+
+**Lý do chia:** hai route JSON có thể kiểm riêng, không cần parser/storage/provider. PUT hiện giữ khóa intent qua I/O; original download có checksum/slot/disconnect và boundary byte đầu, nên cần thiết kế/test riêng. Hướng tiếp **đề xuất**: C2d-4b PUT file, C2d-4c original download (có thể chia thêm theo loại quyền). Review/publication/index writers, search/RAG provider callers, C3/C4 vẫn riêng; không coi C2d-4a hoàn tất là toàn upload/C2d đã chuyển.
+
+Đã tạo prompt và đồng bộ trạng thái docs; **chưa triển khai/chưa chạy API hoặc web test C2d-4a**. Chỉ thử cô lập ở task coding; không thao tác dev/`.env`/provider/pricing. Safety **pending tới C4**. Nền C1/Origin đã chốt, không cần xin lại; lựa chọn helper/lock cụ thể phải kiểm trên runtime thật trong PR.
+
+**Kiểm tài liệu lượt giao:** Conda ras interpreter/pip đúng môi trường; 62 Markdown, 980 liên kết nội bộ, 0 lỗi target/anchor/control character. Hai route/hàm khớp AST source; thay đổi workspace chỉ Markdown, app/web/Compose khớp `origin/main`; whitespace và `git diff --check` đạt. Đây không phải test nghiệp vụ C2d-4a. Docs còn chưa commit để coding agent giữ vào PR tiếp.
+
+## Review độc lập PR #42 (2026-10-06)
+
+Source head `8f924c0`, code `18faa30`, base `5100ff6`; fetch/GitHub CLI xác nhận PR #42 OPEN/chưa merge. Đúng hai file ứng dụng đổi; auth route chỉ handler `my_sessions` đổi. Migrations/grants/predicates/authz/boundaries/web/Compose giữ nguyên. Source migration `0039`, không query DB dev.
+
+[Report độc lập](reviews/pr42-final-read-clock.md): **124/124 API chọn pass**, 245,542 s, 0 failure/error/skip; gồm đủ 65 clock mới và 59 hồi quy/pending/ORM. JUnit/selection khớp, 218 API source hash không đổi. Nạp hàm từ base trong tiến trình đối chứng riêng: 6 fail đúng 200 thay vì 401 và 2 sát hạn pass, source file không đổi. Ba artifact JUnit của agent khớp 1094 node/selection/hash; không tính là reviewer chạy lại 1094.
+
+**Kết luận:** không phát hiện điểm chặn merge trong scope sửa final clock; có thể merge. P2 đã tái hiện ở source cũ được khắc phục cho read helper và final caller của session listing. Giữ TTL/checked_at sau SQL, exact binding/receipt/role và lock/commit contracts; response đã qua boundary có thể tiếp tục gửi. Không đánh dấu toàn C2d/T14/production hoàn tất hoặc mở safety. Reviewer chưa chạy 970 node khác của suite agent, 2406 ngoài selection; inventory agent vẫn 1436 not-run.
+
+Đã dọn đúng container/volume/credentials review, metadata 24 container cũ không đổi. Không `.env`, dev, provider/pricing hoặc source ứng dụng. Docs review chưa commit; reviewer không merge/push/comment. Safety **pending tới C4**; writer/file/provider/C3/C4 vẫn riêng.
+
 ## Triển khai sửa final read clock (2026-10-06)
 
 **Nguồn:** task chủ dự án và [prompt](tasks/c2d-final-read-clock.md). Base xác minh `5100ff6`, PR #41 MERGED/head `1bad143`; không có main tiến thêm lúc fetch. Đã triển khai trên nhánh `fix/c2d-final-read-clock`, chưa merge. Source migration vẫn `0039`; không suy DB dev. Docs review/task chưa commit được giữ trong PR mới.

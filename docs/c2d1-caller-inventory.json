@@ -1,7 +1,7 @@
 {
-  "base": "5100ff67c5c61754e4dd29693cb670a22ce6cf83",
+  "base": "99db5285dfa59dd3d26e86345e849393ed88ce33",
   "source_migration": "0039",
-  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4. Final read clock corrected after predicate SQL; /auth/sessions uses the shared final caller. Details in docs/c2d-final-read-clock.md.",
+  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4. Final read clock corrected after predicate SQL; /auth/sessions uses the shared final caller. Details in docs/c2d-final-read-clock.md. C2d-4a adds GET upload notice final caller and POST intent actor/binding/TTL before commit plus fresh token proof after known commit. PUT/download stay open.",
   "safety": "pending until C4",
   "route_count": 63,
   "routes": [
@@ -1020,41 +1020,48 @@
       "path": "/uploads/notice",
       "function": "notice",
       "source": "api/app/api/routes/uploads.py",
-      "line": 58,
+      "line": 67,
       "dependencies": [
         "get_principal",
-        "get_settings"
+        "get_settings",
+        "get_db",
+        "get_clock"
       ],
       "group": "file-upload",
-      "final_status": "open C2d",
-      "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "final_status": "C2d-4a implemented on review branch, not merged; final clock after SQL; safety pending until C4",
+      "direct_transaction_calls": [
+        "db.rollback"
+      ],
+      "contract_map": "docs/c2d4a-upload-notice-intent.md#boundary-và-lock-map",
+      "boundary": "final_caller",
+      "post_known_commit_new_proof": false
     },
     {
       "method": "POST",
       "path": "/uploads/intents",
       "function": "create_intent",
       "source": "api/app/api/routes/uploads.py",
-      "line": 63,
+      "line": 82,
       "dependencies": [
         "get_principal",
         "get_db",
-        "get_now",
-        "get_settings"
+        "get_clock",
+        "get_settings",
+        "require_trusted_origin"
       ],
       "group": "file-upload",
-      "final_status": "open C2d",
-      "direct_transaction_calls": [
-        "db.commit"
-      ],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "final_status": "C2d-4a implemented on review branch, not merged; final clock after SQL; safety pending until C4",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d4a-upload-notice-intent.md#boundary-và-lock-map",
+      "boundary": "api.upload_intents.create",
+      "post_known_commit_new_proof": true
     },
     {
       "method": "PUT",
       "path": "/uploads/original",
       "function": "upload_original",
       "source": "api/app/api/routes/uploads.py",
-      "line": 147,
+      "line": 125,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -1075,7 +1082,7 @@
       "path": "/files/{file_id}/original",
       "function": "download_original",
       "source": "api/app/api/routes/uploads.py",
-      "line": 244,
+      "line": 222,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -1116,18 +1123,18 @@
   "source_sha256": {
     "api/app/api/routes/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "api/app/api/routes/admin.py": "24e26c2f6f3779098cbcae0bfee4ce5c5e90d11a799f15381d872683234b2ba0",
-    "api/app/api/routes/auth.py": "792e7c9f86099296ed9dbd3e97cf7a2e98096fd968bff2502de060453db0a8c1",
-    "api/app/api/routes/collections.py": "8d014aed105b6e835d96d00d24317e9750f89088200fb4aa9a95218cda4a6f00",
-    "api/app/api/routes/discovery.py": "280be63d5811b2157b894a2bb8ca45fed7d92485e80b2cb835e48a064a2390fb",
-    "api/app/api/routes/library.py": "01d67e95e27167fcceab22fedf954eb3de7dfb5315c0b99fc781c64be20abe97",
-    "api/app/api/routes/publications.py": "1fa378c18791ab64044f81e794378e78251ec27addd5716b829784d8fbb872a9",
+    "api/app/api/routes/auth.py": "5d52a8d7fd60a9eb08de14f3fa8bce14288dd10fb3b389dd3fac24dd8d0151dc",
+    "api/app/api/routes/collections.py": "4666935d67e658e45f289f0f1af6d59e3f8c2af720bd4c7d6ab13c132f44a93d",
+    "api/app/api/routes/discovery.py": "e045d1d79fb7f4a3e957bcaf1e3f218d3d0ed335e5a637c4613fdd6faf7236be",
+    "api/app/api/routes/library.py": "2b3fbdca987b870cbf2a953f8f224bac983debc86118e0a245c8897cd699592b",
+    "api/app/api/routes/publications.py": "86e948371e60d0a84eb5083e71ec3d5fbf719c8c9ee3fef996ecb4b1702661e1",
     "api/app/api/routes/rag.py": "fa890ce04f01282e215198acf7016e6537c9afe58a06f90950b0b3521df4c84b",
-    "api/app/api/routes/reviews.py": "8b5cb817c465f20af4da0aaa0dc5205d3ba0e55502efbdf5baf14322f3809570",
+    "api/app/api/routes/reviews.py": "f7245caffbed374203ff824a878b1a3a9a837b2859f9ed481bc3d0d0e8968ecc",
     "api/app/api/routes/search.py": "5b8c8b1c8afa24821d041d7bd9a765915b5ea8baf10d873c8a8d6803816321e7",
-    "api/app/api/routes/uploads.py": "4cae5e01afd3544699ec89e044d8d49ba8a1e4f5bcbed9a464501ac257aad74a",
+    "api/app/api/routes/uploads.py": "236c86087feb530372842de6189902ae534272ea47388d818655eb59d26217a2",
     "api/app/main.py": "b53f13e8e5dbdbed1de23410c7967298a9e1123a7411730f5d93f4721421f93e"
   },
-  "previous_base": "ca4a623ea9cd4d2f8454659a1d66c48dbf8093d0",
+  "previous_base": "5100ff67c5c61754e4dd29693cb670a22ce6cf83",
   "c2d2a_get_routes": [
     "/collections",
     "/collections/{collection_id}/items",
@@ -1143,5 +1150,9 @@
     "/library/items/{item_id}/coverage",
     "/library/items/{item_id}/references"
   ],
-  "tested_code_commit": "37b7484582184da029b121e78ac30932bceac316"
+  "tested_code_commit": "610e52d22292e16534c7c1771ca40fe6528b467a",
+  "c2d4a_json_routes": [
+    "GET /uploads/notice",
+    "POST /uploads/intents"
+  ]
 }

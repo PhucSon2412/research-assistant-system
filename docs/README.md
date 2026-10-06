@@ -1,8 +1,12 @@
 # Tài liệu dự án
 
+**C2d-4a đã triển khai trên nhánh review, chưa merge**, base PR #42 `99db528`: [bàn giao notice/intent](c2d4a-upload-notice-intent.md). Hai JSON route kiểm caller/role/binding/clock trước commit và proof mới trước trả token sau commit; PUT file/download vẫn riêng. [Quyết định giao](decisions.md#giao-c2d-4a-sau-merge-pr-42-2026-10-06). Source `0039`, safety **pending tới C4**.
+
+**Review PR #42 tại `8f924c0`:** 124/124 API chọn pass độc lập, gồm đủ 65 test clock mới. Đối chứng hàm cũ bắt đúng 6 lỗi và giữ 2 ca sát hạn thành công; không thấy điểm chặn merge trong phạm vi sửa clock. [Report và giới hạn](reviews/pr42-final-read-clock.md). Kết quả giữ theo source review trước merge, không phải kiểm thử C2d-4a.
+
 **Sửa final read clock:** [handoff](c2d-final-read-clock.md) · [inventory](c2d-final-read-clock-test-inventory.json). Source `0039`, safety pending tới C4; kết quả mới tách khỏi review PR #41 bên dưới.
 
-**PR #41 đã merge `5100ff6` (2026-10-06).** Task tiếp: [sửa final read clock sau SQL](tasks/c2d-final-read-clock.md), đã triển khai trên nhánh review, chưa merge. [Review và P2 đã tái hiện](reviews/pr41-c2d3-resource-writes.md): 270/270 API chọn, 45/45 web và typecheck đạt tại source cũ; P2 GET helper ở source cũ đã có bản sửa đang review, chưa merge. Safety pending tới C4.
+**PR #41 đã merge `5100ff6` (2026-10-06).** [Sửa final read clock sau SQL](tasks/c2d-final-read-clock.md) đã merge trong PR #42 `99db528`. [Review và P2 đã tái hiện](reviews/pr41-c2d3-resource-writes.md): 270/270 API chọn, 45/45 web và typecheck đạt tại source cũ; failure P2 giữ làm lịch sử. Safety pending tới C4.
 
 **C2d-3 đã merge PR #41 `5100ff6`, base `833db7c`:** [bàn giao 6 writer](c2d3-library-collection-json-writes.md) · [inventory](c2d3-test-inventory.json). Actor/current role/resource/clock trước commit, proof mới sau commit; không migration/grants mới. Safety pending tới C4. Các kết quả PR #40 bên dưới giữ theo source lịch sử.
 
@@ -28,6 +32,10 @@ Khi có thay đổi quyết định, cập nhật tài liệu liên quan cùng t
 
 | Tài liệu | Nội dung |
 | --- | --- |
+| [Bàn giao C2d-4a](c2d4a-upload-notice-intent.md) | Hai JSON route, binding/secret/clock/lock/commit boundary, mã lỗi và phần PUT/download chưa chuyển; nhánh review chưa merge |
+| [Inventory C2d-4a](c2d4a-test-inventory.json) | 579 API chọn, 2.106 not-run; node/JUnit/source SHA, preparation/fault/đối chứng và cleanup |
+| [Prompt C2d-4a](tasks/m6c2b2c2d4a-upload-notice-intent.md) | Scope/tiêu chí hai JSON route; giữ prompt giao việc, triển khai ở handoff riêng |
+| [Review PR #42](reviews/pr42-final-read-clock.md) | 124 API chọn độc lập, đối chứng hàm cũ 6 fail đúng/2 positive; P2 clock đã khắc phục theo source, safety pending |
 | [Sửa final read clock](c2d-final-read-clock.md) | Clock/TTL sau SQL cuối, session listing, caller/lock/commit map và giới hạn |
 | [Inventory sửa final read clock](c2d-final-read-clock-test-inventory.json) | Source/hash/node/JUnit, chuẩn bị/đối chứng/final và not-run |
 | [Prompt sửa final read clock](tasks/c2d-final-read-clock.md) | P2 TTL vượt hạn trong predicate SQL cuối; proof sau SQL, regression runtime/idle/absolute và hồi quy các read caller |

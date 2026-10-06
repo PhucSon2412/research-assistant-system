@@ -1,5 +1,7 @@
 # Quyền và dữ liệu
 
+**C2d-4a trên nhánh review, chưa merge:** [notice/intent](c2d4a-upload-notice-intent.md) giữ xác nhận tường minh riêng và JSON trước file; current User/session/CSRF, exact acknowledgement–intent binding và TTL sau SQL được kiểm trước commit và trên transaction mới trước token. Commit uncertain/hậu kiểm lỗi không trả token, không hứa rows chưa lưu. PUT/download chưa chuyển; không journal consent xuyên restore. Safety pending tới C4.
+
 **Sửa final read clock (nhánh review):** [handoff](c2d-final-read-clock.md) giữ exact session/User, current Admin, latest head/receipt/generation và mọi ACL; kiểm TTL/checked_at sau SQL cuối. Không touch, khóa hàng mới hoặc commit helper; lỗi response sau known commit không chứng minh mutation chưa lưu. Safety pending tới C4.
 
 **C2d-3 đã merge PR #41 `5100ff6`:** [sáu JSON writer](c2d3-library-collection-json-writes.md) giữ ACL hiện hành. Exact caller/current role/CSRF/resource/clock được kiểm trong transaction ghi sau flush dưới journal exclusive; response dùng proof mới sau commit. Admin không có private/collection bypass; remove gỡ membership ẩn, không đọc item payload. Commit mất reply hoặc lỗi hậu kiểm không chứng minh mutation chưa lưu. Membership/delete collection chưa có journal; restore membership cũ còn riêng. Safety pending tới C4.
