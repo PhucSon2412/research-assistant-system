@@ -31,7 +31,7 @@ Validation nghiệp vụ notice/filename/limit chạy **sau current User guard t
 
 Binding gồm intent/ack ID, User/session/notice, kind/filename/declared size/checksum/token hash, created/expires time, acknowledgement timestamp; `used_at` và `item_id` phải NULL. Lifetime lấy config từ mốc mới sau entry lock/check, không gia hạn sau SQL wait hoặc commit. Response không dùng ORM/proof trước commit.
 
-PUT hiện lấy intent UPDATE trước transfer/parser/storage, sau đó ghi item/version/job/source/FK/audit và commit. Response reader C2d-4a lấy intent rồi acknowledgement trước journal; không lấy User/FK locks sau đó. Vì vậy PUT phải chờ SHARE reader trước khi claim/ghi intent; reader đợi PUT UPDATE xong mới đọc unused lại. Đây chỉ là lock compatibility: **PUT chưa có final caller/boundary mới**, vẫn giữ lock qua I/O, không được mô tả toàn upload đã an toàn.
+Tại source PR #43 (lịch sử), PUT lấy intent UPDATE trước transfer/parser/storage, sau đó ghi item/version/job/source/FK/audit và commit. Response reader C2d-4a lấy intent rồi acknowledgement trước journal; không lấy User/FK locks sau đó. Vì vậy PUT phải chờ SHARE reader trước khi claim/ghi intent; reader đợi PUT UPDATE xong mới đọc unused lại. Đây chỉ là lock compatibility: **PUT chưa có final caller/boundary mới**, vẫn giữ lock qua I/O, không được mô tả toàn upload đã an toàn.
 
 ## Lỗi và giới hạn commit
 

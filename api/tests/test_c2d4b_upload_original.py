@@ -406,6 +406,64 @@ def test_abort_thread_ownership_slot_temp_no_accept_before_commit(upload,monkeyp
     assert len(keys(b))==int(phase=='commit')
 
 
+@pytest.mark.parametrize('phase',['put','commit'])
+def test_cancel_all_tasks_keeps_resources_until_executor_settles(upload,monkeypatch,phase):
+    """Shutdown-style cancellation includes internal tasks, not just HTTP."""
+    b=upload; token=b.make(); entered=threading.Event(); release=threading.Event(); paths=[]
+    real_validate=uploads._validate_file
+    def validate(path,*a):
+        paths.append(path)
+        return real_validate(path,*a)
+    if phase=='put':
+        real=b.storage.put
+        def put(*a):
+            result=real(*a)
+            entered.set(); assert release.wait(15)
+            return result
+        monkeypatch.setattr(b.storage,'put',put)
+    else:
+        real=Session.commit
+        def commit(db):
+            if db.scalar(text('SELECT count(*) FROM source_files')):
+                entered.set(); assert release.wait(15)
+            return real(db)
+        monkeypatch.setattr(Session,'commit',commit)
+    from app.api.deps import get_principal,get_session_context
+    from pathlib import Path
+    async def run():
+        sent=False
+        async def receive():
+            nonlocal sent
+            if not sent:
+                sent=True
+                return {'type':'http.request','body':b.data,'more_body':False}
+            await asyncio.Event().wait()
+        h=headers(b,token)|{'Cookie':f'ras_session={b.w.actor.token}; ras_csrf={b.w.actor.csrf_token}'}
+        req=Request({'type':'http','method':'PUT','path':'/uploads/original',
+            'headers':[(k.lower().encode(),v.encode()) for k,v in h.items()]},receive)
+        with Session(get_engine()) as db:
+            ctx=get_session_context(req,db=db,now=b.clock(),settings=get_settings(),clock=b.clock)
+            principal=get_principal(ctx)
+        task=asyncio.create_task(original.receive(req,principal,b.clock,get_settings(),b.storage,validate))
+        assert await asyncio.to_thread(entered.wait,15)
+        tasks=[t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+        try:
+            for t in tasks:t.cancel()
+            await asyncio.sleep(.05)  # let every cancellation propagate while thread is blocked
+            assert original.slots.active==1
+            assert all(Path(p).exists() for p in paths)
+            assert len(keys(b))==1
+        finally:
+            release.set()
+            await asyncio.gather(*tasks,return_exceptions=True)
+        assert task.cancelled()
+        assert original.slots.active==0 and not original._attempts
+        assert all(not Path(p).exists() for p in paths)
+    asyncio.run(run())
+    assert all(n==int(phase=='commit') for n in rows(b).values())
+    assert len(keys(b))==int(phase=='commit')
+
+
 @pytest.mark.parametrize('fault',['temp','deadline','slot'])
 def test_receive_limits_and_temp_failure_release_resources(upload,monkeypatch,fault):
     b=upload; token=b.make()

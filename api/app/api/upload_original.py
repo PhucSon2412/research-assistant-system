@@ -7,12 +7,14 @@ under a running thread or treats an in-flight commit as a rollback.
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import hashlib
 import tempfile
 import threading
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 
 from sqlalchemy import select, text
@@ -374,7 +376,11 @@ async def receive(request, principal, clock, settings, storage, validate):
 
 async def _thread(stopped, function, *args, **kwargs):
     """A cancelled coroutine cannot destroy resources still used by its thread."""
-    work = asyncio.create_task(asyncio.to_thread(function, *args, **kwargs))
+    # Executor Future is not an asyncio Task: shutdown may cancel *all* Tasks,
+    # including a to_thread wrapper, before its actual thread has finished.
+    # Shield this Future and wait for the real completion before cleanup.
+    work = asyncio.get_running_loop().run_in_executor(
+        None, contextvars.copy_context().run, partial(function, *args, **kwargs))
     try:
         return await asyncio.shield(work)
     except asyncio.CancelledError:

@@ -39,7 +39,7 @@ Khi có thay đổi quyết định, cập nhật tài liệu liên quan cùng t
 | [Bàn giao C2d-4b](c2d4b-upload-original.md) | Phase/lock map, SHA-256 readback, response proof mới, race/cancellation/uncertain, config/proxy và giới hạn |
 | [Prompt C2d-4b](tasks/m6c2b2c2d4b-upload-original.md) | Hợp đồng task PUT original; kết quả trên nhánh review ở handoff riêng |
 | [Review PR #43](reviews/pr43-c2d4a-upload-intents.md) | 167 API chọn độc lập, 47 web/typecheck; PR đã merge, số review giữ theo source cũ, không suy toàn upload/C2d hoàn tất |
-| [Bàn giao C2d-4a](c2d4a-upload-notice-intent.md) | Hai JSON route, binding/secret/clock/lock/commit boundary, mã lỗi và phần PUT/download chưa chuyển; đã merge PR #43 |
+| [Bàn giao C2d-4a](c2d4a-upload-notice-intent.md) | Hai JSON route, binding/secret/clock/lock/commit boundary, mã lỗi và phạm vi lịch sử trước PUT C2d-4b; đã merge PR #43 |
 | [Inventory C2d-4a](c2d4a-test-inventory.json) | 579 API chọn, 2.106 not-run; node/JUnit/source SHA, preparation/fault/đối chứng và cleanup |
 | [Prompt C2d-4a](tasks/m6c2b2c2d4a-upload-notice-intent.md) | Scope/tiêu chí hai JSON route; giữ prompt giao việc, triển khai ở handoff riêng |
 | [Review PR #42](reviews/pr42-final-read-clock.md) | 124 API chọn độc lập, đối chứng hàm cũ 6 fail đúng/2 positive; P2 clock đã khắc phục theo source, safety pending |

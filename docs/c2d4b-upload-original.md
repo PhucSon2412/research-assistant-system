@@ -35,6 +35,8 @@ Response giữ IDs và `state=received` như biên nhận upload. Không buộc 
 | HTTP task cancellation trước acceptance | Báo stop cho attempt được shield; không consume nếu cancellation/disconnect đã biết. Slot/temp thuộc attempt tới khi thread settle |
 | Cancellation khi commit thread đã chạy | Không delete/close file dưới thread; không trả DTO cho caller đã cancel. Đợi thread settle trong attempt riêng, known commit hoặc uncertain đều giữ object |
 
+Regression hủy đồng thời mọi asyncio Task tái hiện 2/2 fail (put/commit): wrapper `to_thread` bị cancel làm slot trả sớm dù executor chưa xong. Boundary nay shield executor Future trực tiếp, giữ contextvars, đợi completion thật trước cleanup; kiểm request cancellation và cancel-all riêng. Đây là cancellation trong process đang sống, không bảo đảm host/process bị kill cứng.
+
 Mỗi blocking phase tự sở hữu file/Session; dependency Session không được chuyển vào thread có thể sống lâu hơn HTTP request. Registry giữ attempt task và thu exception không log nội dung. Slot chỉ trả sau cleanup/temp close và khi thread kết thúc; thread bị treo giữ slot để không vượt concurrency thực tế. Không hứa proxy timeout hủy backend hay có tổng deadline cứng cho toàn request.
 
 `cli.reconcile_originals` giữ cách chạy thủ công sau grace và khi mọi attempt/I/O/commit cũ đã kết thúc; luôn giữ key có SourceFile. Không thêm scheduler/quét bucket đang ingest. Multipart chưa hoàn tất không hiện trong list_objects; chưa có cơ chế riêng abort/expiry multipart, operator phải đối soát khi môi trường đã quiescent. Process/host crash cần reconcile; fault injection không chứng minh mất điện an toàn.
