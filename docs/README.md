@@ -1,5 +1,7 @@
 # Tài liệu dự án
 
+**Review PR #44 tại `b578082`: có 1 điểm chặn merge.** [Report và yêu cầu sửa](reviews/pr44-c2d4b-upload-original.md): commit uncertain bị lỗi Session cleanup che mất outcome, dẫn tới xóa object. Reviewer 230/230 API chọn, 51/51 web/typecheck đạt; ca bổ sung tái hiện lỗi, control giữ object. PR OPEN/chưa merge, safety pending tới C4.
+
 **C2d-4b — PUT original đã kiểm trên nhánh review:** [bàn giao](c2d4b-upload-original.md) · [task](tasks/m6c2b2c2d4b-upload-original.md). Consume intent trong giao dịch cuối, I/O ngoài khóa DB, fresh response proof và cleanup theo commit outcome. Download thuộc C2d-4c; safety pending tới C4.
 
 **Review PR #43 tại `f60645e`:** độc lập 167/167 API (đủ 155 test mới), 47/47 web và typecheck đạt; không phát hiện điểm chặn merge trong phạm vi notice/intent. [Report và giới hạn](reviews/pr43-c2d4a-upload-intents.md). PR đã merge `632ec68`; số review giữ theo source cũ, không phải kiểm C2d-4b.
@@ -36,6 +38,7 @@ Khi có thay đổi quyết định, cập nhật tài liệu liên quan cùng t
 
 | Tài liệu | Nội dung |
 | --- | --- |
+| [Review PR #44](reviews/pr44-c2d4b-upload-original.md) | P2 commit/Session teardown/cleanup; 230 API chọn, 51 web/typecheck và fault bổ sung; cần sửa trước merge |
 | [Bàn giao C2d-4b](c2d4b-upload-original.md) | Phase/lock map, SHA-256 readback, response proof mới, race/cancellation/uncertain, config/proxy và giới hạn |
 | [Test inventory C2d-4b](c2d4b-test-inventory.json) | Source `68950f3`, 808 API pass, collect 2.905/not-run 2.097, 51 web/typecheck/build, đối chứng và giới hạn |
 | [Prompt C2d-4b](tasks/m6c2b2c2d4b-upload-original.md) | Hợp đồng task PUT original; kết quả trên nhánh review ở handoff riêng |

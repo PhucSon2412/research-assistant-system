@@ -251,6 +251,97 @@ def test_integrity_commit_and_cleanup_faults(upload,monkeypatch,mode):
     if mode in ('lost_reply','rollback_reply'): assert r.json()=={'error':'upload_outcome_uncertain'}
 
 
+@pytest.mark.parametrize('outcome,teardown',[
+    ('uncertain','close'), ('uncertain','rollback_close'),
+    ('landed_uncertain','close'), ('committed','close'), ('committed','rollback_close'),
+    ('precommit','none'), ('precommit','close'), ('precommit','rollback_close'),
+])
+def test_acceptance_outcome_survives_session_teardown(upload,monkeypatch,outcome,teardown):
+    """Faults target only acceptance; real runtime, SQL and MinIO stay active."""
+    from pathlib import Path
+    b=upload; token=b.make(); calls=dict(commit=0,rollback=0,close=0,put=0,delete=0)
+    sessions=[];paths=[]
+    real_writer=auth_safety.require_writer
+    def writer(db):
+        result=real_writer(db)
+        db.info['p2_acceptance']=True; sessions.append(db)
+        return result
+    monkeypatch.setattr(auth_safety,'require_writer',writer)
+    real_commit=Session.commit;real_rollback=Session.rollback;real_close=Session.close
+    def commit(db):
+        if db.info.get('p2_acceptance'):
+            calls['commit']+=1
+            if outcome in ('uncertain','landed_uncertain'):
+                # Harness settles SQL, API only observes a failed commit call.
+                # Absence of a row must never authorize uncertain cleanup.
+                real_commit(db) if outcome=='landed_uncertain' else real_rollback(db)
+                raise OSError('synthetic lost commit reply')
+        return real_commit(db)
+    def rollback(db):
+        if db.info.get('p2_acceptance'):
+            calls['rollback']+=1
+            if teardown=='rollback_close':raise OSError('synthetic rollback failure')
+        return real_rollback(db)
+    def close_db(db):
+        if db.info.get('p2_acceptance'):
+            calls['close']+=1
+            if teardown!='none' and calls['close']==1:
+                raise OSError('synthetic close failure before release')
+        return real_close(db)
+    monkeypatch.setattr(Session,'commit',commit)
+    monkeypatch.setattr(Session,'rollback',rollback)
+    monkeypatch.setattr(Session,'close',close_db)
+    real_check=original._consumed
+    def check(db,*a):
+        real_check(db,*a)
+        if db.info.get('p2_acceptance') and outcome=='precommit':
+            raise ApiError(409,'upload_intent_changed')
+    monkeypatch.setattr(original,'_consumed',check)
+    real_validate=uploads._validate_file
+    def validate(path,*a):paths.append(path);return real_validate(path,*a)
+    monkeypatch.setattr(uploads,'_validate_file',validate)
+    for name in ('put','delete'):
+        real=getattr(b.storage,name)
+        def io(*a,_name=name,_real=real):calls[_name]+=1;return _real(*a)
+        monkeypatch.setattr(b.storage,name,io)
+    response=send(b,token)
+    known_rollback=outcome=='precommit' and teardown!='rollback_close'
+    error=('upload_intent_changed' if known_rollback else
+        'upload_response_unavailable' if outcome=='committed' else 'upload_outcome_uncertain')
+    assert response.status_code==(409 if known_rollback else 503),response.text
+    assert response.json()=={'error':error}  # no IDs or response from a stale proof
+    assert calls['commit']==int(outcome!='precommit') and calls['put']==1
+    assert calls['delete']==int(known_rollback)
+    assert all(n==int(outcome in ('committed','landed_uncertain')) for n in rows(b).values())
+    assert len(keys(b))==int(not known_rollback)
+    assert len(sessions)==1 and not sessions[0].in_transaction()
+    assert get_engine().pool.checkedout()==0
+    assert paths and all(not Path(p).exists() for p in paths)
+    assert not original._attempts and original.slots.active==0
+
+
+@pytest.mark.parametrize('phase',['before_accept','after_commit'])
+def test_unclassified_acceptance_exception_cannot_authorize_cleanup(upload,monkeypatch,phase):
+    b=upload;token=b.make();real=original.accept;real_delete=b.storage.delete;calls=[]
+    def accept_file(*a):
+        calls.append(phase)
+        if phase=='after_commit':real(*a)
+        # An unrelated exception code cannot prove precommit rollback.
+        raise ApiError(409,'upload_intent_changed')
+    monkeypatch.setattr(original,'accept',accept_file)
+    def delete(*a):pytest.fail('unclassified acceptance exception deleted an object')
+    monkeypatch.setattr(b.storage,'delete',delete)
+    response=send(b,token)
+    assert response.status_code==503
+    assert response.json()=={'error':'upload_response_unavailable' if phase=='after_commit'
+        else 'upload_outcome_uncertain'}
+    assert calls==[phase] and len(keys(b))==1
+    assert all(n==int(phase=='after_commit') for n in rows(b).values())
+    assert get_engine().pool.checkedout()==0 and not original._attempts and original.slots.active==0
+    # Restore only the storage cleanup spy for fixture bucket teardown.
+    monkeypatch.setattr(b.storage,'delete',real_delete)
+
+
 def test_two_requests_same_intent_only_one_consumes_and_loser_deletes_own_key(upload,monkeypatch):
     b=upload; token=b.make(); real=original.verify; barrier=threading.Barrier(2); staged=[]
     def verify(*a): real(*a); staged.append(a[1]); barrier.wait(15)

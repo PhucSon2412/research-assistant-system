@@ -1,5 +1,7 @@
 # Research Assistant System
 
+**Review PR #44 tại `b578082`: có 1 điểm chặn merge.** [Report và yêu cầu sửa](docs/reviews/pr44-c2d4b-upload-original.md): commit uncertain bị lỗi Session cleanup che mất outcome, dẫn tới xóa object. Reviewer 230/230 API chọn, 51/51 web/typecheck đạt; ca bổ sung tái hiện lỗi, control giữ object. PR OPEN/chưa merge, safety pending tới C4.
+
 **C2d-4b — PUT original trên nhánh review:** [bàn giao](docs/c2d4b-upload-original.md) · [task](docs/tasks/m6c2b2c2d4b-upload-original.md). Intent consume nguyên tử ở giao dịch cuối; nhận file/parser/S3 ngoài khóa, response proof mới và giữ object khi commit uncertain. Download thuộc C2d-4c; safety pending tới C4.
 
 **Review PR #43 tại `f60645e`:** độc lập 167/167 API (đủ 155 test mới), 47/47 web và typecheck đạt; không phát hiện điểm chặn merge trong phạm vi notice/intent. [Report và giới hạn](docs/reviews/pr43-c2d4a-upload-intents.md). PR đã merge `632ec68`; số review giữ theo source cũ, không phải kiểm C2d-4b.

@@ -1,5 +1,11 @@
 # Môi trường phát triển và schema (M1a–C2d-4b)
 
+## Review PR #44 cô lập
+
+[Report và giới hạn](reviews/pr44-c2d4b-upload-original.md): head `b578082`, source `68950f3`, 230 API chọn/51 web/typecheck đạt; fault commit + close lỗi tái hiện P2 xóa object, cần sửa trước merge. Reviewer không chạy lại build/browser DOM/full API. Safety pending tới C4, không thao tác dev.
+
+Conda ras đã xác minh; evidence `%TEMP%/ras-pr44-review-20261006`. PostgreSQL standalone port 58456 và MinIO port 59456, label `ras.task=pr44-review-20261006`, credentials tường minh, external HTTP bị chặn. Đã chạy `& $py <evidence>/runner.py api/tests/test_c2d4b_upload_original.py api/tests/test_uploads.py api/tests/test_migrations.py::test_orm_models_match_migrated_schema -q --basetemp=<evidence>/pytest --junitxml=<evidence>/review.xml`; thêm `uncertain-close-repro.py`/`uncertain-close-control.py` cho fault/control trong bộ nhớ, source disk không đổi. Công cụ này ở ngoài repo, không là lệnh vận hành dev. Đã cleanup exact 2 container/2 exclusive volume, xóa credentials; 24 container cũ giữ ID/image/StartedAt.
+
 ## C2d-4b PUT original cô lập
 
 Base `632ec68`, source head `0039`; nhánh review, **safety pending tới C4**. [Boundary/config/giới hạn](c2d4b-upload-original.md). PostgreSQL `ras-c2d4b-db-20261006` port 58455, MinIO `ras-c2d4b-minio-20261006` port 59455, label `ras.task=c2d4b-20261006`; credentials/journal/evidence ở `%TEMP%/ras-c2d4b-20261006`, ngoài repo. Runner explicit DB/runtime/recovery/MinIO credentials trước import fixture và chặn external HTTP/urllib3. Không dùng `.env`/dev hoặc provider.

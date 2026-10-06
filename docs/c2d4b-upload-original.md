@@ -1,5 +1,7 @@
 # C2d-4b: nhận original và consume intent
 
+**Review độc lập PR #44 tại `b578082`:** 230/230 API chọn (đủ 220 mới + 9 legacy runtime + ORM), 51/51 web/typecheck đạt; [report](reviews/pr44-c2d4b-upload-original.md). **P2 chặn merge:** Session cleanup lỗi sau commit exception che mất uncertain, làm attempt xóa object. Ca bổ sung fail đúng lỗi, control pass; bảng outcome bên dưới là hợp đồng dự kiến, chưa bảo đảm ở nhánh lỗi kép này. PR vẫn OPEN/chưa merge, safety pending tới C4. Kết quả agent giữ riêng theo source.
+
 Base fetch `632ec683940a8bccc711c8a55743b0a3992c1d03`; GitHub CLI xác minh PR #43 MERGED, main chứa `f60645edf01d01794590db256d0ea4b5b1ef5c5e`. Nhánh `feat/m6c2b2c2d4b-upload-original` tạo từ `origin/main`; giữ toàn bộ docs chưa commit, gồm review PR #43 và task. Source migration `0039`, không migration/grants/claim lease mới hoặc suy revision DB dev. **Safety pending tới C4; chưa merge.**
 
 [Task](tasks/m6c2b2c2d4b-upload-original.md) · [Mục lục](README.md) · [Caller inventory](c2d1-caller-inventory.json) · [Test inventory](c2d4b-test-inventory.json)

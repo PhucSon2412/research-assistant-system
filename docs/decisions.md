@@ -1,5 +1,13 @@
 # Nhật ký quyết định
 
+## Review độc lập PR #44 (2026-10-06)
+
+Fetch/GitHub CLI xác minh PR OPEN/chưa merge, head `b578082`, code `68950f3`, base/main `632ec68`, source `0039`; không query dev. [Report](reviews/pr44-c2d4b-upload-original.md): reviewer **230/230 API chọn**, **51/51 web** và typecheck đạt, source hashes không đổi; JUnit/selection/source agent 808 được xác minh riêng, không tính là chạy lại 808.
+
+**P2 chặn merge đã tái hiện:** commit exception rồi Session close lỗi che mất ApiError uncertain; `_attempt` không đặt keep, cleanup SELECT chưa thấy SourceFile rồi xóa object. Fault bổ sung 1 fail đúng lỗi; control chỉ commit lỗi 1 pass giữ object. Đây là injection trên PostgreSQL/MinIO thật, không chứng minh remote commit thật còn in flight hoặc mất điện.
+
+Yêu cầu coding agent giữ outcome/ownership độc lập với exception teardown, không hạ uncertain/known commit thành precommit cleanup; thêm regression lỗi kép/known commit/precommit control. Không cần migration/grants/cutover. Giữ số và giới hạn agent theo source lịch sử; docs review chưa commit cần giữ vào PR sửa. Chưa giao coding C2d-4c, safety pending tới C4. Reviewer chỉ viết docs/công cụ ngoài repo, không sửa app/test source, commit/push/merge/comment PR, dev/`.env`/provider. Đã gỡ 2 container/2 volume thử sau ownership checks, giữ nguyên 24 container có sẵn.
+
 ## Triển khai C2d-4b PUT original (2026-10-06)
 
 Theo task chủ dự án và [prompt đã giao](tasks/m6c2b2c2d4b-upload-original.md), fetch xác minh base `632ec68`, PR #43 MERGED/chứa `f60645e`. Không migration/grants/early claim; giữ docs review/task chưa commit. [Handoff](c2d4b-upload-original.md) ghi lock map, cleanup theo outcome và giới hạn thực tế; source `68950f3` có 808 API pass (collect 2.905/2.097 not-run), 51 web/typecheck/build, bốn đối chứng guard; [inventory](c2d4b-test-inventory.json) tách khỏi PR #43.

@@ -64,6 +64,15 @@ class Accepted:
     used_at: datetime
 
 
+@dataclass
+class AcceptanceOutcome:
+    # Owned by the attempt, updated by its acceptance thread before teardown.
+    # Cleanup authority never depends on the thread's final exception type.
+    commit_started: bool = False
+    committed: bool = False
+    rollback_confirmed: bool = False
+
+
 def _lock_timeout(db, settings):
     db.execute(text(f"SET LOCAL lock_timeout = {int(settings.recovery.gate_lock_timeout_ms)}"))
 
@@ -129,68 +138,84 @@ def _consumed(db, expected, accepted, settings):
     _notice(expected)
 
 
-def accept(principal, expected, csrf, clock, settings, key, mime, pages, stopped):
-    commit_started = False
-    with Session(get_engine()) as db:
-        try:
-            auth_safety.require_writer(db)
-            _lock_timeout(db, settings)
-            lock_users(db, [principal.user_id])
+def accept(principal, expected, csrf, clock, settings, key, mime, pages, stopped, outcome):
+    db = Session(get_engine())
+    failure = None
+    try:
+        auth_safety.require_writer(db)
+        _lock_timeout(db, settings)
+        lock_users(db, [principal.user_id])
+        upload_intents._user(db, principal, csrf, clock, settings)
+        binding = _locked_binding(db, principal, expected.token_hash, settings, writer=True)
+        upload_intents._check(db, expected, principal, csrf, clock, settings)
+        if binding != expected:
+            raise ApiError(409, "upload_intent_changed")
+        if stopped.is_set():
+            raise ApiError(503, "upload_unavailable")
+        item = LibraryItem(visibility="private", owner_user_id=principal.user_id,
+            created_by_user_id=principal.user_id, title=Path(expected.filename).stem)
+        db.add(item); db.flush()
+        version = PaperVersion(item_id=item.id)
+        db.add(version); db.flush()
+        job = IngestionJob(origin="upload", actor_user_id=principal.user_id,
+            scope_visibility="private", scope_owner_user_id=principal.user_id,
+            item_id=item.id, version_id=version.id, idempotency_key=str(expected.intent_id),
+            state="received", rights_epoch_at_start=0)
+        db.add(job); db.flush()
+        source = SourceFile(item_id=item.id, version_id=version.id, job_id=job.id,
+            storage_key=key, verified_mime=mime, byte_size=expected.declared_size,
+            page_count=pages, checksum_sha256=expected.declared_sha256,
+            original_filename=expected.filename, file_source="upload")
+        db.add(source)
+        used_at = clock()
+        db.query(Intent).filter(Intent.id == expected.intent_id).update(
+            {Intent.used_at: used_at, Intent.item_id: item.id}, synchronize_session=False)
+        record_event(db, action="upload.original.receive", outcome=AuditOutcome.SUCCESS,
+            actor_type=AuditActorType.USER, actor_user_id=principal.user_id,
+            target_type="library_item", target_id=str(item.id))
+        db.flush()  # every DML / FK before exclusive journal
+        accepted = Accepted(item.id, version.id, source.id, job.id, used_at)
+        auth_safety.require_final(db, writer=True)
+        db.expire_all()
+        with db.no_autoflush:
+            _consumed(db, expected, accepted, settings)
             upload_intents._user(db, principal, csrf, clock, settings)
-            binding = _locked_binding(db, principal, expected.token_hash, settings, writer=True)
-            upload_intents._check(db, expected, principal, csrf, clock, settings)
-            if binding != expected:
-                raise ApiError(409, "upload_intent_changed")
-            if stopped.is_set():
-                raise ApiError(503, "upload_unavailable")
-            item = LibraryItem(visibility="private", owner_user_id=principal.user_id,
-                created_by_user_id=principal.user_id, title=Path(expected.filename).stem)
-            db.add(item); db.flush()
-            version = PaperVersion(item_id=item.id)
-            db.add(version); db.flush()
-            job = IngestionJob(origin="upload", actor_user_id=principal.user_id,
-                scope_visibility="private", scope_owner_user_id=principal.user_id,
-                item_id=item.id, version_id=version.id, idempotency_key=str(expected.intent_id),
-                state="received", rights_epoch_at_start=0)
-            db.add(job); db.flush()
-            source = SourceFile(item_id=item.id, version_id=version.id, job_id=job.id,
-                storage_key=key, verified_mime=mime, byte_size=expected.declared_size,
-                page_count=pages, checksum_sha256=expected.declared_sha256,
-                original_filename=expected.filename, file_source="upload")
-            db.add(source)
-            used_at = clock()
-            db.query(Intent).filter(Intent.id == expected.intent_id).update(
-                {Intent.used_at: used_at, Intent.item_id: item.id}, synchronize_session=False)
-            record_event(db, action="upload.original.receive", outcome=AuditOutcome.SUCCESS,
-                actor_type=AuditActorType.USER, actor_user_id=principal.user_id,
-                target_type="library_item", target_id=str(item.id))
-            db.flush()  # every DML / FK before exclusive journal
-            accepted = Accepted(item.id, version.id, source.id, job.id, used_at)
-            auth_safety.require_final(db, writer=True)
-            db.expire_all()
-            with db.no_autoflush:
-                _consumed(db, expected, accepted, settings)
-                upload_intents._user(db, principal, csrf, clock, settings)
-                _notice(expected)
-                if clock() >= expected.expires_at:
-                    raise ApiError(409, "upload_intent_expired")
-            if stopped.is_set():
-                raise ApiError(503, "upload_unavailable")
-            commit_started = True
-            db.commit()
-            return accepted
+            _notice(expected)
+            if clock() >= expected.expires_at:
+                raise ApiError(409, "upload_intent_expired")
+        if stopped.is_set():
+            raise ApiError(503, "upload_unavailable")
+        outcome.commit_started = True
+        db.commit()
+        outcome.committed = True
+    except BaseException as exc:
+        failure = exc
+    finally:
+        # Neither rollback nor close can rewrite a started/successful commit.
+        # Explicit teardown prevents __exit__ from replacing the primary error.
+        try:
+            db.rollback()
+            if not outcome.commit_started:
+                outcome.rollback_confirmed = True
         except BaseException as exc:
-            if commit_started:
-                raise ApiError(503, "upload_outcome_uncertain") from None
-            if isinstance(exc, ApiError):
-                raise
-            raise ApiError(503, "upload_unavailable") from None
-        finally:
-            # Local rollback does not establish the remote commit outcome.
+            failure = failure or exc
+        try:
+            db.close()
+        except BaseException as exc:
+            failure = failure or exc
             try:
-                db.rollback()
-            except Exception:
-                db.close()
+                db.invalidate()  # release/discard connections even if close failed
+            except BaseException:
+                pass  # retain object/outcome; no mutation or cleanup retry
+    if failure is not None:
+        if outcome.committed:
+            raise ApiError(503, "upload_response_unavailable") from None
+        if outcome.commit_started or not outcome.rollback_confirmed:
+            raise ApiError(503, "upload_outcome_uncertain") from None
+        if isinstance(failure, ApiError):
+            raise failure from None
+        raise ApiError(503, "upload_unavailable") from None
+    return accepted
 
 
 def receipt(principal, expected, accepted, csrf, clock, settings, key, mime, pages):
@@ -275,6 +300,7 @@ async def _attempt(request, principal, digest, csrf, clock, settings, storage, v
     key = f"originals/{uuid.uuid4().hex}"
     put_started = keep = accepting = False
     directory = None
+    outcome = AcceptanceOutcome()
     try:
         expected = await _thread(stopped, proof, principal, digest, csrf, clock, settings)
         limit = settings.files.pdf_max_bytes if expected.file_kind == "pdf" else settings.files.markdown_max_bytes
@@ -321,10 +347,12 @@ async def _attempt(request, principal, digest, csrf, clock, settings, storage, v
         try:
             accepting = True
             accepted = await _thread(stopped, accept, principal, expected, csrf, clock,
-                settings, key, mime, pages, stopped)
-        except ApiError as exc:
-            if exc.code == "upload_outcome_uncertain":
+                settings, key, mime, pages, stopped, outcome)
+        except Exception:
+            if outcome.commit_started or not outcome.rollback_confirmed:
                 keep = True
+                code = "upload_response_unavailable" if outcome.committed else "upload_outcome_uncertain"
+                raise ApiError(503, code) from None
             raise
         keep = True  # known commit; no postcheck/cancellation can delete it
         return await _thread(stopped, receipt, principal, expected, accepted, csrf,

@@ -1,5 +1,11 @@
 # Chiến lược kiểm thử
 
+## Review độc lập PR #44
+
+[Report P2 và ca tái hiện](reviews/pr44-c2d4b-upload-original.md): source `68950f3`, head `b578082`, **230/230 API chọn pass** (220 mới, 9 legacy runtime, ORM), 0 fail/error/skip, 536,90 s. Web **51/51**, typecheck đạt; không rerun build/browser DOM. Ca bổ sung commit exception + Session close lỗi **1 fail đúng lỗi object bị xóa**; control close bình thường 1 pass giữ object. Không cộng fault/control vào suite 230 hoặc sửa kết quả agent 808.
+
+262 source hashes trước/sau không đổi; ba JUnit agent 808 unique node/hash/selection/source đã đối chiếu, không là reviewer chạy lại 808. Reviewer còn 578 của suite agent và 2675 của collection 2905 not-run; agent 2097 not-run. PostgreSQL/MinIO/runtime/journal thật cô lập, cleanup xong, 24 container có sẵn nguyên trạng; không dev/`.env`/provider. PR OPEN/chưa merge, cần fix P2 và regression outcome/teardown trước merge; safety pending tới C4.
+
 **C2d-4b nhánh review:** [handoff PUT original](c2d4b-upload-original.md) tách kiểm mới PostgreSQL/MinIO/journal/runtime, fresh actor/clock sau I/O, exact consent/consume, race, cancellation/thread ownership, integrity và commit uncertain. Production pending HTTP riêng không patch. Các số kiểm cuối và not-run ghi ở handoff/inventory mới, không cộng lịch sử PR #43; safety pending tới C4.
 
 ## C2d-4b: source kiểm trên nhánh review
