@@ -1,6 +1,6 @@
 # Prompt C2d-3: library và collection JSON writes
 
-**Trạng thái:** đã triển khai tại `12ffccc`, đã kiểm, đang review trên nhánh riêng; chưa merge. [Bàn giao](../c2d3-library-collection-json-writes.md) · [Inventory](../c2d3-test-inventory.json). Yêu cầu gốc bên dưới được giữ; safety pending tới C4.
+**Trạng thái:** đã triển khai tại `12ffccc`, đã kiểm, đã merge PR #41 `5100ff6` (2026-10-06). [Bàn giao](../c2d3-library-collection-json-writes.md) · [Inventory](../c2d3-test-inventory.json). Task tiếp [sửa final read clock](c2d-final-read-clock.md) đã giao, chưa triển khai. Yêu cầu gốc bên dưới được giữ; safety pending tới C4.
 
 [Mục lục](../README.md) · [Quyết định phạm vi](../decisions.md#giao-c2d-3-sau-merge-pr-40-2026-10-05) · [Roadmap](../roadmap.md) · [Caller inventory](../c2d1-caller-inventory.json)
 

@@ -1,7 +1,7 @@
 {
-  "base": "833db7cc1b3a4df6b683f72820fca83a17c19eb7",
+  "base": "5100ff67c5c61754e4dd29693cb670a22ce6cf83",
   "source_migration": "0039",
-  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4.",
+  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4. Final read clock corrected after predicate SQL; /auth/sessions uses the shared final caller. Details in docs/c2d-final-read-clock.md.",
   "safety": "pending until C4",
   "route_count": 63,
   "routes": [
@@ -133,7 +133,7 @@
       "path": "/auth/csrf",
       "function": "csrf",
       "source": "api/app/api/routes/auth.py",
-      "line": 88,
+      "line": 87,
       "dependencies": [
         "get_db",
         "get_now",
@@ -150,7 +150,7 @@
       "path": "/auth/login",
       "function": "login_route",
       "source": "api/app/api/routes/auth.py",
-      "line": 118,
+      "line": 117,
       "dependencies": [
         "get_db",
         "get_now",
@@ -167,7 +167,7 @@
       "path": "/auth/logout",
       "function": "logout",
       "source": "api/app/api/routes/auth.py",
-      "line": 138,
+      "line": 137,
       "dependencies": [
         "get_auth_write_context",
         "get_db",
@@ -185,7 +185,7 @@
       "path": "/auth/session",
       "function": "current_session",
       "source": "api/app/api/routes/auth.py",
-      "line": 155,
+      "line": 154,
       "dependencies": [
         "get_session_context",
         "get_db",
@@ -202,7 +202,7 @@
       "path": "/auth/sessions",
       "function": "my_sessions",
       "source": "api/app/api/routes/auth.py",
-      "line": 171,
+      "line": 170,
       "dependencies": [
         "get_session_context",
         "get_db",
@@ -211,16 +211,17 @@
         "get_clock"
       ],
       "group": "auth",
-      "final_status": "C2a/C2b/C2c final guards; current_session C2d-1",
+      "final_status": "C2a listing; final read clock correction via exact final_caller (review; safety pending until C4)",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở",
+      "boundary_helper": "app.identity.final_caller.final_caller"
     },
     {
       "method": "POST",
       "path": "/auth/sessions/{session_id}/revoke",
       "function": "revoke_my_session",
       "source": "api/app/api/routes/auth.py",
-      "line": 198,
+      "line": 197,
       "dependencies": [
         "get_auth_write_context",
         "get_db",
@@ -240,7 +241,7 @@
       "path": "/auth/sessions/revoke-others",
       "function": "revoke_other_sessions",
       "source": "api/app/api/routes/auth.py",
-      "line": 223,
+      "line": 222,
       "dependencies": [
         "get_auth_write_context",
         "get_db",
@@ -257,7 +258,7 @@
       "path": "/auth/invitations/inspect",
       "function": "inspect_invitation",
       "source": "api/app/api/routes/auth.py",
-      "line": 238,
+      "line": 237,
       "dependencies": [
         "get_db",
         "get_clock"
@@ -272,7 +273,7 @@
       "path": "/auth/invitations/accept",
       "function": "accept_invitation",
       "source": "api/app/api/routes/auth.py",
-      "line": 249,
+      "line": 248,
       "dependencies": [
         "get_clock",
         "get_db",
@@ -289,7 +290,7 @@
       "path": "/auth/password-reset/request",
       "function": "request_password_reset",
       "source": "api/app/api/routes/auth.py",
-      "line": 274,
+      "line": 273,
       "dependencies": [
         "get_db",
         "get_now",
@@ -309,7 +310,7 @@
       "path": "/auth/password-reset/confirm",
       "function": "confirm_password_reset",
       "source": "api/app/api/routes/auth.py",
-      "line": 309,
+      "line": 308,
       "dependencies": [
         "get_db",
         "get_now",
@@ -352,7 +353,7 @@
         "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "completed C2d-3 (review branch; safety pending until C4)",
+      "final_status": "completed C2d-3 (PR #41 merged; safety pending until C4)",
       "direct_transaction_calls": [],
       "contract_map": "docs/c2d3-library-collection-json-writes.md#boundary-ghi-và-khóa",
       "boundary_helper": "app.api.resource_writes.resource_write"
@@ -370,7 +371,7 @@
         "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "completed C2d-3 (review branch; safety pending until C4)",
+      "final_status": "completed C2d-3 (PR #41 merged; safety pending until C4)",
       "direct_transaction_calls": [],
       "contract_map": "docs/c2d3-library-collection-json-writes.md#boundary-ghi-và-khóa",
       "boundary_helper": "app.api.resource_writes.resource_write"
@@ -388,7 +389,7 @@
         "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "completed C2d-3 (review branch; safety pending until C4)",
+      "final_status": "completed C2d-3 (PR #41 merged; safety pending until C4)",
       "direct_transaction_calls": [],
       "contract_map": "docs/c2d3-library-collection-json-writes.md#boundary-ghi-và-khóa",
       "boundary_helper": "app.api.resource_writes.resource_write"
@@ -424,7 +425,7 @@
         "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "completed C2d-3 (review branch; safety pending until C4)",
+      "final_status": "completed C2d-3 (PR #41 merged; safety pending until C4)",
       "direct_transaction_calls": [],
       "contract_map": "docs/c2d3-library-collection-json-writes.md#boundary-ghi-và-khóa",
       "boundary_helper": "app.api.resource_writes.resource_write"
@@ -442,7 +443,7 @@
         "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "completed C2d-3 (review branch; safety pending until C4)",
+      "final_status": "completed C2d-3 (PR #41 merged; safety pending until C4)",
       "direct_transaction_calls": [],
       "contract_map": "docs/c2d3-library-collection-json-writes.md#boundary-ghi-và-khóa",
       "boundary_helper": "app.api.resource_writes.resource_write"
@@ -658,7 +659,7 @@
         "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "completed C2d-3 (review branch; safety pending until C4)",
+      "final_status": "completed C2d-3 (PR #41 merged; safety pending until C4)",
       "direct_transaction_calls": [],
       "contract_map": "docs/c2d3-library-collection-json-writes.md#boundary-ghi-và-khóa",
       "boundary_helper": "app.api.resource_writes.resource_write"

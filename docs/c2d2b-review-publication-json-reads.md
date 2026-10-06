@@ -1,5 +1,7 @@
 # C2d-2b: final caller ở 9 GET review/publication JSON
 
+**Cập nhật bản sửa 2026-10-06:** [bàn giao sửa final read clock](c2d-final-read-clock.md) lấy clock/kiểm idle và absolute sau chính SQL predicate cuối; checked_at dùng mốc mới. Giữ ACL/role/gate/locks và semantics known commit. Các số đo bên dưới là lịch sử; kết quả mới ở handoff/inventory riêng. Safety pending tới C4.
+
 **Review PR #40 (`11da731`): 261/261 test chọn độc lập pass** — 260 C2d-2b + 1 ORM/schema; không phát hiện điểm chặn trong phạm vi 9 GET. PR #40 đã merge `833db7c`, safety pending tới C4. [Báo cáo review](reviews/pr40-c2d2b-review-publication-reads.md). Kết quả agent và reviewer giữ riêng theo source.
 
 [Mục lục](README.md) · [Task](tasks/m6c2b2c2d2b-review-publication-json-reads.md) · [Inventory kiểm](c2d2b-test-inventory.json) · [Caller inventory](c2d1-caller-inventory.json)

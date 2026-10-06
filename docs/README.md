@@ -1,10 +1,14 @@
 # Tài liệu dự án
 
-**C2d-3 đang review từ `833db7c`:** [bàn giao 6 writer](c2d3-library-collection-json-writes.md) · [inventory](c2d3-test-inventory.json). Actor/current role/resource/clock trước commit, proof mới sau commit; không migration/grants mới. Safety pending tới C4. Các kết quả PR #40 bên dưới giữ theo source lịch sử.
+**Sửa final read clock:** [handoff](c2d-final-read-clock.md) · [inventory](c2d-final-read-clock-test-inventory.json). Source `0039`, safety pending tới C4; kết quả mới tách khỏi review PR #41 bên dưới.
+
+**PR #41 đã merge `5100ff6` (2026-10-06).** Task tiếp: [sửa final read clock sau SQL](tasks/c2d-final-read-clock.md), đã triển khai trên nhánh review, chưa merge. [Review và P2 đã tái hiện](reviews/pr41-c2d3-resource-writes.md): 270/270 API chọn, 45/45 web và typecheck đạt tại source cũ; P2 GET helper ở source cũ đã có bản sửa đang review, chưa merge. Safety pending tới C4.
+
+**C2d-3 đã merge PR #41 `5100ff6`, base `833db7c`:** [bàn giao 6 writer](c2d3-library-collection-json-writes.md) · [inventory](c2d3-test-inventory.json). Actor/current role/resource/clock trước commit, proof mới sau commit; không migration/grants mới. Safety pending tới C4. Các kết quả PR #40 bên dưới giữ theo source lịch sử.
 
 **Review PR #40 (`11da731`): 261/261 test chọn độc lập pass** — 260 C2d-2b + 1 ORM/schema; không phát hiện điểm chặn trong phạm vi 9 GET. PR #40 đã merge `833db7c`, safety pending tới C4. [Báo cáo review](reviews/pr40-c2d2b-review-publication-reads.md). Kết quả agent và reviewer giữ riêng theo source.
 
-**PR #40 đã merge `833db7c` (C2d-2b; head mã nguồn `0039`).** [Bàn giao 9 GET review/publication](c2d2b-review-publication-json-reads.md) · [Review độc lập](reviews/pr40-c2d2b-review-publication-reads.md). Task tiếp **[C2d-3 — 6 JSON writer library/collections](tasks/m6c2b2c2d3-library-collection-json-writes.md)**, đã giao, **đã triển khai, đang review (chưa merge)**; [phạm vi chốt theo ủy quyền](decisions.md#giao-c2d-3-sau-merge-pr-40-2026-10-05). Kiểm actor/current role/resource/clock trước commit và proof mới sau commit; không dùng shared read guard làm quyền ghi. File/upload, review/publication writers, search/RAG provider callers và C3/C4 còn riêng. Safety vẫn pending tới C4; không suy revision DB dev từ source. Kết quả bên dưới giữ theo source lịch sử.
+**PR #40 đã merge `833db7c` (C2d-2b; head mã nguồn `0039`).** [Bàn giao 9 GET review/publication](c2d2b-review-publication-json-reads.md) · [Review độc lập](reviews/pr40-c2d2b-review-publication-reads.md). **[C2d-3 — 6 JSON writer library/collections](tasks/m6c2b2c2d3-library-collection-json-writes.md)** đã merge PR #41 `5100ff6`; [phạm vi chốt theo ủy quyền](decisions.md#giao-c2d-3-sau-merge-pr-40-2026-10-05). Kiểm actor/current role/resource/clock trước commit và proof mới sau commit; không dùng shared read guard làm quyền ghi. File/upload, review/publication writers, search/RAG provider callers và C3/C4 còn riêng. Safety vẫn pending tới C4; không suy revision DB dev từ source. Kết quả bên dưới giữ theo source lịch sử.
 
 **Baseline main đã merge trước C2c-1:** PR #33 đã merge `c98bd33` (C1 `0034`), PR #34 đã merge `78e0880` (C2a `0035`), [C2b reset/status](c2b-reset-status.md) đã merge PR #35 `1d3e558`, chứa sửa P2 `f2ba336`; head source `0036`. Safety vẫn pending tới C4. C2b P2: **201/201**, collect 1296 và 1095 chưa chạy lại; suite 471 tại `bdec9ea` là lịch sử; web không đổi (43/43, typecheck/build tại `a8cb586`); [inventory theo source](c2b-test-inventory.json). [C2c-1 bootstrap/initial receipt](tasks/m6c2b2c2c1-bootstrap-initial-receipts.md) được giao tiếp; invitation lifecycle C2c-2 và final callers C2d chưa triển khai. [Cách chia C2c](decisions.md#chia-c2c-sau-merge-pr-35-2026-10-04) bổ sung cho [Origin/cách chia C2 đã chốt](decisions.md#chia-c2-và-chốt-origin-theo-ủy-quyền-2026-10-03). Operator/delivery C3 và cutover C4 vẫn riêng. Không truy vấn/nâng DB hoặc restart dev; head source không là revision DB dev.
 
@@ -24,9 +28,13 @@ Khi có thay đổi quyết định, cập nhật tài liệu liên quan cùng t
 
 | Tài liệu | Nội dung |
 | --- | --- |
+| [Sửa final read clock](c2d-final-read-clock.md) | Clock/TTL sau SQL cuối, session listing, caller/lock/commit map và giới hạn |
+| [Inventory sửa final read clock](c2d-final-read-clock-test-inventory.json) | Source/hash/node/JUnit, chuẩn bị/đối chứng/final và not-run |
+| [Prompt sửa final read clock](tasks/c2d-final-read-clock.md) | P2 TTL vượt hạn trong predicate SQL cuối; proof sau SQL, regression runtime/idle/absolute và hồi quy các read caller |
+| [Review PR #41](reviews/pr41-c2d3-resource-writes.md) | 270 API chọn và 45 web pass; P2 helper GET cũ có ca tái hiện, cần PR sửa hẹp trước cutover |
 | [Bàn giao C2d-3](c2d3-library-collection-json-writes.md) | 6 writer library/collections, User → item → collection → flush → journal exclusive, hậu kiểm và commit uncertain |
 | [Inventory C2d-3](c2d3-test-inventory.json) | Node/JUnit/source/hash, runtime/race/pending, đối chứng và not-run |
-| [Prompt coding C2d-3](tasks/m6c2b2c2d3-library-collection-json-writes.md) | 6 JSON writer library/collections: actor/resource trước commit, proof mới sau commit, FK/lock order và commit uncertain; đã triển khai, đang review |
+| [Prompt coding C2d-3](tasks/m6c2b2c2d3-library-collection-json-writes.md) | 6 JSON writer library/collections: actor/resource trước commit, proof mới sau commit, FK/lock order và commit uncertain; đã merge PR #41 `5100ff6` |
 | [Review PR #40](reviews/pr40-c2d2b-review-publication-reads.md) | 261 test chọn độc lập pass; PR đã merge `833db7c`, safety pending |
 | [Bàn giao C2d-2b](c2d2b-review-publication-json-reads.md) | 9 GET review/publication, final caller/Admin/clock, exact grant, thin/common history và locks |
 | [Inventory C2d-2b](c2d2b-test-inventory.json) | Source/node/JUnit, runtime/race/pending/đối chứng và not-run |

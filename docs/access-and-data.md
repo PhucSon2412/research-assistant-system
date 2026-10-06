@@ -1,6 +1,8 @@
 # Quyền và dữ liệu
 
-**C2d-3 trên nhánh review:** [sáu JSON writer](c2d3-library-collection-json-writes.md) giữ ACL hiện hành. Exact caller/current role/CSRF/resource/clock được kiểm trong transaction ghi sau flush dưới journal exclusive; response dùng proof mới sau commit. Admin không có private/collection bypass; remove gỡ membership ẩn, không đọc item payload. Commit mất reply hoặc lỗi hậu kiểm không chứng minh mutation chưa lưu. Membership/delete collection chưa có journal; restore membership cũ còn riêng. Safety pending tới C4.
+**Sửa final read clock (nhánh review):** [handoff](c2d-final-read-clock.md) giữ exact session/User, current Admin, latest head/receipt/generation và mọi ACL; kiểm TTL/checked_at sau SQL cuối. Không touch, khóa hàng mới hoặc commit helper; lỗi response sau known commit không chứng minh mutation chưa lưu. Safety pending tới C4.
+
+**C2d-3 đã merge PR #41 `5100ff6`:** [sáu JSON writer](c2d3-library-collection-json-writes.md) giữ ACL hiện hành. Exact caller/current role/CSRF/resource/clock được kiểm trong transaction ghi sau flush dưới journal exclusive; response dùng proof mới sau commit. Admin không có private/collection bypass; remove gỡ membership ẩn, không đọc item payload. Commit mất reply hoặc lỗi hậu kiểm không chứng minh mutation chưa lưu. Membership/delete collection chưa có journal; restore membership cũ còn riêng. Safety pending tới C4.
 
 **M6c-2b2b2, PR #31 đã merge `3f21794`, `0032`:** invitation accepted/admin revoked/replaced/delivery compensation ghi cùng auth journal trước commit; restore/replay đóng link bằng `closed_by_recovery`, không dựng lại account. Inspect/accept từ chối trong TTL; Admin hiển thị việc đóng do recovery. Không suy link chưa gửi từ lỗi adapter, không xóa account nếu accept thắng thu hồi bù. PR #30 đã merge `ce67ce8`; session/reset gate giữ nguyên. [Hợp đồng và cửa sổ lỗi](invitation-journal.md).
 
@@ -55,7 +57,7 @@
 
 **Phạm vi C2d-2b sau PR #39:** [9 GET review/publication](tasks/m6c2b2c2d2b-review-publication-json-reads.md) đã merge PR #40 `833db7c`; xem [bàn giao](c2d2b-review-publication-json-reads.md) và [inventory](c2d2b-test-inventory.json). Owner đọc request của mình; Admin đọc private payload chỉ khi grant đúng request/version/file còn hiệu lực. Admin common-copy history có thể gồm revoked với metadata còn được phép sau cleanup, không mở file/text/search/RAG. Caller/clock/current Admin và grant/gates phải kiểm cùng read transaction; safety pending tới C4.
 
-**Phạm vi C2d-3 đã giao, chưa triển khai:** [6 JSON writer library/collections](tasks/m6c2b2c2d3-library-collection-json-writes.md) giữ product ACL: owner private/collection, current Admin chỉ sửa common ordinary-visible; membership không cấp nội dung. Guard actor/resource trước commit, proof mới sau commit; lỗi sau commit không chứng minh chưa lưu. Remove membership cũ vẫn được khi item đã ẩn; xóa collection chỉ xóa liên kết/collection, không paper/file. Chưa có journal membership, không bảo đảm membership không quay lại khi restore. Safety pending tới C4.
+**Phạm vi C2d-3 đã merge PR #41:** [6 JSON writer library/collections](tasks/m6c2b2c2d3-library-collection-json-writes.md) giữ product ACL: owner private/collection, current Admin chỉ sửa common ordinary-visible; membership không cấp nội dung. Guard actor/resource trước commit, proof mới sau commit; lỗi sau commit không chứng minh chưa lưu. Remove membership cũ vẫn được khi item đã ẩn; xóa collection chỉ xóa liên kết/collection, không paper/file. Chưa có journal membership, không bảo đảm membership không quay lại khi restore. Safety pending tới C4.
 
 ## Ma trận quyền MVP đề xuất
 

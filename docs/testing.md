@@ -1,5 +1,19 @@
 # Chiến lược kiểm thử
 
+## Sửa final read clock sau SQL (2026-10-06)
+
+**Suite cuối trên code `18faa30`: 1094/1094 pass, 0 failure/error/skip; collect 2530 unique nodes, 1436 not-run.** Ba JUnit không trùng, hợp đúng selection; SHA-256 218 API Python/SQL file không đổi trước/sau cả ba nhóm. final-core: 653.292 s / final-resources: 1308.332 s / final-reviews: 740.548 s. Không cộng các lượt trước/sau/đối chứng hoặc kết quả lịch sử PR #41. Safety pending tới C4.
+
+[Bàn giao/caller map](c2d-final-read-clock.md) · [Inventory theo node/source/JUnit](c2d-final-read-clock-test-inventory.json). Thành phần: clock mới 65, C2d-1 93, C2d-2a 301, C2d-2b 260, C2d-3 252, login/session 68, config 54, ORM/schema 1. Cả 33 pending HTTP C2d không patch (gồm health/ready của C2d-1); nghiệp vụ chỉ scoped cutover. SQL/runtime/recovery/journal/predicate/ACL thật.
+
+Regression chuẩn trước sửa 6 failure đúng assertion/2 pass; sau sửa đạt trong suite cuối. Hai source mutant: 4+2 failure đúng 200 thay vì 401, 0 setup errors, bytes/hash khôi phục. Lượt chuẩn bị đầu 21 pass/38 failure có fixture key/env sai; empty 5 pass/1 fixture pagination fail rồi 6 pass. Các lỗi script UTF-8/async AST ngoài repo được ghi riêng; không sửa ứng dụng hoặc nới assertions/gates để che lỗi. Web/proxy/Compose không đổi, not-run; các nhóm API/provider/storage/writer/drill/C3/C4 còn lại có reason/node not-run trong inventory.
+
+## Review độc lập PR #41
+
+Tại `1bad143` / code `12ffccc`: **270/270 API chọn pass** (252 C2d-3, 12 library, 5 collection, 1 ORM), 529,945 s, 0 failure/error/skip, 3 warning hiện có. Web **45/45** và typecheck đạt. JUnit 270 unique, hash 217 API Python/SQL không đổi; artifact agent 1095 khớp inventory không phải reviewer chạy lại cả suite. [Report](reviews/pr41-c2d3-resource-writes.md).
+
+**Kiểm bổ sung riêng:** 1 failure đúng ở GET `/collections` tại idle expiry khi predicate SQL cuối chậm; helper đọc không đổi trong PR #41. Đối chứng fixture kiểm clock/expiry sau SQL: 1/1 pass. Không cộng với selection hoặc coi toàn project xanh; cần sửa trước cutover. Reviewer chưa chạy 825 node khác trong suite agent, 2195 ngoài selection, source mutants hoặc full browser/provider/restore/C3/C4. Không thấy điểm chặn 6 writer; PR #41 đã merge `5100ff6`. [Task sửa clock](tasks/c2d-final-read-clock.md) đã triển khai trên nhánh review; kết quả mới ở đầu file, không thay FAIL lịch sử này. Safety pending tới C4.
+
 ## C2d-3: runtime writers và đối chứng
 
 [Bàn giao](c2d3-library-collection-json-writes.md) · [Inventory](c2d3-test-inventory.json). Code `12ffccc`, base `833db7c`, source `0039`; chỉ kiểm PostgreSQL/runtime/journal tổng hợp cô lập. Sáu pending HTTP không patch; nghiệp vụ chỉ scoped cutover. Auth/gate/head/receipt/CSRF/clock/resource SQL thật; races dùng Event + PostgreSQL wait/deadline.
