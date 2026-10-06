@@ -8,6 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
+from pathlib import Path
 
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
@@ -45,6 +46,21 @@ def _user(db, principal, csrf_token, clock, settings):
     if current.role != "user":
         raise ApiError(403, "forbidden")
     return current
+
+
+def _declaration(body, settings):
+    # Preserve current-User denial BEFORE business metadata errors. Pydantic
+    # schema/strict consent validation still occurs before the handler as usual.
+    if body.notice_version != settings.upload_notice_version:
+        raise ApiError(409, "notice_changed")
+    if Path(body.filename).name != body.filename or "\\" in body.filename or any(ord(c) < 32 for c in body.filename):
+        raise ApiError(422, "invalid_filename")
+    suffixes = (".pdf",) if body.file_kind == "pdf" else (".md", ".markdown")
+    if not body.filename.lower().endswith(suffixes):
+        raise ApiError(422, "invalid_filename")
+    limit = settings.files.pdf_max_bytes if body.file_kind == "pdf" else settings.files.markdown_max_bytes
+    if body.byte_size > limit:
+        raise ApiError(413, "file_too_large")
 
 
 def _binding(db: Session, expected: Binding, settings: Settings):
@@ -98,6 +114,7 @@ def create(db: Session, principal: Principal, body, *, csrf_token: str,
         db.execute(text(f"SET LOCAL lock_timeout = {int(settings.recovery.gate_lock_timeout_ms)}"))
         lock_users(db, [principal.user_id])
         _user(db, principal, csrf_token, clock, settings)
+        _declaration(body, settings)
         at = clock()
         raw, digest = generate_token()
         ack = Ack(actor_user_id=principal.user_id, session_id=principal.session_id,

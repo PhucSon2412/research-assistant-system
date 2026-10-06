@@ -88,16 +88,6 @@ def create_intent(
     settings: Settings = Depends(get_settings),
     _origin: None = Depends(require_trusted_origin),
 ) -> dict:
-    if body.notice_version != settings.upload_notice_version:
-        raise ApiError(409, "notice_changed")
-    if Path(body.filename).name != body.filename or "\\" in body.filename or any(ord(c) < 32 for c in body.filename):
-        raise ApiError(422, "invalid_filename")
-    suffixes = (".pdf",) if body.file_kind == "pdf" else (".md", ".markdown")
-    if not body.filename.lower().endswith(suffixes):
-        raise ApiError(422, "invalid_filename")
-    limit = settings.files.pdf_max_bytes if body.file_kind == "pdf" else settings.files.markdown_max_bytes
-    if body.byte_size > limit:
-        raise ApiError(413, "file_too_large")
     return upload_intents.create(db, principal, body, csrf_token=request.headers.get("x-csrf-token") or "",
                                  clock=clock, settings=settings)
 

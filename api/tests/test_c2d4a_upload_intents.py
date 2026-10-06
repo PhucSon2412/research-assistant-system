@@ -126,6 +126,8 @@ def test_notice_user_admin_anonymous_and_two_separate_confirmations(consent):
     assert state(b)=={'processing_acknowledgements':[],'upload_intents':[],'audit':[]}
     b.client.cookies.set('ras_csrf',b.admin_actor.csrf_token)
     assert request(b,headers={'Origin':'http://web.test','X-CSRF-Token':b.admin_actor.csrf_token}).status_code==403
+    for change in ({'notice_version':'old'},{'filename':'../x.md'},{'byte_size':3000000}):
+        assert request(b,b.body|change,headers={'Origin':'http://web.test','X-CSRF-Token':b.admin_actor.csrf_token}).status_code==403
     b.client.cookies.clear()
     assert b.client.get(NOTICE).status_code==401
     b.client.cookies.set('ras_csrf',b.w.actor.csrf_token)
