@@ -39,9 +39,12 @@ def final_caller(db: Session, *, session_id: uuid.UUID, user_id: uuid.UUID,
     ).join(UserSession, UserSession.user_id == User.id).where(
         UserSession.id == session_id, User.id == user_id,
     )).one_or_none()
-    # Read the clock after lock wait AND profile read; never renew idle expiry.
+    if row is None or not session_live(db, session_id, clock(), idle, user_id=user_id):
+        raise ApiError(401, "session_expired", clear_session=True)
+    # The predicate's SQL can itself cross expiry. Recheck TTL after ALL SQL
+    # using the scalar timestamps, without another slow query or idle renewal.
     at = clock()
-    if row is None or not session_live(db, session_id, at, idle, user_id=user_id):
+    if row.absolute_expires_at <= at or row.last_activity_at <= at - idle:
         raise ApiError(401, "session_expired", clear_session=True)
     if admin and row.role != "admin":
         raise ApiError(403, "forbidden")

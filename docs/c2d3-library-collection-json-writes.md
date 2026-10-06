@@ -1,8 +1,12 @@
 # C2d-3: sáu JSON writer library/collections
 
+**Cập nhật bản sửa 2026-10-06:** [bàn giao sửa final read clock](c2d-final-read-clock.md) lấy clock/kiểm idle và absolute sau chính SQL predicate cuối; checked_at dùng mốc mới. Giữ ACL/role/gate/locks và semantics known commit. Các số đo bên dưới là lịch sử; kết quả mới ở handoff/inventory riêng. Safety pending tới C4.
+
+**PR #41 đã merge `5100ff6` (2026-10-06).** Review tại `1bad143`: 270/270 API chọn pass; không thấy điểm chặn phạm vi 6 writer. Helper GET cũ có P2 clock trước predicate SQL, tái hiện `/collections` trả 200 tại idle expiry; [task sửa riêng](tasks/c2d-final-read-clock.md) đã triển khai, xem handoff bản sửa ở đầu file. [Review và giới hạn](reviews/pr41-c2d3-resource-writes.md). safety pending tới C4.
+
 [Mục lục](README.md) · [Task](tasks/m6c2b2c2d3-library-collection-json-writes.md) · [Inventory](c2d3-test-inventory.json) · [Caller inventory](c2d1-caller-inventory.json)
 
-Base fetch `833db7cc1b3a4df6b683f72820fca83a17c19eb7`, merge PR #40, chứa head `11da7316a6be27317c2d6d27c8725aafa51533b2`. Nhánh `feat/m6c2b2c2d3-library-collection-json-writes`. Giữ docs review/handoff chưa commit trong PR này. Không migration hoặc đổi grants: head source `0039`, không suy revision DB dev. **Safety pending tới C4**, chỉ kiểm cô lập; không merge PR.
+Base triển khai `833db7cc1b3a4df6b683f72820fca83a17c19eb7`, merge PR #40, chứa head `11da7316a6be27317c2d6d27c8725aafa51533b2`. Nhánh `feat/m6c2b2c2d3-library-collection-json-writes`, đã merge PR #41 `5100ff6`. Docs review sau đó chưa commit được bàn giao vào PR sửa clock tiếp. Không migration hoặc đổi grants: head source `0039`, không suy revision DB dev. **Safety pending tới C4**, chỉ kiểm cô lập.
 
 ## Boundary ghi và khóa
 

@@ -1,5 +1,7 @@
 # C2d-2a: final caller và quyền ở 13 GET JSON
 
+**Cập nhật bản sửa 2026-10-06:** [bàn giao sửa final read clock](c2d-final-read-clock.md) lấy clock/kiểm idle và absolute sau chính SQL predicate cuối; checked_at dùng mốc mới. Giữ ACL/role/gate/locks và semantics known commit. Các số đo bên dưới là lịch sử; kết quả mới ở handoff/inventory riêng. Safety pending tới C4.
+
 **Trạng thái hiện hành (2026-10-05): PR #39 đã merge `f229141`, chứa code `5d291c0` và docs review `e89815d`; source `0039`.** Task tiếp [C2d-2b — 9 GET review/publication](tasks/m6c2b2c2d2b-review-publication-json-reads.md), đã triển khai trên nhánh review, chưa merge. Các kết quả bên dưới giữ theo source lịch sử; safety pending tới C4.
 
 [Mục lục](README.md) · [Task](tasks/m6c2b2c2d2a-resource-json-reads.md) · [C2d-1](c2d1-final-caller-reads.md) · [Inventory kiểm](c2d2a-test-inventory.json) · [Caller inventory](c2d1-caller-inventory.json)

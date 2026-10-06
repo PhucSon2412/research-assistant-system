@@ -26,7 +26,6 @@ from app.delivery import DeliveryAdapter, MessageKind, OutgoingMessage, build_li
 from app.identity import invitations, password_reset
 from app.identity.errors import InvalidCredentials, InvalidToken
 from app.identity.login import login
-from app.identity.predicates import session_live
 from app.identity.final_caller import final_caller
 from app.identity.session_commit import commit_auth, commit_activity
 from app.identity.passwords import PasswordPolicyError
@@ -176,10 +175,10 @@ def my_sessions(
     clock=Depends(get_clock),
 ) -> dict:
     rows = list_live_sessions(db, user_id=ctx.user_id, now=now, idle=settings.auth.session_idle, clock=clock)
-    # Listing retains its final shared journal lock; check the caller too,
-    # with a fresh clock after the read, without taking User/session row locks.
-    if not session_live(db, ctx.session_id, clock(), settings.auth.session_idle, user_id=ctx.user_id):
-        raise ApiError(401, "session_expired", clear_session=True)
+    # Listing retains its shared journal lock. The common read proof checks
+    # the exact caller and TTL after its own final predicate SQL as well.
+    final_caller(db, session_id=ctx.session_id, user_id=ctx.user_id,
+                 clock=clock, idle=settings.auth.session_idle)
     return {
         "sessions": [
             {

@@ -1,5 +1,7 @@
 # C2a: login/session, predicate và bàn giao
 
+**Cập nhật final read clock (2026-10-06, nhánh review):** `/auth/sessions` tái hiện cùng lỗi latency predicate cuối, dù clock đã sau query danh sách. Route nay dùng `final_caller` sau listing để kiểm TTL sau SQL cuối; shape/ACL/shared journal giữ nguyên. [Bàn giao/kết quả mới](c2d-final-read-clock.md); các số đo C2a bên dưới là lịch sử. Safety pending tới C4.
+
 ## Trạng thái sau C2c-2
 
 PR #37 đã merge `ca4a623`, head mã nguồn `0039`. Bảng helper/inventory C2a bên dưới ghi source tại C2a; các dòng reset/status/bootstrap/invitation chưa chuyển khi đó là **lịch sử**, đã được chuyển trong C2b/C2c. [Bàn giao C2c-2](c2c2-invitation-runtime.md) và [task C2d-1](tasks/m6c2b2c2d1-final-caller-reads.md) là nguồn tiếp để xây inventory caller hiện hành. [C2d-1 đã triển khai trên nhánh review](c2d1-final-caller-reads.md), có caller inventory hiện hành; không coi final checks toàn hệ thống đã hoàn tất. Safety pending tới C4.

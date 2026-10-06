@@ -1,5 +1,33 @@
 # Nhật ký quyết định
 
+## Triển khai sửa final read clock (2026-10-06)
+
+**Nguồn:** task chủ dự án và [prompt](tasks/c2d-final-read-clock.md). Base xác minh `5100ff6`, PR #41 MERGED/head `1bad143`; không có main tiến thêm lúc fetch. Đã triển khai trên nhánh `fix/c2d-final-read-clock`, chưa merge. Source migration vẫn `0039`; không suy DB dev. Docs review/task chưa commit được giữ trong PR mới.
+
+**Chọn trong phạm vi giao:** giữ SQL predicate/head/receipt/generation/exact binding và scalar profile; lấy clock/kiểm TTL sau chính session_live, checked_at cùng mốc, không query/row lock/touch/commit mới. Đối chiếu thấy `/auth/sessions` chưa kiểm clock sau predicate của caller; regression thật 200 ở cả idle/absolute nên chuyển route sang shared final_caller sau listing. Không đổi shape/ACL/grants/gate/policy/mutation. Đây là sửa theo bằng chứng trong scope, không là yêu cầu sản phẩm mới.
+
+**Suite cuối trên code `18faa30`: 1094/1094 pass, 0 failure/error/skip; collect 2530 unique nodes, 1436 not-run.** Ba JUnit không trùng, hợp đúng selection; SHA-256 218 API Python/SQL file không đổi trước/sau cả ba nhóm. final-core: 653.292 s / final-resources: 1308.332 s / final-reviews: 740.548 s. Không cộng các lượt trước/sau/đối chứng hoặc kết quả lịch sử PR #41. Safety pending tới C4.
+
+[Handoff/lock/caller map](c2d-final-read-clock.md) · [Inventory](c2d-final-read-clock-test-inventory.json). Regression 6 fail đúng/2 pass trước sửa, hai đối chứng 4+2 failure đúng, source khôi phục; các preparation/tooling failures giữ riêng. Cleanup cô lập hoàn tất, dev metadata nguyên vẹn. Không mở safety/pricing; file/upload, review/publication/index writers, provider/worker và C3/C4 còn riêng. Lỗi response sau known commit không chứng minh mutation chưa lưu.
+
+## Giao PR sửa final clock sau merge PR #41 (2026-10-06)
+
+**Nguồn:** chủ dự án báo PR đã merge và yêu cầu prompt tiếp. Orchestrator fetch/GitHub CLI xác minh PR #41 MERGED, main/merge `5100ff67c5c61754e4dd29693cb670a22ce6cf83`, head `1bad143`; source migration `0039`, không truy vấn DB dev. Docs review chưa commit được giữ, không coi đã nằm trong merge.
+
+**Chốt phạm vi theo ủy quyền:** giao [PR sửa final read clock](tasks/c2d-final-read-clock.md), nhánh đề nghị `fix/c2d-final-read-clock`. Sửa P2 đã tái hiện: clock của `final_caller` nằm trước SQL `session_live`, khiến GET collections vẫn 200 khi query cuối vượt idle expiry. Proof phải lấy clock/kiểm idle và absolute sau predicate cuối; giữ exact binding/head/receipt/role, gate thật, không touch idle/khóa hàng mới/commit trong helper. Ưu tiên shared helper và hồi quy 25 GET đã chuyển cùng response sau commit của C2d-3; không đổi policy hoặc mở caller mới.
+
+**Tiêu chí:** regression fail trước/pass sau với SQL thật và latency clock mô phỏng, idle/absolute đúng/sát biên, checked_at sau SQL, current Admin/DevOutbox/resource/review/known commit contracts, pending HTTP thật và transaction/pool sạch. Đối chứng chạy riêng và source khôi phục trước suite cuối; JUnit/node/hash/pass/fail/not-run tách khỏi các số lịch sử PR #41. Không migration/grants, dev/provider/pricing hoặc safety ready.
+
+**Trạng thái lượt giao:** chỉ đọc Git/source/docs, tạo prompt và đồng bộ trạng thái; chưa code hoặc chạy API/web cho bản sửa. Validator bằng Conda ras đã xác minh interpreter/pip: 59 Markdown, 908 liên kết nội bộ, 0 lỗi; app API/web không đổi. File/upload, review/publication/index writers, provider callers và C3/C4 vẫn riêng; safety **pending tới C4**. Coding agent được giao commit/push và mở PR tiếng Việt, không merge. Không xin lại nền C1/Origin.
+
+## Review PR #41 và P2 clock ở helper đọc (2026-10-05)
+
+Source `1bad143` / code `12ffccc`, base `833db7c`; PR OPEN/chưa merge, source `0039`, không migration. [Review/chứng cứ](reviews/pr41-c2d3-resource-writes.md): **270/270 API chọn pass**, **45/45 web** và typecheck đạt; 270 node unique, 217 API Python/SQL hash không đổi. Không phát hiện điểm chặn phạm vi 6 writer; reviewer không sửa app, merge/push/comment.
+
+**P2 riêng:** GET `/collections` trả 200 khi SQL predicate cuối kết thúc tại idle expiry; helper `final_caller` lấy clock trước predicate, không sau nó. Test ngoài repo fail đúng với 200 thay vì 401; cùng ca có post-SQL clock check trong fixture pass. Helper không đổi từ base; writer mới có `_actor` kiểm sau SQL và hậu kiểm response. Vì lỗi nằm ở read helper cũ và safety pending, đề xuất merge PR #41 theo scope rồi **PR sửa read helper hẹp trước cutover**; không đánh dấu toàn C2d/T14 hoàn tất.
+
+Task sửa riêng đề xuất tại thời điểm review 2026-10-05: clock sau mọi predicate SQL có thể chậm, exact binding/head/receipt/current role và lock/expiry semantics giữ nguyên; idle/absolute đúng/sát biên, pending thật, hồi quy C2d-1/2a/2b và writer response. Không migration/User lock sau journal/cutover. Khi đó chưa giao coding task tiếp hoặc triển khai fix; quyết định giao ngày 2026-10-06 ở đầu file. Container/volume/credentials thử đã dọn, metadata 9 dev container không đổi. Không `.env`, dev DB hoặc provider/pricing. Docs review chưa commit; coding agent giữ vào PR phù hợp.
+
 ## Triển khai C2d-3 trên nhánh review (2026-10-05)
 
 **Sửa clock trong C2d-3 (`12ffccc`):** sau suite lịch sử `895878e` 1089/1089, thêm ca dùng `session_live` thật nhưng giả lập latency trả về sau idle expiry. Code cũ bắt đầu business commit rồi hậu kiểm trả 401; ca mới fail ở assertion chỉ auth dependency được commit. `_actor` nay đọc scalar activity/absolute expiry và lấy clock lại sau toàn bộ predicate SQL/CSRF, kiểm TTL trước commit. Không thay auth predicate/grants hoặc touch activity; sáu ca route và nhóm clock/wait sau sửa 38/38. Suite cuối trên source mới đã đạt như kết quả dưới đây; lịch sử không cộng vào kết quả cuối.

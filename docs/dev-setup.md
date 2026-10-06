@@ -1,5 +1,21 @@
 # Môi trường phát triển và schema (M1a–C2d-3)
 
+## Sửa final read clock: kiểm cô lập 2026-10-06
+
+**Suite cuối trên code `18faa30`: 1094/1094 pass, 0 failure/error/skip; collect 2530 unique nodes, 1436 not-run.** Ba JUnit không trùng, hợp đúng selection; SHA-256 218 API Python/SQL file không đổi trước/sau cả ba nhóm. final-core: 653.292 s / final-resources: 1308.332 s / final-reviews: 740.548 s. Không cộng các lượt trước/sau/đối chứng hoặc kết quả lịch sử PR #41. Safety pending tới C4.
+
+Conda ras interpreter/pip đã xác minh, không cài thêm/venv. PostgreSQL `ras-final-read-clock-db-20261006`, label `ras.task=final-read-clock-20261006`, bind `127.0.0.1:58453`; explicit admin URL/DB parts trước import fixture, runtime/recovery LOGIN và journal thật. Runner chặn external HTTP; không `.env`, query/nâng/restart dev, provider/pricing/safety changes. Evidence `%TEMP%/ras-final-read-clock-20261006` giữ scripts/log/JUnit/source/selection/journal tổng hợp ngoài repo.
+
+Lệnh evidence thực chạy từ gốc repo bằng Conda Python: `setup.py`; `runner.py` cho preparation/regression-before/after/empty/empty-after và collect; `mutants.py`; `run_final.py` (ba tiến trình pytest riêng, DB/basetemp/journal khác nhau); `inventory.py`; `quality.py`; `cleanup.py`. Đây là evidence thử cô lập, không runbook dev hoặc dependency của suite repo. `python -m compileall -q api/app api/tests api/migrations`, `python -m alembic -c api/alembic.ini heads` và `git diff --check` đạt.
+
+Đã kiểm ID/label/image/port/mount/sole consumer trước khi xóa container/anonymous volume thử, xóa credentials; 24 preexisting container giữ ID/image/StartedAt. [Handoff/kết quả/giới hạn](c2d-final-read-clock.md) · [Inventory](c2d-final-read-clock-test-inventory.json). Source `0039` không là revision DB dev; safety pending tới C4.
+
+**Cập nhật 2026-10-06:** PR #41 đã merge `5100ff6`, source migration `0039`. Task tiếp [sửa final read clock](tasks/c2d-final-read-clock.md) đã triển khai trên nhánh review, chưa merge; [handoff/evidence mới](c2d-final-read-clock.md). Không có lệnh vận hành dev mới. Safety pending tới C4, không suy revision DB dev.
+
+## Review PR #41 cô lập
+
+270/270 API chọn pass tại `1bad143`, 529,945 s; web 45/45 và typecheck đạt. Một GET clock bổ sung fail đúng ở helper cũ, đối chứng fixture sau SQL pass; tách với suite agent. PostgreSQL `ras-pr41-review-db-20261005`, labels `ras.review=pr41-20261005`/`ras.task=c2d3-review-20261005`, port 58450; runtime/journal thật, external HTTP chặn, evidence `%TEMP%/ras-pr41-review-20261005`. Container/volume/credentials đã dọn, metadata 9 dev container không đổi. [Report/source/JUnit và giới hạn](reviews/pr41-c2d3-resource-writes.md). Không runbook/lệnh vận hành dev mới; safety pending tới C4.
+
 ## C2d-3 cô lập
 
 **Suite cuối tại code `12ffccc`: 1095/1095 pass**, 0 failure/error/skip, 2208.995 s; collect 2465 unique nodes, **1370 not-run**. Gồm C2d-3 252 (6 pending HTTP thật), C2d-1 93, C2d-2a 301, C2d-2b 260, login/session 68, reset/status 103, library ACL/CRUD 12, collection GET/CRUD 5 và ORM/schema 1. JUnit khớp đúng selection, không thiếu/trùng; SHA-256 217 API Python/SQL file không đổi. 10/10 đối chứng bị assertions bắt, khôi phục source bytes/hash; web 45/45, typecheck/build đạt.
@@ -11,7 +27,7 @@
 
 Lệnh thực chạy từ gốc repo bằng Conda Python: `setup.py`, `runner.py` cho các lượt smoke/expanded/targeted/late/fresh; `mutants.py`; `final_suite.py --collect`; `final_suite.py`, `quality.py`, `cleanup.py`, `final_inventory.py`. Scripts đó là evidence ngoài repo, không runbook dev. Đã chạy `python -m compileall -q api/app api/tests api/migrations`, `git diff --check`, `npm test --prefix web`, `npm run typecheck --prefix web`, `npm run build --prefix web`. Không query/restart/migrate dev hoặc provider/pricing/safety changes. Source head không là revision DB dev; safety pending tới C4.
 
-**Trạng thái hiện hành (2026-10-05): PR #40 đã merge `833db7c`; source migration `0039`.** [Bàn giao 9 GET](c2d2b-review-publication-json-reads.md) · [Inventory](c2d2b-test-inventory.json). Task tiếp [C2d-3 — 6 JSON writer](tasks/m6c2b2c2d3-library-collection-json-writes.md) đã giao, đã triển khai, đang review (chưa merge); chưa có lệnh vận hành mới. Safety pending tới C4; không chạy Compose up/migrate/recover trên dev để mở readiness. Source head không xác nhận revision DB dev; lệnh bên dưới là chứng cứ môi trường cô lập.
+**Trạng thái hiện hành (2026-10-06): PR #41 đã merge `5100ff6`; source migration `0039`.** [Bàn giao 9 GET](c2d2b-review-publication-json-reads.md) · [Inventory](c2d2b-test-inventory.json). [C2d-3 — 6 JSON writer](tasks/m6c2b2c2d3-library-collection-json-writes.md) đã merge; task tiếp sửa final read clock ở đầu file; chưa có lệnh vận hành mới. Safety pending tới C4; không chạy Compose up/migrate/recover trên dev để mở readiness. Source head không xác nhận revision DB dev; lệnh bên dưới là chứng cứ môi trường cô lập.
 
 ## C2d-2b cô lập
 
