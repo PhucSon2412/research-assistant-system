@@ -1,5 +1,37 @@
 # Nhật ký quyết định
 
+## Triển khai C2d-3 trên nhánh review (2026-10-05)
+
+**Sửa clock trong C2d-3 (`12ffccc`):** sau suite lịch sử `895878e` 1089/1089, thêm ca dùng `session_live` thật nhưng giả lập latency trả về sau idle expiry. Code cũ bắt đầu business commit rồi hậu kiểm trả 401; ca mới fail ở assertion chỉ auth dependency được commit. `_actor` nay đọc scalar activity/absolute expiry và lấy clock lại sau toàn bộ predicate SQL/CSRF, kiểm TTL trước commit. Không thay auth predicate/grants hoặc touch activity; sáu ca route và nhóm clock/wait sau sửa 38/38. Suite cuối trên source mới đã đạt như kết quả dưới đây; lịch sử không cộng vào kết quả cuối.
+
+Theo task đã giao, base `833db7c`, code `895878e` chuyển đúng sáu writer sang `api/resource_writes.py`; không migration/grants hoặc thay auth dependency/read helper/predicate/commit_auth. Code base dùng role snapshot/commit trực tiếp và add khóa collection trước item; nay User NO KEY UPDATE → item nếu cần → collection → flush DML/FK/audit → journal exclusive. Final scalar actor/CSRF/latest predicate/current role, SQL resource gate và clock mới cùng transaction trước commit. DELETE collection giữ owner proof dưới UPDATE lock tới commit vì hàng đã flush DELETE không còn để requery; hậu kiểm 204 chỉ caller mới.
+
+Known commit phải đọc DTO/resource/current caller trong transaction mới; commit exception trả `resource_write_outcome_uncertain`, không replay/retry. Known commit nhưng SQL hậu kiểm lỗi dùng `resource_write_response_unavailable`; scope mất thành 409, auth mất giữ mã auth. Mutation đã commit vẫn có thể tồn tại khi response lỗi. Web chỉ map/test thông báo, không tự submit lại. Remove giữ hợp đồng owner collection/membership dù item ẩn; membership không cấp nội dung/provider.
+
+Các lựa chọn helper/error/DELETE proof là triển khai trong phạm vi được giao, không đổi quyền/receipt/recovery model hoặc xin lại nền. Docs review PR #40 chưa commit được giữ trong PR này. **Suite cuối tại code `12ffccc`: 1095/1095 pass**, 0 failure/error/skip, 2208.995 s; collect 2465 unique nodes, **1370 not-run**. Gồm C2d-3 252 (6 pending HTTP thật), C2d-1 93, C2d-2a 301, C2d-2b 260, login/session 68, reset/status 103, library ACL/CRUD 12, collection GET/CRUD 5 và ORM/schema 1. JUnit khớp đúng selection, không thiếu/trùng; SHA-256 217 API Python/SQL file không đổi. 10/10 đối chứng bị assertions bắt, khôi phục source bytes/hash; web 45/45, typecheck/build đạt. Đã kiểm ID/name/label/image/port/mount và consumer volume trước khi dọn đúng PostgreSQL cô lập cùng anonymous volume, xóa hai file credentials tổng hợp. Metadata ID/image/StartedAt của 24 container có trước task giữ nguyên, không query/nâng/restart DB dev. Evidence/journal/JUnit/log/scripts giữ ngoài repo. Không `.env`, provider/pricing hoặc safety ready. Kết quả/lỗi chuẩn bị giữ riêng trong inventory. Safety pending tới C4; file/provider/writer khác và C3/C4 còn riêng.
+
+## Giao C2d-3 sau merge PR #40 (2026-10-05)
+
+**Nguồn và trạng thái:** chủ dự án báo đã merge và yêu cầu prompt tiếp; orchestrator fetch, GitHub CLI xác nhận PR #40 MERGED, `origin/main = 833db7cc1b3a4df6b683f72820fca83a17c19eb7`, head `11da731` là ancestor. Head source `0039`; không truy vấn DB dev. Các docs review chưa commit được giữ và bàn giao vào PR kế tiếp, không coi đã có trong merge.
+
+**Chốt phạm vi theo ủy quyền:** [C2d-3 — 6 JSON writer library/collections](tasks/m6c2b2c2d3-library-collection-json-writes.md): một PATCH item và năm writer collection CRUD/membership. Sau 25 GET đã chuyển C2d-1/2a/2b, source hiện vẫn dùng principal snapshot và `db.commit()` trực tiếp ở nhóm này; create/rename refresh và library flags đọc sau commit chưa có proof caller mới. Phạm vi đã giao, **chưa triển khai/chưa kiểm**.
+
+Chọn strategy ghi riêng: caller User NO KEY UPDATE trước resource; item nếu cần trước collection để tương thích GET; flush DML/FK/audit trước journal exclusive trực tiếp, final actor/role/clock/resource trên cùng transaction trước commit. Proof và response sau commit thuộc transaction mới. Guard trước commit rollback nghiệp vụ; lỗi sau known commit không chứng minh mutation chưa xảy ra; commit uncertain không success/auto retry hoặc replay metadata từ auth journal. Remove membership ẩn giữ contract owner collection, không mở dữ liệu item ẩn; delete collection giữ paper/version/file.
+
+Đây là quyết định orchestrator trong phạm vi đã được ủy quyền, không phải lựa chọn trực tiếp mới của chủ dự án. Không đổi product ACL/rights/retrieval hoặc mở runtime grants. Ưu tiên không migration; mọi migration nếu cần phải mới sau head thực tế và có lý do. File/upload, review/publication writers, provider callers, membership journal, C3 operator và C4 cutover vẫn riêng. **Safety pending tới C4**, chỉ thử cô lập; không thao tác dev/`.env`/provider/pricing.
+
+**Kiểm chứng lượt giao:** chỉ đọc source/docs/Git và viết tài liệu; chưa chạy test API/web/C2d-3. Kiểm 56 Markdown/843 liên kết nội bộ và control characters: 0 lỗi; diff/whitespace cả file mới đạt, code ứng dụng khớp origin/main. Python validator dùng Conda ras đã xác minh interpreter/pip. Tiêu chí runtime/clock/race/FK/postcommit/pending thật và inventory/JUnit/not-run nằm trong prompt; không cộng các kết quả PR #40 vào task mới.
+
+## Review PR #40 C2d-2b (2026-10-05)
+
+Fetch/xác minh head `11da731` khớp nhánh remote, base `f229141` sau PR #39, code `749a31d`; GitHub CLI xác nhận PR #40 OPEN/chưa merge tại thời điểm review; sau đó chủ dự án merge `833db7c`. Không migration, source `0039`; không truy vấn revision DB dev. **Không phát hiện điểm chặn merge trong phạm vi 9 GET C2d-2b; có thể merge PR #40.** Reviewer không sửa code, merge/push/comment PR. [Review/chứng cứ/giới hạn](reviews/pr40-c2d2b-review-publication-reads.md).
+
+Kiểm độc lập **261/261 pass**: toàn bộ 260 C2d-2b (9 pending HTTP thật) + 1 ORM/schema, 0 failure/error/skip, **551,837 s**, 3 warning hiện có. JUnit đúng 261 node unique, hash 215 API Python/SQL file không đổi. Inventory AST 63/63 route, 13 boundary cũ và 9 mới/6 Admin; writer/storage/shared formatter, migration/deps/identity và web không đổi. Docs trước review: 54 Markdown, 810 links, 0 lỗi/control characters. Không cộng với 734/9 đối chứng/9 pool probe của agent; các nhóm khác vẫn not-run.
+
+Boundary giữ SQL owner/grant/history trước count/page, request → permitted private item → journal; common item → journal, không khóa tombstone sau item. Final role/caller/clock và resource DTO/gates mới; thin closed/inactive 200, revoked common Admin history theo retention đúng contract. Notes sửa câu chữ, không đổi writer transaction.
+
+Runtime/PostgreSQL/journal tổng hợp cô lập, fixture chỉ scoped cutover; external HTTP bị chặn. Đã dọn đúng container/volume và credentials thử, metadata 9 container dev giữ nguyên. Docs review còn chưa commit, coding agent giữ và đưa cùng PR. Safety pending tới C4; writer/file/provider/tổng hồi quy/C3/C4 còn riêng.
+
 ## Triển khai C2d-2b trên nhánh review (2026-10-05)
 
 Theo prompt đã giao và yêu cầu chủ dự án, fetch xác minh main chứa merge PR #39 `f229141`, tạo nhánh `feat/m6c2b2c2d2b-review-publication-json-reads`; giữ docs orchestrator chưa commit. Code kiểm tại `749a31d`, không migration, source head `0039`. [Bàn giao](c2d2b-review-publication-json-reads.md) · [Inventory](c2d2b-test-inventory.json). Chưa merge; safety pending tới C4.

@@ -1,8 +1,10 @@
 # C2d-2b: final caller ở 9 GET review/publication JSON
 
+**Review PR #40 (`11da731`): 261/261 test chọn độc lập pass** — 260 C2d-2b + 1 ORM/schema; không phát hiện điểm chặn trong phạm vi 9 GET. PR #40 đã merge `833db7c`, safety pending tới C4. [Báo cáo review](reviews/pr40-c2d2b-review-publication-reads.md). Kết quả agent và reviewer giữ riêng theo source.
+
 [Mục lục](README.md) · [Task](tasks/m6c2b2c2d2b-review-publication-json-reads.md) · [Inventory kiểm](c2d2b-test-inventory.json) · [Caller inventory](c2d1-caller-inventory.json)
 
-Base fetch `f229141e6db46f7df663cb1d14335530a4d5e9dd`, đúng merge PR #39 và ancestor `e89815d`/`5d291c0`. Nhánh `feat/m6c2b2c2d2b-review-publication-json-reads`. Giữ docs orchestrator chưa commit trong PR. Không migration, head source `0039`; không suy revision DB dev. Triển khai trên nhánh để review, **không merge; safety pending tới C4**.
+Base fetch `f229141e6db46f7df663cb1d14335530a4d5e9dd`, đúng merge PR #39 và ancestor `e89815d`/`5d291c0`. Nhánh `feat/m6c2b2c2d2b-review-publication-json-reads`. Giữ docs orchestrator chưa commit trong PR. Không migration, head source `0039`; không suy revision DB dev. Triển khai đã merge PR #40 tại `833db7c`; agent không tự merge. **Safety pending tới C4**.
 
 ## Boundary và hợp đồng
 

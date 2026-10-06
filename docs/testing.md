@@ -1,8 +1,24 @@
 # Chiến lược kiểm thử
 
+## C2d-3: runtime writers và đối chứng
+
+[Bàn giao](c2d3-library-collection-json-writes.md) · [Inventory](c2d3-test-inventory.json). Code `12ffccc`, base `833db7c`, source `0039`; chỉ kiểm PostgreSQL/runtime/journal tổng hợp cô lập. Sáu pending HTTP không patch; nghiệp vụ chỉ scoped cutover. Auth/gate/head/receipt/CSRF/clock/resource SQL thật; races dùng Event + PostgreSQL wait/deadline.
+
+**Suite cuối tại code `12ffccc`: 1095/1095 pass**, 0 failure/error/skip, 2208.995 s theo JUnit (pytest 2209.01 s, 3 warning hiện có); collect 2465 unique nodes, **1370 not-run**. Gồm C2d-3 252 (6 pending HTTP thật), C2d-1 93, C2d-2a 301, C2d-2b 260, login/session 68, reset/status 103, library ACL/CRUD 12, collection GET/CRUD 5 và ORM/schema 1. JUnit khớp đúng selection, không thiếu/trùng; SHA-256 217 API Python/SQL file không đổi. 10/10 đối chứng bị assertions bắt, không setup error, khôi phục source bytes/hash; web 45/45, typecheck/build đạt. Inventory giữ riêng lượt dừng, missing CSRF fixture, 222 pass/2 lỗi observer/storage, 30 pass/1 fixture owner-immutable, suite lịch sử 1089 tại `895878e`, lỗi clock mới trước sửa và 38 pass sau sửa. Không cộng lịch sử PR #40 hoặc các lượt chồng nhau. Safety pending tới C4.
+
+## Lịch sử giao C2d-3 trước triển khai
+
+[Prompt 6 JSON writer library/collections](tasks/m6c2b2c2d3-library-collection-json-writes.md): runtime actor/resource guard trước commit, FK/lock order, fresh postcommit response, unknown commit, ACL, clock/race, transaction/pool và pending HTTP thật. PR #40 đã merge `833db7c`; kết quả 734 của agent và 261 của reviewer dưới đây thuộc source riêng, **không là kết quả C2d-3**. Lượt giao chỉ viết docs, không chạy API/web. Safety pending tới C4; các caller file/provider và cutover còn riêng.
+
+## Review độc lập PR #40
+
+Source `11da731` / code `749a31d`, base `f229141`, source migration `0039`: **261/261 pass**, 0 failure/error/skip, **551,837 s**, 3 warning hiện có. Toàn bộ 260 C2d-2b gồm 9 pending HTTP thật + 1 ORM/schema; JUnit khớp 261 node unique và 215 API Python/SQL hash không đổi. AST khớp 63/63 route, 13 boundary C2d-2a và đúng 9 C2d-2b/6 current Admin; writers/shared formatters/web không đổi.
+
+[Review/chứng cứ/cleanup và not-run](reviews/pr40-c2d2b-review-publication-reads.md). Không phát hiện điểm chặn C2d-2b; PR #40 đã merge `833db7c` sau review. Không cộng số agent 734/9 đối chứng/9 pool probe với 261; các node ngoài selection, web/proxy/stream/storage/provider/drill/C3/C4 chưa chạy trong review. Runtime/journal/SQL thật, scoped cutover chỉ ở fixture nghiệp vụ, gate pending thật riêng; không `.env` hoặc dev/pricing/safety changes. Safety pending tới C4.
+
 ## C2d-2b review/publication JSON reads
 
-Base PR #39 `f229141`, nhánh `feat/m6c2b2c2d2b-review-publication-json-reads`; source migration `0039`, không migration. [Bàn giao](c2d2b-review-publication-json-reads.md) · [Inventory node/source/JUnit](c2d2b-test-inventory.json). Đã triển khai trên nhánh để review, chưa merge; safety pending tới C4.
+Base PR #39 `f229141`, nhánh `feat/m6c2b2c2d2b-review-publication-json-reads`; source migration `0039`, không migration. [Bàn giao](c2d2b-review-publication-json-reads.md) · [Inventory node/source/JUnit](c2d2b-test-inventory.json). Đã merge PR #40 `833db7c`; safety pending tới C4.
 
 **Suite cuối tại code `749a31d`: 734/734 pass**, 0 failure/error/skip, 1458.049 s; collect 2213 unique nodes, **1479 not-run**, 3 warning hiện có. Gồm C2d-2b 260 (9 pending HTTP thật), C2d-2a 301 (13 GET), C2d-1 93, C2a login/session 68, library GET 9, collection GET 1, discovery GET 1 và ORM/schema 1. JUnit khớp chính xác 734 node đã chọn, không thiếu/trùng; SHA-256 215 API Python/SQL file không đổi trong suite.
 

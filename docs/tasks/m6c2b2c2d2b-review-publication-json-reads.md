@@ -1,6 +1,6 @@
 # Prompt coding C2d-2b: final caller cho review/publication JSON reads
 
-**Trạng thái triển khai:** trên nhánh review, chưa merge; xem [bàn giao](../c2d2b-review-publication-json-reads.md) và [inventory](../c2d2b-test-inventory.json). Prompt/lượt giao dưới đây giữ làm lịch sử phạm vi; safety pending tới C4.
+**Trạng thái triển khai:** đã merge PR #40 `833db7c`; xem [bàn giao](../c2d2b-review-publication-json-reads.md) và [inventory](../c2d2b-test-inventory.json). Prompt/lượt giao dưới đây giữ làm lịch sử phạm vi; safety pending tới C4.
 
 [Mục lục](../README.md) · [Quyết định phạm vi](../decisions.md#giao-c2d-2b-sau-merge-pr-39-2026-10-05) · [Bàn giao C2d-2a](../c2d2a-resource-json-reads.md) · [Review PR #39](../reviews/pr39-c2d2a-resource-reads.md)
 

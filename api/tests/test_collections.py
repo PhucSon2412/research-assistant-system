@@ -60,7 +60,7 @@ def _add(browser, collection, item):
 
 def _delete(browser, collection):
     return browser.client.request("DELETE", f"/collections/{collection}",
-                                  headers={"X-CSRF-Token": browser.csrf()})
+                                  headers={"X-CSRF-Token": browser.csrf(), "Origin": "http://web.test"})
 
 
 def _indexed(storage, browser, body, settings):
@@ -70,7 +70,8 @@ def _indexed(storage, browser, body, settings):
     return ids
 
 
-def test_collection_owner_matrix_metadata_and_crud(api):
+def test_collection_owner_matrix_metadata_and_crud(resource_api):
+    api = resource_api
     api.bootstrap_admin()
     aid = api.create_user("a@example.org")
     bid = api.create_user("b@example.org")
@@ -96,13 +97,14 @@ def test_collection_owner_matrix_metadata_and_crud(api):
             assert other.post(f"/collections/{identifier}/items", {"item_id": str(common)}).json() == {"error": "not_found"}
             assert other.post("/search", {"query": "secret", "mode": "keyword", "collection_id": identifier}).json() == {"error": "not_found"}
     assert a.patch(f"/collections/{collection}", {"name": "Renamed"}).json()["collection"]["name"] == "Renamed"
-    assert a.client.request("DELETE", f"/collections/{collection}/items/{own}", headers={"X-CSRF-Token": a.csrf()}).status_code == 204
+    assert a.client.request("DELETE", f"/collections/{collection}/items/{own}", headers={"X-CSRF-Token": a.csrf(), "Origin": "http://web.test"}).status_code == 204
     assert a.get(f"/collections/{collection}/items").json()["total"] == 1
-    assert a.client.request("DELETE", f"/collections/{collection}", headers={"X-CSRF-Token": a.csrf()}).status_code == 204
+    assert _delete(a, collection).status_code == 204
     assert a.get(f"/collections/{collection}/items").status_code == 404
 
 
-def test_delete_collection_removes_memberships_but_preserves_items(api):
+def test_delete_collection_removes_memberships_but_preserves_items(resource_api):
+    api = resource_api
     owner = api.create_user("owner@example.org")
     browser = api.user_browser("owner@example.org")
     own = api.add_item(owner=owner, title="Private stays")
@@ -119,7 +121,8 @@ def test_delete_collection_removes_memberships_but_preserves_items(api):
         assert browser.get(f"/library/items/{item}").status_code == 200
 
 
-def test_database_rejects_direct_collection_delete_while_members_exist(api):
+def test_database_rejects_direct_collection_delete_while_members_exist(resource_api):
+    api = resource_api
     owner = api.create_user("owner@example.org")
     browser = api.user_browser("owner@example.org")
     item = api.add_item(owner=owner, title="Still linked")
@@ -133,7 +136,8 @@ def test_database_rejects_direct_collection_delete_while_members_exist(api):
     assert api.scalar("SELECT count(*) FROM collection_items WHERE collection_id=:c", c=uuid.UUID(collection)) == 1
 
 
-def test_delete_collection_failure_rolls_back_memberships(api, monkeypatch):
+def test_delete_collection_failure_rolls_back_memberships(resource_api, monkeypatch):
+    api = resource_api
     owner = api.create_user("owner@example.org")
     browser = api.user_browser("owner@example.org")
     item = api.add_item(owner=owner, title="Rollback item")
@@ -146,8 +150,8 @@ def test_delete_collection_failure_rolls_back_memberships(api, monkeypatch):
             raise RuntimeError("synthetic failure after membership delete")
         return original_delete(self, instance)
     monkeypatch.setattr(Session, "delete", fail_collection_delete)
-    with pytest.raises(RuntimeError, match="synthetic failure after membership delete"):
-        _delete(browser, collection)
+    response = _delete(browser, collection)
+    assert response.status_code == 503 and response.json() == {"error": "resource_write_unavailable"}
     assert api.scalar("SELECT count(*) FROM collections WHERE id=:c", c=uuid.UUID(collection)) == 1
     assert api.scalar("SELECT count(*) FROM collection_items WHERE collection_id=:c", c=uuid.UUID(collection)) == 1
     assert api.scalar("SELECT count(*) FROM library_items WHERE id=:i", i=item) == 1

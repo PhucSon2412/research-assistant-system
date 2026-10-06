@@ -1,7 +1,7 @@
 {
-  "base": "f229141e6db46f7df663cb1d14335530a4d5e9dd",
+  "base": "833db7cc1b3a4df6b683f72820fca83a17c19eb7",
   "source_migration": "0039",
-  "scope": "Current route inventory: C2d-1 reads, 13 C2d-2a GET and exactly 9 C2d-2b review/publication JSON GET completed on review branch; writer/file/provider status remains separate.",
+  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4.",
   "safety": "pending until C4",
   "route_count": 63,
   "routes": [
@@ -326,7 +326,7 @@
       "path": "/collections",
       "function": "list_collections",
       "source": "api/app/api/routes/collections.py",
-      "line": 53,
+      "line": 55,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -344,59 +344,61 @@
       "path": "/collections",
       "function": "create_collection",
       "source": "api/app/api/routes/collections.py",
-      "line": 68,
+      "line": 70,
       "dependencies": [
         "get_principal",
-        "get_db"
+        "get_db",
+        "get_clock",
+        "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "open C2d",
-      "direct_transaction_calls": [
-        "db.commit"
-      ],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "final_status": "completed C2d-3 (review branch; safety pending until C4)",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d3-library-collection-json-writes.md#boundary-ghi-và-khóa",
+      "boundary_helper": "app.api.resource_writes.resource_write"
     },
     {
       "method": "PATCH",
       "path": "/collections/{collection_id}",
       "function": "rename_collection",
       "source": "api/app/api/routes/collections.py",
-      "line": 78,
+      "line": 88,
       "dependencies": [
         "get_principal",
-        "get_db"
+        "get_db",
+        "get_clock",
+        "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "open C2d",
-      "direct_transaction_calls": [
-        "db.commit"
-      ],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "final_status": "completed C2d-3 (review branch; safety pending until C4)",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d3-library-collection-json-writes.md#boundary-ghi-và-khóa",
+      "boundary_helper": "app.api.resource_writes.resource_write"
     },
     {
       "method": "DELETE",
       "path": "/collections/{collection_id}",
       "function": "delete_collection",
       "source": "api/app/api/routes/collections.py",
-      "line": 89,
+      "line": 101,
       "dependencies": [
         "get_principal",
-        "get_db"
+        "get_db",
+        "get_clock",
+        "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "open C2d",
-      "direct_transaction_calls": [
-        "db.commit",
-        "db.rollback"
-      ],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "final_status": "completed C2d-3 (review branch; safety pending until C4)",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d3-library-collection-json-writes.md#boundary-ghi-và-khóa",
+      "boundary_helper": "app.api.resource_writes.resource_write"
     },
     {
       "method": "GET",
       "path": "/collections/{collection_id}/items",
       "function": "list_collection_items",
       "source": "api/app/api/routes/collections.py",
-      "line": 102,
+      "line": 116,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -414,34 +416,36 @@
       "path": "/collections/{collection_id}/items",
       "function": "add_collection_item",
       "source": "api/app/api/routes/collections.py",
-      "line": 142,
+      "line": 156,
       "dependencies": [
         "get_principal",
-        "get_db"
+        "get_db",
+        "get_clock",
+        "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "open C2d",
-      "direct_transaction_calls": [
-        "db.commit"
-      ],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "final_status": "completed C2d-3 (review branch; safety pending until C4)",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d3-library-collection-json-writes.md#boundary-ghi-và-khóa",
+      "boundary_helper": "app.api.resource_writes.resource_write"
     },
     {
       "method": "DELETE",
       "path": "/collections/{collection_id}/items/{item_id}",
       "function": "remove_collection_item",
       "source": "api/app/api/routes/collections.py",
-      "line": 155,
+      "line": 184,
       "dependencies": [
         "get_principal",
-        "get_db"
+        "get_db",
+        "get_clock",
+        "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "open C2d",
-      "direct_transaction_calls": [
-        "db.commit"
-      ],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "final_status": "completed C2d-3 (review branch; safety pending until C4)",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d3-library-collection-json-writes.md#boundary-ghi-và-khóa",
+      "boundary_helper": "app.api.resource_writes.resource_write"
     },
     {
       "method": "GET",
@@ -520,7 +524,7 @@
       "path": "/library/items",
       "function": "list_items",
       "source": "api/app/api/routes/library.py",
-      "line": 136,
+      "line": 137,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -538,7 +542,7 @@
       "path": "/library/items/count",
       "function": "count_items",
       "source": "api/app/api/routes/library.py",
-      "line": 177,
+      "line": 178,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -556,7 +560,7 @@
       "path": "/library/items/{item_id}",
       "function": "get_item",
       "source": "api/app/api/routes/library.py",
-      "line": 193,
+      "line": 194,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -574,7 +578,7 @@
       "path": "/library/items/{item_id}/chunks",
       "function": "get_chunks",
       "source": "api/app/api/routes/library.py",
-      "line": 259,
+      "line": 260,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -592,7 +596,7 @@
       "path": "/library/items/{item_id}/metadata-candidates",
       "function": "get_metadata_candidates",
       "source": "api/app/api/routes/library.py",
-      "line": 297,
+      "line": 298,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -610,7 +614,7 @@
       "path": "/library/items/{item_id}/coverage",
       "function": "get_coverage",
       "source": "api/app/api/routes/library.py",
-      "line": 324,
+      "line": 325,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -628,7 +632,7 @@
       "path": "/library/items/{item_id}/references",
       "function": "get_references",
       "source": "api/app/api/routes/library.py",
-      "line": 359,
+      "line": 360,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -646,19 +650,18 @@
       "path": "/library/items/{item_id}",
       "function": "update_item",
       "source": "api/app/api/routes/library.py",
-      "line": 389,
+      "line": 390,
       "dependencies": [
         "get_principal",
         "get_db",
-        "get_now"
+        "get_clock",
+        "get_settings"
       ],
       "group": "json-resource",
-      "final_status": "open C2d",
-      "direct_transaction_calls": [
-        "db.commit",
-        "db.rollback"
-      ],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "final_status": "completed C2d-3 (review branch; safety pending until C4)",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d3-library-collection-json-writes.md#boundary-ghi-và-khóa",
+      "boundary_helper": "app.api.resource_writes.resource_write"
     },
     {
       "method": "GET",
