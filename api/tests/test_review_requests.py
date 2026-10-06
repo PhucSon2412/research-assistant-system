@@ -17,7 +17,8 @@ from app.main import app
 from tests.helpers import WEB_ORIGIN
 from tests.test_ingest_worker import upload
 from tests.test_private_index import fake_provider, settings_with_fake_key
-from tests.test_uploads import upload_api  # noqa: F401  (fixture)
+from tests.original_fixtures import upload_api, base_upload_api  # noqa: F401
+from tests.test_c2c1_bootstrap import installation  # fixture dependency of upload_api
 
 A_BODY = b"## Methods\nReviewable result is seven units.\n"
 B_BODY = b"## Methods\nReviewable secret BSECRET.\n"
@@ -258,7 +259,7 @@ def test_rights_epoch_change_and_close_during_verification_block_review(upload_a
     # A close committed after the first grant check but before any byte is sent wins.
     class ClosingStorage:
         def open(self, key):
-            close_journaled(api.engine, rid)  # the owner's withdraw, from another session
+            close_journaled(api.setup_engine, rid)  # the owner's withdraw, from another session
             return storage.open(key)
 
     app.dependency_overrides[reviews._storage] = lambda: ClosingStorage()

@@ -43,6 +43,7 @@ from tests.test_review_requests import (A_BODY, B_BODY, DECLARED_RIGHTS, DECLARE
                                         original_url, submit, world, write)
 from tests.test_ingest_worker import upload
 from tests.test_uploads import upload_api  # noqa: F401  (fixture)
+from tests.test_c2c1_bootstrap import installation
 
 NOTE = "Synthetic rejection note RNOTE-41 (must never reach the journal)"
 CODES = {"withdraw": "withdrawn_by_requester", "reject": "rights_not_established", "approve": "approved_by_admin"}

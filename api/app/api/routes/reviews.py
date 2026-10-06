@@ -20,14 +20,11 @@ rejection note, recorded evidence, titles, file bytes or tokens.
 
 from __future__ import annotations
 
-import hashlib
-import tempfile
 import uuid
 from datetime import date, datetime, timedelta
 from typing import Literal
-from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, select
@@ -37,6 +34,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_clock, get_db, get_now, get_principal, require_admin, require_trusted_origin
 from app.api.errors import ApiError
 from app.api.review_publication_reads import review_publication_json
+from app.api import original_downloads
 from app.audit import record_event
 from app.authz import (Principal, m2a_private_derivatives_clause, review_grant_clause,
                       review_history_admin_clause)
@@ -70,7 +68,6 @@ RECOVERED_NOTE = ("Yêu cầu đã được đóng khi khôi phục dữ liệu 
                   "có trong dữ liệu khôi phục và không được tạo lại; User có thể gửi yêu cầu mới.")
 RIGHTS_NOTE = ("Quyền do Admin tự kiểm với đúng file/checksum này. Lời khai của User, việc User upload hay việc "
                "paper đọc miễn phí trên arXiv/Hugging Face không tự cấp quyền phân phối.")
-STREAM_CHUNK_BYTES = 64 * 1024
 
 
 def _clean_text(value: str) -> str:
@@ -436,87 +433,17 @@ def _pending_item_id(db: Session, rr: ReviewRequest) -> uuid.UUID | None:
     return db.scalar(select(AccessRights.item_id).where(AccessRights.origin_review_request_id == rr.id))
 
 
-def _deny_reason(rr: ReviewRequest | None, file_id: uuid.UUID) -> str | None:
-    if rr is None:
-        return None
-    if rr.status != ReviewStatus.OPEN.value:
-        return "request_closed"
-    if rr.source_file_id != file_id:
-        return "file_not_in_request"
-    return "grant_inactive"
-
-
 @admin_router.get("/{request_id}/files/{file_id}/original")
-def admin_original(
+async def admin_original(
     request_id: str,
     file_id: str,
+    request: Request,
     admin: Principal = Depends(require_admin),
-    db: Session = Depends(get_db),
     storage: OriginalStorage = Depends(_storage),
+    clock=Depends(get_clock),
+    settings: Settings = Depends(get_settings),
 ) -> StreamingResponse:
-    rid, fid = _parse_id(request_id), _parse_id(file_id)
-    granted = _granted(admin).where(ReviewRequest.id == rid, SourceFile.id == fid)
-
-    def deny(reason_code: str | None) -> ApiError:
-        db.rollback()
-        if reason_code is not None:
-            _audit(db, admin, "review.original.view", AuditOutcome.DENIED, rid, reason_code=reason_code)
-            db.commit()
-        return ApiError(404, "not_found")
-
-    row = db.execute(granted).first()
-    if row is None:
-        raise deny(_deny_reason(db.get(ReviewRequest, rid), fid))
-    rr, _item, _version, source, _email = row
-    db.rollback()  # no lock held while reading the object
-    spool = tempfile.TemporaryFile()
-    try:
-        # Verify the exact bytes the owner submitted before sending any of them.
-        try:
-            body = storage.open(source.storage_key)
-        except Exception:
-            raise ApiError(503, "file_unavailable") from None
-        digest, size = hashlib.sha256(), 0
-        try:
-            for chunk in body.iter_chunks(chunk_size=STREAM_CHUNK_BYTES):
-                size += len(chunk)
-                if size > source.byte_size:
-                    break
-                digest.update(chunk)
-                spool.write(chunk)
-        except Exception:
-            raise ApiError(503, "file_unavailable") from None
-        finally:
-            body.close()
-        if size != source.byte_size or digest.hexdigest() != rr.file_checksum_sha256:
-            _audit(db, admin, "review.original.view", AuditOutcome.FAILURE, rid, reason_code="checksum_mismatch")
-            db.commit()
-            raise ApiError(409, "review_file_integrity_failed")
-        # Re-check the grant under a share lock: a withdraw/reject committed
-        # while verifying wins; one arriving later waits for this audit row.
-        if db.execute(granted.with_for_update(of=ReviewRequest, read=True)).first() is None:
-            raise deny(_deny_reason(db.get(ReviewRequest, rid), fid))
-        _audit(db, admin, "review.original.view", AuditOutcome.SUCCESS, rid, source_file_id=str(source.id))
-        db.commit()
-    except BaseException:
-        spool.close()
-        raise
-    spool.seek(0)
-
-    def chunks():
-        # Bytes sent after a later close commits cannot be recalled (docs/access-and-data.md).
-        try:
-            while block := spool.read(STREAM_CHUNK_BYTES):
-                yield block
-        finally:
-            spool.close()
-
-    filename = quote(source.original_filename or "original", safe="")
-    return StreamingResponse(chunks(), media_type=source.verified_mime, headers={
-        "Content-Disposition": f"attachment; filename*=UTF-8''{filename}",
-        "Content-Length": str(source.byte_size),
-        "Cache-Control": "no-store",
-    })
+    return await original_downloads.receive(request, admin, file_id, clock, settings, storage, request_id)
 
 
 @admin_router.post("/{request_id}/reject", dependencies=[Depends(require_trusted_origin)])
