@@ -1074,7 +1074,8 @@
       "direct_transaction_calls": [],
       "contract_map": "docs/c2d4b-upload-original.md#boundary-và-lock-map",
       "boundary": "api.upload_original.receive",
-      "post_known_commit_new_proof": true
+      "post_known_commit_new_proof": true,
+      "acceptance_outcome": "attempt-owned commit_started/committed/rollback_confirmed; teardown errors cannot authorize cleanup after commit; safety pending until C4"
     },
     {
       "method": "GET",
@@ -1157,6 +1158,7 @@
     "PUT /uploads/original"
   ],
   "previous_tested_code_commit": "610e52d22292e16534c7c1771ca40fe6528b467a",
-  "c2d4b_code_commit": "68950f3357e740bed6030af53dc385bcef5de585",
-  "previous_inventory_base": "99db5285dfa59dd3d26e86345e849393ed88ce33"
+  "c2d4b_code_commit": "adfdb722fdd0de529b45addddd516872e3b404ac",
+  "previous_inventory_base": "99db5285dfa59dd3d26e86345e849393ed88ce33",
+  "previous_c2d4b_code_commit": "68950f3357e740bed6030af53dc385bcef5de585"
 }

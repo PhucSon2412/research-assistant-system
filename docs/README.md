@@ -1,6 +1,6 @@
 # Tài liệu dự án
 
-**Review PR #44 tại `b578082`: có 1 điểm chặn merge.** [Report và yêu cầu sửa](reviews/pr44-c2d4b-upload-original.md): commit uncertain bị lỗi Session cleanup che mất outcome, dẫn tới xóa object. Reviewer 230/230 API chọn, 51/51 web/typecheck đạt; ca bổ sung tái hiện lỗi, control giữ object. PR OPEN/chưa merge, safety pending tới C4.
+**P2 PR #44 đã sửa trên source `adfdb72`, cần review lại.** [Handoff](c2d4b-upload-original.md#sửa-p2-outcome-độc-lập-với-teardown): outcome độc lập rollback/Session.close, 463 API pass/2.452 not-run; [report gốc](reviews/pr44-c2d4b-upload-original.md) giữ P2 tại `b578082` và số reviewer riêng. PR OPEN/chưa merge, safety pending tới C4.
 
 **C2d-4b — PUT original đã kiểm trên nhánh review:** [bàn giao](c2d4b-upload-original.md) · [task](tasks/m6c2b2c2d4b-upload-original.md). Consume intent trong giao dịch cuối, I/O ngoài khóa DB, fresh response proof và cleanup theo commit outcome. Download thuộc C2d-4c; safety pending tới C4.
 
@@ -38,9 +38,9 @@ Khi có thay đổi quyết định, cập nhật tài liệu liên quan cùng t
 
 | Tài liệu | Nội dung |
 | --- | --- |
-| [Review PR #44](reviews/pr44-c2d4b-upload-original.md) | P2 commit/Session teardown/cleanup; 230 API chọn, 51 web/typecheck và fault bổ sung; cần sửa trước merge |
+| [Review PR #44](reviews/pr44-c2d4b-upload-original.md) | P2 tại source b578082; 230 API chọn và fault bổ sung lịch sử; bản sửa adfdb72 cần review lại |
 | [Bàn giao C2d-4b](c2d4b-upload-original.md) | Phase/lock map, SHA-256 readback, response proof mới, race/cancellation/uncertain, config/proxy và giới hạn |
-| [Test inventory C2d-4b](c2d4b-test-inventory.json) | Source `68950f3`, 808 API pass, collect 2.905/not-run 2.097, 51 web/typecheck/build, đối chứng và giới hạn |
+| [Test inventory C2d-4b](c2d4b-test-inventory.json) | P2 source adfdb72: 463 pass/2.452 not-run; lịch sử 68950f3: 808 API và 51 web/typecheck/build giữ riêng |
 | [Prompt C2d-4b](tasks/m6c2b2c2d4b-upload-original.md) | Hợp đồng task PUT original; kết quả trên nhánh review ở handoff riêng |
 | [Review PR #43](reviews/pr43-c2d4a-upload-intents.md) | 167 API chọn độc lập, 47 web/typecheck; PR đã merge, số review giữ theo source cũ, không suy toàn upload/C2d hoàn tất |
 | [Bàn giao C2d-4a](c2d4a-upload-notice-intent.md) | Hai JSON route, binding/secret/clock/lock/commit boundary, mã lỗi và phạm vi lịch sử trước PUT C2d-4b; đã merge PR #43 |

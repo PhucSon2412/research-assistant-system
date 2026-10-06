@@ -1,5 +1,8 @@
 # Roadmap đề xuất
 
+**Sửa P2 PR #44:** source `adfdb72`, 463 API pass/2.452 not-run; [handoff outcome/teardown](c2d4b-upload-original.md#sửa-p2-outcome-độc-lập-với-teardown). Kết quả 808 tại 68950f3 bên dưới là trước P2, giữ riêng. Cần review lại, chưa merge; safety pending tới C4, C2d-4c riêng.
+
+
 **C2d-4b đã kiểm trên nhánh review:** [handoff PUT original](c2d4b-upload-original.md); không migration/grants, source `0039`. Kiểm runtime/MinIO/journal, race/cancellation/integrity, proof mới sau known commit và proxy streaming; source `68950f3`: 808 API pass, 2.097 not-run, 51 web/typecheck/build; [inventory](c2d4b-test-inventory.json) ghi riêng. Original download C2d-4c tiếp tục riêng, safety pending tới C4. Phần giao và kết quả lịch sử bên dưới giữ nguồn riêng.
 
 ## C2d-4b sau merge PR #43

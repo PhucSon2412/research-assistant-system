@@ -1,5 +1,14 @@
 # Môi trường phát triển và schema (M1a–C2d-4b)
 
+## P2 PR #44 cô lập
+
+Source `adfdb72`; Conda ras interpreter/pip xác minh. PostgreSQL `ras-pr44-p2-db-20261006` port 58457, MinIO `ras-pr44-p2-minio-20261006` port 59457, label `ras.task=pr44-p2-20261006`; journal/credentials/evidence ngoài repo `%TEMP%/ras-pr44-p2-20261006`. Runtime c1_runtime, credentials tường minh trước fixture import, key provider bỏ khỏi process env, HTTP ngoài local bị chặn; không `.env`/dev/provider/cutover.
+
+Lệnh đã chạy: `python <evidence>/setup.py`; `python <evidence>/runner.py api/tests/test_c2d4b_upload_original.py -q -k outcome_survives --junitxml=<evidence>/before.xml` (7 fail/1 pass trước sửa); after2 (8 pass), focused 10 pass; `python -m py_compile api/app/api/upload_original.py`; `python <evidence>/runner.py api --collect-only -q`; `python <evidence>/suite.py` (ba selection rời, **463 pass**, **2.452 not-run**). [Inventory, phần p2_fix](c2d4b-test-inventory.json) và [handoff](c2d4b-upload-original.md#sửa-p2-outcome-độc-lập-với-teardown) giữ source/node/JUnit/hash và lượt collection lỗi indentation riêng. Web không đổi, không chạy lại lệnh web trong lượt sửa này.
+
+Cleanup đã kiểm exact ID/name/label/image/ports/mount/sole consumer rồi gỡ hai container/hai volume P2, xóa đúng ba credentials, giữ evidence/journal; 24 container cũ giữ ID/image/StartedAt. Safety pending tới C4. Đây là lệnh kiểm cô lập ngoài repo, không vận hành dev.
+
+
 ## Review PR #44 cô lập
 
 [Report và giới hạn](reviews/pr44-c2d4b-upload-original.md): head `b578082`, source `68950f3`, 230 API chọn/51 web/typecheck đạt; fault commit + close lỗi tái hiện P2 xóa object, cần sửa trước merge. Reviewer không chạy lại build/browser DOM/full API. Safety pending tới C4, không thao tác dev.

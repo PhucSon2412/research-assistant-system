@@ -1,5 +1,11 @@
 # Chiến lược kiểm thử
 
+## Sửa P2 PR #44: acceptance outcome và teardown
+
+Source `adfdb72`: **463/463 API**, 0 fail/error/skip; 239 upload (230 C2d-4b gồm 10 regression P2, cộng 9 legacy), 155 consent, 68 runtime login/session và ORM 1. Collect **2.915**, not-run **2.452**. [Handoff](c2d4b-upload-original.md#sửa-p2-outcome-độc-lập-với-teardown) và [inventory, phần p2_fix](c2d4b-test-inventory.json) đối chiếu JUnit unique/selection/hash 262 file trước/sau.
+
+Tám ca trước sửa 7 fail/1 control pass, sau sửa 8 pass; thêm hai exception chưa phân loại, focused 10 pass. Lượt chỉnh indentation có 1 collection error, sửa/py_compile đạt; không cộng preparation hoặc số 808/230 cũ vào 463. Web/auth/schema/grants/download không đổi; không rerun web/typecheck/build, full caller/migration/C3/C4/provider/restore/browser DOM. Runtime PostgreSQL/MinIO/journal thật cô lập; injection không chứng minh crash thật. Stack P2 cleanup xong, 24 container cũ nguyên trạng. Safety pending tới C4, cần review lại; không merge.
+
 ## Review độc lập PR #44
 
 [Report P2 và ca tái hiện](reviews/pr44-c2d4b-upload-original.md): source `68950f3`, head `b578082`, **230/230 API chọn pass** (220 mới, 9 legacy runtime, ORM), 0 fail/error/skip, 536,90 s. Web **51/51**, typecheck đạt; không rerun build/browser DOM. Ca bổ sung commit exception + Session close lỗi **1 fail đúng lỗi object bị xóa**; control close bình thường 1 pass giữ object. Không cộng fault/control vào suite 230 hoặc sửa kết quả agent 808.

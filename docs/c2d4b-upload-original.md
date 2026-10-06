@@ -1,6 +1,6 @@
 # C2d-4b: nhận original và consume intent
 
-**Review độc lập PR #44 tại `b578082`:** 230/230 API chọn (đủ 220 mới + 9 legacy runtime + ORM), 51/51 web/typecheck đạt; [report](reviews/pr44-c2d4b-upload-original.md). **P2 chặn merge:** Session cleanup lỗi sau commit exception che mất uncertain, làm attempt xóa object. Ca bổ sung fail đúng lỗi, control pass; bảng outcome bên dưới là hợp đồng dự kiến, chưa bảo đảm ở nhánh lỗi kép này. PR vẫn OPEN/chưa merge, safety pending tới C4. Kết quả agent giữ riêng theo source.
+**Review độc lập PR #44 tại `b578082` (trước sửa P2):** 230/230 API chọn (đủ 220 mới + 9 legacy runtime + ORM), 51/51 web/typecheck đạt; [report](reviews/pr44-c2d4b-upload-original.md). **P2 chặn merge:** Session cleanup lỗi sau commit exception che mất uncertain, làm attempt xóa object. Ca bổ sung fail đúng lỗi, control pass; tại source review, hợp đồng giữ object chưa bảo đảm ở nhánh lỗi kép này. Bản sửa và kiểm mới giữ riêng dưới đây. PR vẫn OPEN/chưa merge, safety pending tới C4. Kết quả agent giữ riêng theo source.
 
 Base fetch `632ec683940a8bccc711c8a55743b0a3992c1d03`; GitHub CLI xác minh PR #43 MERGED, main chứa `f60645edf01d01794590db256d0ea4b5b1ef5c5e`. Nhánh `feat/m6c2b2c2d4b-upload-original` tạo từ `origin/main`; giữ toàn bộ docs chưa commit, gồm review PR #43 và task. Source migration `0039`, không migration/grants/claim lease mới hoặc suy revision DB dev. **Safety pending tới C4; chưa merge.**
 
@@ -31,8 +31,10 @@ Response giữ IDs và `state=received` như biên nhận upload. Không buộc 
 
 | Outcome | Object / response |
 | --- | --- |
-| Precommit denial/SQL/partial put, thread đã settled | Rollback business rows; best effort SELECT SourceFile trên transaction riêng rồi đóng connection trước delete key riêng. DB không trả lời thì giữ orphan |
+| I/O lỗi trước acceptance, hoặc precommit có rollback xác nhận | Rollback business rows; best effort SELECT SourceFile trên transaction riêng rồi đóng connection trước delete key riêng. DB không trả lời thì giữ orphan |
 | Commit exception, kể cả landed/lost reply | `503 upload_outcome_uncertain`, không IDs/retry; giữ object dù một SELECT chưa thấy tham chiếu |
+| Known commit, teardown lỗi | `503 upload_response_unavailable`, không IDs/retry; giữ rows/object |
+| Acceptance lỗi chưa phân loại/rollback chưa xác nhận | `503 upload_outcome_uncertain`, không IDs/retry; giữ object, không suy rollback qua SELECT |
 | Known commit, hậu kiểm thất bại | Giữ rows/object; auth/role/gate/binding denial hoặc `upload_response_unavailable`; không trả IDs hoặc hứa chưa lưu |
 | HTTP task cancellation trước acceptance | Báo stop cho attempt được shield; không consume nếu cancellation/disconnect đã biết. Slot/temp thuộc attempt tới khi thread settle |
 | Cancellation khi commit thread đã chạy | Không delete/close file dưới thread; không trả DTO cho caller đã cancel. Đợi thread settle trong attempt riêng, known commit hoặc uncertain đều giữ object |
@@ -51,9 +53,21 @@ Storage SDK dùng config connect 10 giây, read 30 giây, tối đa 2 attempt th
 
 Proxy Next giữ body streaming, không buffer PDF; timeout 120 giây. Proxy lỗi 502 dùng upload_outcome_uncertain; form coi lỗi mạng/5xx/response thiếu IDs là chưa xác định hoặc response unavailable, đề nghị kiểm thư viện, không tự PUT lại/tạo intent mới. Auth denial sau known commit cũng không chứng minh file chưa được nhận; UI nêu khả năng đó. Checkbox reset mỗi lượt. Original download giữ task C2d-4c.
 
-## Kiểm chứng theo source
+## Sửa P2: outcome độc lập với teardown
 
-Source code cuối `68950f3357e740bed6030af53dc385bcef5de585`, base `632ec68`; commit sau chỉ docs/inventory. Fetch cuối main vẫn cùng base. Collect toàn API **2.905 node**, selection/JUnit unique **808/808 pass**, **0 fail/error/skip**, **2.097 not-run**. Ba process test cô lập chạy selection rời nhau trên cùng source, hash trước/sau của 262 file Python/SQL/web bằng nhau; không sửa code hoặc chạy mutants đồng thời suite.
+Source sửa `adfdb722fdd0de529b45addddd516872e3b404ac`, trên cùng PR #44; [review gốc](reviews/pr44-c2d4b-upload-original.md) giữ kết quả tại `b578082`. Không đổi SQL ACL/clock/lock map, schema/grants, download hoặc web.
+
+Attempt sở hữu `AcceptanceOutcome` riêng với ba mốc: commit_started đặt **trước** commit; committed chỉ đặt khi commit trả thành công; rollback_confirmed chỉ đặt khi rollback trả thành công **và chưa từng gọi commit**. Teardown không thể xóa hai mốc commit. `accept()` quản lý Session tường minh thay vì để `__exit__` che exception; luôn thử rollback rồi close, fallback invalidate/discard connection khi close lỗi. Đọc outcome sau thread settled; cancellation vẫn giữ object bảo thủ.
+
+Attempt quyết định cleanup từ outcome, không từ ApiError/code cuối: commit đã bắt đầu hoặc không có known precommit rollback thì giữ object. Known commit + teardown lỗi không phát proof/IDs, trả response unavailable. Precommit rollback xác nhận vẫn dọn key riêng dù close lỗi; rollback không xác nhận giữ orphan. Invalidate là giải phóng connection, không retry mutation hoặc chứng minh commit từ xa. Nếu driver/OS làm mọi cleanup transport đều thất bại, không hứa release vật lý tức thời; state/object vẫn được giữ.
+
+Tám regression thực trên runtime PostgreSQL/MinIO: commit lỗi + close, commit lỗi + rollback/close, landed/lost reply + close, known commit + close hoặc rollback/close, precommit control normal/close/rollback-close. Trước sửa **7 fail/1 pass**, sau sửa **8 pass**; hai ca bổ sung acceptance exception chưa phân loại trước acceptance/sau known commit cũng pass. Kiểm exact error/no IDs, một put/tối đa một commit, rows/object/delete, transaction/pool/temp/slot/attempt release. Fault harness cho SQL rollback/landed để tạo trạng thái kiểm, API chỉ quan sát commit exception; không chứng minh remote commit thật còn in flight.
+
+Lượt đầu sau chỉnh gặp 1 collection error do indentation ở accept; sửa, py_compile đạt, chạy lại 8 rồi 10 regression đạt. Không tính lượt lỗi hoặc focused vào số suite cuối. **Suite cuối 463/463 pass, 0 fail/error/skip**: 239 upload (230 C2d-4b, gồm 10 regression P2, + 9 legacy), 155 consent, 68 runtime login/session + 1 ORM schema. Collect 2.915, **2.452 not-run**. [Inventory, phần `p2_fix`](c2d4b-test-inventory.json) giữ source/JUnit/selection và 262 source hash trước/sau bằng nhau. Web không đổi; không rerun test/typecheck/build web, giữ số lịch sử riêng. Đã dọn hai container/hai exclusive volume P2 theo ID/name/label/image/port/mount/consumer; 24 container có sẵn giữ ID/image/StartedAt. Xóa ba file credentials sinh riêng, giữ journal/JUnit/evidence ở `%TEMP%/ras-pr44-p2-20261006`. Không đổi hoặc cộng các số 808 ban đầu, 230 reviewer hay 51 web lịch sử. Safety pending tới C4, chưa merge; C2d-4c riêng.
+
+## Kiểm chứng theo source ban đầu (trước P2)
+
+Source code vòng ban đầu `68950f3357e740bed6030af53dc385bcef5de585`, base `632ec68`; commit bàn giao ban đầu `b578082` chỉ docs/inventory. Fetch cuối main vẫn cùng base. Collect toàn API **2.905 node**, selection/JUnit unique **808/808 pass**, **0 fail/error/skip**, **2.097 not-run**. Ba process test cô lập chạy selection rời nhau trên cùng source, hash trước/sau của 262 file Python/SQL/web bằng nhau; không sửa code hoặc chạy mutants đồng thời suite.
 
 | Nhóm cuối | Pass |
 | --- | ---: |

@@ -1,5 +1,11 @@
 # Nhật ký quyết định
 
+## Sửa P2 PR #44: giữ outcome khi teardown lỗi (2026-10-06)
+
+Theo yêu cầu chủ dự án và [review](reviews/pr44-c2d4b-upload-original.md), source `adfdb72` giữ outcome trong state do attempt sở hữu, cập nhật trước/sau commit và chỉ xác nhận precommit rollback khi rollback trả thành công. Lỗi close/rollback không hạ commit uncertain/known thành quyền cleanup. Acceptance Session teardown tường minh, fallback invalidate để trả/discard connection; không retry mutation. Known commit + teardown lỗi trả response unavailable không IDs, giữ dữ liệu.
+
+[Handoff P2](c2d4b-upload-original.md#sửa-p2-outcome-độc-lập-với-teardown) ghi mốc/state/error/resources và giới hạn; suite liên quan 463/463 pass, collect 2.915/2.452 not-run; source/hash/node ở phần p2_fix của inventory. Giữ review và kết quả 808/230 trước sửa riêng; không migration/grants/web/download, không dev/`.env`/provider. Safety pending tới C4, cần review lại, không merge.
+
 ## Review độc lập PR #44 (2026-10-06)
 
 Fetch/GitHub CLI xác minh PR OPEN/chưa merge, head `b578082`, code `68950f3`, base/main `632ec68`, source `0039`; không query dev. [Report](reviews/pr44-c2d4b-upload-original.md): reviewer **230/230 API chọn**, **51/51 web** và typecheck đạt, source hashes không đổi; JUnit/selection/source agent 808 được xác minh riêng, không tính là chạy lại 808.

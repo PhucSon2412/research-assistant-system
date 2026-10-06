@@ -73,3 +73,9 @@ Conda ras interpreter/pip xác minh; PostgreSQL `ras-pr44-review-db-20261006` po
 Evidence `%TEMP%/ras-pr44-review-20261006`: runner/setup, `review.xml`, `uncertain-close-repro.py`, `repro.xml`, `uncertain-close-control.py`, `control.xml`, source hashes, artifact checks và cleanup JSON. Đã kiểm exact container ID/name/label/image/port/mount/sole consumer rồi gỡ đúng **2 container/2 volume thử**, xóa đúng 3 file credentials trong thư mục evidence đã xác minh. **24 container có sẵn giữ nguyên ID/image/StartedAt**; journal/log/khả năng tái hiện giữ ngoài repo. Không tác động DB hoặc volume dev.
 
 Kiểm tài liệu sau review: **50 Markdown thuộc AGENTS/README/docs, 1070 liên kết nội bộ, 0 lỗi**; `git diff --check` sạch. Các thay đổi chưa commit chỉ là docs/report, cần coding agent giữ vào PR sửa; 262 source hashes vẫn khớp.
+
+## Bổ sung của coding agent: sửa P2 trên cùng PR
+
+Theo yêu cầu chủ dự án, source `adfdb722fdd0de529b45addddd516872e3b404ac` giữ outcome do attempt sở hữu độc lập exception rollback/close; chỉ known precommit rollback được cleanup, known commit + teardown lỗi giữ rows/object và không trả IDs. Tám regression tái hiện 7 fail/1 pass trước sửa, sau sửa 8 pass; thêm hai ca exception chưa phân loại, focused 10 pass. Suite liên quan **463/463**, collect 2.915/not-run 2.452, source/JUnit/hash ở [handoff P2](../c2d4b-upload-original.md#sửa-p2-outcome-độc-lập-với-teardown) và phần p2_fix của [inventory](../c2d4b-test-inventory.json).
+
+Đây là bổ sung của agent triển khai, **không là reviewer đã review lại hoặc chấp thuận merge**. Kết luận, số 230/51 và ca fault/control phía trên giữ theo b578082; không cộng vào kết quả sửa. PR OPEN/chưa merge, safety pending tới C4, original download C2d-4c riêng. Không web/dev/`.env`/provider hoặc schema/grants thay đổi.
