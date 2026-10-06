@@ -15,18 +15,20 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_clock, get_db, get_now, get_principal
+from app.api.deps import get_clock, get_db, get_now, get_principal, require_trusted_origin
+from app.api import upload_intents
 from app.api.errors import ApiError
 from app.audit import record_event
 from app.authz import Principal, common_original_clause, m2a_private_derivatives_clause
 from app.common_original import VerifiedFileResponse, prepare_common_original
 from app.config import Settings, get_settings
-from app.identity.tokens import generate_token, hash_token, plausible_token
-from app.models import IngestionJob, LibraryItem, PaperVersion, ProcessingAcknowledgement, SourceFile, UploadIntent
+from app.identity.tokens import hash_token, plausible_token
+from app.identity.final_caller import final_caller
+from app.models import IngestionJob, LibraryItem, PaperVersion, SourceFile, UploadIntent
 from app.models.enums import AuditActorType, AuditOutcome, JobOrigin, JobState, VerifiedMime, Visibility
 from app.pdf_probe import page_count
 from app.storage import OriginalStorage, get_storage
@@ -42,12 +44,19 @@ NOTICE = (
 
 class IntentInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    acknowledged: Literal[True]
+    acknowledged: StrictBool
     notice_version: str
     file_kind: Literal["pdf", "markdown"]
     filename: str = Field(min_length=1, max_length=255)
     byte_size: int = Field(gt=0)
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @field_validator("acknowledged")
+    @classmethod
+    def explicit_confirmation(cls, value: bool) -> bool:
+        if value is not True:
+            raise ValueError("explicit confirmation required")
+        return value
 
 
 def _storage(settings: Settings = Depends(get_settings)) -> OriginalStorage:
@@ -55,8 +64,18 @@ def _storage(settings: Settings = Depends(get_settings)) -> OriginalStorage:
 
 
 @router.get("/uploads/notice")
-def notice(principal: Principal = Depends(get_principal), settings: Settings = Depends(get_settings)) -> dict:
-    return {"version": settings.upload_notice_version, "text": NOTICE}
+def notice(principal: Principal = Depends(get_principal), settings: Settings = Depends(get_settings),
+           db: Session = Depends(get_db), clock=Depends(get_clock)) -> dict:
+    try:
+        final_caller(db, session_id=principal.session_id, user_id=principal.user_id,
+                     clock=clock, idle=settings.auth.session_idle)
+        return {"version": settings.upload_notice_version, "text": NOTICE}
+    except ApiError:
+        raise
+    except Exception:
+        raise ApiError(503, "service_recovering") from None
+    finally:
+        db.rollback()
 
 
 @router.post("/uploads/intents", status_code=201)
@@ -65,13 +84,10 @@ def create_intent(
     request: Request,
     principal: Principal = Depends(get_principal),
     db: Session = Depends(get_db),
-    now: datetime = Depends(get_now),
+    clock: Callable[[], datetime] = Depends(get_clock),
     settings: Settings = Depends(get_settings),
+    _origin: None = Depends(require_trusted_origin),
 ) -> dict:
-    if request.headers.get("origin") not in settings.http.allowed_origins:
-        raise ApiError(403, "csrf_failed")
-    if principal.is_admin:
-        raise ApiError(403, "forbidden")
     if body.notice_version != settings.upload_notice_version:
         raise ApiError(409, "notice_changed")
     if Path(body.filename).name != body.filename or "\\" in body.filename or any(ord(c) < 32 for c in body.filename):
@@ -82,36 +98,8 @@ def create_intent(
     limit = settings.files.pdf_max_bytes if body.file_kind == "pdf" else settings.files.markdown_max_bytes
     if body.byte_size > limit:
         raise ApiError(413, "file_too_large")
-    raw, digest = generate_token()
-    ack = ProcessingAcknowledgement(
-        actor_user_id=principal.user_id,
-        session_id=principal.session_id,
-        notice_version=body.notice_version,
-        acknowledged_at=now,
-    )
-    db.add(ack)
-    db.flush()
-    intent = UploadIntent(
-        token_hash=digest,
-        acknowledgement_id=ack.id,
-        user_id=principal.user_id,
-        session_id=principal.session_id,
-        notice_version=body.notice_version,
-        file_kind=body.file_kind,
-        filename=body.filename,
-        declared_size=body.byte_size,
-        declared_sha256=body.sha256,
-        created_at=now,
-        expires_at=now + settings.files.upload_intent_lifetime,
-    )
-    db.add(intent)
-    db.flush()
-    record_event(db, action="upload.intent.create", outcome=AuditOutcome.SUCCESS,
-                 actor_type=AuditActorType.USER, actor_user_id=principal.user_id,
-                 target_type="upload_intent", target_id=str(intent.id),
-                 details={"notice_version": body.notice_version})
-    db.commit()
-    return {"intent_token": raw, "expires_at": intent.expires_at.isoformat()}
+    return upload_intents.create(db, principal, body, csrf_token=request.headers.get("x-csrf-token") or "",
+                                 clock=clock, settings=settings)
 
 
 def _validate_file(path: str, kind: str, settings: Settings) -> tuple[str, int | None]:
