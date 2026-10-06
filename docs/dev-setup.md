@@ -1,4 +1,14 @@
-# Môi trường phát triển và schema (M1a–C2d-3)
+# Môi trường phát triển và schema (M1a–C2d-4a)
+
+## C2d-4a notice và intent cô lập
+
+Base `99db528`, code/test cuối `610e52d`, web kiểm tại `27dd4c5` và không đổi sau đó; source migration `0039`, **nhánh review chưa merge, safety pending tới C4**. Conda ras interpreter/pip đã xác minh, không venv/cài thêm. PostgreSQL standalone `ras-c2d4a-db-20261006`, label `ras.task=c2d4a-20261006`, bind `127.0.0.1:58454`; credentials/admin URL/DB parts tường minh, runtime/recovery LOGIN thật. Journal/evidence ngoài repo `%TEMP%/ras-c2d4a-20261006`; runner chặn external HTTP sync/async, không fallback `.env`. Scoped cutover chỉ trong fixture nghiệp vụ; hai pending HTTP giữ gate thật.
+
+Lệnh thực chạy từ root với `$py = "$env:USERPROFILE\.conda\envs\ras\python.exe"`: `& $py <evidence>/setup.py`, `& $py <evidence>/runner.py api --collect-only -q`, `& $py <evidence>/mutants.py`, `& $py <evidence>/final_suite.py` (selection hai nhóm và JUnit riêng). `final_suite.py` gọi `runner.py api -q --ras-selected --selection=<core/reg-nodes.json> --basetemp=<thư mục riêng> --junitxml=<final-core/reg.xml>`. Đây là evidence runner cô lập, **không là lệnh vận hành dev**.
+
+Web: `npm test --prefix web` đạt 47/47; `npm run typecheck --prefix web` và `npm run build --prefix web` đạt. Smoke callback form thật qua proxy tới HTTP upstream tổng hợp; không browser DOM/full product hay file transfer. [Handoff và kết quả API theo source](c2d4a-upload-notice-intent.md). Không đọc/sửa `.env`, query/nâng/restart dev, provider/pricing hoặc mở readiness. PUT/download/C3/C4 còn riêng.
+
+API cuối `610e52d`: 579/579, core 313 / 783,825 s, reg 266 / 409,836 s; JUnit/selection/source hashes khớp, 2.106 not-run. Suite đầu `27dd4c5`, regression Admin metadata fail trước sửa, cùng ca pass sau sửa và ba mutants chạy lại giữ ở history/inventory riêng. Hai lượt container thử đã dọn sau ownership checks; 24 container cũ giữ metadata. Evidence đầu ở `history-27dd4c5`, basetemp/journal hai lượt khác nhau, không xóa để ghi đè lịch sử.
 
 ## Sửa final read clock: kiểm cô lập 2026-10-06
 
@@ -10,7 +20,7 @@ Lệnh evidence thực chạy từ gốc repo bằng Conda Python: `setup.py`; `
 
 Đã kiểm ID/label/image/port/mount/sole consumer trước khi xóa container/anonymous volume thử, xóa credentials; 24 preexisting container giữ ID/image/StartedAt. [Handoff/kết quả/giới hạn](c2d-final-read-clock.md) · [Inventory](c2d-final-read-clock-test-inventory.json). Source `0039` không là revision DB dev; safety pending tới C4.
 
-**Cập nhật 2026-10-06:** PR #41 đã merge `5100ff6`, source migration `0039`. Task tiếp [sửa final read clock](tasks/c2d-final-read-clock.md) đã triển khai trên nhánh review, chưa merge; [handoff/evidence mới](c2d-final-read-clock.md). Không có lệnh vận hành dev mới. Safety pending tới C4, không suy revision DB dev.
+**Cập nhật 2026-10-06:** PR #42 đã merge `99db528`, source migration `0039`; [handoff/evidence sửa clock](c2d-final-read-clock.md) giữ theo source đã kiểm. Task tiếp [C2d-4a notice/intent](tasks/m6c2b2c2d4a-upload-notice-intent.md) đã giao, chưa triển khai/chưa kiểm. Không có lệnh vận hành dev mới. Safety pending tới C4, không suy revision DB dev.
 
 ## Review PR #41 cô lập
 

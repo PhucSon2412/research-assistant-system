@@ -1,8 +1,12 @@
 # Research Assistant System
 
+**C2d-4a đã triển khai trên nhánh review, chưa merge**, base PR #42 `99db528`: [bàn giao notice/intent](docs/c2d4a-upload-notice-intent.md). Chỉ hai JSON route kiểm caller/binding/clock trước commit và proof mới trước trả token; PUT file và original download còn riêng. Source `0039`, safety **pending tới C4**; không có thao tác dev mới.
+
+**Review PR #42 tại `8f924c0`:** 124/124 API chọn pass độc lập, gồm đủ 65 test clock mới. Đối chứng hàm cũ bắt đúng 6 lỗi và giữ 2 ca sát hạn thành công; không thấy điểm chặn merge trong phạm vi sửa clock. [Report và giới hạn](docs/reviews/pr42-final-read-clock.md). Kết quả giữ theo source review trước merge, không phải kiểm thử C2d-4a.
+
 **Sửa final read clock:** [handoff](docs/c2d-final-read-clock.md) · [inventory](docs/c2d-final-read-clock-test-inventory.json). Source `0039`, safety pending tới C4; kết quả mới tách khỏi review PR #41 bên dưới.
 
-**PR #41 đã merge `5100ff6` (2026-10-06).** Task tiếp: [sửa final read clock sau SQL](docs/tasks/c2d-final-read-clock.md), đã triển khai trên nhánh review, chưa merge. [Review và P2 đã tái hiện](docs/reviews/pr41-c2d3-resource-writes.md): 270/270 API chọn, 45/45 web và typecheck đạt tại source cũ; P2 GET helper ở source cũ đã có bản sửa đang review, chưa merge. Safety pending tới C4.
+**PR #41 đã merge `5100ff6` (2026-10-06).** [Sửa final read clock sau SQL](docs/tasks/c2d-final-read-clock.md) đã merge trong PR #42 `99db528`. [Review và P2 đã tái hiện](docs/reviews/pr41-c2d3-resource-writes.md): 270/270 API chọn, 45/45 web và typecheck đạt tại source cũ; failure P2 giữ làm lịch sử. Safety pending tới C4.
 
 **C2d-3 đã merge PR #41 `5100ff6`, base `833db7c`:** [bàn giao 6 writer](docs/c2d3-library-collection-json-writes.md) · [inventory](docs/c2d3-test-inventory.json). Không migration/grants mới; safety pending tới C4. Kết quả PR #40 bên dưới giữ theo source lịch sử.
 
