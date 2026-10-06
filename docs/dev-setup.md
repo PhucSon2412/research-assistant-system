@@ -1,5 +1,21 @@
 # Môi trường phát triển và schema (M1a–C2d-4b)
 
+**Sau merge PR #44 (2026-10-06):** main `dd8bdc6`, source migration `0039`, không query DB dev. [Task C2d-4c original downloads](tasks/m6c2b2c2d4c-original-downloads.md) đã triển khai trên nhánh review (code `4c49919`, [handoff](c2d4c-original-downloads.md), [inventory](c2d4c-test-inventory.json)), chưa merge; không có lệnh vận hành dev mới. Chỉ dùng runtime/PostgreSQL/MinIO/journal cô lập với credentials tường minh; không đọc `.env` hoặc nâng/restart dev. Safety pending tới C4. Các lệnh và trạng thái review dưới đây là evidence lịch sử, không suy dev sẽ healthy.
+
+## C2d-4c cô lập
+
+Source code chốt `4c49919203db085dacd0778b3ce62e6787fd3823`, base `dd8bdc6`; [handoff](c2d4c-original-downloads.md) và [inventory](c2d4c-test-inventory.json) là chứng cứ hiện hành. Python/pip đã kiểm đúng Conda ras; không cài hoặc tạo venv. Evidence ngoài repo `%TEMP%/ras-c2d4c-20261006`, journal riêng trong thư mục test tạm ngoài repo. PostgreSQL `pgvector/pgvector:pg16` tại 58457, MinIO `RELEASE.2025-09-07T16-13-09Z` tại 59457, label `ras.task=c2d4c-20261006`; chỉ bind 127.0.0.1. Mọi credentials DB/MinIO thử cấp tường minh trước import fixture, không fallback `.env`.
+
+Đã chạy host runner ngoài repo qua `& $py <evidence>/run.py <các file/node trong selection inventory> -q --tb=short -s --junitxml=<evidence>/final-api.xml`; orchestration `final.py` ghi source hashes trước/sau, đối chiếu selected/unique JUnit/missing/extra/duplicate. Đối chứng `mutants.py` chạy nối tiếp trước suite cuối, restore byte/hash từng guard. Runner chặn HTTP ngoài local; không khởi động worker/beat/provider. `npm test --prefix web`, `npm run typecheck --prefix web`, `npm run build --prefix web` ghi log riêng. Socket smoke khởi động Uvicorn 58458 và Next 53457 bằng fixture, stop cả hai trong finally; Chrome headless dùng bản đã cài, không tự tải trình duyệt.
+
+Auth/GET/audit runtime thật; chỉ resource setup/corruption và POST của legacy fixture chưa chuyển đổi dùng engine đặc quyền cô lập. Không thêm grants hoặc chứng nhận các writer đó runtime-ready. Pending HTTP giữ gate thật đóng. Các lệnh trên là kiểm chứng cô lập, không lệnh mở dev/cutover; các số cũ bên dưới giữ theo source lịch sử. Cleanup có metadata ownership/mount/sole-consumer và đối chiếu tài nguyên có sẵn trong inventory; giữ journal/JUnit/log ngoài repo, xóa credentials thử sau suite.
+
+## Review lại P2 PR #44 cô lập
+
+[Report và giới hạn](reviews/pr44-c2d4b-upload-original.md#review-lại-p2-tại-5504810): head `5504810`, code `adfdb72`, 76 API chọn pass độc lập và hai ca fault/control riêng pass; không phát hiện điểm chặn merge scope C2d-4b. Web không đổi, không chạy lại. PR chưa merge, safety pending tới C4.
+
+Conda ras interpreter/pip đã xác minh; evidence `%TEMP%/ras-pr44-p2-review-20261006`. PostgreSQL port 58457, MinIO 59457, label `ras.task=pr44-p2-review-20261006`, credentials tường minh; chỉ HTTP local. Chạy `& $py <evidence>/runner.py <các node chọn ghi trong report> -q --basetemp=<evidence>/pytest --junitxml=<evidence>/review-p2.xml`; `uncertain-close-repro.py`/`uncertain-close-control.py` chạy riêng đúng node fixture ghi trong script. `artifact_checks.py` đối chiếu 463 artifact agent và 262 hash; đây là công cụ kiểm ngoài repo, không là lệnh vận hành dev. Đã gỡ đúng 2 container/2 exclusive volume và xóa 3 file credentials sau ownership checks; 24 container có sẵn giữ nguyên ID/image/StartedAt. Các mục dưới giữ evidence những lượt trước.
+
 ## P2 PR #44 cô lập
 
 Source `adfdb72`; Conda ras interpreter/pip xác minh. PostgreSQL `ras-pr44-p2-db-20261006` port 58457, MinIO `ras-pr44-p2-minio-20261006` port 59457, label `ras.task=pr44-p2-20261006`; journal/credentials/evidence ngoài repo `%TEMP%/ras-pr44-p2-20261006`. Runtime c1_runtime, credentials tường minh trước fixture import, key provider bỏ khỏi process env, HTTP ngoài local bị chặn; không `.env`/dev/provider/cutover.

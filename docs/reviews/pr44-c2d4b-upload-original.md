@@ -2,7 +2,36 @@
 
 [Mục lục](../README.md) · [Task](../tasks/m6c2b2c2d4b-upload-original.md) · [Handoff](../c2d4b-upload-original.md) · [Inventory agent](../c2d4b-test-inventory.json)
 
-## Kết luận
+**Sau review:** chủ dự án xác nhận merge; fetch/GitHub CLI ngày 2026-10-06 xác minh PR #44 MERGED tại `dd8bdc689ef7b495618116add4832628d7d24327`, chứa head `5504810`. [Task tiếp C2d-4c](../tasks/m6c2b2c2d4c-original-downloads.md) đã giao, chưa triển khai. Kết quả/verdict/OPEN tại từng lượt dưới đây giữ lịch sử theo source, không chạy lại tại merge. Safety pending tới C4.
+
+## Review lại P2 tại 5504810
+
+Ngày 2026-10-06, xác minh PR #44 **OPEN, chưa merge**, head `550481007b2bac82dc469c616700266b201593ee`, code sửa `adfdb722fdd0de529b45addddd516872e3b404ac`, base/main `632ec683940a8bccc711c8a55743b0a3992c1d03`. Working tree sạch trước kiểm; source migration `0039`, không query DB dev.
+
+**P2 đã được sửa; không phát hiện điểm chặn merge còn lại trong phạm vi C2d-4b.** Outcome do attempt sở hữu được ghi trước commit và sau commit thành công; rollback/close không xóa các mốc đó. Cleanup acceptance chỉ được phép khi chưa gọi commit và rollback đã được xác nhận. Known commit + teardown lỗi giữ rows/object, không trả IDs; exception chưa phân loại không cấp quyền cleanup. Giữ hợp đồng cancellation và release tài nguyên; không nới ACL, clock, schema/grants hoặc safety pending. Original download C2d-4c tiếp tục riêng sau merge do chủ dự án quyết định.
+
+### Kiểm độc lập trên bản sửa
+
+| Kiểm | Kết quả reviewer |
+| --- | --- |
+| 10 regression P2 mới | **10/10 pass**, gồm lỗi kép, known commit, precommit rollback và exception chưa phân loại |
+| C2d-4b chọn thêm: cancellation/thread, I/O ngoài khóa, race, integrity, fresh actor/clock, pending và receipt | **56/56 pass** |
+| Legacy upload runtime + ORM/schema | **10/10 pass** (9 + 1) |
+| Tổng selection trên | **76/76 pass**, 0 fail/error/skip, **194,592 s**, 3 warning hiện có |
+| Ca tái hiện P2 cũ: commit exception + close lỗi | **1 pass**; `503 upload_outcome_uncertain`, 0 business row, **1 object giữ lại** |
+| Control cùng commit exception, close bình thường | **1 pass**, cùng mã lỗi và object giữ lại |
+
+Hai ca ngoài repo thay test body trong bộ nhớ trên fixture runtime/PostgreSQL/MinIO thật; không thêm vào số 76 hoặc inventory production. Commit harness đã rollback DB để SELECT không thấy hàng, API chỉ biết commit exception. Đây là fault injection, không chứng minh crash, remote commit đang chạy hoặc mất điện thật.
+
+Đối chiếu độc lập ba JUnit agent: 239 upload + 155 consent + 69 runtime/ORM = **463 unique pass**, khớp node selection, SHA artifact và 262 source hashes trước/sau/current. Reviewer chỉ chạy lại 76 trong số đó; **387 node của selection agent** và **2.839 node của collection 2.915** chưa chạy độc lập. Agent còn **2.452 not-run**. Không cộng số 808/230/51 lịch sử hoặc hai ca bổ sung vào lượt kiểm mới. Web không đổi so với b578082; không chạy lại web/build/browser, full callers, C3/C4, provider, restore hoặc benchmark.
+
+Evidence `%TEMP%/ras-pr44-p2-review-20261006`: `review-p2.xml`, `repro.xml`, `control.xml`, ba source JSON, `artifact-checks.json`, runner/fault scripts và cleanup JSON. JUnit SHA-256 lần lượt `ae3c8bb573928e63e2340597adc0c5c9347a0bb76cb1f8f10a030d06ec3455eb`, `2dcfbe2c7b276a00bdb7449469976223feb09f0b44418b3a541396ece186c75a`, `96cefbc2f325b66511c508d62d4faaef5c0cd46d8404ce0c4c05d6f5fa63b0c7`. Script đối chiếu artifact ban đầu dùng tên selection file không tồn tại; đã sửa sang đối chiếu nhóm node theo lệnh chọn và chạy lại đạt, không có test ứng dụng fail trong lượt này.
+
+Conda ras interpreter/pip đã xác minh. PostgreSQL `ras-pr44-p2-review-db-20261006` port 58457, MinIO `ras-pr44-p2-review-minio-20261006` port 59457, label `ras.task=pr44-p2-review-20261006`; credentials tường minh trước import, HTTP ngoài local bị chặn, không đọc `.env`/key. Đã kiểm exact ID/name/label/image/port/mount/sole consumer rồi gỡ đúng **2 container/2 volume thử**, xóa 3 file credentials; **24 container có sẵn giữ nguyên ID/image/StartedAt**. Giữ journal/log/evidence ngoài repo. Không sửa app/test source, commit/push/merge/comment PR, dev hoặc pricing/readiness. Safety **pending tới C4**; giới hạn thread/multipart, reconcile thủ công và release transport vẫn như handoff.
+
+QA sau cập nhật: **50 Markdown, 1.085 liên kết nội bộ, 0 lỗi**; không ký tự control bất hợp lệ, `git diff --check` sạch. Chín file docs/hướng dẫn được cập nhật chưa commit; agent cần giữ và đưa vào PR. 262 source hashes và AST parser/download vẫn khớp; không sửa code ứng dụng để review.
+
+## Kết luận review ban đầu tại b578082 (lịch sử)
 
 Ngày 2026-10-06, Git fetch/GitHub CLI xác minh PR #44 **OPEN, chưa merge**, head `b578082731aeaf321f5d7d5ff597823dc3a5dd44`, base/main `632ec683940a8bccc711c8a55743b0a3992c1d03`. Code/test `68950f3357e740bed6030af53dc385bcef5de585`; source migration `0039`, không query DB dev. Working tree sạch khi bắt đầu review.
 
@@ -74,8 +103,8 @@ Evidence `%TEMP%/ras-pr44-review-20261006`: runner/setup, `review.xml`, `uncerta
 
 Kiểm tài liệu sau review: **50 Markdown thuộc AGENTS/README/docs, 1070 liên kết nội bộ, 0 lỗi**; `git diff --check` sạch. Các thay đổi chưa commit chỉ là docs/report, cần coding agent giữ vào PR sửa; 262 source hashes vẫn khớp.
 
-## Bổ sung của coding agent: sửa P2 trên cùng PR
+## Bổ sung của coding agent trước review lại: sửa P2 trên cùng PR
 
 Theo yêu cầu chủ dự án, source `adfdb722fdd0de529b45addddd516872e3b404ac` giữ outcome do attempt sở hữu độc lập exception rollback/close; chỉ known precommit rollback được cleanup, known commit + teardown lỗi giữ rows/object và không trả IDs. Tám regression tái hiện 7 fail/1 pass trước sửa, sau sửa 8 pass; thêm hai ca exception chưa phân loại, focused 10 pass. Suite liên quan **463/463**, collect 2.915/not-run 2.452, source/JUnit/hash ở [handoff P2](../c2d4b-upload-original.md#sửa-p2-outcome-độc-lập-với-teardown) và phần p2_fix của [inventory](../c2d4b-test-inventory.json).
 
-Đây là bổ sung của agent triển khai, **không là reviewer đã review lại hoặc chấp thuận merge**. Kết luận, số 230/51 và ca fault/control phía trên giữ theo b578082; không cộng vào kết quả sửa. PR OPEN/chưa merge, safety pending tới C4, original download C2d-4c riêng. Không web/dev/`.env`/provider hoặc schema/grants thay đổi.
+Tại thời điểm bổ sung này, agent triển khai **chưa có review lại từ reviewer**. Kết luận, số 230/51 và ca fault/control của review ban đầu giữ theo b578082; không cộng vào kết quả sửa. Review lại trên bản sửa nằm ở đầu report. PR OPEN/chưa merge, safety pending tới C4, original download C2d-4c riêng. Không web/dev/`.env`/provider hoặc schema/grants thay đổi.

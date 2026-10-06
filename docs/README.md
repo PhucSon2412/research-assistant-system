@@ -1,8 +1,10 @@
 # Tài liệu dự án
 
-**P2 PR #44 đã sửa trên source `adfdb72`, cần review lại.** [Handoff](c2d4b-upload-original.md#sửa-p2-outcome-độc-lập-với-teardown): outcome độc lập rollback/Session.close, 463 API pass/2.452 not-run; [report gốc](reviews/pr44-c2d4b-upload-original.md) giữ P2 tại `b578082` và số reviewer riêng. PR OPEN/chưa merge, safety pending tới C4.
+**C2d-4c đã triển khai trên nhánh review, base PR #44 `dd8bdc6`.** [Bàn giao tải original](c2d4c-original-downloads.md) · [inventory](c2d4c-test-inventory.json): đúng hai GET/ba gate private/common/review, spool size/SHA-256 ngoài DB, clock cuối, audit known commit rồi proof mới, ownership slot/temp và proxy streaming. Source code `4c49919`; kết quả cuối ghi tại inventory, các số PR #44 bên dưới giữ riêng. **Safety pending tới C4; chưa merge.**
 
-**C2d-4b — PUT original đã kiểm trên nhánh review:** [bàn giao](c2d4b-upload-original.md) · [task](tasks/m6c2b2c2d4b-upload-original.md). Consume intent trong giao dịch cuối, I/O ngoài khóa DB, fresh response proof và cleanup theo commit outcome. Download thuộc C2d-4c; safety pending tới C4.
+**Review lại PR #44 tại `5504810`: P2 đã sửa, không phát hiện điểm chặn merge trong phạm vi C2d-4b.** Độc lập **76/76 API** và hai ca fault/control riêng đạt; artifact 463 của agent được đối chiếu, không tính là chạy lại toàn bộ. [Report và giới hạn](reviews/pr44-c2d4b-upload-original.md#review-lại-p2-tại-5504810) giữ review ban đầu tại `b578082`. PR sau đó đã merge `dd8bdc6`; chưa chạy lại suite tại merge. Safety **pending tới C4**; download C2d-4c riêng.
+
+**C2d-4b — PUT original đã merge PR #44 `dd8bdc6`:** [bàn giao](c2d4b-upload-original.md) · [task](tasks/m6c2b2c2d4b-upload-original.md). Consume intent trong giao dịch cuối, I/O ngoài khóa DB, fresh response proof và cleanup theo commit outcome. Download thuộc C2d-4c; safety pending tới C4.
 
 **Review PR #43 tại `f60645e`:** độc lập 167/167 API (đủ 155 test mới), 47/47 web và typecheck đạt; không phát hiện điểm chặn merge trong phạm vi notice/intent. [Report và giới hạn](reviews/pr43-c2d4a-upload-intents.md). PR đã merge `632ec68`; số review giữ theo source cũ, không phải kiểm C2d-4b.
 
@@ -38,10 +40,11 @@ Khi có thay đổi quyết định, cập nhật tài liệu liên quan cùng t
 
 | Tài liệu | Nội dung |
 | --- | --- |
-| [Review PR #44](reviews/pr44-c2d4b-upload-original.md) | P2 tại source b578082; 230 API chọn và fault bổ sung lịch sử; bản sửa adfdb72 cần review lại |
+| [Prompt C2d-4c](tasks/m6c2b2c2d4c-original-downloads.md) | Hai GET/ba gate quyền; checksum/spool ngoài DB, audit/response proof mới, thu hồi/cancellation và proxy; đã giao, chưa triển khai |
+| [Review PR #44](reviews/pr44-c2d4b-upload-original.md) | P2 tại b578082 giữ lịch sử; review lại 76 API và hai ca riêng đạt; PR đã merge dd8bdc6 |
 | [Bàn giao C2d-4b](c2d4b-upload-original.md) | Phase/lock map, SHA-256 readback, response proof mới, race/cancellation/uncertain, config/proxy và giới hạn |
 | [Test inventory C2d-4b](c2d4b-test-inventory.json) | P2 source adfdb72: 463 pass/2.452 not-run; lịch sử 68950f3: 808 API và 51 web/typecheck/build giữ riêng |
-| [Prompt C2d-4b](tasks/m6c2b2c2d4b-upload-original.md) | Hợp đồng task PUT original; kết quả trên nhánh review ở handoff riêng |
+| [Prompt C2d-4b](tasks/m6c2b2c2d4b-upload-original.md) | Hợp đồng PUT original đã merge PR #44 dd8bdc6; kết quả theo source ở handoff riêng |
 | [Review PR #43](reviews/pr43-c2d4a-upload-intents.md) | 167 API chọn độc lập, 47 web/typecheck; PR đã merge, số review giữ theo source cũ, không suy toàn upload/C2d hoàn tất |
 | [Bàn giao C2d-4a](c2d4a-upload-notice-intent.md) | Hai JSON route, binding/secret/clock/lock/commit boundary, mã lỗi và phạm vi lịch sử trước PUT C2d-4b; đã merge PR #43 |
 | [Inventory C2d-4a](c2d4a-test-inventory.json) | 579 API chọn, 2.106 not-run; node/JUnit/source SHA, preparation/fault/đối chứng và cleanup |

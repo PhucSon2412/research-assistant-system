@@ -1,8 +1,10 @@
 # Research Assistant System
 
-**P2 PR #44 đã sửa trên source `adfdb72`, cần review lại.** [Handoff](docs/c2d4b-upload-original.md#sửa-p2-outcome-độc-lập-với-teardown): outcome độc lập rollback/Session.close, 463 API pass/2.452 not-run; [report gốc](docs/reviews/pr44-c2d4b-upload-original.md) giữ P2 tại `b578082` và số reviewer riêng. PR OPEN/chưa merge, safety pending tới C4.
+**C2d-4c đã triển khai trên nhánh review, base PR #44 `dd8bdc6`.** [Bàn giao tải original](docs/c2d4c-original-downloads.md) · [inventory](docs/c2d4c-test-inventory.json): đúng hai GET/ba gate private/common/review, spool size/SHA-256 ngoài DB, clock cuối, audit known commit rồi proof mới, ownership slot/temp và proxy streaming. Source code `4c49919`; kết quả cuối ghi tại inventory, các số PR #44 bên dưới giữ riêng. **Safety pending tới C4; chưa merge.**
 
-**C2d-4b — PUT original trên nhánh review:** [bàn giao](docs/c2d4b-upload-original.md) · [task](docs/tasks/m6c2b2c2d4b-upload-original.md). Intent consume nguyên tử ở giao dịch cuối; nhận file/parser/S3 ngoài khóa, response proof mới và giữ object khi commit uncertain. Download thuộc C2d-4c; safety pending tới C4.
+**Review lại PR #44 tại `5504810`: P2 đã sửa, không phát hiện điểm chặn merge trong phạm vi C2d-4b.** Độc lập **76/76 API** và hai ca fault/control riêng đạt; artifact 463 của agent được đối chiếu, không tính là chạy lại toàn bộ. [Report và giới hạn](docs/reviews/pr44-c2d4b-upload-original.md#review-lại-p2-tại-5504810) giữ review ban đầu tại `b578082`. PR sau đó đã merge `dd8bdc6`; chưa chạy lại suite tại merge. Safety **pending tới C4**; download C2d-4c riêng.
+
+**C2d-4b — PUT original đã merge PR #44 `dd8bdc6`:** [bàn giao](docs/c2d4b-upload-original.md) · [task](docs/tasks/m6c2b2c2d4b-upload-original.md). Intent consume nguyên tử ở giao dịch cuối; nhận file/parser/S3 ngoài khóa, response proof mới và giữ object khi commit uncertain. Download thuộc C2d-4c; safety pending tới C4.
 
 **Review PR #43 tại `f60645e`:** độc lập 167/167 API (đủ 155 test mới), 47/47 web và typecheck đạt; không phát hiện điểm chặn merge trong phạm vi notice/intent. [Report và giới hạn](docs/reviews/pr43-c2d4a-upload-intents.md). PR đã merge `632ec68`; số review giữ theo source cũ, không phải kiểm C2d-4b.
 
