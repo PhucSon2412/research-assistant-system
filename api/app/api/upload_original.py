@@ -12,6 +12,7 @@ import tempfile
 import threading
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy import select, text
@@ -24,6 +25,7 @@ from app.api.errors import ApiError
 from app.audit import record_event
 from app.authz import m2a_private_derivatives_clause
 from app.db import get_engine
+from app.config import get_settings
 from app.identity.predicates import lock_users
 from app.identity.tokens import hash_token, plausible_token
 from app.models import LibraryItem, PaperVersion, SourceFile, IngestionJob
@@ -57,11 +59,18 @@ class Accepted:
     version_id: uuid.UUID
     file_id: uuid.UUID
     job_id: uuid.UUID
-    used_at: object
+    used_at: datetime
 
 
 def _lock_timeout(db, settings):
     db.execute(text(f"SET LOCAL lock_timeout = {int(settings.recovery.gate_lock_timeout_ms)}"))
+
+
+def _notice(expected):
+    # A notice configuration reload during I/O must invalidate the old consent.
+    # This does not introduce hot-reload machinery or an auth/consent journal.
+    if expected.notice_version != get_settings().upload_notice_version:
+        raise ApiError(409, "notice_changed")
 
 
 def _locked_binding(db, principal, digest, settings, *, writer=False):
@@ -86,6 +95,7 @@ def proof(principal, digest, csrf, clock, settings, expected=None):
             binding = _locked_binding(db, principal, digest, settings)
             auth_safety.require_final(db)
             upload_intents._check(db, expected or binding, principal, csrf, clock, settings)
+            _notice(expected or binding)
             return binding
         except ApiError as exc:
             if expected is None and exc.code in ("upload_intent_expired", "notice_changed"):
@@ -114,6 +124,7 @@ def _consumed(db, expected, accepted, settings):
         raise ApiError(409, "upload_intent_changed")
     if row.notice_version != settings.upload_notice_version:
         raise ApiError(409, "notice_changed")
+    _notice(expected)
 
 
 def accept(principal, expected, csrf, clock, settings, key, mime, pages, stopped):
@@ -158,6 +169,7 @@ def accept(principal, expected, csrf, clock, settings, key, mime, pages, stopped
             with db.no_autoflush:
                 _consumed(db, expected, accepted, settings)
                 upload_intents._user(db, principal, csrf, clock, settings)
+                _notice(expected)
                 if clock() >= expected.expires_at:
                     raise ApiError(409, "upload_intent_expired")
             if stopped.is_set():
@@ -211,6 +223,7 @@ def receipt(principal, expected, accepted, csrf, clock, settings, key, mime, pag
             if found is None:
                 raise ApiError(409, "upload_intent_changed")
             upload_intents._user(db, principal, csrf, clock, settings)  # clock AFTER all SQL
+            _notice(expected)
             # Intent expiry is a consume boundary, not a second consumption.
             return {"item_id": str(accepted.item_id), "version_id": str(accepted.version_id),
                 "file_id": str(accepted.file_id), "job_id": str(accepted.job_id), "state": "received"}

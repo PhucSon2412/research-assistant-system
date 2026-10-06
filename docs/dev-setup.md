@@ -8,7 +8,7 @@ Lệnh đã thực chạy bằng Conda ras: `python <evidence>/setup.py`; `pytho
 
 Runtime config mới: `RAS_FILES__UPLOAD_MAX_CONCURRENT`, `RAS_FILES__UPLOAD_BODY_TIMEOUT_SECONDS`, `RAS_STORAGE__CONNECT_TIMEOUT_SECONDS`, `RAS_STORAGE__READ_TIMEOUT_SECONDS`, `RAS_STORAGE__MAX_ATTEMPTS`. Settings có bounds/test; khi deploy container phải truyền env vào process/container, không chỉ đặt env trên host. Không đổi Compose/dev trong task này. Timeout SDK/socket/body không là tổng deadline request. Reconcile chỉ sau quiescence/grace, chưa có multipart cleanup riêng.
 
-**Cập nhật sau merge PR #43:** main `632ec68`, head source `0039`, không suy revision DB dev. [C2d-4b PUT original](tasks/m6c2b2c2d4b-upload-original.md) đã giao, chưa triển khai/chưa kiểm; chưa có lệnh vận hành mới. Chỉ test cô lập với DB/MinIO credentials tường minh; không dùng `.env` hoặc stack dev. Safety pending tới C4.
+**Cập nhật sau merge PR #43:** main `632ec68`, head source `0039`, không suy revision DB dev. [C2d-4b PUT original](c2d4b-upload-original.md) trên nhánh review, kết quả giữ ở handoff; chưa có lệnh vận hành mới. Chỉ test cô lập với DB/MinIO credentials tường minh; không dùng `.env` hoặc stack dev. Safety pending tới C4.
 
 ## C2d-4a notice và intent cô lập
 
@@ -30,7 +30,7 @@ Lệnh evidence thực chạy từ gốc repo bằng Conda Python: `setup.py`; `
 
 Đã kiểm ID/label/image/port/mount/sole consumer trước khi xóa container/anonymous volume thử, xóa credentials; 24 preexisting container giữ ID/image/StartedAt. [Handoff/kết quả/giới hạn](c2d-final-read-clock.md) · [Inventory](c2d-final-read-clock-test-inventory.json). Source `0039` không là revision DB dev; safety pending tới C4.
 
-**Cập nhật 2026-10-06:** PR #42 đã merge `99db528`, source migration `0039`; [handoff/evidence sửa clock](c2d-final-read-clock.md) giữ theo source đã kiểm. [C2d-4a notice/intent](tasks/m6c2b2c2d4a-upload-notice-intent.md) đã merge PR #43 `632ec68`; C2d-4b đã giao, chưa triển khai/chưa kiểm. Không có lệnh vận hành dev mới. Safety pending tới C4, không suy revision DB dev.
+**Cập nhật 2026-10-06:** PR #42 đã merge `99db528`, source migration `0039`; [handoff/evidence sửa clock](c2d-final-read-clock.md) giữ theo source đã kiểm. [C2d-4a notice/intent](tasks/m6c2b2c2d4a-upload-notice-intent.md) đã merge PR #43 `632ec68`; C2d-4b trên nhánh review; kết quả theo handoff riêng. Không có lệnh vận hành dev mới. Safety pending tới C4, không suy revision DB dev.
 
 ## Review PR #41 cô lập
 

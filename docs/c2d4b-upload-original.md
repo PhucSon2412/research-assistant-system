@@ -10,6 +10,8 @@ Route cũ khóa intent UPDATE xuyên body/parser/S3; dùng `now` đầu request,
 
 Intent vẫn được tạo bằng JSON trước file. `_check` của C2d-4a giữ unused-only; `_consumed` riêng chỉ nhận đúng binding/item/used_at của attempt vừa commit. Missing/foreign/wrong-session/used/expiry/notice cũ tại proof ban đầu trả `404 invalid_intent`; giữa pipeline expiry/binding đổi trả `409`. Auth/CSRF/current role/gate giữ denial tương ứng; không log filename/token/hash/text.
 
+Tự rà soát phát hiện settings snapshot đầu request chưa bắt được cấu hình notice đã nạp lại khi staging đang chạy. Regression chuẩn trước sửa: 5/5 fail đúng 201 thay vì 409 (parser/put/readback/consume/response). PUT nay còn đọc `get_settings().upload_notice_version` tại mỗi boundary và sau SQL cuối của consume/response; 5/5 đạt sau sửa. Không thêm cơ chế hot reload hay sửa helper unused C2d-4a. Các lần triển khai phải đồng bộ cấu hình notice của process; không suy một env chưa nạp lại là cấu hình active đã đổi.
+
 ## Boundary và lock map
 
 | Phase | Transaction, khóa và clock |

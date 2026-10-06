@@ -672,3 +672,23 @@ def test_pdf_probe_timeout_rejects_before_storage(upload,monkeypatch):
     def timeout(*a,**kw):raise subprocess.TimeoutExpired('synthetic probe',get_settings().files.pdf_probe_timeout_seconds)
     monkeypatch.setattr(pdf_probe.subprocess,'run',timeout)
     assert send(b,token,data).status_code==422 and not any(rows(b).values()) and not keys(b)
+
+
+@pytest.mark.parametrize('phase',['parser','put','readback','consume','response'])
+def test_configured_notice_reload_during_upload_is_rejected(upload,monkeypatch,phase):
+    b=upload;token=b.make();puts=[];real_put=b.storage.put
+    def track(*a):puts.append(True);return real_put(*a)
+    monkeypatch.setattr(b.storage,'put',track)
+    def reload():
+        monkeypatch.setenv('RAS_UPLOAD_NOTICE_VERSION','reloaded.v2');get_settings.cache_clear()
+    obj=uploads if phase=='parser' else b.storage if phase in ('put','readback') else original
+    name='_validate_file' if phase=='parser' else 'put' if phase=='put' else 'open' if phase=='readback' else '_consumed' if phase=='consume' else 'receipt'
+    real=getattr(obj,name)
+    def call(*a):
+        if phase in ('consume','response'):reload();return real(*a)
+        result=real(*a);reload();return result
+    monkeypatch.setattr(obj,name,call)
+    r=send(b,token)
+    assert r.status_code==409 and r.json()=={'error':'notice_changed'},r.text
+    assert all(n==int(phase=='response') for n in rows(b).values()) and len(keys(b))==int(phase=='response')
+    if phase=='parser':assert not puts

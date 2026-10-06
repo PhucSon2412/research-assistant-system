@@ -4,7 +4,7 @@
 
 ## C2d-4b sau merge PR #43
 
-PR #43 đã merge `632ec68` ngày 2026-10-06. [PUT original C2d-4b](tasks/m6c2b2c2d4b-upload-original.md) đã giao, chưa triển khai/chưa kiểm: staging không giữ khóa DB, consume intent nguyên tử cùng item/version/file/job ở giao dịch cuối, proof mới trước response, checksum readback và cleanup theo commit outcome. Runtime/MinIO/race/cancel/pending cùng proxy streaming là đầu ra kiểm chứng. [Quyết định và cấu hình đề xuất](decisions.md#giao-c2d-4b-sau-merge-pr-43-2026-10-06). Download C2d-4c và writer/provider/C3/C4 còn riêng; safety pending tới C4.
+PR #43 đã merge `632ec68` ngày 2026-10-06. [PUT original C2d-4b](c2d4b-upload-original.md) trên nhánh review: staging không giữ khóa DB, consume intent nguyên tử cùng item/version/file/job ở giao dịch cuối, proof mới trước response, checksum readback và cleanup theo commit outcome. Runtime/MinIO/race/cancel/pending cùng proxy streaming là đầu ra kiểm chứng. [Quyết định và cấu hình đề xuất](decisions.md#giao-c2d-4b-sau-merge-pr-43-2026-10-06). Download C2d-4c và writer/provider/C3/C4 còn riêng; safety pending tới C4.
 
 ## C2d-4a sau merge PR #42
 
@@ -44,7 +44,7 @@ Review/publication GET tách thành C2d-2b vì có grant private tạm và forma
 
 [Quyết định theo ủy quyền](decisions.md#chia-c2d-sau-merge-pr-37-2026-10-05) giao C2d-1 trước: helper final caller và `GET /auth/session`, `GET /admin/users`, `GET /admin/dev-outbox`. **C2d-1 đã merge PR #38 `d06664e`**; [bàn giao](c2d1-final-caller-reads.md) và [caller inventory](c2d1-caller-inventory.json). Kết quả agent/reviewer giữ riêng theo source, không cộng lịch sử. C2d-2a đã chốt ở mục trên; các nhóm khác dưới đây tiếp tục đề xuất theo inventory/source.
 
-Trạng thái từng PR theo inventory/source: C2d-2a/2b/3, sửa final read clock và C2d-4a đã merge; C2d-4b đã giao, chưa triển khai/chưa kiểm. Các nhóm chưa giao tiếp tục **đề xuất**, sẽ chốt riêng:
+Trạng thái từng PR theo inventory/source: C2d-2a/2b/3, sửa final read clock và C2d-4a đã merge; C2d-4b trên nhánh review; kết quả theo handoff riêng. Các nhóm chưa giao tiếp tục **đề xuất**, sẽ chốt riêng:
 
 | Phần tiếp | Đầu ra review riêng | Phụ thuộc |
 | --- | --- | --- |
@@ -61,7 +61,7 @@ Trạng thái từng PR theo inventory/source: C2d-2a/2b/3, sửa final read clo
 
 Worker dùng durable job/item rights + recovery gate, không mang session giả hoặc buộc vào tuổi session trình duyệt. C3 operator/delivery/status recovery, C4 storage/cutover, journal membership/xóa riêng và backup scheduler còn riêng.
 
-**PR #38–#43 đã merge** (C2d-1/2a/2b/3, sửa clock và notice/intent, source `0039`). Các handoff giữ riêng; C2d-4b đã giao, chưa triển khai/chưa kiểm. Safety pending tới C4; core caller protections phải hoàn tất trước C3/C4. Phần C2b và milestone bên dưới là lịch sử.
+**PR #38–#43 đã merge** (C2d-1/2a/2b/3, sửa clock và notice/intent, source `0039`). Các handoff giữ riêng; C2d-4b trên nhánh review; kết quả theo handoff riêng. Safety pending tới C4; core caller protections phải hoàn tất trước C3/C4. Phần C2b và milestone bên dưới là lịch sử.
 
 **M6c-2b2b2, PR #31 đã merge `3f21794`:** base PR #30 đã merge `ce67ce8`, `0031`; invitation journal thêm `0032`. [Hợp đồng](invitation-journal.md) bảo vệ link đã kết thúc sau restore với journal hiện hành, không dựng lại account; full API **901/901**, web **42/42**, đối chứng **8/8**, drill **59/59** là chứng cứ lịch sử PR #31 (giới hạn ở tài liệu kiểm chứng).
 
