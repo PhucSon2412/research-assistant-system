@@ -1,5 +1,9 @@
 # C2d-4b: nhận original và consume intent
 
+**Cập nhật sau merge:** PR #44 đã merge `dd8bdc6` ngày 2026-10-06, chứa head `5504810` và source P2 `adfdb72`. [C2d-4c — original downloads](c2d4c-original-downloads.md) đã triển khai trên nhánh review, code `4c49919`; kết quả mới trong [inventory riêng](c2d4c-test-inventory.json). Không chạy lại suite tại merge hoặc suy revision DB dev; safety pending tới C4. Những trạng thái OPEN bên dưới là snapshot lịch sử tại source kiểm.
+
+**Review lại P2 tại `5504810` (code `adfdb72`):** không phát hiện điểm chặn merge còn lại trong phạm vi C2d-4b. Reviewer độc lập **76/76 API** và hai ca tái hiện/control riêng đạt; đã đối chiếu 463 artifact agent và 262 source hashes. [Report mới](reviews/pr44-c2d4b-upload-original.md#review-lại-p2-tại-5504810) tách số và giới hạn khỏi lịch sử dưới đây. PR OPEN/chưa merge, safety **pending tới C4**; download C2d-4c riêng. Web không đổi, không chạy lại.
+
 **Review độc lập PR #44 tại `b578082` (trước sửa P2):** 230/230 API chọn (đủ 220 mới + 9 legacy runtime + ORM), 51/51 web/typecheck đạt; [report](reviews/pr44-c2d4b-upload-original.md). **P2 chặn merge:** Session cleanup lỗi sau commit exception che mất uncertain, làm attempt xóa object. Ca bổ sung fail đúng lỗi, control pass; tại source review, hợp đồng giữ object chưa bảo đảm ở nhánh lỗi kép này. Bản sửa và kiểm mới giữ riêng dưới đây. PR vẫn OPEN/chưa merge, safety pending tới C4. Kết quả agent giữ riêng theo source.
 
 Base fetch `632ec683940a8bccc711c8a55743b0a3992c1d03`; GitHub CLI xác minh PR #43 MERGED, main chứa `f60645edf01d01794590db256d0ea4b5b1ef5c5e`. Nhánh `feat/m6c2b2c2d4b-upload-original` tạo từ `origin/main`; giữ toàn bộ docs chưa commit, gồm review PR #43 và task. Source migration `0039`, không migration/grants/claim lease mới hoặc suy revision DB dev. **Safety pending tới C4; chưa merge.**

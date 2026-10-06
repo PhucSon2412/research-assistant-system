@@ -1,7 +1,7 @@
 {
-  "base": "632ec683940a8bccc711c8a55743b0a3992c1d03",
+  "base": "dd8bdc689ef7b495618116add4832628d7d24327",
   "source_migration": "0039",
-  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4. Final read clock corrected after predicate SQL; /auth/sessions uses the shared final caller. Details in docs/c2d-final-read-clock.md. C2d-4a adds GET upload notice final caller and POST intent actor/binding/TTL before commit plus fresh token proof after known commit. C2d-4b PUT original is implemented on review branch with unlocked staging, atomic consume and a new exact response proof. Original download C2d-4c and remaining callers stay open.",
+  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4. Final read clock corrected after predicate SQL; /auth/sessions uses the shared final caller. Details in docs/c2d-final-read-clock.md. C2d-4a adds GET upload notice final caller and POST intent actor/binding/TTL before commit plus fresh token proof after known commit. C2d-4b PUT original merged PR #44 at dd8bdc6 with unlocked staging, atomic consume and a new exact response proof. C2d-4c implements exactly two original GETs/three separate gates, short scalar proofs, shared verified spools, known audit commit then fresh response proof, current caller/clock and cancellation ownership. Other writers/provider callers stay open. See docs/tasks/m6c2b2c2d4c-original-downloads.md.",
   "safety": "pending until C4",
   "route_count": 63,
   "routes": [
@@ -807,7 +807,7 @@
       "path": "/review-requests/notice",
       "function": "notice",
       "source": "api/app/api/routes/reviews.py",
-      "line": 303,
+      "line": 300,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -825,7 +825,7 @@
       "path": "/review-requests",
       "function": "list_own",
       "source": "api/app/api/routes/reviews.py",
-      "line": 310,
+      "line": 307,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -843,7 +843,7 @@
       "path": "/review-requests",
       "function": "submit",
       "source": "api/app/api/routes/reviews.py",
-      "line": 342,
+      "line": 339,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -863,7 +863,7 @@
       "path": "/review-requests/{request_id}",
       "function": "get_own",
       "source": "api/app/api/routes/reviews.py",
-      "line": 319,
+      "line": 316,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -881,7 +881,7 @@
       "path": "/review-requests/{request_id}/withdraw",
       "function": "withdraw",
       "source": "api/app/api/routes/reviews.py",
-      "line": 388,
+      "line": 385,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -899,7 +899,7 @@
       "path": "/admin/review-requests",
       "function": "admin_list",
       "source": "api/app/api/routes/reviews.py",
-      "line": 326,
+      "line": 323,
       "dependencies": [
         "require_admin",
         "get_db",
@@ -917,7 +917,7 @@
       "path": "/admin/review-requests/{request_id}",
       "function": "admin_get",
       "source": "api/app/api/routes/reviews.py",
-      "line": 335,
+      "line": 332,
       "dependencies": [
         "require_admin",
         "get_db",
@@ -935,26 +935,30 @@
       "path": "/admin/review-requests/{request_id}/files/{file_id}/original",
       "function": "admin_original",
       "source": "api/app/api/routes/reviews.py",
-      "line": 450,
+      "line": 437,
       "dependencies": [
         "require_admin",
-        "get_db",
-        "_storage"
+        "_storage",
+        "get_clock",
+        "get_settings"
       ],
-      "group": "review-write-file",
-      "final_status": "open C2d",
-      "direct_transaction_calls": [
-        "db.commit",
-        "db.rollback"
+      "group": "original-download",
+      "final_status": "C2d-4c implemented on review branch; current caller/exact scalar gate/clock after final SQL, no DB across I/O; audit branches use fresh proof after known commit",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d4c-original-downloads.md#boundary-và-lock-map",
+      "planned_task": "docs/tasks/m6c2b2c2d4c-original-downloads.md",
+      "boundary_helper": "app.api.original_downloads.receive",
+      "permission_branches": [
+        "current Admin exact open review grant"
       ],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "post_known_audit_commit_new_proof": true
     },
     {
       "method": "POST",
       "path": "/admin/review-requests/{request_id}/reject",
       "function": "admin_reject",
       "source": "api/app/api/routes/reviews.py",
-      "line": 523,
+      "line": 450,
       "dependencies": [
         "require_admin",
         "get_db",
@@ -972,7 +976,7 @@
       "path": "/admin/review-requests/{request_id}/approve",
       "function": "admin_approve",
       "source": "api/app/api/routes/reviews.py",
-      "line": 549,
+      "line": 476,
       "dependencies": [
         "require_admin",
         "get_db",
@@ -1020,7 +1024,7 @@
       "path": "/uploads/notice",
       "function": "notice",
       "source": "api/app/api/routes/uploads.py",
-      "line": 61,
+      "line": 57,
       "dependencies": [
         "get_principal",
         "get_settings",
@@ -1041,7 +1045,7 @@
       "path": "/uploads/intents",
       "function": "create_intent",
       "source": "api/app/api/routes/uploads.py",
-      "line": 76,
+      "line": 72,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -1061,7 +1065,7 @@
       "path": "/uploads/original",
       "function": "upload_original",
       "source": "api/app/api/routes/uploads.py",
-      "line": 107,
+      "line": 103,
       "dependencies": [
         "get_principal",
         "get_clock",
@@ -1070,7 +1074,7 @@
         "require_trusted_origin"
       ],
       "group": "file-upload",
-      "final_status": "C2d-4b implemented on review branch; safety pending until C4",
+      "final_status": "C2d-4b merged PR #44 dd8bdc6, including P2 outcome fix; safety pending until C4",
       "direct_transaction_calls": [],
       "contract_map": "docs/c2d4b-upload-original.md#boundary-và-lock-map",
       "boundary": "api.upload_original.receive",
@@ -1082,18 +1086,24 @@
       "path": "/files/{file_id}/original",
       "function": "download_original",
       "source": "api/app/api/routes/uploads.py",
-      "line": 119,
+      "line": 115,
       "dependencies": [
         "get_principal",
-        "get_db",
+        "_storage",
         "get_clock",
-        "get_settings",
-        "_storage"
+        "get_settings"
       ],
-      "group": "file-upload",
-      "final_status": "private final missing; common final session exists, binding/postcommit drill open",
+      "group": "original-download",
+      "final_status": "C2d-4c implemented on review branch; current caller/exact scalar gate/clock after final SQL, no DB across I/O; audit branches use fresh proof after known commit",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d4c-original-downloads.md#boundary-và-lock-map",
+      "planned_task": "docs/tasks/m6c2b2c2d4c-original-downloads.md",
+      "boundary_helper": "app.api.original_downloads.receive",
+      "permission_branches": [
+        "private owner",
+        "common exact download rights"
+      ],
+      "post_known_audit_commit_new_proof": true
     },
     {
       "method": "GET",
@@ -1160,5 +1170,26 @@
   "previous_tested_code_commit": "610e52d22292e16534c7c1771ca40fe6528b467a",
   "c2d4b_code_commit": "adfdb722fdd0de529b45addddd516872e3b404ac",
   "previous_inventory_base": "99db5285dfa59dd3d26e86345e849393ed88ce33",
-  "previous_c2d4b_code_commit": "68950f3357e740bed6030af53dc385bcef5de585"
+  "previous_c2d4b_code_commit": "68950f3357e740bed6030af53dc385bcef5de585",
+  "c2d4c_plan": {
+    "assigned_date": "2026-10-06",
+    "verified_merge_base": "dd8bdc689ef7b495618116add4832628d7d24327",
+    "source_migration": "0039",
+    "status": "implemented/tested on review branch at 4c49919; not merged; safety pending until C4",
+    "routes": [
+      "GET /files/{file_id}/original",
+      "GET /admin/review-requests/{request_id}/files/{file_id}/original"
+    ],
+    "branches": [
+      "private owner",
+      "common exact download rights",
+      "current Admin exact open review grant"
+    ],
+    "contract": "docs/tasks/m6c2b2c2d4c-original-downloads.md",
+    "historic_source_note": "Other code/test commits remain their historical sources; current function line numbers refreshed from AST. Current C2d-4c results do not complete other callers.",
+    "handoff": "docs/c2d4c-original-downloads.md",
+    "inventory": "docs/c2d4c-test-inventory.json"
+  },
+  "previous_c2d4c_inventory_base": "632ec683940a8bccc711c8a55743b0a3992c1d03",
+  "c2d4c_code_commit": "4c49919203db085dacd0778b3ce62e6787fd3823"
 }

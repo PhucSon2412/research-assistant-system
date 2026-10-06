@@ -1,6 +1,6 @@
 # Prompt C2d-4b: nhận original và tiêu thụ upload intent
 
-**Trạng thái:** đã triển khai/kiểm trên nhánh review, chưa merge; [handoff](../c2d4b-upload-original.md) giữ kết quả theo source riêng. Nội dung dưới đây giữ hợp đồng giao task. PR #43 đã merge ngày 2026-10-06 tại `632ec683940a8bccc711c8a55743b0a3992c1d03`, chứa head `f60645e`. Head migration mã nguồn `0039`; không suy revision DB dev. Safety **pending tới C4**.
+**Trạng thái:** đã triển khai/kiểm và merge PR #44 tại `dd8bdc6`; [handoff](../c2d4b-upload-original.md) giữ kết quả theo source riêng. [Original downloads C2d-4c](m6c2b2c2d4c-original-downloads.md) giao tiếp, chưa triển khai. Nội dung dưới đây giữ hợp đồng giao task. PR #43 đã merge ngày 2026-10-06 tại `632ec683940a8bccc711c8a55743b0a3992c1d03`, chứa head `f60645e`. Head migration mã nguồn `0039`; không suy revision DB dev. Safety **pending tới C4**.
 
 [Mục lục](../README.md) · [Quyết định giao](../decisions.md#giao-c2d-4b-sau-merge-pr-43-2026-10-06) · [Roadmap](../roadmap.md) · [Bàn giao C2d-4a](../c2d4a-upload-notice-intent.md) · [Review PR #43](../reviews/pr43-c2d4a-upload-intents.md)
 

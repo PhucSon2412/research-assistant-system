@@ -1,12 +1,22 @@
 # Chiến lược kiểm thử
 
+## C2d-4c trên nhánh review
+
+[Prompt original downloads](tasks/m6c2b2c2d4c-original-downloads.md#4-kiểm-thử-cần-có) quy định runtime/head/receipt/MinIO thật cho hai GET/ba nhánh, checksum cùng-size/slot/temp/ASGI disconnect, caller/gate/clock cuối, audit commit và proof mới, race thu hồi, pending không patch và proxy. API/web/đối chứng/evidence/not-run phải ghi theo source mới. Lượt giao chỉ khảo sát source/Git và viết docs là lịch sử; [handoff](c2d4c-original-downloads.md) và [inventory](c2d4c-test-inventory.json) ghi source code `4c49919`, collect/selection/JUnit unique/not-run và đối chứng mới. Không cộng các lượt preparation/fault/mutant vào pass cuối. PR #44 đã merge `dd8bdc6`; các số review bên dưới giữ theo source riêng, không là test sau merge. Safety pending tới C4.
+
+## Review lại P2 PR #44
+
+Head `5504810`, code `adfdb72`: **76/76 API chọn độc lập pass**, 0 fail/error/skip, 194,592 s; gồm 10 regression P2, 56 hồi quy C2d-4b, 9 legacy upload và ORM/schema. Ca tái hiện commit exception + close lỗi và control close bình thường đều pass riêng: `upload_outcome_uncertain`, 0 rows, 1 object giữ lại. Không cộng hai body ngoài repo hoặc số lịch sử vào selection hiện hành. [Report/evidence](reviews/pr44-c2d4b-upload-original.md#review-lại-p2-tại-5504810).
+
+Artifact 463 unique node của agent khớp selection/SHA/JUnit; 262 source hashes trước/sau/current không đổi. Reviewer còn 387 node selection agent và 2.839 node collection chưa chạy độc lập; agent 2.452 not-run. Web không đổi, không chạy lại; không full business/C3/C4/provider/crash/benchmark. Không phát hiện điểm chặn merge scope C2d-4b. Cleanup riêng hoàn tất, 24 container có sẵn giữ nguyên; safety pending tới C4, PR chưa merge. Hai mục review ban đầu dưới đây giữ theo source lịch sử.
+
 ## Sửa P2 PR #44: acceptance outcome và teardown
 
 Source `adfdb72`: **463/463 API**, 0 fail/error/skip; 239 upload (230 C2d-4b gồm 10 regression P2, cộng 9 legacy), 155 consent, 68 runtime login/session và ORM 1. Collect **2.915**, not-run **2.452**. [Handoff](c2d4b-upload-original.md#sửa-p2-outcome-độc-lập-với-teardown) và [inventory, phần p2_fix](c2d4b-test-inventory.json) đối chiếu JUnit unique/selection/hash 262 file trước/sau.
 
 Tám ca trước sửa 7 fail/1 control pass, sau sửa 8 pass; thêm hai exception chưa phân loại, focused 10 pass. Lượt chỉnh indentation có 1 collection error, sửa/py_compile đạt; không cộng preparation hoặc số 808/230 cũ vào 463. Web/auth/schema/grants/download không đổi; không rerun web/typecheck/build, full caller/migration/C3/C4/provider/restore/browser DOM. Runtime PostgreSQL/MinIO/journal thật cô lập; injection không chứng minh crash thật. Stack P2 cleanup xong, 24 container cũ nguyên trạng. Safety pending tới C4, cần review lại; không merge.
 
-## Review độc lập PR #44
+## Review độc lập PR #44 tại b578082 (trước sửa)
 
 [Report P2 và ca tái hiện](reviews/pr44-c2d4b-upload-original.md): source `68950f3`, head `b578082`, **230/230 API chọn pass** (220 mới, 9 legacy runtime, ORM), 0 fail/error/skip, 536,90 s. Web **51/51**, typecheck đạt; không rerun build/browser DOM. Ca bổ sung commit exception + Session close lỗi **1 fail đúng lỗi object bị xóa**; control close bình thường 1 pass giữ object. Không cộng fault/control vào suite 230 hoặc sửa kết quả agent 808.
 

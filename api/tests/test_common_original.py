@@ -19,6 +19,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app import common_original
+from app.api import original_downloads
 from app import config as app_config
 from app import publication
 from app.api.routes import uploads
@@ -31,7 +32,8 @@ from tests.test_publication import (MISSING, SOURCE_URL, common_file, common_key
                                     state)
 from tests.test_review_approval import A_SHA, ADMIN_EVIDENCE, ADMIN_LICENSE, ADMIN_SOURCE, approve
 from tests.test_review_requests import A_BODY, B_BODY, submit, world, write
-from tests.test_uploads import upload_api  # noqa: F401  (fixture)
+from tests.original_fixtures import upload_api, base_upload_api  # noqa: F401
+from tests.test_c2c1_bootstrap import installation  # fixture dependency of upload_api
 
 C_BODY = b"## Methods\nCommon copy C with a condition.\n"
 D_BODY = b"## Methods\nPending copy D never published.\n"
@@ -88,11 +90,12 @@ def use_storage(fake):
 
 def admin_principal(api) -> Principal:
     admin_id = api.scalar("SELECT id FROM users WHERE email=:e", e=ADMIN_EMAIL)
-    return Principal(user_id=admin_id, role="admin", session_id=uuid.uuid4(), email=ADMIN_EMAIL, display_name=None)
+    session_id = api.scalar("SELECT id FROM sessions WHERE user_id=:u AND revoked_at IS NULL ORDER BY created_at DESC,id LIMIT 1",u=admin_id)
+    return Principal(user_id=admin_id, role="admin", session_id=session_id, email=ADMIN_EMAIL, display_name=None)
 
 
 def revoke_now(api, item_id) -> None:
-    with Session(api.engine, expire_on_commit=False) as db:
+    with Session(api.setup_engine, expire_on_commit=False) as db:
         publication.revoke(db, admin_principal(api), uuid.UUID(item_id), RevocationReason.RIGHTS_WITHDRAWN,
                            api.clock.now, timedelta(hours=24))
 
@@ -334,28 +337,32 @@ def test_revoke_after_the_last_check_waits_and_the_checked_response_completes(up
     api, storage = upload_api
     a, b, admin, ids_a, _ = world(api, storage, monkeypatch)
     copy, file_id = copy_of(api, a, admin, ids_a)
-    real_audit = common_original._audit
+    real_audit = original_downloads._audit
     revoker: dict = {}
 
-    def audit_then_let_revoke_queue(db, principal, outcome, target, **details):
+    def audit_then_let_revoke_queue(db, principal, target, outcome, **details):
         if outcome is AuditOutcome.SUCCESS and "thread" not in revoker:
             # The download holds the item FOR SHARE here; the revoke must queue behind it.
             revoker["thread"] = threading.Thread(target=lambda: revoke_now(api, copy))
             revoker["thread"].start()
             deadline = time.monotonic() + 10
-            while api.scalar("""SELECT count(*) FROM pg_stat_activity WHERE datname=current_database()
-                    AND wait_event_type='Lock'""") == 0:
-                assert time.monotonic() < deadline, "revoke never waited for the download's lock"
-                time.sleep(0.02)
+            with api.setup_engine.connect() as observer:
+                while observer.scalar(text("""SELECT count(*) FROM pg_stat_activity WHERE datname=current_database()
+                        AND wait_event_type='Lock'""")) == 0:
+                    observer.rollback()
+                    assert time.monotonic() < deadline, "revoke never waited for the download's lock"
+                    time.sleep(0.02)
             revoker["waited"] = True
-        return real_audit(db, principal, outcome, target, **details)
+        return real_audit(db, principal, target, outcome, **details)
 
-    monkeypatch.setattr(common_original, "_audit", audit_then_let_revoke_queue)
+    monkeypatch.setattr(original_downloads, "_audit", audit_then_let_revoke_queue)
     response = b.get(url(file_id))
     revoker["thread"].join(10)
     assert revoker.get("waited") and not revoker["thread"].is_alive()
-    # Checked before t_rev: the whole verified file is delivered and cannot be recalled.
-    assert response.status_code == 200 and response.content == A_BODY
+    # Audit lock is no longer the response boundary: the queued revoke wins
+    # before the NEW postcommit proof. Separate C2d-4c tests cover boundary-win.
+    assert response.status_code == 404 and response.json() == MISSING
+    assert "content-disposition" not in response.headers
     assert state(api, copy) == "revoked"
     # Every request after t_rev is refused, including the same saved URL.
     for who, browser in (("a", a), ("b", b), ("admin", admin)):
@@ -411,7 +418,7 @@ def test_session_expiring_while_the_object_is_read_gets_no_bytes(upload_api, mon
         return api.user_browser("b@example.org")  # its session's last activity is clock.now
 
     def expire_b_sessions_in(**delta):
-        with api.engine.begin() as conn:
+        with api.setup_engine.begin() as conn:  # privileged TTL corruption, never a runtime grant
             conn.execute(text("""UPDATE sessions SET absolute_expires_at=:t WHERE revoked_at IS NULL
                 AND user_id=(SELECT id FROM users WHERE email='b@example.org')"""),
                          {"t": api.clock.now + timedelta(**delta)})

@@ -97,6 +97,8 @@ const MESSAGES: Record<string, string> = {
   review_request_open: "File này đã có yêu cầu duyệt đang mở.",
   review_request_closed: "Yêu cầu này đã đóng; không thể thay đổi nữa.",
   review_file_integrity_failed: "File gốc không khớp checksum lúc gửi yêu cầu; không mở được để duyệt.",
+  private_file_integrity_failed: "File gốc bị thiếu hoặc không khớp SHA-256; không tải được.",
+  download_audit_outcome_uncertain: "Chưa xác định được kết quả ghi nhật ký tải. Không tự tải lại; kiểm tra sau khi kết nối ổn định.",
   review_grant_inactive: "Quyền duyệt của yêu cầu này không còn hiệu lực (quyền của item đã thay đổi).",
   checksum_confirmation_mismatch: "SHA-256 xác nhận không khớp file của yêu cầu; tải lại trang và kiểm lại.",
   rights_evidence_required: "Cần URL giấy phép hoặc ghi chú bằng chứng do Admin tự kiểm.",

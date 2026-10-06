@@ -1,5 +1,33 @@
 # Nhật ký quyết định
 
+## Triển khai C2d-4c trên nhánh review (2026-10-06)
+
+Base đã fetch/xác minh `dd8bdc689ef7b495618116add4832628d7d24327`, PR #44 MERGED có P2 head `5504810`/code `adfdb72`. Code C2d-4c `4c49919` thực hiện đúng [task giao theo ủy quyền](tasks/m6c2b2c2d4c-original-downloads.md), không migration/grants mới. [Handoff](c2d4c-original-downloads.md) ghi đối chiếu code cũ, transaction/locks và giới hạn; [inventory](c2d4c-test-inventory.json) ghi source/hashes, kết quả cuối, preparation và đối chứng riêng.
+
+Ba gate quyền giữ riêng, share byte ownership/pool. Common/review giữ audit writer theo User → resources → flush → exclusive journal trực tiếp, rồi proof response transaction mới sau known commit. Private thêm spool/checksum, không audit mới. Actual spool cũng được băm lại để phát hiện short/incorrect temp writes. Outcome audit giữ ngoài Session teardown; cleanup lỗi không che uncertain/deny. ASGI close chờ thread dưới owner lock trong executor; cancel proxy không tự retry hoặc thu hồi bytes đã phát.
+
+Giữ object-missing private/common `409` integrity và review `503 file_unavailable` theo code base; thêm `503 download_audit_outcome_uncertain`. API hiện hành clear session cookie; proxy giữ tất cả Set-Cookie, có test synthetic multi-cookie. Cấu hình pool 4 mỗi process/API là lựa chọn ban đầu của task cần đo, không luật kiến trúc/SLO. Các resource writer cũ không đủ runtime journal privileges được dùng bằng engine dựng fixture cô lập, không mở grants hoặc tính là chuyển writer.
+
+Chỉ kiểm cô lập, không dev/provider/pricing. Safety pending tới C4, C3/C4 và writer/provider khác còn mở. Không merge PR này; các kết quả PR #44 và lượt giao bên dưới là lịch sử theo source riêng.
+
+## Giao C2d-4c sau merge PR #44 (2026-10-06)
+
+**Đã xác nhận:** chủ dự án báo PR #44 đã merge và yêu cầu prompt tiếp theo. Fetch/GitHub CLI xác minh MERGED, merge/main `dd8bdc689ef7b495618116add4832628d7d24327`, chứa head `5504810` và source P2 `adfdb72`. Source migration `0039`, không query DB dev; tree commit HEAD cũ và main khớp, docs review chưa commit được giữ. Các số 76/463/51 theo source lịch sử, không chạy lại tại merge.
+
+**Orchestrator chọn theo ủy quyền, trong phạm vi C2d-4c:** một PR cho đúng hai download GET/ba nhánh private owner, common rights và Admin review exact file. Cả ba stream từ spool size/SHA-256 đã kiểm ngoài DB, chung pool download hiện hành và ownership tới thread/response settled; không trộn gate review vào ordinary route. Nhánh riêng bổ sung checksum, không mở quyền mới. [Prompt chi tiết](tasks/m6c2b2c2d4c-original-downloads.md) quy định scalar target, locks, clock cuối, audit, proxy và tests.
+
+Common/review giữ audit trước phát: audit writer caller User → request (review) → item → flush audit/FK → journal exclusive trực tiếp → fresh GET actor/gate/clock → known commit, rồi **transaction response mới** resource → journal shared → caller/gate/target/clock cuối. GET không thêm CSRF/Origin của POST; private không thêm audit mới. Commit uncertain/teardown lỗi không phát bytes, không retry mutation hoặc xóa original. Không I/O storage/client dưới khóa. Boundary thắng trước thu hồi có thể stream tiếp; request mới sau thu hồi bị chặn, bytes đã gửi không thu hồi được. Đây không phải kiểm quyền mỗi chunk hoặc deadline tổng/SLO mới.
+
+**Phần riêng:** review/publication writers, provider callers, private deletion/journal mới, C3/C4 và production journal/storage. Không migration/grants dự kiến, không đổi readiness/pricing, không thao tác dev/`.env`/provider. Lượt này chỉ viết docs/task, chưa triển khai/chạy test C2d-4c; safety **pending tới C4**. Agent giữ mọi docs chưa commit, commit/push/mở PR tiếng Việt và không merge theo task đã giao.
+
+Kiểm tài liệu lượt giao: 51 Markdown, 1.113 liên kết nội bộ, không lỗi file/anchor/control; `git diff --check` sạch. Không có thay đổi API/web hoặc kết quả test ứng dụng mới; Python kiểm docs dùng Conda ras đã xác minh. Giữ evidence hoạch định riêng ngoài repo; không ghi đè số review/task lịch sử.
+
+## Review lại P2 PR #44 (2026-10-06)
+
+Xác minh PR OPEN/chưa merge, head `5504810`, code `adfdb72`, base/main `632ec68`; source `0039`, không query dev. [Report mới](reviews/pr44-c2d4b-upload-original.md#review-lại-p2-tại-5504810): outcome độc lập teardown đáp ứng yêu cầu sửa P2; **không phát hiện điểm chặn merge còn lại trong phạm vi C2d-4b**. Reviewer độc lập 76/76 API và hai ca fault/control riêng đạt; artifact 463 của agent khớp node/JUnit/hash, không là chạy lại toàn selection. Không đổi kiến trúc, grants, schema, web hoặc pricing/safety readiness.
+
+Giữ failure và số kiểm ban đầu tại b578082 làm lịch sử. Fault injection không chứng minh crash thật; full inventory/C3/C4/download chưa nằm trong kết quả này. Cleanup đúng 2 container/2 volume thử, 24 container có sẵn nguyên trạng, không `.env`/dev/provider. PR chưa merge; C2d-4c chỉ giao sau khi chủ dự án xác nhận merge. Safety **pending tới C4**.
+
 ## Sửa P2 PR #44: giữ outcome khi teardown lỗi (2026-10-06)
 
 Theo yêu cầu chủ dự án và [review](reviews/pr44-c2d4b-upload-original.md), source `adfdb72` giữ outcome trong state do attempt sở hữu, cập nhật trước/sau commit và chỉ xác nhận precommit rollback khi rollback trả thành công. Lỗi close/rollback không hạ commit uncertain/known thành quyền cleanup. Acceptance Session teardown tường minh, fallback invalidate để trả/discard connection; không retry mutation. Known commit + teardown lỗi trả response unavailable không IDs, giữ dữ liệu.
