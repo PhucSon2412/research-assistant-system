@@ -2,7 +2,7 @@
 
 User -> INSERT/FK/audit -> exclusive journal -> known commit. Response uses
 intent SHARE -> acknowledgement SHARE -> shared journal on a NEW transaction.
-PUT currently locks intent first too; this reader never requests User afterward.
+PUT locks User then intent to consume; this reader never requests User afterward.
 """
 from collections.abc import Callable
 from dataclasses import dataclass, field

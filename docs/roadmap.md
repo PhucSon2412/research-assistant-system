@@ -1,8 +1,17 @@
 # Roadmap đề xuất
 
+**Sửa P2 PR #44:** source `adfdb72`, 463 API pass/2.452 not-run; [handoff outcome/teardown](c2d4b-upload-original.md#sửa-p2-outcome-độc-lập-với-teardown). Kết quả 808 tại 68950f3 bên dưới là trước P2, giữ riêng. Cần review lại, chưa merge; safety pending tới C4, C2d-4c riêng.
+
+
+**C2d-4b đã kiểm trên nhánh review:** [handoff PUT original](c2d4b-upload-original.md); không migration/grants, source `0039`. Kiểm runtime/MinIO/journal, race/cancellation/integrity, proof mới sau known commit và proxy streaming; source `68950f3`: 808 API pass, 2.097 not-run, 51 web/typecheck/build; [inventory](c2d4b-test-inventory.json) ghi riêng. Original download C2d-4c tiếp tục riêng, safety pending tới C4. Phần giao và kết quả lịch sử bên dưới giữ nguồn riêng.
+
+## C2d-4b sau merge PR #43
+
+PR #43 đã merge `632ec68` ngày 2026-10-06. [PUT original C2d-4b](c2d4b-upload-original.md) trên nhánh review: staging không giữ khóa DB, consume intent nguyên tử cùng item/version/file/job ở giao dịch cuối, proof mới trước response, checksum readback và cleanup theo commit outcome. Runtime/MinIO/race/cancel/pending cùng proxy streaming là đầu ra kiểm chứng. [Quyết định và cấu hình đề xuất](decisions.md#giao-c2d-4b-sau-merge-pr-43-2026-10-06). Download C2d-4c và writer/provider/C3/C4 còn riêng; safety pending tới C4.
+
 ## C2d-4a sau merge PR #42
 
-PR #42 đã merge `99db528` ngày 2026-10-06, source `0039`. [C2d-4a notice/intent](c2d4a-upload-notice-intent.md) **đã triển khai trên nhánh review, chưa merge**: `GET /uploads/notice` và `POST /uploads/intents`, current caller/role/binding/clock trước commit, proof mới trước trả token sau commit và lỗi commit uncertain. [Quyết định](decisions.md#triển-khai-c2d-4a-notice-và-intent-2026-10-06).
+PR #42 đã merge `99db528` ngày 2026-10-06, source `0039`. [C2d-4a notice/intent](c2d4a-upload-notice-intent.md) **đã merge PR #43 `632ec68`**: `GET /uploads/notice` và `POST /uploads/intents`, current caller/role/binding/clock trước commit, proof mới trước trả token sau commit và lỗi commit uncertain. [Quyết định](decisions.md#triển-khai-c2d-4a-notice-và-intent-2026-10-06).
 
 Đầu ra một PR nhỏ có runtime/contract/clock/binding/commit/pending tests, inventory/JUnit và handoff. PUT file và original download không thuộc PR này: hướng chia tiếp C2d-4b/4c cần lock/I/O và boundary riêng; các writer/provider/C3/C4 còn mở. Safety pending tới C4, không mở readiness hoặc thao tác dev.
 
@@ -38,15 +47,15 @@ Review/publication GET tách thành C2d-2b vì có grant private tạm và forma
 
 [Quyết định theo ủy quyền](decisions.md#chia-c2d-sau-merge-pr-37-2026-10-05) giao C2d-1 trước: helper final caller và `GET /auth/session`, `GET /admin/users`, `GET /admin/dev-outbox`. **C2d-1 đã merge PR #38 `d06664e`**; [bàn giao](c2d1-final-caller-reads.md) và [caller inventory](c2d1-caller-inventory.json). Kết quả agent/reviewer giữ riêng theo source, không cộng lịch sử. C2d-2a đã chốt ở mục trên; các nhóm khác dưới đây tiếp tục đề xuất theo inventory/source.
 
-Trạng thái từng PR theo inventory/source: C2d-2a/2b/3 và sửa final read clock đã merge; C2d-4a đã giao, chưa triển khai. Các nhóm chưa giao tiếp tục **đề xuất**, sẽ chốt riêng:
+Trạng thái từng PR theo inventory/source: C2d-2a/2b/3, sửa final read clock và C2d-4a đã merge; C2d-4b trên nhánh review; kết quả theo handoff riêng. Các nhóm chưa giao tiếp tục **đề xuất**, sẽ chốt riêng:
 
 | Phần tiếp | Đầu ra review riêng | Phụ thuộc |
 | --- | --- | --- |
 | JSON reads C2d-2a | 13 GET library/collections/discovery, phạm vi đã giao; caller/current role + SQL ACL trước count/page và kiểm resource cuối | Helper C2d-1 đã merge + caller inventory |
 | JSON reads C2d-2b | [Task đã giao](tasks/m6c2b2c2d2b-review-publication-json-reads.md): 9 GET review/publication, exact grant Admin/thin history và final caller; đã merge PR #40 `833db7c` | C2d-2a đã merge và inventory/shared formatter |
 | JSON writes C2d-3 | [Task đã giao](tasks/m6c2b2c2d3-library-collection-json-writes.md): 6 library/collection writers, actor/resource trước commit, fresh proof sau commit và FK/lock/uncertain contract; đã merge PR #41 `5100ff6` | C2d-1/2a/2b đã merge; strategy ghi riêng |
-| Upload JSON C2d-4a | [Task đã giao](tasks/m6c2b2c2d4a-upload-notice-intent.md): notice/intent, xác nhận riêng, actor/clock trước commit và fresh proof trước trả token; chưa triển khai | PR #42 và C2d-3 đã merge |
-| PUT file C2d-4b (đề xuất) | Final auth sau parser/storage, trước lưu/job/commit; intent claim/lock/I/O và orphan/uncertain | C2d-4a + lock/I/O inventory |
+| Upload JSON C2d-4a | [Task](tasks/m6c2b2c2d4a-upload-notice-intent.md): notice/intent, xác nhận riêng, actor/clock trước commit và fresh proof trước trả token; đã merge PR #43 `632ec68` | PR #42 và C2d-3 đã merge |
+| PUT file C2d-4b | [Task đã giao](tasks/m6c2b2c2d4b-upload-original.md): consume cuối, I/O ngoài khóa, SHA-256 readback, fresh response proof và orphan/uncertain/cancel; đã triển khai trên nhánh review, kết quả theo [handoff](c2d4b-upload-original.md) | C2d-4a đã merge + lock/I/O inventory |
 | Original download C2d-4c (đề xuất) | Private/common/review exact permission sau storage/trước byte đầu; checksum/slot/disconnect, không proof qua commit | Helper + inventory lock/I/O; có thể chia thêm |
 | Resource writes/journal | Actor/role cuối ở review/promotion/publication/common-index, exclusive journal và lỗi copy/commit | Lock map và các helper tương ứng |
 | Search/provider | Caller sau reservation commit trước embedding/rerank và final hit/chunk response; ACL trước top-k, accounting uncertain | Helper + boundary ledger/resource |
@@ -55,7 +64,7 @@ Trạng thái từng PR theo inventory/source: C2d-2a/2b/3 và sửa final read 
 
 Worker dùng durable job/item rights + recovery gate, không mang session giả hoặc buộc vào tuổi session trình duyệt. C3 operator/delivery/status recovery, C4 storage/cutover, journal membership/xóa riêng và backup scheduler còn riêng.
 
-**PR #38–#42 đã merge** (C2d-1/2a/2b/3 và sửa clock, source `0039`). Các handoff giữ riêng; [C2d-4a notice/intent](c2d4a-upload-notice-intent.md) đã triển khai trên nhánh review, chưa merge. Safety pending tới C4; core caller protections phải hoàn tất trước C3/C4. Phần C2b và milestone bên dưới là lịch sử.
+**PR #38–#43 đã merge** (C2d-1/2a/2b/3, sửa clock và notice/intent, source `0039`). Các handoff giữ riêng; C2d-4b trên nhánh review; kết quả theo handoff riêng. Safety pending tới C4; core caller protections phải hoàn tất trước C3/C4. Phần C2b và milestone bên dưới là lịch sử.
 
 **M6c-2b2b2, PR #31 đã merge `3f21794`:** base PR #30 đã merge `ce67ce8`, `0031`; invitation journal thêm `0032`. [Hợp đồng](invitation-journal.md) bảo vệ link đã kết thúc sau restore với journal hiện hành, không dựng lại account; full API **901/901**, web **42/42**, đối chứng **8/8**, drill **59/59** là chứng cứ lịch sử PR #31 (giới hạn ở tài liệu kiểm chứng).
 

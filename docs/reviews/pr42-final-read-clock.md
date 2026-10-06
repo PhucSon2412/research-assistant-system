@@ -1,6 +1,6 @@
 # Review PR #42: final read clock sau SQL
 
-**Cập nhật sau review (2026-10-06):** chủ dự án đã merge; fetch/GitHub CLI xác minh merge/main `99db5285dfa59dd3d26e86345e849393ed88ce33`. Task tiếp [C2d-4a notice/intent](../tasks/m6c2b2c2d4a-upload-notice-intent.md) đã giao, chưa triển khai. Trạng thái OPEN trong phần kết luận dưới đây là snapshot lúc review, kết quả kiểm không đổi. Safety pending tới C4.
+**Cập nhật sau review (2026-10-06):** chủ dự án đã merge; fetch/GitHub CLI xác minh merge/main `99db5285dfa59dd3d26e86345e849393ed88ce33`. [C2d-4a notice/intent](../tasks/m6c2b2c2d4a-upload-notice-intent.md) đã merge PR #43 `632ec68`; task tiếp C2d-4b được dẫn trong mục lục hiện hành. Trạng thái OPEN trong phần kết luận dưới đây là snapshot lúc review, kết quả kiểm không đổi. Safety pending tới C4.
 
 [Mục lục](../README.md) · [Task](../tasks/c2d-final-read-clock.md) · [Bàn giao](../c2d-final-read-clock.md) · [Inventory agent](../c2d-final-read-clock-test-inventory.json)
 

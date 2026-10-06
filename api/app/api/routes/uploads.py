@@ -2,34 +2,28 @@
 
 from __future__ import annotations
 
-import hashlib
-import os
-import tempfile
 import uuid
 from collections.abc import Callable
 from datetime import datetime
-from pathlib import Path
 from typing import Literal
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_clock, get_db, get_now, get_principal, require_trusted_origin
+from app.api.deps import get_clock, get_db, get_principal, require_trusted_origin
 from app.api import upload_intents
+from app.api import upload_original as original_upload
 from app.api.errors import ApiError
-from app.audit import record_event
 from app.authz import Principal, common_original_clause, m2a_private_derivatives_clause
 from app.common_original import VerifiedFileResponse, prepare_common_original
 from app.config import Settings, get_settings
-from app.identity.tokens import hash_token, plausible_token
 from app.identity.final_caller import final_caller
-from app.models import IngestionJob, LibraryItem, PaperVersion, SourceFile, UploadIntent
-from app.models.enums import AuditActorType, AuditOutcome, JobOrigin, JobState, VerifiedMime, Visibility
+from app.models import LibraryItem, PaperVersion, SourceFile
+from app.models.enums import VerifiedMime, Visibility
 from app.pdf_probe import page_count
 from app.storage import OriginalStorage, get_storage
 
@@ -109,113 +103,16 @@ def _validate_file(path: str, kind: str, settings: Settings) -> tuple[str, int |
     return VerifiedMime.MARKDOWN.value, None
 
 
-def _delete_if_unreferenced(db: Session, storage: OriginalStorage, key: str) -> None:
-    """A failed/ambiguous commit may have succeeded: never delete a referenced object."""
-    try:
-        db.rollback()
-        if db.scalar(select(SourceFile.id).where(SourceFile.storage_key == key)) is None:
-            storage.delete(key)
-    except Exception:
-        # An unreachable DB makes the commit outcome unknown. A later orphan
-        # sweep removes unreferenced objects; no object URL is exposed.
-        pass
-
-
 @router.put("/uploads/original", status_code=201)
 async def upload_original(
     request: Request,
     principal: Principal = Depends(get_principal),
-    db: Session = Depends(get_db),
-    now: datetime = Depends(get_now),
+    clock: Callable[[], datetime] = Depends(get_clock),
     settings: Settings = Depends(get_settings),
     storage: OriginalStorage = Depends(_storage),
+    _origin: None = Depends(require_trusted_origin),
 ) -> dict:
-    if request.headers.get("origin") not in settings.http.allowed_origins:
-        raise ApiError(403, "csrf_failed")
-    raw = request.headers.get("x-upload-intent")
-    if not plausible_token(raw):
-        raise ApiError(404, "invalid_intent")
-    # Lock for the entire bounded transfer. A racing request waits and then
-    # sees used_at; only one transaction can publish the item.
-    intent = db.scalar(select(UploadIntent).where(UploadIntent.token_hash == hash_token(raw)).with_for_update())
-    if (intent is None or intent.user_id != principal.user_id or intent.session_id != principal.session_id
-            or intent.notice_version != settings.upload_notice_version or intent.used_at is not None
-            or now >= intent.expires_at):
-        db.rollback()
-        raise ApiError(404, "invalid_intent")
-    limit = settings.files.pdf_max_bytes if intent.file_kind == "pdf" else settings.files.markdown_max_bytes
-    if request.headers.get("content-type", "").split(";")[0] not in ("application/octet-stream", "application/pdf", "text/markdown"):
-        db.rollback()
-        raise ApiError(422, "invalid_file_type")
-    if request.headers.get("content-length"):
-        try:
-            declared_length = int(request.headers["content-length"])
-        except ValueError:
-            db.rollback()
-            raise ApiError(422, "invalid_request") from None
-        if declared_length > limit or declared_length > intent.declared_size:
-            db.rollback()
-            raise ApiError(413, "file_too_large")
-    key = f"originals/{uuid.uuid4().hex}"
-    stored = False
-    try:
-        with tempfile.TemporaryDirectory(prefix="ras-upload-") as directory:
-            path = os.path.join(directory, "original")
-            digest = hashlib.sha256()
-            size = 0
-            with open(path, "wb") as file:
-                async for chunk in request.stream():
-                    size += len(chunk)
-                    if size > limit or size > intent.declared_size:
-                        raise ApiError(413, "file_too_large")
-                    digest.update(chunk)
-                    file.write(chunk)
-            if size != intent.declared_size or digest.hexdigest() != intent.declared_sha256:
-                raise ApiError(422, "file_mismatch")
-            mime, pages = await run_in_threadpool(_validate_file, path, intent.file_kind, settings)
-            with open(path, "rb") as file:
-                await run_in_threadpool(storage.put, key, file, mime)
-            stored = True
-        item = LibraryItem(visibility=Visibility.PRIVATE.value, owner_user_id=principal.user_id,
-                           created_by_user_id=principal.user_id, title=Path(intent.filename).stem)
-        db.add(item)
-        db.flush()
-        version = PaperVersion(item_id=item.id)
-        db.add(version)
-        db.flush()
-        job = IngestionJob(origin=JobOrigin.UPLOAD.value, actor_user_id=principal.user_id,
-                           scope_visibility=Visibility.PRIVATE.value, scope_owner_user_id=principal.user_id,
-                           item_id=item.id, version_id=version.id, idempotency_key=str(intent.id),
-                           state=JobState.RECEIVED.value, rights_epoch_at_start=0)
-        db.add(job)
-        db.flush()
-        source = SourceFile(item_id=item.id, version_id=version.id, job_id=job.id, storage_key=key,
-                            verified_mime=mime, byte_size=size, page_count=pages,
-                            checksum_sha256=digest.hexdigest(), original_filename=intent.filename,
-                            file_source="upload")
-        db.add(source)
-        intent.used_at = now
-        intent.item_id = item.id
-        db.flush()
-        record_event(db, action="upload.original.receive", outcome=AuditOutcome.SUCCESS,
-                     actor_type=AuditActorType.USER, actor_user_id=principal.user_id,
-                     target_type="library_item", target_id=str(item.id))
-        db.commit()
-        return {"item_id": str(item.id), "version_id": str(version.id), "file_id": str(source.id),
-                "job_id": str(job.id), "state": "received"}
-    except ApiError:
-        db.rollback()
-        raise
-    except Exception:
-        if stored:
-            _delete_if_unreferenced(db, storage, key)
-        else:
-            db.rollback()
-            try:
-                storage.delete(key)  # multipart/partial put may have left an object
-            except Exception:
-                pass
-        raise ApiError(503, "upload_unavailable") from None
+    return await original_upload.receive(request, principal, clock, settings, storage, _validate_file)
 
 
 @router.get("/files/{file_id}/original")

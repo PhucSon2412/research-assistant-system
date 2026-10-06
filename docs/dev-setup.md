@@ -1,8 +1,33 @@
-# Môi trường phát triển và schema (M1a–C2d-4a)
+# Môi trường phát triển và schema (M1a–C2d-4b)
+
+## P2 PR #44 cô lập
+
+Source `adfdb72`; Conda ras interpreter/pip xác minh. PostgreSQL `ras-pr44-p2-db-20261006` port 58457, MinIO `ras-pr44-p2-minio-20261006` port 59457, label `ras.task=pr44-p2-20261006`; journal/credentials/evidence ngoài repo `%TEMP%/ras-pr44-p2-20261006`. Runtime c1_runtime, credentials tường minh trước fixture import, key provider bỏ khỏi process env, HTTP ngoài local bị chặn; không `.env`/dev/provider/cutover.
+
+Lệnh đã chạy: `python <evidence>/setup.py`; `python <evidence>/runner.py api/tests/test_c2d4b_upload_original.py -q -k outcome_survives --junitxml=<evidence>/before.xml` (7 fail/1 pass trước sửa); after2 (8 pass), focused 10 pass; `python -m py_compile api/app/api/upload_original.py`; `python <evidence>/runner.py api --collect-only -q`; `python <evidence>/suite.py` (ba selection rời, **463 pass**, **2.452 not-run**). [Inventory, phần p2_fix](c2d4b-test-inventory.json) và [handoff](c2d4b-upload-original.md#sửa-p2-outcome-độc-lập-với-teardown) giữ source/node/JUnit/hash và lượt collection lỗi indentation riêng. Web không đổi, không chạy lại lệnh web trong lượt sửa này.
+
+Cleanup đã kiểm exact ID/name/label/image/ports/mount/sole consumer rồi gỡ hai container/hai volume P2, xóa đúng ba credentials, giữ evidence/journal; 24 container cũ giữ ID/image/StartedAt. Safety pending tới C4. Đây là lệnh kiểm cô lập ngoài repo, không vận hành dev.
+
+
+## Review PR #44 cô lập
+
+[Report và giới hạn](reviews/pr44-c2d4b-upload-original.md): head `b578082`, source `68950f3`, 230 API chọn/51 web/typecheck đạt; fault commit + close lỗi tái hiện P2 xóa object, cần sửa trước merge. Reviewer không chạy lại build/browser DOM/full API. Safety pending tới C4, không thao tác dev.
+
+Conda ras đã xác minh; evidence `%TEMP%/ras-pr44-review-20261006`. PostgreSQL standalone port 58456 và MinIO port 59456, label `ras.task=pr44-review-20261006`, credentials tường minh, external HTTP bị chặn. Đã chạy `& $py <evidence>/runner.py api/tests/test_c2d4b_upload_original.py api/tests/test_uploads.py api/tests/test_migrations.py::test_orm_models_match_migrated_schema -q --basetemp=<evidence>/pytest --junitxml=<evidence>/review.xml`; thêm `uncertain-close-repro.py`/`uncertain-close-control.py` cho fault/control trong bộ nhớ, source disk không đổi. Công cụ này ở ngoài repo, không là lệnh vận hành dev. Đã cleanup exact 2 container/2 exclusive volume, xóa credentials; 24 container cũ giữ ID/image/StartedAt.
+
+## C2d-4b PUT original cô lập
+
+Base `632ec68`, source head `0039`; nhánh review, **safety pending tới C4**. [Boundary/config/giới hạn](c2d4b-upload-original.md). PostgreSQL `ras-c2d4b-db-20261006` port 58455, MinIO `ras-c2d4b-minio-20261006` port 59455, label `ras.task=c2d4b-20261006`; credentials/journal/evidence ở `%TEMP%/ras-c2d4b-20261006`, ngoài repo. Runner explicit DB/runtime/recovery/MinIO credentials trước import fixture và chặn external HTTP/urllib3. Không dùng `.env`/dev hoặc provider.
+
+Lệnh đã thực chạy bằng Conda ras: `python <evidence>/setup.py`; `python <evidence>/runner.py api --collect-only -q`; pytest preparation/refined với `--junitxml=<evidence>/...xml`. Suite cuối dùng `python <evidence>/final_suite.py`, ba selection rời nhau từ collect đầy đủ; source `68950f3`, 808 pass/2.097 not-run, [inventory/JUnit/hash](c2d4b-test-inventory.json). Web đã chạy `npm test --prefix web`, `npm run typecheck --prefix web`, `npm run build --prefix web`; 51 pass/typecheck/build đạt. Các lượt chuẩn bị không cộng vào kết quả cuối. Đây là lệnh thử cô lập, không vận hành dev.
+
+Runtime config mới: `RAS_FILES__UPLOAD_MAX_CONCURRENT`, `RAS_FILES__UPLOAD_BODY_TIMEOUT_SECONDS`, `RAS_STORAGE__CONNECT_TIMEOUT_SECONDS`, `RAS_STORAGE__READ_TIMEOUT_SECONDS`, `RAS_STORAGE__MAX_ATTEMPTS`. Settings có bounds/test; khi deploy container phải truyền env vào process/container, không chỉ đặt env trên host. Không đổi Compose/dev trong task này. Timeout SDK/socket/body không là tổng deadline request. Reconcile chỉ sau quiescence/grace, chưa có multipart cleanup riêng.
+
+**Cập nhật sau merge PR #43:** main `632ec68`, head source `0039`, không suy revision DB dev. [C2d-4b PUT original](c2d4b-upload-original.md) trên nhánh review, kết quả giữ ở handoff; chưa có lệnh vận hành mới. Chỉ test cô lập với DB/MinIO credentials tường minh; không dùng `.env` hoặc stack dev. Safety pending tới C4.
 
 ## C2d-4a notice và intent cô lập
 
-Base `99db528`, code/test cuối `610e52d`, web kiểm tại `27dd4c5` và không đổi sau đó; source migration `0039`, **nhánh review chưa merge, safety pending tới C4**. Conda ras interpreter/pip đã xác minh, không venv/cài thêm. PostgreSQL standalone `ras-c2d4a-db-20261006`, label `ras.task=c2d4a-20261006`, bind `127.0.0.1:58454`; credentials/admin URL/DB parts tường minh, runtime/recovery LOGIN thật. Journal/evidence ngoài repo `%TEMP%/ras-c2d4a-20261006`; runner chặn external HTTP sync/async, không fallback `.env`. Scoped cutover chỉ trong fixture nghiệp vụ; hai pending HTTP giữ gate thật.
+Base `99db528`, code/test cuối `610e52d`, web kiểm tại `27dd4c5` và không đổi sau đó; source migration `0039`, **đã merge PR #43 `632ec68`, safety pending tới C4**. Conda ras interpreter/pip đã xác minh, không venv/cài thêm. PostgreSQL standalone `ras-c2d4a-db-20261006`, label `ras.task=c2d4a-20261006`, bind `127.0.0.1:58454`; credentials/admin URL/DB parts tường minh, runtime/recovery LOGIN thật. Journal/evidence ngoài repo `%TEMP%/ras-c2d4a-20261006`; runner chặn external HTTP sync/async, không fallback `.env`. Scoped cutover chỉ trong fixture nghiệp vụ; hai pending HTTP giữ gate thật.
 
 Lệnh thực chạy từ root với `$py = "$env:USERPROFILE\.conda\envs\ras\python.exe"`: `& $py <evidence>/setup.py`, `& $py <evidence>/runner.py api --collect-only -q`, `& $py <evidence>/mutants.py`, `& $py <evidence>/final_suite.py` (selection hai nhóm và JUnit riêng). `final_suite.py` gọi `runner.py api -q --ras-selected --selection=<core/reg-nodes.json> --basetemp=<thư mục riêng> --junitxml=<final-core/reg.xml>`. Đây là evidence runner cô lập, **không là lệnh vận hành dev**.
 
@@ -20,7 +45,7 @@ Lệnh evidence thực chạy từ gốc repo bằng Conda Python: `setup.py`; `
 
 Đã kiểm ID/label/image/port/mount/sole consumer trước khi xóa container/anonymous volume thử, xóa credentials; 24 preexisting container giữ ID/image/StartedAt. [Handoff/kết quả/giới hạn](c2d-final-read-clock.md) · [Inventory](c2d-final-read-clock-test-inventory.json). Source `0039` không là revision DB dev; safety pending tới C4.
 
-**Cập nhật 2026-10-06:** PR #42 đã merge `99db528`, source migration `0039`; [handoff/evidence sửa clock](c2d-final-read-clock.md) giữ theo source đã kiểm. Task tiếp [C2d-4a notice/intent](tasks/m6c2b2c2d4a-upload-notice-intent.md) đã giao, chưa triển khai/chưa kiểm. Không có lệnh vận hành dev mới. Safety pending tới C4, không suy revision DB dev.
+**Cập nhật 2026-10-06:** PR #42 đã merge `99db528`, source migration `0039`; [handoff/evidence sửa clock](c2d-final-read-clock.md) giữ theo source đã kiểm. [C2d-4a notice/intent](tasks/m6c2b2c2d4a-upload-notice-intent.md) đã merge PR #43 `632ec68`; C2d-4b trên nhánh review; kết quả theo handoff riêng. Không có lệnh vận hành dev mới. Safety pending tới C4, không suy revision DB dev.
 
 ## Review PR #41 cô lập
 

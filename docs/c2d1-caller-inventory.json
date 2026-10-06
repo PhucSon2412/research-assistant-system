@@ -1,7 +1,7 @@
 {
-  "base": "99db5285dfa59dd3d26e86345e849393ed88ce33",
+  "base": "632ec683940a8bccc711c8a55743b0a3992c1d03",
   "source_migration": "0039",
-  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4. Final read clock corrected after predicate SQL; /auth/sessions uses the shared final caller. Details in docs/c2d-final-read-clock.md. C2d-4a adds GET upload notice final caller and POST intent actor/binding/TTL before commit plus fresh token proof after known commit. PUT/download stay open.",
+  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4. Final read clock corrected after predicate SQL; /auth/sessions uses the shared final caller. Details in docs/c2d-final-read-clock.md. C2d-4a adds GET upload notice final caller and POST intent actor/binding/TTL before commit plus fresh token proof after known commit. C2d-4b PUT original is implemented on review branch with unlocked staging, atomic consume and a new exact response proof. Original download C2d-4c and remaining callers stay open.",
   "safety": "pending until C4",
   "route_count": 63,
   "routes": [
@@ -211,7 +211,7 @@
         "get_clock"
       ],
       "group": "auth",
-      "final_status": "C2a listing; final read clock correction via exact final_caller (review; safety pending until C4)",
+      "final_status": "C2a listing; final read clock correction via exact final_caller merged PR #42; safety pending until C4",
       "direct_transaction_calls": [],
       "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở",
       "boundary_helper": "app.identity.final_caller.final_caller"
@@ -1020,7 +1020,7 @@
       "path": "/uploads/notice",
       "function": "notice",
       "source": "api/app/api/routes/uploads.py",
-      "line": 67,
+      "line": 61,
       "dependencies": [
         "get_principal",
         "get_settings",
@@ -1028,7 +1028,7 @@
         "get_clock"
       ],
       "group": "file-upload",
-      "final_status": "C2d-4a implemented on review branch, not merged; final clock after SQL; safety pending until C4",
+      "final_status": "C2d-4a merged PR #43 at 632ec68; final clock after SQL; safety pending until C4",
       "direct_transaction_calls": [
         "db.rollback"
       ],
@@ -1041,7 +1041,7 @@
       "path": "/uploads/intents",
       "function": "create_intent",
       "source": "api/app/api/routes/uploads.py",
-      "line": 82,
+      "line": 76,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -1050,7 +1050,7 @@
         "require_trusted_origin"
       ],
       "group": "file-upload",
-      "final_status": "C2d-4a implemented on review branch, not merged; final clock after SQL; safety pending until C4",
+      "final_status": "C2d-4a merged PR #43 at 632ec68; final clock after SQL; safety pending until C4",
       "direct_transaction_calls": [],
       "contract_map": "docs/c2d4a-upload-notice-intent.md#boundary-và-lock-map",
       "boundary": "api.upload_intents.create",
@@ -1061,28 +1061,28 @@
       "path": "/uploads/original",
       "function": "upload_original",
       "source": "api/app/api/routes/uploads.py",
-      "line": 125,
+      "line": 107,
       "dependencies": [
         "get_principal",
-        "get_db",
-        "get_now",
+        "get_clock",
         "get_settings",
-        "_storage"
+        "_storage",
+        "require_trusted_origin"
       ],
       "group": "file-upload",
-      "final_status": "open C2d",
-      "direct_transaction_calls": [
-        "db.commit",
-        "db.rollback"
-      ],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "final_status": "C2d-4b implemented on review branch; safety pending until C4",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d4b-upload-original.md#boundary-và-lock-map",
+      "boundary": "api.upload_original.receive",
+      "post_known_commit_new_proof": true,
+      "acceptance_outcome": "attempt-owned commit_started/committed/rollback_confirmed; teardown errors cannot authorize cleanup after commit; safety pending until C4"
     },
     {
       "method": "GET",
       "path": "/files/{file_id}/original",
       "function": "download_original",
       "source": "api/app/api/routes/uploads.py",
-      "line": 222,
+      "line": 119,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -1131,7 +1131,7 @@
     "api/app/api/routes/rag.py": "fa890ce04f01282e215198acf7016e6537c9afe58a06f90950b0b3521df4c84b",
     "api/app/api/routes/reviews.py": "f7245caffbed374203ff824a878b1a3a9a837b2859f9ed481bc3d0d0e8968ecc",
     "api/app/api/routes/search.py": "5b8c8b1c8afa24821d041d7bd9a765915b5ea8baf10d873c8a8d6803816321e7",
-    "api/app/api/routes/uploads.py": "236c86087feb530372842de6189902ae534272ea47388d818655eb59d26217a2",
+    "api/app/api/routes/uploads.py": "85c1299165200ad87b75578435ee7c994409b708e967a739781eeffb93edf7df",
     "api/app/main.py": "b53f13e8e5dbdbed1de23410c7967298a9e1123a7411730f5d93f4721421f93e"
   },
   "previous_base": "5100ff67c5c61754e4dd29693cb670a22ce6cf83",
@@ -1150,9 +1150,15 @@
     "/library/items/{item_id}/coverage",
     "/library/items/{item_id}/references"
   ],
-  "tested_code_commit": "610e52d22292e16534c7c1771ca40fe6528b467a",
   "c2d4a_json_routes": [
     "GET /uploads/notice",
     "POST /uploads/intents"
-  ]
+  ],
+  "c2d4b_put_routes": [
+    "PUT /uploads/original"
+  ],
+  "previous_tested_code_commit": "610e52d22292e16534c7c1771ca40fe6528b467a",
+  "c2d4b_code_commit": "adfdb722fdd0de529b45addddd516872e3b404ac",
+  "previous_inventory_base": "99db5285dfa59dd3d26e86345e849393ed88ce33",
+  "previous_c2d4b_code_commit": "68950f3357e740bed6030af53dc385bcef5de585"
 }

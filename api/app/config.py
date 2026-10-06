@@ -89,6 +89,9 @@ class FileLimits(BaseModel):
     pdf_max_pages: int = Field(default=100, gt=0)
     markdown_max_bytes: int = Field(default=2 * MIB, gt=0)
     upload_intent_lifetime: timedelta = timedelta(minutes=10)
+    # Initial settings to measure; per-process staging, separate from downloads.
+    upload_max_concurrent: int = Field(default=4, gt=0, le=64)
+    upload_body_timeout_seconds: float = Field(default=90, gt=0, le=600)
     pdf_probe_timeout_seconds: int = Field(default=10, gt=0)
     pdf_probe_memory_bytes: int = Field(default=256 * MIB, gt=0)
     orphan_grace: timedelta = timedelta(hours=24)
@@ -119,6 +122,9 @@ class ObjectStorage(BaseModel):
     access_key: SecretStr
     secret_key: SecretStr
     bucket: str = "ras-originals"
+    connect_timeout_seconds: int = Field(default=10, gt=0, le=120)
+    read_timeout_seconds: int = Field(default=30, gt=0, le=120)
+    max_attempts: int = Field(default=2, gt=0, le=5)
 
 
 class PdfBodyThreshold(BaseModel):

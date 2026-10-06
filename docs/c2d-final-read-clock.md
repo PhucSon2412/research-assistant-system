@@ -1,6 +1,6 @@
 # C2d: sửa final read clock sau predicate SQL
 
-**PR #42 đã merge `99db528` (2026-10-06).** [C2d-4a notice/intent](c2d4a-upload-notice-intent.md) đã triển khai trên nhánh review, chưa merge; PUT/download và các nhóm writer/provider/C3/C4 còn riêng. Source `0039`, safety pending tới C4. Các số đo bản sửa clock bên dưới là lịch sử, không cộng vào task mới.
+**PR #42 đã merge `99db528` (2026-10-06).** [C2d-4a notice/intent](c2d4a-upload-notice-intent.md) đã merge PR #43 `632ec68`; [C2d-4b PUT original](c2d4b-upload-original.md) trên nhánh review, kết quả giữ ở handoff. Download và các nhóm writer/provider/C3/C4 còn riêng. Source `0039`, safety pending tới C4. Các số đo bản sửa clock bên dưới là lịch sử, không cộng vào task mới.
 
 **Review độc lập PR #42 tại `8f924c0` (2026-10-06):** 124/124 API chọn pass; 218 API Python/SQL hash không đổi. Đối chứng nạp riêng hàm cũ trong tiến trình test: 6 fail đúng/2 positive, không sửa file ứng dụng. Không phát hiện điểm chặn merge trong phạm vi PR; [report/source/JUnit/not-run](reviews/pr42-final-read-clock.md). Kết quả 1094 của agent bên dưới giữ riêng, không phải kiểm thử task mới.
 

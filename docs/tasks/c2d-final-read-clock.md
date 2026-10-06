@@ -1,6 +1,6 @@
 # Prompt: sửa final clock của read caller sau SQL
 
-**Trạng thái:** đã merge PR #42 tại `99db5285dfa59dd3d26e86345e849393ed88ce33` (2026-10-06); [handoff và kết quả](../c2d-final-read-clock.md). Giữ nội dung giao dưới đây làm lịch sử yêu cầu ngày 2026-10-06. Task tiếp [C2d-4a notice/intent](m6c2b2c2d4a-upload-notice-intent.md) đã giao, chưa triển khai. PR #41 đã merge `5100ff67c5c61754e4dd29693cb670a22ce6cf83`. Source migration `0039`; safety **pending tới C4**.
+**Trạng thái:** đã merge PR #42 tại `99db5285dfa59dd3d26e86345e849393ed88ce33` (2026-10-06); [handoff và kết quả](../c2d-final-read-clock.md). Giữ nội dung giao dưới đây làm lịch sử yêu cầu ngày 2026-10-06. [C2d-4a notice/intent](m6c2b2c2d4a-upload-notice-intent.md) đã merge PR #43 `632ec68`; task tiếp C2d-4b được dẫn trong mục lục hiện hành. PR #41 đã merge `5100ff67c5c61754e4dd29693cb670a22ce6cf83`. Source migration `0039`; safety **pending tới C4**.
 
 [Mục lục](../README.md) · [Quyết định giao](../decisions.md#giao-pr-sửa-final-clock-sau-merge-pr-41-2026-10-06) · [P2 và chứng cứ](../reviews/pr41-c2d3-resource-writes.md#p2-ở-helper-đọc-clock-trước-predicate-sql) · [Bàn giao C2d-1](../c2d1-final-caller-reads.md) · [Roadmap](../roadmap.md)
 

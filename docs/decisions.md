@@ -1,5 +1,49 @@
 # Nhật ký quyết định
 
+## Sửa P2 PR #44: giữ outcome khi teardown lỗi (2026-10-06)
+
+Theo yêu cầu chủ dự án và [review](reviews/pr44-c2d4b-upload-original.md), source `adfdb72` giữ outcome trong state do attempt sở hữu, cập nhật trước/sau commit và chỉ xác nhận precommit rollback khi rollback trả thành công. Lỗi close/rollback không hạ commit uncertain/known thành quyền cleanup. Acceptance Session teardown tường minh, fallback invalidate để trả/discard connection; không retry mutation. Known commit + teardown lỗi trả response unavailable không IDs, giữ dữ liệu.
+
+[Handoff P2](c2d4b-upload-original.md#sửa-p2-outcome-độc-lập-với-teardown) ghi mốc/state/error/resources và giới hạn; suite liên quan 463/463 pass, collect 2.915/2.452 not-run; source/hash/node ở phần p2_fix của inventory. Giữ review và kết quả 808/230 trước sửa riêng; không migration/grants/web/download, không dev/`.env`/provider. Safety pending tới C4, cần review lại, không merge.
+
+## Review độc lập PR #44 (2026-10-06)
+
+Fetch/GitHub CLI xác minh PR OPEN/chưa merge, head `b578082`, code `68950f3`, base/main `632ec68`, source `0039`; không query dev. [Report](reviews/pr44-c2d4b-upload-original.md): reviewer **230/230 API chọn**, **51/51 web** và typecheck đạt, source hashes không đổi; JUnit/selection/source agent 808 được xác minh riêng, không tính là chạy lại 808.
+
+**P2 chặn merge đã tái hiện:** commit exception rồi Session close lỗi che mất ApiError uncertain; `_attempt` không đặt keep, cleanup SELECT chưa thấy SourceFile rồi xóa object. Fault bổ sung 1 fail đúng lỗi; control chỉ commit lỗi 1 pass giữ object. Đây là injection trên PostgreSQL/MinIO thật, không chứng minh remote commit thật còn in flight hoặc mất điện.
+
+Yêu cầu coding agent giữ outcome/ownership độc lập với exception teardown, không hạ uncertain/known commit thành precommit cleanup; thêm regression lỗi kép/known commit/precommit control. Không cần migration/grants/cutover. Giữ số và giới hạn agent theo source lịch sử; docs review chưa commit cần giữ vào PR sửa. Chưa giao coding C2d-4c, safety pending tới C4. Reviewer chỉ viết docs/công cụ ngoài repo, không sửa app/test source, commit/push/merge/comment PR, dev/`.env`/provider. Đã gỡ 2 container/2 volume thử sau ownership checks, giữ nguyên 24 container có sẵn.
+
+## Triển khai C2d-4b PUT original (2026-10-06)
+
+Theo task chủ dự án và [prompt đã giao](tasks/m6c2b2c2d4b-upload-original.md), fetch xác minh base `632ec68`, PR #43 MERGED/chứa `f60645e`. Không migration/grants/early claim; giữ docs review/task chưa commit. [Handoff](c2d4b-upload-original.md) ghi lock map, cleanup theo outcome và giới hạn thực tế; source `68950f3` có 808 API pass (collect 2.905/2.097 not-run), 51 web/typecheck/build, bốn đối chứng guard; [inventory](c2d4b-test-inventory.json) tách khỏi PR #43.
+
+Agent chọn cách sở hữu tài nguyên trong phạm vi task: Session riêng cho từng proof/writer/response trong thread; HTTP task shield một attempt sở hữu slot/temp tới khi thread settle. Executor Future được shield trực tiếp để cancellation mọi Task không làm mất ownership của thread; contextvars giữ như to_thread. Cancellation đặt stop trước acceptance; commit đã chạy/exception giữ object, không IDs/retry. Response item → job → intent → ack → version/file → journal shared, kiểm consumed binding/caller mới, không yêu cầu state received hoặc intent chưa hết hạn sau known consume.
+
+Giá trị ban đầu cần đo được đưa vào config: upload 4 slot mỗi process, nhận body 90 giây, SDK connect/read 10/30 giây và 2 attempt. Không SLO/tổng deadline; disk/SDK/multipart/retries có thể khiến tổng vượt proxy 120 giây. Proxy/form nêu outcome chưa xác định và kiểm thư viện, không tự retry. Không thêm multipart sweeper hoặc consent journal xuyên restore.
+
+Fixture upload legacy đổi từ raw User INSERT sang runtime bootstrap/invitation/login; assertion xóa object khi commit exception đổi sang giữ orphan vì trái hợp đồng đã giao. Worker-state fixture dùng worker claim/begin/finish thật, có synthetic legal item progression; không chứng minh index hoặc gọi provider. Original download C2d-4c và writer/provider/C3/C4 giữ riêng. **Safety pending tới C4**, không dev/`.env`/pricing/provider.
+
+## Giao C2d-4b sau merge PR #43 (2026-10-06)
+
+**Đã xác nhận:** chủ dự án báo đã merge và yêu cầu prompt tiếp. Git fetch/GitHub CLI xác minh PR #43 MERGED tại `632ec683940a8bccc711c8a55743b0a3992c1d03`, chứa head `f60645e`; source migration `0039`, không query DB dev. Các kết quả review PR #43 bên dưới giữ lịch sử theo source cũ.
+
+**Orchestrator chọn theo ủy quyền:** giao [C2d-4b PUT original](tasks/m6c2b2c2d4b-upload-original.md), một PR riêng. Tiêu thụ intent ở giao dịch nhận file cuối: User → intent → acknowledgement → flush item/version/file/job/audit → journal exclusive → fresh binding/actor/clock → commit. Nhận body/parser/S3/readback SHA-256 ngoài transaction/khóa DB. Staging key riêng mỗi attempt; cùng intent chỉ một commit, không early claim/lease. Response dùng transaction/proof mới; worker tiến state không khiến API ghi đè hoặc hủy job đã nhận.
+
+Commit exception/cancellation khi thread còn có thể commit là **uncertain**: không IDs/retry, giữ object dù SELECT chưa thấy tham chiếu. Chỉ cleanup key riêng sau known rollback và xác nhận không tham chiếu; DB lỗi giữ orphan cho reconcile sau grace/outcome settled. SHA-256 readback trước DB publication áp cả PDF/Markdown; HEAD không thay băm. Không hứa thu hồi network bytes hoặc tính bất biến sau lần băm cuối.
+
+**Đề xuất cấu hình, cần đo:** slot upload riêng 4 attempt mỗi process API, body receive timeout 90 giây; không phải rate limit toàn hệ thống/SLO. Coding agent đối chiếu timeout parser/SDK/proxy thực tế, ghi giới hạn client timeout không hủy backend; các giá trị vào config/test. Intent lifetime kiểm tại consume; intent hết hạn sau known commit không đảo ngược accepted item, session vẫn phải sống tại response.
+
+**Phần riêng/cần xác nhận sau:** original downloads C2d-4c, writer/provider còn lại, operator/delivery C3, journal độc lập/cutover C4. Không journal consent/intent hoặc sửa grants/migration mặc định trong task này. Safety **pending tới C4**. Lượt giao việc chỉ viết docs, chưa triển khai hoặc chạy test C2d-4b, không dev/provider/`.env`.
+
+## Review độc lập PR #43 (2026-10-06)
+
+Fetch/GitHub CLI xác minh PR OPEN/chưa merge, head `f60645e`, code `610e52d`, base/main `99db528`; source migration `0039`. [Report](reviews/pr43-c2d4a-upload-intents.md): **167/167 API chọn độc lập pass**, đủ 155 mới + 6 writer success + 5 pending + 1 ORM; 413,422 s, 0 failure/error/skip. 220 API hash giữ nguyên, JUnit/node khớp. Web chạy lại **47/47**, typecheck đạt; không browser DOM/build lại.
+
+Hai JUnit agent đúng 579 unique node/selection/SHA; collection 2685 và 2106 not-run, 259 source hash khớp. Reviewer chỉ chạy 167, còn 412 trong suite agent và 2518 ngoài selection chưa chạy độc lập. Không phát hiện điểm chặn merge scope hai JSON route: exact binding/clock trước commit, fresh transaction/proof trước trả token, fail closed/uncertain không token/retry; không suy PUT/download, toàn C2d/T14 hoặc restore/production an toàn.
+
+Docs review chưa commit; không sửa app, `.env`, dev, provider/pricing hoặc safety gate. Đã dọn container/sole volume/credentials cô lập, 24 container cũ giữ ID/image/StartedAt. Safety **pending tới C4**. PUT/download và các writer/provider/C3/C4 giữ task riêng sau merge; reviewer không merge/push/comment PR.
+
 ## Triển khai C2d-4a notice và intent (2026-10-06)
 
 **Nguồn:** task chủ dự án và [prompt](tasks/m6c2b2c2d4a-upload-notice-intent.md). Fetch xác minh `origin/main=99db528`, PR #42 MERGED/chứa `8f924c0`; nhánh `feat/m6c2b2c2d4a-upload-notice-intent`. Giữ toàn bộ docs chưa commit, gồm review PR #42. Source `0039`, không migration/grants, dev/`.env`/provider/pricing hoặc safety ready; **pending tới C4**.

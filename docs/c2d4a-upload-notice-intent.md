@@ -1,6 +1,8 @@
 # C2d-4a: upload notice và intent
 
-**Đã triển khai trên nhánh review, chưa merge.** Base fetch `99db5285dfa59dd3d26e86345e849393ed88ce33`, PR #42 MERGED và chứa head `8f924c0`. Chỉ hai JSON route; migration source `0039`, không đổi schema/grants và không suy revision DB dev. Safety **pending tới C4**.
+**Review độc lập PR #43 tại `f60645e` (2026-10-06):** 167/167 API chọn, gồm đủ 155 test mới; 47/47 web và typecheck đạt. 220 API hash không đổi; artifact 579 và 259 source hash của agent khớp, không tính là reviewer chạy lại 579. [Report/source/JUnit/not-run](reviews/pr43-c2d4a-upload-intents.md). Không phát hiện điểm chặn merge trong scope; PR đã merge `632ec68`, safety pending tới C4. Kết quả agent bên dưới giữ riêng.
+
+**Đã merge PR #43 `632ec68`.** Base fetch `99db5285dfa59dd3d26e86345e849393ed88ce33`, PR #42 MERGED và chứa head `8f924c0`. Chỉ hai JSON route; migration source `0039`, không đổi schema/grants và không suy revision DB dev. Safety **pending tới C4**. Task tiếp [C2d-4b PUT original](c2d4b-upload-original.md) trên nhánh review, kết quả giữ ở handoff; download riêng C2d-4c.
 
 [Mục lục](README.md) · [Task](tasks/m6c2b2c2d4a-upload-notice-intent.md) · [Test inventory](c2d4a-test-inventory.json) · [Caller inventory](c2d1-caller-inventory.json)
 
@@ -29,7 +31,7 @@ Validation nghiệp vụ notice/filename/limit chạy **sau current User guard t
 
 Binding gồm intent/ack ID, User/session/notice, kind/filename/declared size/checksum/token hash, created/expires time, acknowledgement timestamp; `used_at` và `item_id` phải NULL. Lifetime lấy config từ mốc mới sau entry lock/check, không gia hạn sau SQL wait hoặc commit. Response không dùng ORM/proof trước commit.
 
-PUT hiện lấy intent UPDATE trước transfer/parser/storage, sau đó ghi item/version/job/source/FK/audit và commit. Response reader C2d-4a lấy intent rồi acknowledgement trước journal; không lấy User/FK locks sau đó. Vì vậy PUT phải chờ SHARE reader trước khi claim/ghi intent; reader đợi PUT UPDATE xong mới đọc unused lại. Đây chỉ là lock compatibility: **PUT chưa có final caller/boundary mới**, vẫn giữ lock qua I/O, không được mô tả toàn upload đã an toàn.
+Tại source PR #43 (lịch sử), PUT lấy intent UPDATE trước transfer/parser/storage, sau đó ghi item/version/job/source/FK/audit và commit. Response reader C2d-4a lấy intent rồi acknowledgement trước journal; không lấy User/FK locks sau đó. Vì vậy PUT phải chờ SHARE reader trước khi claim/ghi intent; reader đợi PUT UPDATE xong mới đọc unused lại. Đây chỉ là lock compatibility: **PUT chưa có final caller/boundary mới**, vẫn giữ lock qua I/O, không được mô tả toàn upload đã an toàn.
 
 ## Lỗi và giới hạn commit
 

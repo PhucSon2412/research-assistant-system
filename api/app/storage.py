@@ -22,7 +22,10 @@ class OriginalStorage:
             endpoint_url=settings.storage.endpoint_url,
             aws_access_key_id=settings.storage.access_key.get_secret_value(),
             aws_secret_access_key=settings.storage.secret_key.get_secret_value(),
-            config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
+            config=Config(signature_version="s3v4", s3={"addressing_style": "path"},
+                connect_timeout=settings.storage.connect_timeout_seconds,
+                read_timeout=settings.storage.read_timeout_seconds,
+                retries={"mode": "standard", "total_max_attempts": settings.storage.max_attempts}),
         )
 
     def ensure_bucket(self) -> None:

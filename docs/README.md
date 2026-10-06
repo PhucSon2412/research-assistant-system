@@ -1,6 +1,12 @@
 # Tài liệu dự án
 
-**C2d-4a đã triển khai trên nhánh review, chưa merge**, base PR #42 `99db528`: [bàn giao notice/intent](c2d4a-upload-notice-intent.md). Hai JSON route kiểm caller/role/binding/clock trước commit và proof mới trước trả token sau commit; PUT file/download vẫn riêng. [Quyết định giao](decisions.md#giao-c2d-4a-sau-merge-pr-42-2026-10-06). Source `0039`, safety **pending tới C4**.
+**P2 PR #44 đã sửa trên source `adfdb72`, cần review lại.** [Handoff](c2d4b-upload-original.md#sửa-p2-outcome-độc-lập-với-teardown): outcome độc lập rollback/Session.close, 463 API pass/2.452 not-run; [report gốc](reviews/pr44-c2d4b-upload-original.md) giữ P2 tại `b578082` và số reviewer riêng. PR OPEN/chưa merge, safety pending tới C4.
+
+**C2d-4b — PUT original đã kiểm trên nhánh review:** [bàn giao](c2d4b-upload-original.md) · [task](tasks/m6c2b2c2d4b-upload-original.md). Consume intent trong giao dịch cuối, I/O ngoài khóa DB, fresh response proof và cleanup theo commit outcome. Download thuộc C2d-4c; safety pending tới C4.
+
+**Review PR #43 tại `f60645e`:** độc lập 167/167 API (đủ 155 test mới), 47/47 web và typecheck đạt; không phát hiện điểm chặn merge trong phạm vi notice/intent. [Report và giới hạn](reviews/pr43-c2d4a-upload-intents.md). PR đã merge `632ec68`; số review giữ theo source cũ, không phải kiểm C2d-4b.
+
+**C2d-4a đã merge PR #43 `632ec68`**, base PR #42 `99db528`: [bàn giao notice/intent](c2d4a-upload-notice-intent.md). Hai JSON route kiểm caller/role/binding/clock trước commit và proof mới trước trả token sau commit; PUT file/download vẫn riêng. [Quyết định giao](decisions.md#giao-c2d-4a-sau-merge-pr-42-2026-10-06). Source `0039`, safety **pending tới C4**.
 
 **Review PR #42 tại `8f924c0`:** 124/124 API chọn pass độc lập, gồm đủ 65 test clock mới. Đối chứng hàm cũ bắt đúng 6 lỗi và giữ 2 ca sát hạn thành công; không thấy điểm chặn merge trong phạm vi sửa clock. [Report và giới hạn](reviews/pr42-final-read-clock.md). Kết quả giữ theo source review trước merge, không phải kiểm thử C2d-4a.
 
@@ -32,7 +38,12 @@ Khi có thay đổi quyết định, cập nhật tài liệu liên quan cùng t
 
 | Tài liệu | Nội dung |
 | --- | --- |
-| [Bàn giao C2d-4a](c2d4a-upload-notice-intent.md) | Hai JSON route, binding/secret/clock/lock/commit boundary, mã lỗi và phần PUT/download chưa chuyển; nhánh review chưa merge |
+| [Review PR #44](reviews/pr44-c2d4b-upload-original.md) | P2 tại source b578082; 230 API chọn và fault bổ sung lịch sử; bản sửa adfdb72 cần review lại |
+| [Bàn giao C2d-4b](c2d4b-upload-original.md) | Phase/lock map, SHA-256 readback, response proof mới, race/cancellation/uncertain, config/proxy và giới hạn |
+| [Test inventory C2d-4b](c2d4b-test-inventory.json) | P2 source adfdb72: 463 pass/2.452 not-run; lịch sử 68950f3: 808 API và 51 web/typecheck/build giữ riêng |
+| [Prompt C2d-4b](tasks/m6c2b2c2d4b-upload-original.md) | Hợp đồng task PUT original; kết quả trên nhánh review ở handoff riêng |
+| [Review PR #43](reviews/pr43-c2d4a-upload-intents.md) | 167 API chọn độc lập, 47 web/typecheck; PR đã merge, số review giữ theo source cũ, không suy toàn upload/C2d hoàn tất |
+| [Bàn giao C2d-4a](c2d4a-upload-notice-intent.md) | Hai JSON route, binding/secret/clock/lock/commit boundary, mã lỗi và phạm vi lịch sử trước PUT C2d-4b; đã merge PR #43 |
 | [Inventory C2d-4a](c2d4a-test-inventory.json) | 579 API chọn, 2.106 not-run; node/JUnit/source SHA, preparation/fault/đối chứng và cleanup |
 | [Prompt C2d-4a](tasks/m6c2b2c2d4a-upload-notice-intent.md) | Scope/tiêu chí hai JSON route; giữ prompt giao việc, triển khai ở handoff riêng |
 | [Review PR #42](reviews/pr42-final-read-clock.md) | 124 API chọn độc lập, đối chứng hàm cũ 6 fail đúng/2 positive; P2 clock đã khắc phục theo source, safety pending |
