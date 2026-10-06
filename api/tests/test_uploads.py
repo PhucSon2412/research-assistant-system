@@ -20,16 +20,51 @@ from app.storage import get_storage
 from app.clock import utcnow
 from app.cli import reconcile_originals
 from app.models import SourceFile
-from tests.conftest import _read_dotenv, _unquote, REPO_DIR
-from tests.helpers import WEB_ORIGIN
+from tests.helpers import WEB_ORIGIN, Harness, Browser, FakeClock, DEV_ENV, ADMIN_EMAIL, ADMIN_PASSWORD, USER_PASSWORD
+from tests.test_c2c1_bootstrap import installation
+from tests.test_auth_safety_foundation import NOW
 
 
 @pytest.fixture
-def upload_api(api, monkeypatch):
+def upload_api(installation, monkeypatch):
+    # Scoped business cutover only; real runtime bootstrap/invite/login/receipts.
+    from app import auth_safety
+    from app.api.deps import get_clock, get_now
+    from app.identity.bootstrap import bootstrap_admin
+    from app.identity.invitations import create_invitation, accept_invitation
+    from app.identity.login import login
+    monkeypatch.setattr(auth_safety, 'cutover', lambda db: 'ready')
+    for key,value in DEV_ENV.items(): monkeypatch.setenv(key,value)
+    clock=FakeClock();clock.now=NOW
+    app.dependency_overrides[get_clock]=lambda:lambda:clock.now
+    app.dependency_overrides[get_now]=lambda:clock.now
+    class RuntimeBrowser(Browser):
+        def _unsafe(self,method,path,json=None,headers=None,csrf=True):
+            return super()._unsafe(method,path,json,{'Origin':WEB_ORIGIN}|(headers or {}),csrf)
+    class RuntimeHarness(Harness):
+        admin_id=None
+        def browser(self):return RuntimeBrowser(WEB_ORIGIN)
+        def bootstrap_admin(self):
+            if self.admin_id is None:
+                self.admin_id=bootstrap_admin(self.engine,email=ADMIN_EMAIL,password=ADMIN_PASSWORD,
+                    policy=app_config.get_settings().password,clock=lambda:clock.now).user_id
+            return self.admin_id
+        def create_user(self,email,password=USER_PASSWORD):
+            self.bootstrap_admin()
+            settings=app_config.get_settings()
+            with Session(self.engine) as db:
+                actor=login(db,email=ADMIN_EMAIL,password=ADMIN_PASSWORD,now=clock.now,settings=settings,clock=lambda:clock.now)[1]
+            with Session(self.engine) as db:
+                created=create_invitation(db,inviter_id=self.admin_id,actor_session_id=actor.session_id,
+                    csrf_token=actor.csrf_token,email=email,display_name=None,now=clock.now,
+                    lifetime=settings.auth.invite,clock=lambda:clock.now)
+            with Session(self.engine) as db:
+                user=accept_invitation(db,raw_token=created.token,password=password,display_name=None,
+                    now=clock.now,policy=settings.password,clock=lambda:clock.now)
+                return user.id
+    api=RuntimeHarness(installation.runtime,clock)
     env = {k: os.environ[k] for k in ("MINIO_ROOT_USER", "MINIO_ROOT_PASSWORD", "MINIO_API_HOST_PORT") if k in os.environ}
-    if not all(env.get(k) for k in ("MINIO_ROOT_USER", "MINIO_ROOT_PASSWORD")):
-        env = {k: _unquote(v) for k, v in _read_dotenv(REPO_DIR / ".env").items()}
-    assert env.get("MINIO_ROOT_USER") and env.get("MINIO_ROOT_PASSWORD")
+    assert all(env.get(k) for k in ("MINIO_ROOT_USER", "MINIO_ROOT_PASSWORD", "MINIO_API_HOST_PORT"))
     monkeypatch.setenv("RAS_STORAGE__ENDPOINT_URL", f"http://127.0.0.1:{env.get('MINIO_API_HOST_PORT', '9000')}")
     monkeypatch.setenv("RAS_STORAGE__ACCESS_KEY", env["MINIO_ROOT_USER"])
     monkeypatch.setenv("RAS_STORAGE__SECRET_KEY", env["MINIO_ROOT_PASSWORD"])
@@ -47,6 +82,7 @@ def upload_api(api, monkeypatch):
     except Exception:
         pass
     app_config.get_settings.cache_clear()
+    app.dependency_overrides.clear()
 
 
 def pdf(pages=1) -> bytes:
@@ -213,7 +249,7 @@ def test_storage_failure_leaves_no_item(upload_api):
     assert len(list(real_storage.orphan_keys())) == 0
 
 
-def test_db_commit_failure_removes_unreferenced_object(upload_api, monkeypatch):
+def test_db_commit_exception_retains_object_without_retry(upload_api, monkeypatch):
     api, storage = upload_api
     api.create_user("a@example.org")
     a = api.user_browser("a@example.org")
@@ -234,9 +270,9 @@ def test_db_commit_failure_removes_unreferenced_object(upload_api, monkeypatch):
     assert failed
     assert api.scalar("SELECT count(*) FROM source_files") == 0
     assert api.scalar("SELECT count(*) FROM library_items") == 0
-    assert len(list(storage.orphan_keys())) == 0
-    monkeypatch.setattr(Session, "commit", original_commit)
-    assert send(a, token, data).status_code == 201
+    # A local commit exception cannot prove the remote transaction settled.
+    # The old delete-on-exception expectation contradicted C2d-4b's contract.
+    assert len(list(storage.orphan_keys())) == 1
 
 
 def test_reconcile_removes_crash_orphan_but_keeps_referenced_file(upload_api, monkeypatch):

@@ -23,6 +23,7 @@ export function Upload({ onComplete }: { onComplete: () => void }) {
     setBusy(true);
     setError(null);
     setResult(null);
+    let putStarted = false;
     try {
       const kind = file.name.toLowerCase().endsWith(".pdf") ? "pdf" : "markdown";
       const hash = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
@@ -33,21 +34,27 @@ export function Upload({ onComplete }: { onComplete: () => void }) {
         body: { acknowledged: true, notice_version: notice.version, file_kind: kind,
                 filename: file.name, byte_size: file.size, sha256 },
       });
+      const csrf = await csrfToken();
+      putStarted = true;
       const response = await fetch("/api/uploads/original", {
         method: "PUT",
-        headers: { "x-csrf-token": await csrfToken(), "x-upload-intent": intent.intent_token,
+        headers: { "x-csrf-token": csrf, "x-upload-intent": intent.intent_token,
                    "content-type": "application/octet-stream" },
         body: file,
         credentials: "same-origin",
         cache: "no-store",
       });
       const data = await response.json().catch(() => null);
-      if (!response.ok) throw new ApiError(response.status, data?.error ?? "upload_failed");
+      if (!response.ok) throw new ApiError(response.status,
+        response.status >= 500 && !data?.error ? "upload_outcome_uncertain" : data?.error ?? "upload_failed");
+      if (!data?.item_id) throw new ApiError(502, "upload_response_unavailable");
       setResult(data.item_id);
       setFile(null);
       onComplete();
     } catch (err) {
-      setError(describeError(err));
+      const uncertain = putStarted && (!(err instanceof ApiError) || err.status >= 500);
+      setError(describeError(uncertain ? new ApiError(503, "upload_outcome_uncertain") : err)
+        + (putStarted && !uncertain ? " Nếu file đã được nhận trước khi phiên thay đổi, hãy kiểm tra thư viện." : ""));
     } finally {
       // One explicit confirmation cannot silently carry over to the next upload.
       setConfirmed(false);

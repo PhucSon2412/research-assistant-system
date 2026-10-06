@@ -21,11 +21,14 @@ export async function PUT(request: Request): Promise<Response> {
       redirect: "manual",
       signal: AbortSignal.timeout(120_000),
     } as RequestInit & { duplex: "half" });
+    const out = new Headers({ "content-type": upstream.headers.get("content-type") ?? "application/json", "cache-control": "no-store" });
+    for (const cookie of upstream.headers.getSetCookie()) out.append("set-cookie", cookie);
     return new Response(upstream.body, {
       status: upstream.status,
-      headers: { "content-type": upstream.headers.get("content-type") ?? "application/json", "cache-control": "no-store" },
+      headers: out,
     });
   } catch {
-    return Response.json({ error: "api_unreachable" }, { status: 502 });
+    // A proxy timeout / disconnect cannot establish the backend PUT outcome.
+    return Response.json({ error: "upload_outcome_uncertain" }, { status: 502 });
   }
 }

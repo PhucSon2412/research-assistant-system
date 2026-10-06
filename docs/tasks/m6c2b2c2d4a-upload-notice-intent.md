@@ -1,6 +1,6 @@
 # Prompt C2d-4a: notice và upload intent với caller hiện tại
 
-**Trạng thái:** đã triển khai trên nhánh review, chưa merge; [bàn giao/kết quả theo source](../c2d4a-upload-notice-intent.md). Prompt bên dưới giữ hợp đồng giao việc. Main xác minh ngày 2026-10-06: `99db5285dfa59dd3d26e86345e849393ed88ce33`; head migration mã nguồn `0039`, không suy revision DB dev. Safety **pending tới C4**.
+**Trạng thái:** đã merge PR #43 tại `632ec68`; [bàn giao/kết quả theo source](../c2d4a-upload-notice-intent.md). Prompt bên dưới giữ hợp đồng giao việc lịch sử với base `99db5285dfa59dd3d26e86345e849393ed88ce33`; head migration mã nguồn `0039`, không suy revision DB dev. Task tiếp [C2d-4b PUT original](m6c2b2c2d4b-upload-original.md) đã giao, chưa triển khai/chưa kiểm. Safety **pending tới C4**.
 
 [Mục lục](../README.md) · [Quyết định giao](../decisions.md#giao-c2d-4a-sau-merge-pr-42-2026-10-06) · [Roadmap](../roadmap.md) · [Review PR #42](../reviews/pr42-final-read-clock.md) · [Caller inventory](../c2d1-caller-inventory.json)
 

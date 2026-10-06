@@ -1,8 +1,20 @@
 # Chiến lược kiểm thử
 
+**C2d-4b nhánh review:** [handoff PUT original](c2d4b-upload-original.md) tách kiểm mới PostgreSQL/MinIO/journal/runtime, fresh actor/clock sau I/O, exact consent/consume, race, cancellation/thread ownership, integrity và commit uncertain. Production pending HTTP riêng không patch. Các số kiểm cuối và not-run ghi ở handoff/inventory mới, không cộng lịch sử PR #43; safety pending tới C4.
+
+## C2d-4b: kiểm dự kiến, chưa chạy
+
+[Task PUT original](tasks/m6c2b2c2d4b-upload-original.md#5-kiểm-thử-và-chứng-cứ) chốt runtime PostgreSQL/MinIO cô lập, fresh caller/binding/clock, consume một lần, I/O không giữ khóa, checksum readback và cleanup/cancel theo commit outcome. Cần proof response mới, worker-state race, pending thật và HTTP qua proxy streaming. Cấp credentials test tường minh để không fallback `.env`; không gọi provider. Chọn suite theo rủi ro và báo inventory/JUnit/source/not-run; các số PR #43 bên dưới không tính là C2d-4b đã kiểm. Safety pending tới C4.
+
+## Review độc lập PR #43
+
+Tại head `f60645e` / code `610e52d`: **167/167 API chọn pass**, 413,422 s, 0 failure/error/skip, 3 warning hiện có; đủ 155 upload notice/intent mới, 6 writer success, 5 pending và 1 ORM/schema. JUnit/node khớp, 220 API hash trước/sau không đổi. Web **47/47 pass**, typecheck đạt; callback/proxy HTTP tổng hợp, không browser DOM, build chưa chạy lại. [Report](reviews/pr43-c2d4a-upload-intents.md).
+
+Artifact agent 579 khớp hai JUnit/node/SHA và 259 source hash tại review, không coi là reviewer chạy lại 579. Reviewer chưa chạy 412 node khác của suite agent, 2518 ngoài selection; agent vẫn 2106 not-run. Faults/races trong 155 mới đã chạy; không chạy lại mutants, full product/PUT/download/storage/provider/restore/C3/C4. Không phát hiện điểm chặn merge scope hai JSON route; PR sau đó đã merge `632ec68`, không chạy lại suite tại merge. Safety pending tới C4. Số agent bên dưới giữ riêng.
+
 ## C2d-4a: kiểm cô lập theo source mới
 
-[Handoff notice/intent](c2d4a-upload-notice-intent.md), base merge PR #42 `99db528`. Kiểm runtime/auth/gate thật cho hai JSON route, xác nhận và binding, clock sau SQL, rollback trước commit, proof mới và token không được trả khi commit uncertain/postcheck thất bại. HTTP pending riêng không patch; không parser/storage/provider hoặc dev. Selection/JUnit/source/not-run được báo riêng ở handoff/inventory task mới, không cộng kết quả lịch sử bên dưới. Safety pending tới C4; nhánh review chưa merge.
+[Handoff notice/intent](c2d4a-upload-notice-intent.md), base merge PR #42 `99db528`; đã merge PR #43 `632ec68`. Kiểm runtime/auth/gate thật cho hai JSON route, xác nhận và binding, clock sau SQL, rollback trước commit, proof mới và token không được trả khi commit uncertain/postcheck thất bại. HTTP pending riêng không patch; không parser/storage/provider hoặc dev. Selection/JUnit/source/not-run được báo riêng ở handoff/inventory, không cộng kết quả lịch sử bên dưới. Safety pending tới C4.
 
 **Code/test `610e52d`: 579/579 pass**, 0 fail/error/skip; collect 2.685, **2.106 not-run**. Core 313 / 783,825 s, reg 266 / 409,836 s; hai JUnit khớp đủ selection unique, 259 API/web source hashes giữ nguyên. Gồm 155 upload mới, 65 clock, 93 final caller, 68 login/session, 66 Origin, 50 writer, 54 config và 28 migration/ORM. [Inventory từng node/source/JUnit](c2d4a-test-inventory.json).
 

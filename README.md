@@ -1,6 +1,10 @@
 # Research Assistant System
 
-**C2d-4a đã triển khai trên nhánh review, chưa merge**, base PR #42 `99db528`: [bàn giao notice/intent](docs/c2d4a-upload-notice-intent.md). Chỉ hai JSON route kiểm caller/binding/clock trước commit và proof mới trước trả token; PUT file và original download còn riêng. Source `0039`, safety **pending tới C4**; không có thao tác dev mới.
+**Task tiếp: [C2d-4b — PUT original](docs/tasks/m6c2b2c2d4b-upload-original.md)** đã giao, chưa triển khai/chưa kiểm. Intent consume nguyên tử ở giao dịch cuối; nhận file/parser/S3 ngoài khóa, response proof mới và giữ object khi commit uncertain. Download thuộc C2d-4c; safety pending tới C4.
+
+**Review PR #43 tại `f60645e`:** độc lập 167/167 API (đủ 155 test mới), 47/47 web và typecheck đạt; không phát hiện điểm chặn merge trong phạm vi notice/intent. [Report và giới hạn](docs/reviews/pr43-c2d4a-upload-intents.md). PR đã merge `632ec68`; số review giữ theo source cũ, không phải kiểm C2d-4b.
+
+**C2d-4a đã merge PR #43 `632ec68`**, base PR #42 `99db528`: [bàn giao notice/intent](docs/c2d4a-upload-notice-intent.md). Chỉ hai JSON route kiểm caller/binding/clock trước commit và proof mới trước trả token; PUT file và original download còn riêng. Source `0039`, safety **pending tới C4**; không có thao tác dev mới.
 
 **Review PR #42 tại `8f924c0`:** 124/124 API chọn pass độc lập, gồm đủ 65 test clock mới. Đối chứng hàm cũ bắt đúng 6 lỗi và giữ 2 ca sát hạn thành công; không thấy điểm chặn merge trong phạm vi sửa clock. [Report và giới hạn](docs/reviews/pr42-final-read-clock.md). Kết quả giữ theo source review trước merge, không phải kiểm thử C2d-4a.
 
