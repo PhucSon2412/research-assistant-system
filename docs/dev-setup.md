@@ -1687,3 +1687,5 @@ git -c core.safecrlf=false diff --check
 ```
 
 Output pytest thực được redirect vào `before.log`/`after.log`/`collect.log` cùng thư mục. Trước sửa 3 fail/3 pass đúng P2; sau sửa **201 pass / 384,23 s**, gồm 105 C2b và 96 login/migration/ORM, 0 failure/error/skip. Lệnh đầu suite đầy đủ dùng nhầm `test_c2b_migrations.py`, không chạy test; sửa thành tên singular như trên. Collect **1296**, **1095 chưa chạy lại trong P2**; 471 cũ là lịch sử. [Chi tiết và inventory](c2b-reset-status.md#sửa-p2-pr-35-initial-status-độc-lập). Web không đổi/không chạy lại. Đã dọn đúng container/volume thử sau kiểm label, dev ID/image/StartedAt giữ nguyên qua inspect chỉ đọc. Safety pending tới C4; chưa merge PR #35.
+
+C2d-5a source `1666273`: suite cuối 1.371/1.371 pass, collect 3.468, not-run 2.097; JUnit unique/no missing/duplicates, hash trước/sau trùng. 58 web/typecheck/build và Chrome proxy đạt; 7 đối chứng riêng bắt assertion. Cleanup exact giữ 24 container có sẵn; [inventory](c2d5a-test-inventory.json) lưu toàn bộ lệnh/kết quả/giới hạn, không cộng số lịch sử.

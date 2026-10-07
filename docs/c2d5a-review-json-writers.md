@@ -91,8 +91,60 @@ gửi lại. Response submit có thể đọc request đã closed sau commit, kh
 
 ## Kiểm chứng và giới hạn
 
-Đang kiểm trên PostgreSQL/MinIO/journal cô lập; kết quả cuối và inventory sẽ
-ghi riêng sau khi đóng băng source. Không cộng lịch sử PR #45 (991/350/57).
+Code đóng băng `1666273eeef8ffb54da7f43d176d7cec1ce2a75f`. [Inventory](c2d5a-test-inventory.json)
+giữ đầy đủ node ID collect/selected/not-run, từng JUnit SHA-256, unique/no
+missing/no duplicates và SHA-256 source trước/sau **trùng nhau**.
+Collect **3,468**; suite cuối **1,371/1,371 pass**, **0 fail/error/skip**,
+**2,097 not-run**. Không cộng preparation, đối chứng hoặc lịch sử PR #45 (991/350/57).
+
+| Nhóm suite cuối | Pass | Phạm vi |
+| --- | ---: | --- |
+| Writers/schema/proxy | 234 | Đủ 222 ca mới (219 writer + 2 migration + 1 Chrome proxy), 8 review runtime contract, 4 head/ORM/downgrade |
+| GET/download/clock | 655 | 260 C2d-2b GET, 330 C2d-4c original, 65 final clock |
+| Auth/journal | 479 | Foundation, C2a session/login, C2b reset/status, C2c2 invitation/restore/migration |
+| Legacy closure migration | 3 | Pristine downgrade `0028`, matching/mismatch binding `0029` |
+
+Web **58/58 pass**, 0 fail/skip; typecheck và build đạt với cùng web source.
+Chrome **154.0.8037.98** headless thực hiện form qua **Next start → socket Uvicorn**:
+checkbox ban đầu trống/submit disabled, submit 201, withdraw 200, reject 200
+thin history; owner reject 403, expired session 401/clear-cookie/no-store.
+Log/JUnit ở thư mục evidence ngoài repo, không paper/credentials trong PR.
+PNG được tạo trong temp đã bị pytest retention của lượt sau dọn; không giữ
+ảnh Chrome lâu dài hoặc tuyên bố có PNG trong artifact cuối.
+
+**7/7 đối chứng guard** bắt đúng assertion failure, 0 setup errors; byte/hash
+khôi phục trước suite: role, final clock, exact tuple, pending counter,
+independent SQL time binding, fresh response proof, outcome qua teardown.
+Đối chứng outcome kiểm contract state độc lập, không tuyên bố đã phát DTO trái quyền.
+Preparation lỗi observer Engine, storage fixture, ready/open assertion, lock
+barrier/timeout và Chrome label đã sửa; toàn bộ JUnit chuẩn bị vẫn giữ riêng
+(kể cả lỗi thiếu C1 runtime password và các lượt fail). Docker init cũng từng
+gặp readiness/default DB lỗi trước khi hoàn tất setup cô lập.
+Lượt reads đầu bị dừng sau **30 setup error** do wrapper thiếu `RAS_STORAGE__*`
+(đã có `MINIO_*`); constructor từ chối trước S3 client/network, không chạm dev.
+Lượt dừng không có JUnit/không tính pass. Sửa chỉ wrapper ngoài repo, kiểm lại
+6 download pass rồi chạy lại đủ 655 ca trong hai nhóm; source không đổi.
+Lượt auth đầu có 478 pass/1 fail (thiếu identifier của fixture restore C2c2
+cố định port/label cũ), giữ trong preparation và không cộng pass. Dựng thêm
+PostgreSQL mới ở port trống `58442`, nhãn owner C2d5a + nhãn fixture yêu cầu;
+chạy lại 478 auth và riêng pg_dump/pg_restore C2c2 **1 pass**, không fallback
+vào container có sẵn hoặc sửa source. Credential values của evidence lỗi đã
+redact trước ghi inventory.
+
+Snapshot PostgreSQL request open/absent → runtime withdraw/reject → journal
+copy riêng → hold/migrate/recover kiểm old review URL 404, replay idempotent,
+không common/rights/receipt mới. Đây không phải diễn tập backup operator đầy đủ.
+Các HTTP legacy `test_review_closure_journal` còn gắn setup/expectation replay
+cũ không được tính pass; scope đó được kiểm lại bằng test runtime/fault/restore
+mới và regression foundation/direct migration. Các suite business/provider
+ngoài selection giữ not-run, không tuyên bố toàn repository xanh.
+
+Cleanup chỉ ba container thử theo exact ID/name/label/image/port/mount và
+sole consumer; anonymous volumes + credentials generated ngoài repo đã xóa.
+**24 container có sẵn giữ nguyên ID/image/StartedAt** trước/sau. Logs/XML/node
+IDs/scripts giữ ngoài repo tại `C:\Users\ADMIN\AppData\Local\Temp\ras-c2d5a-20261007`.
+Journal/dump/PNG thử từng nằm trong pytest temp ngoài repo, có thể bị retention dọn.
+Chi tiết cleanup/selection/fault và hash nằm trong inventory.
 Conda `C:\Users\ADMIN\.conda\envs\ras` đã xác minh interpreter/pip; không
 venv/cài mới, `.env`, provider/key, dev DB hoặc readiness/pricing thay đổi.
 
