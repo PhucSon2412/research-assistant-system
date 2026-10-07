@@ -1,5 +1,7 @@
 # Mô hình dữ liệu logic
 
+**C2d-5a `0040` (nhánh review):** `review_requests.closure_transaction_id` nullable, trigger chỉ mint `txid_current()` khi open → closed, immutable sau đó; lịch sử giữ NULL. Marker là binding live, không receipt/POST success xuyên restore. Hai domain routine mirror/confirm derive review ID từ line, SQL exact tuple/status/reason/time và mirror false trước append; force constraints trước byte đầu. Không sửa `0028/0029/0039`, không thêm FK cản replay request absent. Populated downgrade bị chặn theo C1. [Handoff](c2d5a-review-json-writers.md), [inventory](c2d5a-test-inventory.json); safety pending tới C4.
+
 **M6c-2b2b2 (PR #31 đã merge `3f21794`, `0032`), sau PR #30 merge `ce67ce8` (`0031`):** `invitations` thêm `closed_by_recovery_at`, `recovery_end_kind`, `closure_reason`; partial unique email chỉ giữ hàng có `accepted_at`, `revoked_at`, `closed_by_recovery_at` đều NULL. Cặp accepted_at/User FK giữ nguyên cho accept thật; replay không gán chúng. Mirror thêm invitation ID/kind/reason/time, ID unique và không FK. CHECK/INSERT trigger khớp body trước append; deferred closure trigger/BEFORE finality ngăn thiếu journal và mở lại/xóa invitation đã kết thúc. [Chi tiết schema/replay](invitation-journal.md).
 
 **Schema auth restore C1 `0033`:**

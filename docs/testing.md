@@ -1,5 +1,17 @@
 # Chiến lược kiểm thử
 
+## C2d-5a — kiểm chứng theo source riêng
+
+[Handoff](c2d5a-review-json-writers.md) và [inventory](c2d5a-test-inventory.json) ghi collect/selection/JUnit unique/not-run, hash trước/sau, preparation failures và đối chứng guard riêng. Runtime thật ba POST; fixture original chỉ còn privileged approve/publish/revoke legacy. Scoped cutover chỉ fixture business, HTTP pending không patch. PostgreSQL/MinIO/journal riêng, Conda `ras`, chặn external HTTP; Chrome/Next proxy thật. Không cộng lịch sử PR #45, không mở safety pending/C4.
+
+## C2d-5a đã giao, chưa kiểm
+
+[Task ba review JSON writer](tasks/m6c2b2c2d5a-review-json-writers.md#6-kiểm-chứng-cần-có) yêu cầu runtime thật cho cả submit/withdraw/reject; routine/SQL binding trước append, exact pending closure gate, actor/clock và outcome độc lập teardown, proof mới và proxy. Journal fault/restore, race cùng GET/download và migration/roles có evidence riêng; scoped cutover chỉ fixture, pending HTTP không patch. PR #45 đã merge `070cb37`, các số 991/350/57 dưới đây giữ source lịch sử. Lượt giao không chạy API/web; test/inventory mới do coding agent tạo, safety pending tới C4.
+
+## Review độc lập PR #45
+
+Head `b23ff82`, code `4c49919`: reviewer thực chạy **350/350 API**, 0 fail/error/skip, gồm đủ 330 ca C2d-4c, 9 legacy upload, 10 regression P2 và ORM/schema. **57/57 web** và typecheck đạt. 267 hash trước/sau không đổi, seal agent 269 file khớp; JUnit unique đúng selection. [Report/evidence](reviews/pr45-c2d4c-original-downloads.md) tách artifact 991/8 mutants/browser/build của agent khỏi kết quả chạy độc lập. Reviewer còn 641 node selection agent và 2.896 node collection chưa chạy; không full cutover/provider/benchmark. Không phát hiện điểm chặn merge scope hai GET/ba gate; PR OPEN/chưa merge, safety pending tới C4. Cleanup riêng xong, 24 container có sẵn giữ nguyên.
+
 ## C2d-4c trên nhánh review
 
 [Prompt original downloads](tasks/m6c2b2c2d4c-original-downloads.md#4-kiểm-thử-cần-có) quy định runtime/head/receipt/MinIO thật cho hai GET/ba nhánh, checksum cùng-size/slot/temp/ASGI disconnect, caller/gate/clock cuối, audit commit và proof mới, race thu hồi, pending không patch và proxy. API/web/đối chứng/evidence/not-run phải ghi theo source mới. Lượt giao chỉ khảo sát source/Git và viết docs là lịch sử; [handoff](c2d4c-original-downloads.md) và [inventory](c2d4c-test-inventory.json) ghi source code `4c49919`, collect/selection/JUnit unique/not-run và đối chứng mới. Không cộng các lượt preparation/fault/mutant vào pass cuối. PR #44 đã merge `dd8bdc6`; các số review bên dưới giữ theo source riêng, không là test sau merge. Safety pending tới C4.
@@ -318,3 +330,5 @@ Drill `drill_invitation_restore.py`: project/port/volume riêng, artifact ngoài
 **Full API cuối:** **901/901 passed**, exit **0/0/0**, không failure/error/skip. Chia theo file, manifest từ inventory/chi phí JUnit: **289/217/395** test, mỗi file đúng một tiến trình, DB/bucket/journal tạm riêng; thời gian pytest tương ứng **782,40/775,04/762,75 s**. Đối chiếu ba JUnit với collect: **901 unique node ID**, thiếu **0**, trùng **0**, gồm ORM/schema và cả hai ca sửa. Mỗi tiến trình có cùng warning Starlette/httpx hiện có. Không ghi nhận flaky ở lượt cuối, không retry hoặc loại test để đạt số tổng.
 
 SHA-256 của **19** file code/test/script (17 file ban đầu + hai test sửa) không đổi trong lượt full cuối; không sửa code hoặc chạy mutant song song. Sau khi suite kết thúc, chỉ bỏ một space cuối dòng trong `0032` theo staged diff check; Python AST trước/sau giống nhau, không đổi logic. Inventory, manifest, XML/log, `full-final-verification.json` và đối chiếu whitespace ở temp ngoài repo. Đã dọn container/volume của `ras-invtest` sau khi kiểm đúng quyền sở hữu; hai project drill cũng đã sạch. Đối chiếu cuối: **9 container dev** giữ nguyên ID/image/StartedAt; không migrate/restart dev hoặc đọc/sửa `.env`.
+
+C2d-5a source `1666273`: suite cuối 1.371/1.371 pass, collect 3.468, not-run 2.097; JUnit unique/no missing/duplicates, hash trước/sau trùng. 58 web/typecheck/build và Chrome proxy đạt; 7 đối chứng riêng bắt assertion. Cleanup exact giữ 24 container có sẵn; [inventory](c2d5a-test-inventory.json) lưu toàn bộ lệnh/kết quả/giới hạn, không cộng số lịch sử.

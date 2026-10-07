@@ -1,5 +1,38 @@
 # Nhật ký quyết định
 
+## Triển khai boundary C2d-5a (2026-10-07)
+
+Theo hợp đồng [task C2d-5a](tasks/m6c2b2c2d5a-review-json-writers.md), agent chọn
+`api/review_writes.py` riêng cho đúng ba POST và migration `0040` sau head
+source đã kiểm `0039`. Không đổi approval/shared legacy closure helper.
+`closure_transaction_id` do trigger mint khi open → closed giúp pending gate
+kiểm exact tuple/quyết định/time/actor của chính transaction, thay vì cho UUID
+bất kỳ hoặc trừ toàn counter. Routine mirror/confirm review chỉ cấp runtime
+allowlist, giữ recovery legacy/absent replay và không cấp raw journal DML.
+
+Outcome thuộc operation; commit exception luôn lỗi chưa xác định, không replay
+để báo business success. Append/fsync lỗi sau precheck hợp lệ có thể known-commit
+closure + mirror false để fail closed; lỗi confirm/actor/commit không đi nhánh
+này. Known commit lấy proof/DTO transaction mới, Admin reject chỉ thin history.
+Chi tiết privilege/lock/fault ở [handoff](c2d5a-review-json-writers.md).
+Đây là lựa chọn triển khai scoped theo ủy quyền của orchestrator, không quyết
+định trực tiếp mới của chủ dự án hoặc luật kiến trúc vĩnh viễn. Safety pending
+tới C4; chỉ thử cô lập, các writer/provider và C3/C4 giữ riêng.
+
+## Giao C2d-5a sau merge PR #45 (2026-10-07)
+
+Fetch/GitHub CLI xác minh PR #45 MERGED `070cb37aeb35da62c088293eaff9c55dd58f1929` (2026-10-07 Asia/Saigon), main chứa head `b23ff82`/code `4c49919`; source `0039`. Review 350 API/57 web/typecheck và artifact 991 giữ theo source review; không rerun tại merge. [Task đã giao](tasks/m6c2b2c2d5a-review-json-writers.md) chuyển đúng submit/withdraw/reject; approval/copy, publication/index và provider tiếp tục riêng.
+
+**Orchestrator chốt scoped theo ủy quyền:** giữ caller User NO KEY UPDATE trước resource; submit item SHARE và insert, closure request UPDATE trước item nếu cần. Reject giữ thin workflow, không đòi quyền đọc private còn sống. Journal exclusive trực tiếp sau flush; exact pending closure của transaction không che closure/mirror/hold khác. Cho phép migration mới sau head để ghi typed review mirror qua routine runtime hẹp, giữ protected-table raw DML bị chặn; provisioning/upgrade roles đều được kiểm. Tên routine/helper do agent chọn, không nới product ACL/auth model hoặc đưa credentials recovery vào API.
+
+Commit/append outcome độc lập teardown. Durable intent có thể đóng grant qua recovery dù POST lỗi; replay không chứng minh mutation/audit thành công, commit exception luôn controlled error và không retry/success DTO. Known commit có transaction/proof response mới; owner đọc history, Admin sau reject chỉ thin output. Lỗi response không chứng minh chưa lưu. Nền C1/Origin đã chốt, không xin lại; các lựa chọn trên chỉ cho task này, không là quyết định trực tiếp mới của chủ dự án hay luật kiến trúc vĩnh viễn.
+
+Lượt giao chỉ đọc Git/source/docs, viết prompt và kiểm docs/inventory; chưa code, thêm migration hay chạy API/web/task. Safety pending tới C4; không `.env`, dev, provider/pricing hoặc readiness. Giữ docs review/giao việc chưa commit vào PR tiếp; coding agent được giao commit/push/mở PR tiếng Việt, không merge.
+
+## Review độc lập PR #45 (2026-10-07)
+
+Review tại head `b23ff82`, source `4c49919`, base PR #44 `dd8bdc6`: **không phát hiện điểm chặn merge trong scope C2d-4c; có thể merge**. [Report](reviews/pr45-c2d4c-original-downloads.md) ghi độc lập 350 API/57 web/typecheck, đối chiếu artifact agent và phần not-run riêng. Quyền ba nhánh, checksum trước byte đầu, audit known commit rồi proof transaction mới, clock/ownership và boundary thu hồi khớp task. Runtime POST review/publication chưa được chứng nhận, writer/provider/C3/C4 còn riêng. Không đổi quyết định kiến trúc, grants, readiness hoặc pricing; safety vẫn pending tới C4. PR OPEN/chưa merge trong lượt review này.
+
 ## Triển khai C2d-4c trên nhánh review (2026-10-06)
 
 Base đã fetch/xác minh `dd8bdc689ef7b495618116add4832628d7d24327`, PR #44 MERGED có P2 head `5504810`/code `adfdb72`. Code C2d-4c `4c49919` thực hiện đúng [task giao theo ủy quyền](tasks/m6c2b2c2d4c-original-downloads.md), không migration/grants mới. [Handoff](c2d4c-original-downloads.md) ghi đối chiếu code cũ, transaction/locks và giới hạn; [inventory](c2d4c-test-inventory.json) ghi source/hashes, kết quả cuối, preparation và đối chứng riêng.

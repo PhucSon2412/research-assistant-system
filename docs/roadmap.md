@@ -1,8 +1,14 @@
 # Roadmap đề xuất
 
+## C2d-5a sau merge PR #45
+
+PR #45 đã merge `070cb37` ngày 2026-10-07, source `0039`. [Task C2d-5a đã giao](tasks/m6c2b2c2d5a-review-json-writers.md): đúng ba POST submit/withdraw/reject, actor/role/resource/clock trước commit, typed closure mirror runtime hẹp, pending gate có binding và proof response mới. Đã triển khai trên nhánh review, migration `0040`; [handoff](c2d5a-review-json-writers.md) / [inventory](c2d5a-test-inventory.json) ghi kiểm chứng theo source. Approval/copy và publication/provider/C3/C4 còn riêng. [Quyết định scoped](decisions.md#giao-c2d-5a-sau-merge-pr-45-2026-10-07), safety pending tới C4.
+
+Đề xuất tiếp: approval/copy riêng → publish/revoke/common-index (chia theo lock/I/O/journal nếu cần) → search/provider → RAG/provider → tổng hồi quy C2d. Chưa coi các nhóm đó đã được triển khai hoặc toàn T14 đã đạt. C3 operator/delivery và C4 cutover/storage độc lập giữ riêng. Các mốc PR #45 trước merge bên dưới là lịch sử.
+
 ## C2d-4c sau merge PR #44
 
-PR #44 đã merge `dd8bdc6` ngày 2026-10-06. [Tải original C2d-4c](c2d4c-original-downloads.md) đã triển khai trên nhánh review, chưa merge (code `4c49919`, [inventory](c2d4c-test-inventory.json)): hai GET/ba nhánh private/common/review, spool size/SHA-256 ngoài DB, caller/gate/target/clock cuối, audit known commit rồi proof response mới, giới hạn slot/disconnect và streaming proxy. Một PR kiểm chứng runtime/MinIO/race/fault/pending/proxy, inventory và docs; không triển khai writer/provider hoặc C3/C4. [Quyết định scoped theo ủy quyền](decisions.md#giao-c2d-4c-sau-merge-pr-44-2026-10-06), safety **pending tới C4**. Các mục review/triển khai trước merge dưới đây giữ nguồn lịch sử.
+PR #44 đã merge `dd8bdc6` ngày 2026-10-06. [Tải original C2d-4c](c2d4c-original-downloads.md) đã merge PR #45 `070cb37` (code `4c49919`, [inventory](c2d4c-test-inventory.json)): hai GET/ba nhánh private/common/review, spool size/SHA-256 ngoài DB, caller/gate/target/clock cuối, audit known commit rồi proof response mới, giới hạn slot/disconnect và streaming proxy. Một PR kiểm chứng runtime/MinIO/race/fault/pending/proxy, inventory và docs; không triển khai writer/provider hoặc C3/C4. [Quyết định scoped theo ủy quyền](decisions.md#giao-c2d-4c-sau-merge-pr-44-2026-10-06), safety **pending tới C4**. Các mục review/triển khai trước merge dưới đây giữ nguồn lịch sử.
 
 **Review lại P2 PR #44:** head `5504810`, source `adfdb72`; độc lập 76/76 API và hai ca fault/control riêng đạt, không phát hiện điểm chặn merge scope C2d-4b. [Report](reviews/pr44-c2d4b-upload-original.md#review-lại-p2-tại-5504810) giữ số lịch sử và giới hạn; 463 artifact agent được đối chiếu, 2.452 not-run phía agent. PR sau đó đã merge `dd8bdc6`, chưa rerun tại merge; safety pending tới C4.
 
@@ -60,7 +66,7 @@ Trạng thái từng PR theo inventory/source: C2d-2a/2b/3, sửa final read clo
 | JSON writes C2d-3 | [Task đã giao](tasks/m6c2b2c2d3-library-collection-json-writes.md): 6 library/collection writers, actor/resource trước commit, fresh proof sau commit và FK/lock/uncertain contract; đã merge PR #41 `5100ff6` | C2d-1/2a/2b đã merge; strategy ghi riêng |
 | Upload JSON C2d-4a | [Task](tasks/m6c2b2c2d4a-upload-notice-intent.md): notice/intent, xác nhận riêng, actor/clock trước commit và fresh proof trước trả token; đã merge PR #43 `632ec68` | PR #42 và C2d-3 đã merge |
 | PUT file C2d-4b | [Task đã giao](tasks/m6c2b2c2d4b-upload-original.md): consume cuối, I/O ngoài khóa, SHA-256 readback, fresh response proof và orphan/uncertain/cancel; đã merge PR #44 `dd8bdc6`, kết quả theo [handoff](c2d4b-upload-original.md) | C2d-4a đã merge + lock/I/O inventory |
-| Original download C2d-4c | [Task đã giao](tasks/m6c2b2c2d4c-original-downloads.md): hai GET/ba gate quyền, spool checksum trước byte đầu, audit known commit rồi proof mới, slot/disconnect/proxy; đã triển khai trên nhánh review, chưa merge; [handoff/inventory](c2d4c-original-downloads.md) | C2d-4b đã merge + helper/lock/I/O inventory |
+| Original download C2d-4c | [Task đã giao](tasks/m6c2b2c2d4c-original-downloads.md): hai GET/ba gate quyền, spool checksum trước byte đầu, audit known commit rồi proof mới, slot/disconnect/proxy; đã merge PR #45 `070cb37`; [handoff/inventory](c2d4c-original-downloads.md) | C2d-4b đã merge + helper/lock/I/O inventory |
 | Resource writes/journal | Actor/role cuối ở review/promotion/publication/common-index, exclusive journal và lỗi copy/commit | Lock map và các helper tương ứng |
 | Search/provider | Caller sau reservation commit trước embedding/rerank và final hit/chunk response; ACL trước top-k, accounting uncertain | Helper + boundary ledger/resource |
 | RAG/provider | Caller trước generation và mọi nhánh insufficient evidence/final response, proof mới sau commit; provider_ok/citation gate | Search/provider + evidence/response inventory |
@@ -68,7 +74,7 @@ Trạng thái từng PR theo inventory/source: C2d-2a/2b/3, sửa final read clo
 
 Worker dùng durable job/item rights + recovery gate, không mang session giả hoặc buộc vào tuổi session trình duyệt. C3 operator/delivery/status recovery, C4 storage/cutover, journal membership/xóa riêng và backup scheduler còn riêng.
 
-**PR #38–#44 đã merge** (C2d-1/2a/2b/3, sửa clock, notice/intent và PUT original, source `0039`). Các handoff giữ riêng; C2d-4c đã triển khai trên nhánh review, chưa merge; kết quả source `4c49919` trong inventory riêng. Safety pending tới C4; core caller protections phải hoàn tất trước C3/C4. Phần C2b và milestone bên dưới là lịch sử.
+**PR #38–#44 đã merge** (C2d-1/2a/2b/3, sửa clock, notice/intent và PUT original, source `0039`). Các handoff giữ riêng; C2d-4c đã merge PR #45 `070cb37`; kết quả source `4c49919` trong inventory riêng. Safety pending tới C4; core caller protections phải hoàn tất trước C3/C4. Phần C2b và milestone bên dưới là lịch sử.
 
 **M6c-2b2b2, PR #31 đã merge `3f21794`:** base PR #30 đã merge `ce67ce8`, `0031`; invitation journal thêm `0032`. [Hợp đồng](invitation-journal.md) bảo vệ link đã kết thúc sau restore với journal hiện hành, không dựng lại account; full API **901/901**, web **42/42**, đối chứng **8/8**, drill **59/59** là chứng cứ lịch sử PR #31 (giới hạn ở tài liệu kiểm chứng).
 

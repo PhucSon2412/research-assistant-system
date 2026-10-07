@@ -1,7 +1,7 @@
 {
-  "base": "dd8bdc689ef7b495618116add4832628d7d24327",
-  "source_migration": "0039",
-  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4. Final read clock corrected after predicate SQL; /auth/sessions uses the shared final caller. Details in docs/c2d-final-read-clock.md. C2d-4a adds GET upload notice final caller and POST intent actor/binding/TTL before commit plus fresh token proof after known commit. C2d-4b PUT original merged PR #44 at dd8bdc6 with unlocked staging, atomic consume and a new exact response proof. C2d-4c implements exactly two original GETs/three separate gates, short scalar proofs, shared verified spools, known audit commit then fresh response proof, current caller/clock and cancellation ownership. Other writers/provider callers stay open. See docs/tasks/m6c2b2c2d4c-original-downloads.md.",
+  "base": "070cb37aeb35da62c088293eaff9c55dd58f1929",
+  "source_migration": "0040",
+  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4. Final read clock corrected after predicate SQL; /auth/sessions uses the shared final caller. Details in docs/c2d-final-read-clock.md. C2d-4a adds GET upload notice final caller and POST intent actor/binding/TTL before commit plus fresh token proof after known commit. C2d-4b PUT original merged PR #44 at dd8bdc6 with unlocked staging, atomic consume and a new exact response proof. C2d-4c implements exactly two original GETs/three separate gates, short scalar proofs, shared verified spools, known audit commit then fresh response proof, current caller/clock and cancellation ownership. Other writers/provider callers stay open. See docs/tasks/m6c2b2c2d4c-original-downloads.md. PR #45 merged at 070cb37. C2d-5a submit/withdraw/admin_reject implemented on review branch: runtime domain closure routines, exact transaction pending binding, current actor/clock and new response proof; approval and other writers/provider callers remain open.",
   "safety": "pending until C4",
   "route_count": 63,
   "routes": [
@@ -807,7 +807,7 @@
       "path": "/review-requests/notice",
       "function": "notice",
       "source": "api/app/api/routes/reviews.py",
-      "line": 300,
+      "line": 308,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -825,7 +825,7 @@
       "path": "/review-requests",
       "function": "list_own",
       "source": "api/app/api/routes/reviews.py",
-      "line": 307,
+      "line": 315,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -843,27 +843,27 @@
       "path": "/review-requests",
       "function": "submit",
       "source": "api/app/api/routes/reviews.py",
-      "line": 339,
+      "line": 347,
       "dependencies": [
+        "require_trusted_origin",
         "get_principal",
         "get_db",
-        "get_now",
-        "get_settings"
+        "get_settings",
+        "get_clock"
       ],
       "group": "review-write-file",
-      "final_status": "open C2d",
-      "direct_transaction_calls": [
-        "db.commit",
-        "db.rollback"
-      ],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "final_status": "implemented C2d-5a on review branch; safety pending C4",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d5a-review-json-writers.md",
+      "boundary": "api/review_writes.write",
+      "commit": "operation-owned outcome; uncertain no success/retry; known commit new transaction proof"
     },
     {
       "method": "GET",
       "path": "/review-requests/{request_id}",
       "function": "get_own",
       "source": "api/app/api/routes/reviews.py",
-      "line": 316,
+      "line": 324,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -881,25 +881,27 @@
       "path": "/review-requests/{request_id}/withdraw",
       "function": "withdraw",
       "source": "api/app/api/routes/reviews.py",
-      "line": 385,
+      "line": 355,
       "dependencies": [
+        "require_trusted_origin",
         "get_principal",
         "get_db",
-        "get_now"
+        "get_settings",
+        "get_clock"
       ],
       "group": "review-write-file",
-      "final_status": "open C2d",
-      "direct_transaction_calls": [
-        "db.rollback"
-      ],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "final_status": "implemented C2d-5a on review branch; safety pending C4",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d5a-review-json-writers.md",
+      "boundary": "api/review_writes.write",
+      "commit": "operation-owned outcome; uncertain no success/retry; known commit new transaction proof"
     },
     {
       "method": "GET",
       "path": "/admin/review-requests",
       "function": "admin_list",
       "source": "api/app/api/routes/reviews.py",
-      "line": 323,
+      "line": 331,
       "dependencies": [
         "require_admin",
         "get_db",
@@ -917,7 +919,7 @@
       "path": "/admin/review-requests/{request_id}",
       "function": "admin_get",
       "source": "api/app/api/routes/reviews.py",
-      "line": 332,
+      "line": 340,
       "dependencies": [
         "require_admin",
         "get_db",
@@ -935,7 +937,7 @@
       "path": "/admin/review-requests/{request_id}/files/{file_id}/original",
       "function": "admin_original",
       "source": "api/app/api/routes/reviews.py",
-      "line": 437,
+      "line": 394,
       "dependencies": [
         "require_admin",
         "_storage",
@@ -958,25 +960,27 @@
       "path": "/admin/review-requests/{request_id}/reject",
       "function": "admin_reject",
       "source": "api/app/api/routes/reviews.py",
-      "line": 450,
+      "line": 407,
       "dependencies": [
+        "require_trusted_origin",
         "require_admin",
         "get_db",
-        "get_now"
+        "get_settings",
+        "get_clock"
       ],
       "group": "review-write-file",
-      "final_status": "open C2d",
-      "direct_transaction_calls": [
-        "db.rollback"
-      ],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "final_status": "implemented C2d-5a on review branch; safety pending C4",
+      "direct_transaction_calls": [],
+      "contract_map": "docs/c2d5a-review-json-writers.md",
+      "boundary": "api/review_writes.write",
+      "commit": "operation-owned outcome; uncertain no success/retry; known commit new transaction proof"
     },
     {
       "method": "POST",
       "path": "/admin/review-requests/{request_id}/approve",
       "function": "admin_approve",
       "source": "api/app/api/routes/reviews.py",
-      "line": 476,
+      "line": 415,
       "dependencies": [
         "require_admin",
         "get_db",

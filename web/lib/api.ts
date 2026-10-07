@@ -126,6 +126,11 @@ const MESSAGES: Record<string, string> = {
   resource_write_unavailable: "Chưa hoàn tất thay đổi. Hãy kiểm tra trạng thái và thử lại sau.",
   resource_write_response_unavailable: "Thay đổi đã được lưu nhưng chưa đọc được phản hồi. Hãy kiểm tra lại trạng thái trước khi thao tác tiếp.",
   review_closure_unavailable: "Không ghi được việc đóng yêu cầu; yêu cầu vẫn đang mở. Thử lại ngay.",
+  review_write_unavailable: "Không hoàn tất được thao tác. Hãy kiểm tra lại trạng thái yêu cầu.",
+  review_write_outcome_uncertain:
+    "Chưa xác định được kết quả lưu. Yêu cầu có thể đã lưu hoặc quyền review có thể kết thúc qua phục hồi. Kiểm tra lại trạng thái; không tự gửi lại.",
+  review_write_response_unavailable:
+    "Thao tác đã lưu nhưng chưa đọc được phản hồi mới. Hãy tải lại trạng thái yêu cầu sau khi kết nối hoặc đăng nhập lại.",
   review_journal_unavailable:
     "Yêu cầu đã đóng nhưng không ghi được nhật ký; hệ thống tạm ngừng phục vụ tới khi quản trị viên sửa nhật ký.",
   review_closure_pending_recovery:

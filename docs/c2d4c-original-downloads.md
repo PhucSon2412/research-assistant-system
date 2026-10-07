@@ -1,8 +1,10 @@
 # C2d-4c: tải original riêng, chung và review
 
+[Review độc lập PR #45 tại `b23ff82`](reviews/pr45-c2d4c-original-downloads.md): 350/350 API, 57/57 web và typecheck đạt; không phát hiện điểm chặn merge scope C2d-4c. Kết quả agent 991 bên dưới giữ riêng, PR sau đó đã merge `070cb37`, chưa rerun tại merge; safety pending tới C4.
+
 [Task](tasks/m6c2b2c2d4c-original-downloads.md) · [Inventory](c2d4c-test-inventory.json) · [Caller inventory](c2d1-caller-inventory.json)
 
-Base đã fetch và xác minh `dd8bdc689ef7b495618116add4832628d7d24327`; PR #44 MERGED, main chứa head `5504810` và code P2 `adfdb72`. Nhánh `feat/m6c2b2c2d4c-original-downloads` giữ mọi docs orchestrator chưa commit. Source migration `0039`, không migration/grants mới. **Safety pending tới C4; PR để review, không merge.**
+Base đã fetch và xác minh `dd8bdc689ef7b495618116add4832628d7d24327`; PR #44 MERGED, main chứa head `5504810` và code P2 `adfdb72`. Nhánh `feat/m6c2b2c2d4c-original-downloads` giữ mọi docs orchestrator chưa commit. Source migration `0039`, không migration/grants mới. **Safety pending tới C4; PR #45 đã merge `070cb37`.** Kết quả triển khai dưới đây giữ theo source trước merge; [C2d-5a writer](tasks/m6c2b2c2d5a-review-json-writers.md) được giao tiếp.
 
 ## Đối chiếu trước sửa
 

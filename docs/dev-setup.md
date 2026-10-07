@@ -1,5 +1,11 @@
 # Môi trường phát triển và schema (M1a–C2d-4b)
 
+## C2d-5a cô lập
+
+Đã chạy host Conda `C:\Users\ADMIN\.conda\envs\ras\python.exe`, PostgreSQL riêng `127.0.0.1:58467`, MinIO riêng `127.0.0.1:59467`; credentials generated ngoài repo, explicit `RAS_TEST_DATABASE_ADMIN_URL` và C1 runtime/recovery passwords trước import. Không `.env`/dev/provider/pricing/readiness. Proxy thử Uvicorn `58468`, Next `53467`, Chrome headless hiện có. Script wrapper/evidence ngoài repo ở `C:\Users\ADMIN\AppData\Local\Temp\ras-c2d5a-20261007`; xem [inventory](c2d5a-test-inventory.json) cho lệnh thực chạy, source/hash/JUnit/cleanup. Đây là run đã kiểm cô lập, không runbook cutover hoặc cấp credentials privileged cho API. Safety pending tới C4.
+
+**PR #45 đã merge `070cb37` (2026-10-07 Asia/Saigon), source `0039`.** [C2d-5a ba JSON review writer](tasks/m6c2b2c2d5a-review-json-writers.md) đã giao, chưa triển khai/chưa kiểm; routine runtime/migration mới và lệnh mới phải có chứng cứ trước thêm runbook. Không suy revision DB dev hoặc mở safety pending tới C4; các lệnh/kết quả C2d-4c dưới đây giữ theo source thử trước merge.
+
 **Sau merge PR #44 (2026-10-06):** main `dd8bdc6`, source migration `0039`, không query DB dev. [Task C2d-4c original downloads](tasks/m6c2b2c2d4c-original-downloads.md) đã triển khai trên nhánh review (code `4c49919`, [handoff](c2d4c-original-downloads.md), [inventory](c2d4c-test-inventory.json)), chưa merge; không có lệnh vận hành dev mới. Chỉ dùng runtime/PostgreSQL/MinIO/journal cô lập với credentials tường minh; không đọc `.env` hoặc nâng/restart dev. Safety pending tới C4. Các lệnh và trạng thái review dưới đây là evidence lịch sử, không suy dev sẽ healthy.
 
 ## C2d-4c cô lập
@@ -1681,3 +1687,5 @@ git -c core.safecrlf=false diff --check
 ```
 
 Output pytest thực được redirect vào `before.log`/`after.log`/`collect.log` cùng thư mục. Trước sửa 3 fail/3 pass đúng P2; sau sửa **201 pass / 384,23 s**, gồm 105 C2b và 96 login/migration/ORM, 0 failure/error/skip. Lệnh đầu suite đầy đủ dùng nhầm `test_c2b_migrations.py`, không chạy test; sửa thành tên singular như trên. Collect **1296**, **1095 chưa chạy lại trong P2**; 471 cũ là lịch sử. [Chi tiết và inventory](c2b-reset-status.md#sửa-p2-pr-35-initial-status-độc-lập). Web không đổi/không chạy lại. Đã dọn đúng container/volume thử sau kiểm label, dev ID/image/StartedAt giữ nguyên qua inspect chỉ đọc. Safety pending tới C4; chưa merge PR #35.
+
+C2d-5a source `1666273`: suite cuối 1.371/1.371 pass, collect 3.468, not-run 2.097; JUnit unique/no missing/duplicates, hash trước/sau trùng. 58 web/typecheck/build và Chrome proxy đạt; 7 đối chứng riêng bắt assertion. Cleanup exact giữ 24 container có sẵn; [inventory](c2d5a-test-inventory.json) lưu toàn bộ lệnh/kết quả/giới hạn, không cộng số lịch sử.
