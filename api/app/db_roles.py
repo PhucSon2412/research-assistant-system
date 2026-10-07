@@ -3,6 +3,7 @@ import re
 from sqlalchemy import text
 
 RUNTIME_ROUTINES = {"ras_auth_review_closure_mirror", "ras_auth_review_closure_confirm",
+                    "ras_auth_review_approval_mirror", "ras_auth_review_approval_confirm",
                     "ras_auth_mirror", "ras_auth_confirm", "ras_auth_project", "ras_auth_change", "ras_auth_rehash",
                     "ras_auth_session_create", "ras_auth_token_create", "ras_auth_lock_users",
                     "ras_auth_session_lock", "ras_auth_session_activity", "ras_auth_session_close", "ras_auth_closure_mirror",
@@ -79,6 +80,8 @@ def provision(engine, *, runtime: str, recovery: str, definer: str):
         conn.execute(text(f"GRANT INSERT ON users,audit_events TO {df}"))
         conn.execute(text(f"GRANT SELECT,INSERT,UPDATE ON invitations TO {df}"))
         conn.execute(text(f"GRANT SELECT ON review_requests TO {df}"))
+        # Approval mirror binds the exact private tuple and new common tuple/rights (C2d-5b).
+        conn.execute(text(f"GRANT SELECT ON library_items,paper_versions,source_files,access_rights TO {df}"))
         conn.execute(text(f"GRANT EXECUTE ON FUNCTION ras_auth_phc_valid(text,integer) TO {df}"))
         if conn.scalar(text("SELECT to_regprocedure('ras_auth_invitation_before_journal()') IS NOT NULL")):
             conn.execute(text(f"GRANT EXECUTE ON FUNCTION ras_auth_invitation_before_journal(),ras_auth_invitation_actor(uuid,uuid,text,timestamptz,interval) TO {df}"))

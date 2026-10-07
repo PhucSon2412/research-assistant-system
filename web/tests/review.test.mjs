@@ -5,6 +5,7 @@ import { loadProxyConfig, proxyRequest } from "../lib/proxy.ts";
 import {
   EMPTY_APPROVE_FORM, PUBLICATION_STATE_TEXT, REVOCATION_REASONS, STATUS_TEXT, closeReasonText,
   INDEX_ELIGIBILITY_TEXT, INDEX_EXTERNAL_NOTICE, makeIndexBody,
+  APPROVAL_OUTCOME_UNKNOWN, approvalOutcomeUnknown,
   fieldList, fileChoiceLabel, makeApproveBody, makePublishBody, makeReviewBody, makeRevokeBody, reviewDownloadHref,
 } from "../lib/review.ts";
 import { streamFromApi } from "../lib/stream.ts";
@@ -53,6 +54,20 @@ test("approve body carries only the Admin's own findings and needs the unticked 
   }
   assert.ok(makeApproveBody({ ...filled, licenseUrl: "", evidence: "Synthetic permission letter" }));
   assert.equal(closeReasonText("approved_by_admin"), "Admin đã phê duyệt; bản chung riêng đang chờ công bố");
+});
+
+test("a lost or cut-off approve answer is reported as unknown, never as 'nothing saved'", () => {
+  for (const code of [null, "api_timeout", "api_unreachable", "api_response_incomplete", "http_error"]) {
+    assert.equal(approvalOutcomeUnknown(code), true, String(code));
+  }
+  for (const code of ["review_request_closed", "approval_outcome_uncertain", "forbidden", "approval_busy"]) {
+    assert.equal(approvalOutcomeUnknown(code), false, code);
+  }
+  assert.match(APPROVAL_OUTCOME_UNKNOWN, /có thể đã được lưu/);
+  assert.match(APPROVAL_OUTCOME_UNKNOWN, /không tự gửi lại/);
+  // The form starts empty and unticked on every attempt; the declaration is never a default.
+  assert.equal(EMPTY_APPROVE_FORM.confirmed, false);
+  assert.deepEqual(Object.entries(EMPTY_APPROVE_FORM).filter(([, v]) => v !== "" && v !== false), []);
 });
 
 test("review download goes through the streaming route, only for the API's review path", () => {

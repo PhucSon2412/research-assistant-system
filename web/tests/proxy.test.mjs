@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
 import {
-  DEFAULT_PROVIDER_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS, loadProxyConfig, proxyRequest, timeoutFor,
+  DEFAULT_PROVIDER_TIMEOUT_SECONDS, DEFAULT_REVIEW_APPROVAL_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS, loadProxyConfig,
+  proxyRequest, timeoutFor,
 } from "../lib/proxy.ts";
 
 // Synthetic upstream standing in for FastAPI; values below are fake, not real sessions.
@@ -160,11 +161,13 @@ test("prefixes outside the allowlist and dot segments never reach the API", asyn
 test("timeout config: defaults, overrides and invalid values fail closed", () => {
   const base = "http://api:8000";
   assert.deepEqual(loadProxyConfig({ API_INTERNAL_URL: base }),
-    { base, timeoutMs: DEFAULT_TIMEOUT_SECONDS * 1000, providerTimeoutMs: DEFAULT_PROVIDER_TIMEOUT_SECONDS * 1000 });
+    { base, timeoutMs: DEFAULT_TIMEOUT_SECONDS * 1000, providerTimeoutMs: DEFAULT_PROVIDER_TIMEOUT_SECONDS * 1000,
+      approvalTimeoutMs: DEFAULT_REVIEW_APPROVAL_TIMEOUT_SECONDS * 1000 });
   assert.equal(DEFAULT_TIMEOUT_SECONDS, 15);
   assert.equal(DEFAULT_PROVIDER_TIMEOUT_SECONDS, 120);
   assert.deepEqual(loadProxyConfig({ API_INTERNAL_URL: `${base}/`, WEB_PROXY_TIMEOUT_SECONDS: "20",
-    WEB_PROXY_PROVIDER_TIMEOUT_SECONDS: " 300 " }), { base, timeoutMs: 20_000, providerTimeoutMs: 300_000 });
+    WEB_PROXY_PROVIDER_TIMEOUT_SECONDS: " 300 " }), { base, timeoutMs: 20_000, providerTimeoutMs: 300_000,
+      approvalTimeoutMs: 120_000 });
   for (const [timeout, provider] of [["0", "120"], ["abc", "120"], ["15", "301"], ["15", "1.5"],
     ["15", "-5"], ["30", "20"], ["15", "1e2"]]) {
     assert.equal(loadProxyConfig({ API_INTERNAL_URL: base, WEB_PROXY_TIMEOUT_SECONDS: timeout,
@@ -174,13 +177,77 @@ test("timeout config: defaults, overrides and invalid values fail closed", () =>
 });
 
 test("only provider-bound routes get the longer budget", () => {
-  const config = { base: "http://api", timeoutMs: 15_000, providerTimeoutMs: 120_000 };
+  const config = { base: "http://api", timeoutMs: 15_000, providerTimeoutMs: 120_000, approvalTimeoutMs: 90_000 };
   assert.equal(timeoutFor("POST", ["rag", "ask"], config), 120_000);
   assert.equal(timeoutFor("POST", ["search"], config), 120_000);
   assert.equal(timeoutFor("GET", ["search", "chunks", "c-1"], config), 15_000);
   assert.equal(timeoutFor("POST", ["collections"], config), 15_000);
   assert.equal(timeoutFor("GET", ["rag", "ask"], config), 15_000);
   assert.equal(timeoutFor("POST", ["library", "items"], config), 15_000);
+});
+
+test("review approval timeout: default 120 s, validated 1-300 and never below the normal timeout", () => {
+  const base = "http://api:8000";
+  assert.equal(DEFAULT_REVIEW_APPROVAL_TIMEOUT_SECONDS, 120);
+  assert.equal(loadProxyConfig({ API_INTERNAL_URL: base, WEB_PROXY_REVIEW_APPROVAL_TIMEOUT_SECONDS: "300" })
+    .approvalTimeoutMs, 300_000);
+  assert.equal(loadProxyConfig({ API_INTERNAL_URL: base, WEB_PROXY_TIMEOUT_SECONDS: "20",
+    WEB_PROXY_REVIEW_APPROVAL_TIMEOUT_SECONDS: "20" }).approvalTimeoutMs, 20_000);
+  for (const [timeout, approval] of [["15", "0"], ["15", "301"], ["15", "abc"], ["15", "1.5"], ["15", "-1"],
+    ["15", "1e2"], ["30", "20"], ["15", "14"]]) {
+    assert.equal(loadProxyConfig({ API_INTERNAL_URL: base, WEB_PROXY_TIMEOUT_SECONDS: timeout,
+      WEB_PROXY_REVIEW_APPROVAL_TIMEOUT_SECONDS: approval }), null, `${timeout}/${approval}`);
+  }
+});
+
+test("only the exact Admin approve POST gets the approval budget", () => {
+  const config = { base: "http://api", timeoutMs: 15_000, providerTimeoutMs: 120_000, approvalTimeoutMs: 120_000 };
+  const id = "0f1e2d3c-0000-4000-8000-000000000001";
+  assert.equal(timeoutFor("POST", ["admin", "review-requests", id, "approve"], config), 120_000);
+  for (const [method, path] of [
+    ["GET", ["admin", "review-requests", id, "approve"]],
+    ["POST", ["admin", "review-requests", id, "reject"]],
+    ["POST", ["review-requests", id, "withdraw"]],
+    ["POST", ["review-requests"]],
+    ["POST", ["admin", "review-requests", "approve"]],
+    ["POST", ["admin", "review-requests", id, "approve", "x"]],
+    ["POST", ["admin", "common-copies", id, "publish"]],
+    ["POST", ["admin", "common-copies", id, "approve"]],
+    ["POST", ["review-requests", id, "approve"]],
+  ]) {
+    assert.equal(timeoutFor(method, path, { ...config, approvalTimeoutMs: 99_000 }), 15_000, path.join("/"));
+  }
+});
+
+test("approve answer after 15 s reaches the browser; reject at 15 s is still cut off", async () => {
+  const id = "0f1e2d3c-0000-4000-8000-000000000001";
+  const api = await upstream((req, res) => {
+    setTimeout(() => {
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store",
+        "set-cookie": ["ras_csrf=rotated; Path=/; SameSite=Lax"] });
+      res.end(JSON.stringify({ url: req.url }));
+    }, 16_000);
+  });
+  const config = loadProxyConfig({ API_INTERNAL_URL: api.base });
+  try {
+    const [approved, rejected] = await Promise.all([
+      proxyRequest(browser("POST", `admin/review-requests/${id}/approve`, { confirm_verified: true }),
+        ["admin", "review-requests", id, "approve"], config),
+      proxyRequest(browser("POST", `admin/review-requests/${id}/reject`, { reason_code: "other" }),
+        ["admin", "review-requests", id, "reject"], config),
+    ]);
+    assert.equal(approved.status, 200);
+    assert.deepEqual(await approved.json(), { url: `/admin/review-requests/${id}/approve` });
+    assert.equal(approved.headers.get("cache-control"), "no-store");
+    assert.deepEqual(approved.headers.getSetCookie(), ["ras_csrf=rotated; Path=/; SameSite=Lax"]);
+    assert.equal(rejected.status, 504);
+    assert.deepEqual(await rejected.json(), { error: "api_timeout" });
+    // One request each: the proxy never retries a POST.
+    assert.equal(api.seen.filter((r) => r.url.endsWith("/approve")).length, 1);
+    assert.equal(api.seen.filter((r) => r.url.endsWith("/reject")).length, 1);
+  } finally {
+    await api.close();
+  }
 });
 
 test("misconfigured proxy answers 503 without contacting the API", async () => {

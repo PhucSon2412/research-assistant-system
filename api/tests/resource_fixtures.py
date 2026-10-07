@@ -1,6 +1,7 @@
 """Resource contract fixtures with real runtime accounts/receipts, no raw auth seed."""
 import hashlib
 import io
+import uuid
 from types import SimpleNamespace
 
 import pytest
@@ -11,8 +12,7 @@ from app.authz import Principal
 from app.identity import invitations
 from app.models import (Chunk, LibraryItem, MetadataCandidate, PaperVersion, PdfPage,
                         ReferenceEntry, ReviewRequest, Section, SourceFile)
-from app.models.enums import RightsAudience
-from app import promotion, publication
+from app import publication
 from tests.helpers import (Harness, Browser, FakeClock, USER_PASSWORD, WEB_ORIGIN, DEV_ENV)
 from tests.test_c2c1_bootstrap import installation
 from tests.test_c2c2_invitations import world as resource_world, issue
@@ -121,8 +121,24 @@ class MemoryOriginals:
         self.objects.pop(key, None)
 
 
+def runtime_approve(w, request_id, storage, *, title="Common readable", source="synthetic test author",
+                    evidence="synthetic permission", download=False, search=True, provider=False, clock=None):
+    """Approve through the C2d-5b runtime boundary: real Admin session/CSRF, proofs,
+    copy, routines and journal. Only original storage is supplied by the caller."""
+    import asyncio
+    import threading
+    from app.api import review_approval
+    from app.api.routes.reviews import ApproveInput
+    admin = Principal(w.uid, "admin", w.actor.session_id, "admin@example.test", None)
+    data = ApproveInput(confirm_verified=True, file_checksum_sha256=SHA, title=title, verified_source=source,
+        evidence_note=evidence, checked_on=NOW.date(), scope=dict(audience="instance_users",
+        original_download=download, fulltext_search=search, external_processing=provider, conditions=None))
+    return asyncio.run(review_approval.attempt(None, admin, str(request_id), data, w.actor.csrf_token,
+        clock or (lambda: NOW), get_settings(), storage, threading.Event()))
+
+
 def common_copy(w, *, download=False, search=True, provider=False, indexed=True, pending=False):
-    """Valid rights via actual approval/closure journal; only original storage is in memory."""
+    """Valid rights via the runtime approval/closure journal; only original storage is in memory."""
     ids = source(w, w.uid, "review source")
     with Session(w.engine, expire_on_commit=False) as db:
         rr = ReviewRequest(item_id=ids.item, version_id=ids.version, source_file_id=ids.file,
@@ -132,13 +148,13 @@ def common_copy(w, *, download=False, search=True, provider=False, indexed=True,
         db.add(rr); db.commit(); rid=rr.id
     admin = Principal(w.uid, "admin", w.actor.session_id, "admin@example.test", None)
     storage = MemoryOriginals(ids)
-    rights = promotion.RecordedRights("Common readable", "synthetic test author", None, None,
-        "synthetic permission", NOW.date(), RightsAudience.INSTANCE_USERS, download, search,
-        provider or (indexed and not pending), None)
-    with Session(w.engine, expire_on_commit=False) as db:
-        copy = promotion.approve(db, admin, storage, rid, SHA, rights, NOW)
-        result = SimpleNamespace(item=copy.item.id, version=copy.version.id, file=copy.source.id,
-                                 key=copy.source.storage_key, admin=admin)
+    done = runtime_approve(w, rid, storage, download=download, search=search,
+                           provider=provider or (indexed and not pending))
+    item = uuid.UUID(done["request"]["pending_publication_id"])
+    with Session(w.engine) as db:
+        version, file, key = db.execute(text("SELECT version_id, id, storage_key FROM source_files WHERE item_id=:i"),
+                                        {"i": item}).one()
+    result = SimpleNamespace(item=item, version=version, file=file, key=key, admin=admin)
     if not pending:
         with Session(w.engine) as db:
             publication.publish(db, admin, storage, result.item, SHA, NOW)

@@ -8,10 +8,10 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { api, describeError } from "../../../../lib/api";
+import { ApiError, api, describeError } from "../../../../lib/api";
 import {
-  CONDITIONS_BLOCK_NOTE, EMPTY_APPROVE_FORM, REJECT_REASONS, STATUS_TEXT, closeReasonText, makeApproveBody,
-  reviewDownloadHref,
+  APPROVAL_OUTCOME_UNKNOWN, CONDITIONS_BLOCK_NOTE, EMPTY_APPROVE_FORM, REJECT_REASONS, STATUS_TEXT,
+  approvalOutcomeUnknown, closeReasonText, makeApproveBody, reviewDownloadHref,
   type AdminReviewRequest, type ApproveForm,
 } from "../../../../lib/review";
 import { ErrorText, Shell, useSession } from "../../../components/session";
@@ -36,7 +36,9 @@ function ApproveSection({ request, onDone }: { request: AdminReviewRequest; onDo
       await api(`/admin/review-requests/${encodeURIComponent(request.id)}/approve`, { method: "POST", body });
       onDone();
     } catch (err) {
-      setError(describeError(err));
+      // Never re-send: a missing/cut-off answer may follow a saved approval.
+      setError(approvalOutcomeUnknown(err instanceof ApiError ? err.code : null)
+        ? APPROVAL_OUTCOME_UNKNOWN : describeError(err));
       set("confirmed", false);
     } finally {
       setBusy(false);

@@ -107,7 +107,13 @@ const MESSAGES: Record<string, string> = {
   approval_storage_unavailable: "Không sao chép/kiểm được file gốc sang bản chung; chưa có gì được ghi nhận. Thử lại sau.",
   // M6c-2b1: the journaled close may still have ended the request (closed_by_recovery) without any copy.
   approval_unavailable: "Không ghi được phê duyệt; không có bản chung nào được tạo. Tải lại trang để xem yêu cầu còn mở hay đã đóng.",
-  approval_outcome_uncertain: "Không chắc quyết định đã được ghi; tải lại trang để xem trạng thái trước khi thử lại.",
+  approval_outcome_uncertain:
+    "Chưa xác định được kết quả phê duyệt: bản chung có thể đã được tạo và quyền xem tạm có thể đã kết thúc. Tải lại trang để kiểm tra trạng thái; không tự gửi lại phê duyệt.",
+  approval_response_unavailable:
+    "Phê duyệt đã được lưu nhưng chưa đọc được phản hồi mới. Tải lại trang để xem trạng thái; không gửi lại phê duyệt.",
+  approval_busy: "Đang có nhiều phê duyệt sao chép file cùng lúc; phê duyệt này chưa bắt đầu. Thử lại sau.",
+  approval_copy_timeout:
+    "Sao chép/kiểm file gốc vượt thời gian cho phép; phê duyệt chưa được ghi. Tải lại trang để kiểm tra trạng thái trước khi thử lại.",
   already_published: "Bản này đã được công bố.",
   common_copy_revoked: "Bản này đã bị thu hồi; không thể công bố hay thu hồi lại.",
   rights_not_publishable: "Quyền đã ghi không còn đúng cho bản này (đã đổi epoch/thu hồi hoặc lệch file); không công bố.",
