@@ -1,7 +1,7 @@
 {
-  "base": "070cb37aeb35da62c088293eaff9c55dd58f1929",
-  "source_migration": "0040",
-  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4. Final read clock corrected after predicate SQL; /auth/sessions uses the shared final caller. Details in docs/c2d-final-read-clock.md. C2d-4a adds GET upload notice final caller and POST intent actor/binding/TTL before commit plus fresh token proof after known commit. C2d-4b PUT original merged PR #44 at dd8bdc6 with unlocked staging, atomic consume and a new exact response proof. C2d-4c implements exactly two original GETs/three separate gates, short scalar proofs, shared verified spools, known audit commit then fresh response proof, current caller/clock and cancellation ownership. Other writers/provider callers stay open. See docs/tasks/m6c2b2c2d4c-original-downloads.md. PR #45 merged at 070cb37. C2d-5a submit/withdraw/admin_reject implemented on review branch: runtime domain closure routines, exact transaction pending binding, current actor/clock and new response proof; approval and other writers/provider callers remain open.",
+  "base": "8ff5b4ed5f643a4618f70b73550cdcce465181ab",
+  "source_migration": "0041",
+  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4. Final read clock corrected after predicate SQL; /auth/sessions uses the shared final caller. Details in docs/c2d-final-read-clock.md. C2d-4a adds GET upload notice final caller and POST intent actor/binding/TTL before commit plus fresh token proof after known commit. C2d-4b PUT original merged PR #44 at dd8bdc6 with unlocked staging, atomic consume and a new exact response proof. C2d-4c implements exactly two original GETs/three separate gates, short scalar proofs, shared verified spools, known audit commit then fresh response proof, current caller/clock and cancellation ownership. Other writers/provider callers stay open. See docs/tasks/m6c2b2c2d4c-original-downloads.md. PR #45 merged at 070cb37. C2d-5a submit/withdraw/admin_reject merged PR #46 at 8ff5b4e: runtime domain closure routines, exact transaction pending binding, current actor/clock and new response proof; approval and other writers/provider callers remain open. C2d-5b approval/copy task is assigned but not implemented/tested; see docs/tasks/m6c2b2c2d5b-review-approval-original-copy.md. C2d-5b implemented on review branch (not merged): POST approve uses api/review_approval.py, runtime approval mirror/confirm routines 0041, owned copy outside DB locks and a new thin response proof; publish/revoke/index/provider callers remain open. See docs/c2d5b-review-approval-original-copy.md.",
   "safety": "pending until C4",
   "route_count": 63,
   "routes": [
@@ -852,7 +852,7 @@
         "get_clock"
       ],
       "group": "review-write-file",
-      "final_status": "implemented C2d-5a on review branch; safety pending C4",
+      "final_status": "merged C2d-5a PR #46 at 8ff5b4e; safety pending C4",
       "direct_transaction_calls": [],
       "contract_map": "docs/c2d5a-review-json-writers.md",
       "boundary": "api/review_writes.write",
@@ -890,7 +890,7 @@
         "get_clock"
       ],
       "group": "review-write-file",
-      "final_status": "implemented C2d-5a on review branch; safety pending C4",
+      "final_status": "merged C2d-5a PR #46 at 8ff5b4e; safety pending C4",
       "direct_transaction_calls": [],
       "contract_map": "docs/c2d5a-review-json-writers.md",
       "boundary": "api/review_writes.write",
@@ -969,7 +969,7 @@
         "get_clock"
       ],
       "group": "review-write-file",
-      "final_status": "implemented C2d-5a on review branch; safety pending C4",
+      "final_status": "merged C2d-5a PR #46 at 8ff5b4e; safety pending C4",
       "direct_transaction_calls": [],
       "contract_map": "docs/c2d5a-review-json-writers.md",
       "boundary": "api/review_writes.write",
@@ -980,17 +980,21 @@
       "path": "/admin/review-requests/{request_id}/approve",
       "function": "admin_approve",
       "source": "api/app/api/routes/reviews.py",
-      "line": 415,
+      "line": 422,
       "dependencies": [
+        "require_trusted_origin",
         "require_admin",
-        "get_db",
-        "get_now",
+        "get_settings",
+        "get_clock",
         "_storage"
       ],
       "group": "review-write-file",
-      "final_status": "open C2d",
+      "final_status": "implemented C2d-5b on review branch (not merged); safety pending C4",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d5b-review-approval-original-copy.md",
+      "task": "docs/tasks/m6c2b2c2d5b-review-approval-original-copy.md",
+      "boundary": "api/review_approval.receive",
+      "implemented_contract": "proof request SHARE -> private item SHARE (exact grant) -> journal shared -> current Admin/CSRF/clock before copy and before put; copy/readback outside DB locks owned by attempt (slot/spool/key/executor); acceptance Admin User NO KEY UPDATE -> request UPDATE -> private item SHARE -> common/rights/audit flush -> journal exclusive -> ras_auth_review_approval_mirror/append/confirm -> commit; commit exception uncertain keeps object; new thin response proof after known commit"
     },
     {
       "method": "POST",
@@ -1143,9 +1147,9 @@
     "api/app/api/routes/library.py": "2b3fbdca987b870cbf2a953f8f224bac983debc86118e0a245c8897cd699592b",
     "api/app/api/routes/publications.py": "86e948371e60d0a84eb5083e71ec3d5fbf719c8c9ee3fef996ecb4b1702661e1",
     "api/app/api/routes/rag.py": "fa890ce04f01282e215198acf7016e6537c9afe58a06f90950b0b3521df4c84b",
-    "api/app/api/routes/reviews.py": "f7245caffbed374203ff824a878b1a3a9a837b2859f9ed481bc3d0d0e8968ecc",
+    "api/app/api/routes/reviews.py": "f721e6487b38303829956bc9d81557d8469212440530fd75b6a64b30befaffc7",
     "api/app/api/routes/search.py": "5b8c8b1c8afa24821d041d7bd9a765915b5ea8baf10d873c8a8d6803816321e7",
-    "api/app/api/routes/uploads.py": "85c1299165200ad87b75578435ee7c994409b708e967a739781eeffb93edf7df",
+    "api/app/api/routes/uploads.py": "dff71fe1385b57f41615354579637567f3fdc7f0de4f778dc069fd1cce605abe",
     "api/app/main.py": "b53f13e8e5dbdbed1de23410c7967298a9e1123a7411730f5d93f4721421f93e"
   },
   "previous_base": "5100ff67c5c61754e4dd29693cb670a22ce6cf83",
@@ -1195,5 +1199,8 @@
     "inventory": "docs/c2d4c-test-inventory.json"
   },
   "previous_c2d4c_inventory_base": "632ec683940a8bccc711c8a55743b0a3992c1d03",
-  "c2d4c_code_commit": "4c49919203db085dacd0778b3ce62e6787fd3823"
+  "c2d4c_code_commit": "4c49919203db085dacd0778b3ce62e6787fd3823",
+  "c2d5b_routes": [
+    "POST /admin/review-requests/{request_id}/approve"
+  ]
 }

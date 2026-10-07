@@ -1,6 +1,6 @@
 # Prompt C2d-5a: tạo, rút và từ chối yêu cầu review
 
-**Đã triển khai trên nhánh review; [handoff](../c2d5a-review-json-writers.md) / [inventory](../c2d5a-test-inventory.json) ghi kết quả theo source, chưa merge.** PR #45 đã merge `070cb37aeb35da62c088293eaff9c55dd58f1929` ngày 2026-10-07 (Asia/Saigon), chứa head `b23ff82`/code `4c49919`. Head migration mã nguồn hiện `0039`; không suy revision DB dev. Safety **pending tới C4**.
+**Đã merge PR #46 `8ff5b4e`; [handoff](../c2d5a-review-json-writers.md) / [inventory](../c2d5a-test-inventory.json) ghi kết quả theo source trước merge, chưa rerun tại merge.** PR #45 đã merge `070cb37aeb35da62c088293eaff9c55dd58f1929` ngày 2026-10-07 (Asia/Saigon), chứa head `b23ff82`/code `4c49919`. Ở mốc giao task, head migration mã nguồn là `0039`; nhánh PR #46 thêm `0040`. Không suy revision DB dev. Safety **pending tới C4**.
 
 [Mục lục](../README.md) · [Quyết định giao](../decisions.md#giao-c2d-5a-sau-merge-pr-45-2026-10-07) · [Roadmap](../roadmap.md) · [Review PR #45](../reviews/pr45-c2d4c-original-downloads.md) · [Caller inventory](../c2d1-caller-inventory.json)
 

@@ -1,5 +1,9 @@
 # Môi trường phát triển và schema (M1a–C2d-4b)
 
+## C2d-5b cô lập
+
+Host Conda `C:\Users\ADMIN\.conda\envs\ras\python.exe` (interpreter/pip đã kiểm), PostgreSQL riêng `127.0.0.1:58475`, MinIO riêng `127.0.0.1:59475`, label `ras.task=c2d5b-20261007`; credentials generated ngoài repo, đặt `RAS_TEST_DATABASE_ADMIN_URL`, `RAS_STORAGE__*`, `RAS_C1_*` trước import fixture, không fallback `.env`. Restore C2c2 dùng container riêng `58442` (label lịch sử bắt buộc + owner C2d-5b). Proxy smoke: Uvicorn `58476`, Next `53476`, Chrome headless đã cài; `npm run build --prefix web` trước smoke. Wrapper/evidence ngoài repo `%TEMP%/ras-c2d5b-20261007` (`run.py`, `final_runs.py`, `mutants.py`); lệnh/kết quả thực chạy trong [inventory](c2d5b-test-inventory.json). Biến mới: `RAS_FILES__APPROVAL_COPY_MAX_CONCURRENT` (2), `RAS_FILES__APPROVAL_COPY_DEADLINE_SECONDS` (90), `WEB_PROXY_REVIEW_APPROVAL_TIMEOUT_SECONDS` (120) — giá trị đề xuất cần đo. Không dev DB/restart/provider/pricing/readiness. Safety pending tới C4.
+
 ## C2d-5a cô lập
 
 Đã chạy host Conda `C:\Users\ADMIN\.conda\envs\ras\python.exe`, PostgreSQL riêng `127.0.0.1:58467`, MinIO riêng `127.0.0.1:59467`; credentials generated ngoài repo, explicit `RAS_TEST_DATABASE_ADMIN_URL` và C1 runtime/recovery passwords trước import. Không `.env`/dev/provider/pricing/readiness. Proxy thử Uvicorn `58468`, Next `53467`, Chrome headless hiện có. Script wrapper/evidence ngoài repo ở `C:\Users\ADMIN\AppData\Local\Temp\ras-c2d5a-20261007`; xem [inventory](c2d5a-test-inventory.json) cho lệnh thực chạy, source/hash/JUnit/cleanup. Đây là run đã kiểm cô lập, không runbook cutover hoặc cấp credentials privileged cho API. Safety pending tới C4.

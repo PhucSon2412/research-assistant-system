@@ -1,5 +1,9 @@
 # C2d-5a: ba JSON writer review qua runtime
 
+**Trạng thái hiện hành:** PR #46 đã merge `8ff5b4e`; source head `0040`. Kết quả agent/reviewer bên dưới giữ theo source trước merge. [Task tiếp C2d-5b](tasks/m6c2b2c2d5b-review-approval-original-copy.md) chuyển một approve/copy; chưa triển khai, safety pending tới C4.
+
+[Review độc lập PR #46](reviews/pr46-c2d5a-review-json-writers.md): 234 API (gồm Chrome proxy) và 58 web/typecheck/build; không phát hiện điểm chặn merge scope C2d-5a tại `7938153`. Artifact agent tách riêng; PR OPEN tại lúc review, đã merge `8ff5b4e`; chưa rerun tại merge, safety pending tới C4.
+
 [Task](tasks/m6c2b2c2d5a-review-json-writers.md) · [Caller map](c2d1-caller-inventory.json)
 
 Base fetch/xác minh `070cb37aeb35da62c088293eaff9c55dd58f1929`: PR #45 MERGED,

@@ -1,10 +1,16 @@
 # Roadmap đề xuất
 
+## C2d-5b sau merge PR #46
+
+**Đã triển khai trên nhánh review, chưa merge:** [handoff](c2d5b-review-approval-original-copy.md) / [inventory](c2d5b-test-inventory.json), migration `0041`. Tiếp theo đề xuất: publish/revoke/common-index runtime → search/provider → RAG/provider → tổng hồi quy C2d; C3/C4 riêng.
+
+[Task approve/copy original](tasks/m6c2b2c2d5b-review-approval-original-copy.md): một POST qua runtime thật, original/key riêng có checksum/readback ngoài DB, actor/grant/clock trước acceptance, approved/common/rights journal coupling và response thin proof mới. PR #46 merge `8ff5b4e`, source `0040`; migration mới nếu cần sau head thực tế (dự kiến `0041`). Đầu ra một PR có MinIO/runtime/race/fault/restore/proxy/Chrome, handoff/inventory/not-run; chưa code/chưa kiểm trong lượt giao. Publish/revoke/common-index/provider/C3/C4 riêng, safety pending tới C4.
+
 ## C2d-5a sau merge PR #45
 
-PR #45 đã merge `070cb37` ngày 2026-10-07, source `0039`. [Task C2d-5a đã giao](tasks/m6c2b2c2d5a-review-json-writers.md): đúng ba POST submit/withdraw/reject, actor/role/resource/clock trước commit, typed closure mirror runtime hẹp, pending gate có binding và proof response mới. Đã triển khai trên nhánh review, migration `0040`; [handoff](c2d5a-review-json-writers.md) / [inventory](c2d5a-test-inventory.json) ghi kiểm chứng theo source. Approval/copy và publication/provider/C3/C4 còn riêng. [Quyết định scoped](decisions.md#giao-c2d-5a-sau-merge-pr-45-2026-10-07), safety pending tới C4.
+PR #45 đã merge `070cb37` ngày 2026-10-07, source `0039`. [Task C2d-5a đã giao](tasks/m6c2b2c2d5a-review-json-writers.md): đúng ba POST submit/withdraw/reject, actor/role/resource/clock trước commit, typed closure mirror runtime hẹp, pending gate có binding và proof response mới. Đã merge PR #46 `8ff5b4e`, migration `0040`; [handoff](c2d5a-review-json-writers.md) / [inventory](c2d5a-test-inventory.json) ghi kiểm chứng theo source. Approval/copy và publication/provider/C3/C4 còn riêng. [Quyết định scoped](decisions.md#giao-c2d-5a-sau-merge-pr-45-2026-10-07), safety pending tới C4.
 
-Đề xuất tiếp: approval/copy riêng → publish/revoke/common-index (chia theo lock/I/O/journal nếu cần) → search/provider → RAG/provider → tổng hồi quy C2d. Chưa coi các nhóm đó đã được triển khai hoặc toàn T14 đã đạt. C3 operator/delivery và C4 cutover/storage độc lập giữ riêng. Các mốc PR #45 trước merge bên dưới là lịch sử.
+C2d-5b approval/copy đã triển khai trên nhánh review, chưa merge → publish/revoke/common-index (chia theo lock/I/O/journal nếu cần) → search/provider → RAG/provider → tổng hồi quy C2d. Chưa coi các nhóm đó đã được triển khai hoặc toàn T14 đã đạt. C3 operator/delivery và C4 cutover/storage độc lập giữ riêng. Các mốc PR #45 trước merge bên dưới là lịch sử.
 
 ## C2d-4c sau merge PR #44
 
