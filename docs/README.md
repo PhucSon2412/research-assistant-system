@@ -1,6 +1,10 @@
 # Tài liệu dự án
 
-**C2d-4c đã triển khai trên nhánh review, base PR #44 `dd8bdc6`.** [Bàn giao tải original](c2d4c-original-downloads.md) · [inventory](c2d4c-test-inventory.json): đúng hai GET/ba gate private/common/review, spool size/SHA-256 ngoài DB, clock cuối, audit known commit rồi proof mới, ownership slot/temp và proxy streaming. Source code `4c49919`; kết quả cuối ghi tại inventory, các số PR #44 bên dưới giữ riêng. **Safety pending tới C4; chưa merge.**
+**C2d-5a đã triển khai trên nhánh review:** [ba JSON writer review](c2d5a-review-json-writers.md) · [inventory](c2d5a-test-inventory.json). Runtime thật cho submit/withdraw/reject, migration `0040`, pending closure exact binding, actor/clock trước commit và proof response mới. Approval/publication/provider/C3/C4 riêng, **safety pending tới C4**. Kết quả cuối theo source trong inventory; không cộng số lịch sử PR #45.
+
+**Review PR #45 tại `b23ff82`: không phát hiện điểm chặn merge trong phạm vi C2d-4c.** Reviewer chạy độc lập **350/350 API**, **57/57 web** và typecheck; artifact 991 của agent được đối chiếu riêng. [Report, evidence và giới hạn](reviews/pr45-c2d4c-original-downloads.md). PR sau đó đã merge `070cb37`; chưa rerun tại merge, safety **pending tới C4**; writer/provider khác vẫn riêng.
+
+**C2d-4c đã merge PR #45 `070cb37`, base PR #44 `dd8bdc6`.** [Bàn giao tải original](c2d4c-original-downloads.md) · [inventory](c2d4c-test-inventory.json): đúng hai GET/ba gate private/common/review, spool size/SHA-256 ngoài DB, clock cuối, audit known commit rồi proof mới, ownership slot/temp và proxy streaming. Source code `4c49919`; kết quả cuối ghi tại inventory, các số PR #44 bên dưới giữ riêng. **Safety pending tới C4; không dùng kết quả lịch sử để mở traffic.**
 
 **Review lại PR #44 tại `5504810`: P2 đã sửa, không phát hiện điểm chặn merge trong phạm vi C2d-4b.** Độc lập **76/76 API** và hai ca fault/control riêng đạt; artifact 463 của agent được đối chiếu, không tính là chạy lại toàn bộ. [Report và giới hạn](reviews/pr44-c2d4b-upload-original.md#review-lại-p2-tại-5504810) giữ review ban đầu tại `b578082`. PR sau đó đã merge `dd8bdc6`; chưa chạy lại suite tại merge. Safety **pending tới C4**; download C2d-4c riêng.
 

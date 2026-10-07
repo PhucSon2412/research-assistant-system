@@ -1,6 +1,6 @@
 # Prompt C2d-4c: tải original riêng, chung và review
 
-**Trạng thái hiện hành:** đã triển khai trên nhánh review (code `4c49919`); [handoff](../c2d4c-original-downloads.md) và [inventory](../c2d4c-test-inventory.json) ghi kết quả kiểm theo source. Chưa merge. Nội dung giao dưới đây được giữ; trạng thái “chưa triển khai” lúc giao là lịch sử. PR #44 đã merge ngày 2026-10-06 tại `dd8bdc689ef7b495618116add4832628d7d24327`, chứa head `5504810` và source sửa P2 `adfdb72`. Head migration mã nguồn `0039`; không suy revision DB dev. Safety **pending tới C4**.
+**Trạng thái hiện hành:** đã merge PR #45 `070cb37` (code `4c49919`); [handoff](../c2d4c-original-downloads.md) và [inventory](../c2d4c-test-inventory.json) ghi kết quả kiểm theo source. Kết quả giữ theo source trước merge; chưa rerun tại merge. Nội dung giao dưới đây được giữ; trạng thái “chưa triển khai” lúc giao là lịch sử. PR #44 đã merge ngày 2026-10-06 tại `dd8bdc689ef7b495618116add4832628d7d24327`, chứa head `5504810` và source sửa P2 `adfdb72`. Head migration mã nguồn `0039`; không suy revision DB dev. Safety **pending tới C4**.
 
 [Mục lục](../README.md) · [Quyết định giao](../decisions.md#giao-c2d-4c-sau-merge-pr-44-2026-10-06) · [Roadmap](../roadmap.md) · [Bàn giao PUT](../c2d4b-upload-original.md) · [Review PR #44](../reviews/pr44-c2d4b-upload-original.md)
 

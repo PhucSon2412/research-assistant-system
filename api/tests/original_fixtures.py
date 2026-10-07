@@ -1,7 +1,7 @@
 """Legacy resource-writer setup for original read regressions.
 
-Accounts and GETs keep runtime auth. Unconverted review/publication writer
-HTTP is used only to prepare resources using the isolated privileged engine;
+Accounts, GETs and submit/withdraw/reject keep runtime auth. Only legacy
+approve/publish/revoke HTTP prepares resources using the isolated owner;
 no principal, auth predicate, receipt, journal or runtime grant is replaced.
 These assertions do not certify those writers as runtime-ready.
 """
@@ -21,8 +21,7 @@ def upload_api(base_upload_api, installation):
     h.setup_engine=installation.engine
     def sessions(request: Request):
         resource_writer=(request.method=='POST' and (
-            (request.url.path.startswith('/admin/review-requests/') and request.url.path.endswith(('/approve','/reject'))) or
-            (request.url.path.startswith('/review-requests/') and request.url.path.endswith('/withdraw')) or
+            (request.url.path.startswith('/admin/review-requests/') and request.url.path.endswith('/approve')) or
             (request.url.path.startswith('/admin/common-copies/') and request.url.path.endswith(('/publish','/revoke')))))
         with Session(installation.engine if resource_writer else get_engine(),expire_on_commit=False) as db:
             yield db

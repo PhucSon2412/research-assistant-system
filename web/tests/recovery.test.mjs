@@ -68,6 +68,15 @@ test("review-closure journal errors never claim the grant is still open when it 
   }
 });
 
+test("review writer uncertain and postcommit errors ask for a fresh state, never promise rollback", () => {
+  const uncertain = describeError(new ApiError(503, "review_write_outcome_uncertain"));
+  assert.match(uncertain, /có thể.*phục hồi.*không tự gửi lại/);
+  for (const code of ["review_write_outcome_uncertain", "review_write_response_unavailable", "review_write_unavailable"]) {
+    assert.doesNotMatch(describeError(new ApiError(503, code)), /vẫn đang mở|chưa lưu|Thử lại ngay/);
+  }
+  assert.match(describeError(new ApiError(503, "review_write_response_unavailable")), /đã lưu.*phản hồi mới/);
+});
+
 test("resource scope churn asks the reader to reload without rendering stale rows", async () => {
   const previousFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response(JSON.stringify({ error: "resource_scope_changed" }),

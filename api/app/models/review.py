@@ -114,3 +114,4 @@ class ReviewRequest(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"))
     close_reason_code: Mapped[str | None] = mapped_column(Text)
     rejection_note: Mapped[str | None] = mapped_column(Text)
+    closure_transaction_id: Mapped[int | None] = mapped_column(BigInteger)

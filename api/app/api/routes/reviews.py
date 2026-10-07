@@ -34,7 +34,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_clock, get_db, get_now, get_principal, require_admin, require_trusted_origin
 from app.api.errors import ApiError
 from app.api.review_publication_reads import review_publication_json
-from app.api import original_downloads
+from app.api import original_downloads, review_writes
 from app.audit import record_event
 from app.authz import (Principal, m2a_private_derivatives_clause, review_grant_clause,
                       review_history_admin_clause)
@@ -45,7 +45,6 @@ from app.models.review import (DECLARED_TEXT_MAX_CHARS, DECLARED_URL_MAX_CHARS, 
                                WITHDRAWN_BY_REQUESTER)
 from app.models.rights import RIGHTS_TEXT_MAX_CHARS, RIGHTS_URL_MAX_CHARS, SCOPE_CONDITIONS_MAX_CHARS
 from app.promotion import RecordedRights, approve
-from app.review_closing import commit_close
 from app.storage import OriginalStorage, get_storage
 
 router = APIRouter(prefix="/review-requests", tags=["review"])
@@ -97,6 +96,13 @@ class ReviewRequestInput(BaseModel):
     declared_source_url: str | None = Field(default=None, max_length=DECLARED_URL_MAX_CHARS)
     declared_rights: str = Field(min_length=1, max_length=DECLARED_TEXT_MAX_CHARS)
     declared_license_url: str | None = Field(default=None, max_length=DECLARED_URL_MAX_CHARS)
+
+    @field_validator("acknowledged", mode="before")
+    @classmethod
+    def _acknowledgement(cls, value):
+        if value is not True:
+            raise ValueError("explicit acknowledgement required")
+        return value
 
     @field_validator("declared_source", "declared_rights")
     @classmethod
@@ -210,6 +216,8 @@ def _target_out(rr: ReviewRequest, item: LibraryItem, version: PaperVersion, sou
 def _pending_note(rr: ReviewRequest) -> str:
     if rr.status == ReviewStatus.CLOSED_BY_RECOVERY.value:
         return RECOVERED_NOTE
+    if rr.status in (ReviewStatus.WITHDRAWN.value, ReviewStatus.REJECTED.value):
+        return "Yêu cầu đã đóng; quyền xem tạm của Admin đã kết thúc. Paper vẫn ở kho riêng."
     return APPROVED_NOTE if rr.status == ReviewStatus.APPROVED.value else PENDING_NOTE
 
 
@@ -336,70 +344,19 @@ def admin_get(request_id: str, admin: Principal = Depends(require_admin), db: Se
 
 
 @router.post("", status_code=201, dependencies=[Depends(require_trusted_origin)])
-def submit(
-    body: ReviewRequestInput,
-    principal: Principal = Depends(get_principal),
-    db: Session = Depends(get_db),
-    now: datetime = Depends(get_now),
-    settings: Settings = Depends(get_settings),
-) -> dict:
-    if principal.is_admin:
-        # Admins do not upload private papers and must not review their own.
-        raise ApiError(403, "forbidden")
-    if body.notice_version != settings.review.notice_version:
-        raise ApiError(409, "notice_changed")
-    # One gate for "not mine", "missing" and "file not in that version of that item".
-    target = db.execute(
-        select(LibraryItem, PaperVersion, SourceFile)
-        .join(PaperVersion, PaperVersion.item_id == LibraryItem.id)
-        .join(SourceFile, SourceFile.version_id == PaperVersion.id)
-        .where(LibraryItem.id == body.item_id, PaperVersion.id == body.version_id,
-               SourceFile.id == body.source_file_id, m2a_private_derivatives_clause(principal))
-        .with_for_update(of=LibraryItem, read=True)
-    ).first()
-    if target is None:
-        db.rollback()
-        raise ApiError(404, "not_found")
-    item, version, source = target
-    rr = ReviewRequest(item_id=item.id, version_id=version.id, source_file_id=source.id,
-                       requester_user_id=principal.user_id, status=ReviewStatus.OPEN.value,
-                       file_checksum_sha256=source.checksum_sha256, rights_epoch_at_submit=item.rights_epoch,
-                       notice_version=body.notice_version, declared_source=body.declared_source,
-                       declared_source_url=body.declared_source_url, declared_rights=body.declared_rights,
-                       declared_license_url=body.declared_license_url, submitted_at=now)
-    db.add(rr)
-    try:
-        db.flush()
-    except IntegrityError as exc:
-        db.rollback()
-        if getattr(getattr(exc.orig, "diag", None), "constraint_name", None) == "uq_review_requests_open_file":
-            raise ApiError(409, "review_request_open") from None
-        raise
-    _audit(db, principal, "review.request.submit", AuditOutcome.SUCCESS, rr.id,
-           item_id=str(item.id), version_id=str(version.id), source_file_id=str(source.id))
-    db.commit()
-    return {"request": _owner_out(rr, item, version, source)}
+def submit(body: ReviewRequestInput, request: Request, principal: Principal = Depends(get_principal),
+           db: Session = Depends(get_db), settings: Settings = Depends(get_settings),
+           clock=Depends(get_clock)) -> dict:
+    return review_writes.write(db, principal, action="submit", body=body,
+        csrf_token=request.headers.get("x-csrf-token", ""), clock=clock, settings=settings)
 
 
 @router.post("/{request_id}/withdraw", dependencies=[Depends(require_trusted_origin)])
-def withdraw(
-    request_id: str,
-    principal: Principal = Depends(get_principal),
-    db: Session = Depends(get_db),
-    now: datetime = Depends(get_now),
-) -> dict:
-    rr, item, version, source = _owned_request(db, principal, request_id, lock=True)
-    if rr.status != ReviewStatus.OPEN.value:
-        db.rollback()
-        raise ApiError(409, "review_request_closed")
-    rr.status = ReviewStatus.WITHDRAWN.value
-    rr.closed_at = now
-    rr.closed_by_user_id = principal.user_id
-    rr.close_reason_code = WITHDRAWN_BY_REQUESTER
-    _audit(db, principal, "review.request.withdraw", AuditOutcome.SUCCESS, rr.id, reason_code=WITHDRAWN_BY_REQUESTER)
-    # Journaled, then committed: from this commit every new Admin review read of the file is refused.
-    rr = commit_close(db, rr)
-    return {"request": _owner_out(rr, item, version, source)}
+def withdraw(request_id: str, request: Request, principal: Principal = Depends(get_principal),
+             db: Session = Depends(get_db), settings: Settings = Depends(get_settings),
+             clock=Depends(get_clock)) -> dict:
+    return review_writes.write(db, principal, action="withdraw", request_id=request_id,
+        csrf_token=request.headers.get("x-csrf-token", ""), clock=clock, settings=settings)
 
 
 # --- Admin -----------------------------------------------------------------
@@ -447,29 +404,11 @@ async def admin_original(
 
 
 @admin_router.post("/{request_id}/reject", dependencies=[Depends(require_trusted_origin)])
-def admin_reject(
-    request_id: str,
-    body: RejectInput,
-    admin: Principal = Depends(require_admin),
-    db: Session = Depends(get_db),
-    now: datetime = Depends(get_now),
-) -> dict:
-    rr = db.scalar(select(ReviewRequest).where(ReviewRequest.id == _parse_id(request_id)).with_for_update())
-    if rr is None:
-        db.rollback()
-        raise ApiError(404, "not_found")
-    if rr.status != ReviewStatus.OPEN.value:
-        db.rollback()
-        raise ApiError(409, "review_request_closed")
-    rr.status = ReviewStatus.REJECTED.value
-    rr.closed_at = now
-    rr.closed_by_user_id = admin.user_id
-    rr.close_reason_code = body.reason_code.value
-    rr.rejection_note = body.note
-    # The note stays on the request for the owner; audit keeps only the code.
-    _audit(db, admin, "review.request.reject", AuditOutcome.SUCCESS, rr.id, reason_code=body.reason_code.value)
-    rr = commit_close(db, rr)  # journaled, then committed
-    return {"request": _admin_out(rr, None)}
+def admin_reject(request_id: str, body: RejectInput, request: Request,
+                 admin: Principal = Depends(require_admin), db: Session = Depends(get_db),
+                 settings: Settings = Depends(get_settings), clock=Depends(get_clock)) -> dict:
+    return review_writes.write(db, admin, action="reject", body=body, request_id=request_id,
+        csrf_token=request.headers.get("x-csrf-token", ""), clock=clock, settings=settings)
 
 
 @admin_router.post("/{request_id}/approve", dependencies=[Depends(require_trusted_origin)])
