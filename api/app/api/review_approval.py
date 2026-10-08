@@ -242,79 +242,99 @@ def _status(db, current, rid):
                                                         review_history_admin_clause(current)))
 
 
+def _short(function, code):
+    """Run one short proof/writer on its own Session; never a 500 from teardown.
+
+    Rollback and close are both attempted; if either fails the connection is
+    invalidated and the attempt stops with a controlled error: a proof only
+    counts once its Session was released cleanly. A denial raised by the proof
+    itself is kept; non-Exception BaseExceptions are re-raised unchanged.
+    """
+    db = Session(get_engine())
+    failure = result = None
+    try:
+        result = function(db)
+    except BaseException as exc:
+        failure = exc
+    teardown_failed = False
+    for method in ("rollback", "close"):
+        try:
+            getattr(db, method)()
+        except BaseException:
+            teardown_failed = True
+    if teardown_failed:
+        try:
+            db.invalidate()  # release/discard the connection even if close failed
+        except BaseException:
+            pass
+    if failure is not None:
+        if isinstance(failure, ApiError) or not isinstance(failure, Exception):
+            raise failure
+        raise ApiError(503, code) from None
+    if teardown_failed:
+        raise ApiError(503, code)
+    return result
+
+
 def caller_denial(principal, csrf, clock, settings):
     """Malformed IDs still face the current caller/gate/clock, with no resource lock."""
-    with Session(get_engine()) as db:
-        try:
-            _lock_timeout(db, settings)
-            auth_safety.require_final(db)
-            _current(db, principal, csrf, clock, settings)
-        except ApiError:
-            raise
-        except Exception:
-            raise ApiError(503, "approval_unavailable") from None
-        finally:
-            db.rollback()
+    def check(db):
+        _lock_timeout(db, settings)
+        auth_safety.require_final(db)
+        _current(db, principal, csrf, clock, settings)
+    _short(check, "approval_unavailable")
     raise ApiError(404, "not_found")
 
 
 def proof(principal, rid, body, csrf, clock, settings, expected: Target | None = None) -> Target:
     """Short proof on its own Session; the connection is returned before any I/O."""
-    with Session(get_engine()) as db:
+    def check(db):
+        _lock_timeout(db, settings)
+        db.execute(select(ReviewRequest.id).where(ReviewRequest.id == rid,
+            review_history_admin_clause(principal)).with_for_update(read=True)).all()
+        _lock_private_item(db, principal, rid)
+        auth_safety.require_final(db)
+        current = _current(db, principal, csrf, clock, settings)
+
+        def deny(status, code):
+            _current(db, principal, csrf, clock, settings)  # auth loss wins over a late denial
+            raise ApiError(status, code)
+
         try:
-            _lock_timeout(db, settings)
-            db.execute(select(ReviewRequest.id).where(ReviewRequest.id == rid,
-                review_history_admin_clause(principal)).with_for_update(read=True)).all()
-            _lock_private_item(db, principal, rid)
-            auth_safety.require_final(db)
-            current = _current(db, principal, csrf, clock, settings)
-
-            def deny(status, code):
-                _current(db, principal, csrf, clock, settings)  # auth loss wins over a late denial
-                raise ApiError(status, code)
-
-            try:
-                _validate(body, clock())
-            except ApiError as exc:
-                deny(exc.status_code, exc.code)
-            status = _status(db, current, rid)
-            if status is None:
-                deny(404, "not_found")
-            if status != ReviewStatus.OPEN.value:
-                deny(409, "review_request_closed")
-            target = _target(db, current, rid)
-            if target is None or (expected is not None and target != expected):
-                deny(409, "review_grant_inactive")
-            if body.file_checksum_sha256 != target.checksum:
-                deny(409, "checksum_confirmation_mismatch")
-            _current(db, principal, csrf, clock, settings)  # clock AFTER every SQL
-            return target
-        except ApiError:
-            raise
-        except Exception:
-            raise ApiError(503, "approval_unavailable") from None
-        finally:
-            db.rollback()
+            _validate(body, clock())
+        except ApiError as exc:
+            deny(exc.status_code, exc.code)
+        status = _status(db, current, rid)
+        if status is None:
+            deny(404, "not_found")
+        if status != ReviewStatus.OPEN.value:
+            deny(409, "review_request_closed")
+        target = _target(db, current, rid)
+        if target is None or (expected is not None and target != expected):
+            deny(409, "review_grant_inactive")
+        if body.file_checksum_sha256 != target.checksum:
+            deny(409, "checksum_confirmation_mismatch")
+        _current(db, principal, csrf, clock, settings)  # clock AFTER every SQL
+        return target
+    return _short(check, "approval_unavailable")
 
 
 def refusal_audit(principal, rid, csrf, clock, settings, outcome, reason):
     """Best effort, IDs/code only: User -> audit/FK flush -> exclusive journal -> actor."""
+    def write(db):
+        auth_safety.require_writer(db)
+        _lock_timeout(db, settings)
+        lock_users(db, [principal.user_id])
+        current = _current(db, principal, csrf, clock, settings)
+        record_event(db, action=ACTION, outcome=outcome, actor_type=AuditActorType.USER,
+                     actor_user_id=current.user_id, target_type="review_request", target_id=str(rid),
+                     details={"reason_code": reason})
+        db.flush()
+        auth_safety.require_final(db, writer=True)
+        _current(db, principal, csrf, clock, settings)
+        db.commit()
     try:
-        with Session(get_engine()) as db:
-            try:
-                auth_safety.require_writer(db)
-                _lock_timeout(db, settings)
-                lock_users(db, [principal.user_id])
-                current = _current(db, principal, csrf, clock, settings)
-                record_event(db, action=ACTION, outcome=outcome, actor_type=AuditActorType.USER,
-                             actor_user_id=current.user_id, target_type="review_request", target_id=str(rid),
-                             details={"reason_code": reason})
-                db.flush()
-                auth_safety.require_final(db, writer=True)
-                _current(db, principal, csrf, clock, settings)
-                db.commit()
-            finally:
-                db.rollback()
+        _short(write, "approval_unavailable")
     except Exception:
         pass  # never conceals the refusal, never retried
 
@@ -545,35 +565,30 @@ def respond(principal, approval: Approval, csrf, clock, settings) -> dict:
     """New transaction after a known commit; the precommit proof authorises nothing."""
     from app.api.routes import reviews
     rid = approval.request_id
-    with Session(get_engine()) as db:
-        try:
-            _lock_timeout(db, settings)
-            db.execute(select(ReviewRequest.id).where(ReviewRequest.id == rid,
-                review_history_admin_clause(principal)).with_for_update(read=True)).all()
-            db.execute(select(LibraryItem.id).where(LibraryItem.id == approval.common_item_id,
-                review_copy_admin_clause(principal)).with_for_update(of=LibraryItem, read=True)).all()
-            auth_safety.require_final(db)
-            current = _current(db, principal, csrf, clock, settings)
-            row = db.execute(select(ReviewRequest.id, ReviewRequest.status, ReviewRequest.submitted_at,
-                ReviewRequest.closed_at, ReviewRequest.close_reason_code, ReviewRequest.closed_by_user_id)
-                .where(ReviewRequest.id == rid, review_history_admin_clause(current))).one_or_none()
-            if row is None or (row.status, row.close_reason_code, row.closed_at, row.closed_by_user_id) != (
-                    ReviewStatus.APPROVED.value, APPROVED_BY_ADMIN, approval.closed_at, approval.actor_user_id):
-                _current(db, principal, csrf, clock, settings)
-                raise ApiError(409, "resource_scope_changed")
-            # The copy may since be published or revoked: the ID only through the current gate.
-            common = db.scalar(select(LibraryItem.id).join(AccessRights, AccessRights.item_id == LibraryItem.id)
-                .where(LibraryItem.id == approval.common_item_id, AccessRights.id == approval.rights_id,
-                       AccessRights.origin_review_request_id == rid, review_copy_admin_clause(current)))
-            dto = reviews._admin_out(SimpleNamespace(**row._mapping), None, common)
-            _current(db, principal, csrf, clock, settings)  # clock AFTER the DTO SQL
-            return {"request": dto}
-        except ApiError:
-            raise
-        except Exception:
-            raise ApiError(503, "approval_response_unavailable") from None
-        finally:
-            db.rollback()
+
+    def read(db):
+        _lock_timeout(db, settings)
+        db.execute(select(ReviewRequest.id).where(ReviewRequest.id == rid,
+            review_history_admin_clause(principal)).with_for_update(read=True)).all()
+        db.execute(select(LibraryItem.id).where(LibraryItem.id == approval.common_item_id,
+            review_copy_admin_clause(principal)).with_for_update(of=LibraryItem, read=True)).all()
+        auth_safety.require_final(db)
+        current = _current(db, principal, csrf, clock, settings)
+        row = db.execute(select(ReviewRequest.id, ReviewRequest.status, ReviewRequest.submitted_at,
+            ReviewRequest.closed_at, ReviewRequest.close_reason_code, ReviewRequest.closed_by_user_id)
+            .where(ReviewRequest.id == rid, review_history_admin_clause(current))).one_or_none()
+        if row is None or (row.status, row.close_reason_code, row.closed_at, row.closed_by_user_id) != (
+                ReviewStatus.APPROVED.value, APPROVED_BY_ADMIN, approval.closed_at, approval.actor_user_id):
+            _current(db, principal, csrf, clock, settings)
+            raise ApiError(409, "resource_scope_changed")
+        # The copy may since be published or revoked: the ID only through the current gate.
+        common = db.scalar(select(LibraryItem.id).join(AccessRights, AccessRights.item_id == LibraryItem.id)
+            .where(LibraryItem.id == approval.common_item_id, AccessRights.id == approval.rights_id,
+                   AccessRights.origin_review_request_id == rid, review_copy_admin_clause(current)))
+        dto = reviews._admin_out(SimpleNamespace(**row._mapping), None, common)
+        _current(db, principal, csrf, clock, settings)  # clock AFTER the DTO SQL
+        return {"request": dto}
+    return _short(read, "approval_response_unavailable")
 
 
 # --- the attempt ------------------------------------------------------------------
@@ -591,8 +606,15 @@ async def attempt(request, principal, raw_id, body, csrf, clock, settings, stora
     try:
         rid = uuid.UUID(str(raw_id))
     except ValueError:
-        await _thread(stopped, caller_denial, principal, csrf, clock, settings)
-        raise ApiError(404, "not_found") from None
+        rid = None
+    if rid is None:
+        try:
+            await _thread(stopped, caller_denial, principal, csrf, clock, settings)
+        except ApiError:
+            raise
+        except Exception:
+            raise ApiError(503, "approval_unavailable") from None
+        raise ApiError(404, "not_found")
     rights = rights_of(body)
 
     async def audited(function, *args):
@@ -604,7 +626,14 @@ async def attempt(request, principal, raw_id, body, csrf, clock, settings, stora
                               AuditOutcome.DENIED, DENIALS[exc.code])
             raise
 
-    target = await audited(proof, principal, rid, body, csrf, clock, settings)
+    try:
+        # Before any slot, storage or mutation: a proof that did not finish
+        # cleanly (including its Session release) ends the attempt here.
+        target = await audited(proof, principal, rid, body, csrf, clock, settings)
+    except ApiError:
+        raise
+    except Exception:
+        raise ApiError(503, "approval_unavailable") from None
     slots.acquire(settings.files.approval_copy_max_concurrent)
     key = f"originals/{uuid.uuid4().hex}"
     spool = None

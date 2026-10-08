@@ -1767,3 +1767,89 @@ def test_pending_http_without_cutover_patch_no_copy_dml_or_journal_change(instal
     with w.engine.connect() as c:
         assert c.scalar(text('SELECT (SELECT count(*) FROM library_items)+(SELECT count(*) FROM review_requests)'
                              '+(SELECT count(*) FROM audit_events)+(SELECT count(*) FROM revocation_journal_records)')) == rows
+
+
+# --- PR #47 P2: short-proof Session teardown never escapes as HTTP 500 -----------------
+
+TEARDOWN_FAULTS = ('none', 'rollback', 'close', 'both', 'both_before_release')
+
+
+def teardown_session(fault, *, nth=None):
+    """Session whose rollback/close fail (after or before doing their work) for instance ``nth`` (or all)."""
+    made = []
+
+    class Teardown(Session):
+        def __init__(self, *a, **kw):
+            super().__init__(*a, **kw)
+            made.append(self)
+            self._fault = fault if nth is None or len(made) == nth else 'none'
+
+        def rollback(self):
+            if self._fault == 'both_before_release':
+                raise RuntimeError('injected rollback fault before release')
+            super().rollback()
+            if self._fault in ('rollback', 'both'):
+                raise RuntimeError('injected rollback fault')
+
+        def close(self):
+            if self._fault == 'both_before_release':
+                raise RuntimeError('injected close fault before release')
+            super().close()
+            if self._fault in ('close', 'both'):
+                raise RuntimeError('injected close fault')
+    return Teardown
+
+
+def raw_client(b):
+    from app.main import app
+    c = TestClient(app, base_url='http://web.test', raise_server_exceptions=False)
+    c.cookies.set('ras_session', b.w.actor.token)
+    c.cookies.set('ras_csrf', b.w.actor.csrf_token)
+    return c
+
+
+@pytest.mark.parametrize('rid_kind', ('valid', 'malformed'))
+@pytest.mark.parametrize('fault', TEARDOWN_FAULTS)
+def test_first_proof_teardown_fault_is_controlled_and_stops_before_storage(approvals, monkeypatch, rid_kind, fault):
+    b = approvals
+    before_journal = b.w.path.read_bytes()
+    monkeypatch.setattr(boundary, 'Session', teardown_session(fault))
+    rid = b.rid if rid_kind == 'valid' else 'not-a-uuid'
+    with raw_client(b) as c:
+        r = c.post(f'/admin/review-requests/{rid}/approve', json=body(),
+                   headers={'Origin': 'http://web.test', 'X-CSRF-Token': b.w.actor.csrf_token})
+    if fault == 'none':
+        assert r.status_code == (200 if rid_kind == 'valid' else 404), r.text
+    else:
+        assert (r.status_code, r.headers.get('content-type'), r.json()) == (
+            503, 'application/json', {'error': 'approval_unavailable'}), r.text
+        s = state(b)
+        assert nothing(b, s) and s.requests[0][1] == 'open' and not s.audit
+        assert b.storage.opened == [] and b.storage.puts == [] and b.w.path.read_bytes() == before_journal
+    assert gate(b).open and boundary.slots.active == 0
+    assert get_engine().pool.checkedout() == 0  # a failed release still invalidates the connection
+
+
+@pytest.mark.parametrize('fault', TEARDOWN_FAULTS[1:])
+def test_mid_copy_proof_teardown_fault_stops_before_put(approvals, monkeypatch, fault):
+    b = approvals
+    before_journal = b.w.path.read_bytes()
+    monkeypatch.setattr(boundary, 'Session', teardown_session(fault, nth=2))  # proof before the put
+    r = approve(b)
+    assert (r.status_code, r.json()) == (503, {'error': 'approval_unavailable'})
+    assert nothing(b) and b.storage.opened == [b.own.key] and b.storage.puts == []
+    assert b.w.path.read_bytes() == before_journal and boundary.slots.active == 0
+    assert get_engine().pool.checkedout() == 0
+
+
+@pytest.mark.parametrize('fault', TEARDOWN_FAULTS[1:])
+def test_response_proof_teardown_fault_after_known_commit_keeps_rows_and_copy(approvals, monkeypatch, fault):
+    b = approvals
+    # Sessions in order: proof, mid proof, acceptance, response.
+    monkeypatch.setattr(boundary, 'Session', teardown_session(fault, nth=4))
+    r = approve(b)
+    assert (r.status_code, r.json()) == (503, {'error': 'approval_response_unavailable'})
+    s = state(b)
+    assert s.requests[0][1] == 'approved' and len(s.common) == 1 and s.mirrors == [(b.rid, True)]
+    assert len(b.storage.copies()) == 1 and b.storage.deleted == []
+    assert gate(b).open and boundary.slots.active == 0 and get_engine().pool.checkedout() == 0
