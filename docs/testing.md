@@ -1,5 +1,13 @@
 # Chiến lược kiểm thử
 
+## C2d-5b — sửa P2 PR #47
+
+18 regression teardown mới: trên code cũ 10 fail đúng lỗi (8 HTTP 500, 2 rò connection), sau sửa 22/22 (gồm 4 ca outcome cũ cùng `-k`). Selection sau sửa 1.727/1.727 (approval 299 gồm Chrome, writers 220, reads-json 325, reads-originals 330, resources 553), collect 3.731, not-run 2.004; 12/12 đối chứng. Auth/web không chạy lại (không đổi). [Handoff](c2d5b-review-approval-original-copy.md#sửa-p2-review-pr-47), [inventory `p2_fix`](c2d5b-test-inventory.json).
+
+## Review độc lập PR #47
+
+Head `bac3739`, code `b7ba608`: selection **281/281 API**, web **62/62**, typecheck/build đạt. Regression ngoài repo **4 fail đúng P2 / 2 control pass** chứng minh lỗi teardown proof đầu trả 500 thay JSON 503; không có setup error/skip. [Report](reviews/pr47-c2d5b-review-approval-original-copy.md) ghi source hash, JUnit, selection/not-run, Chrome proxy, artifact agent 2.188 và cleanup riêng. Chưa merge, safety pending tới C4; không cộng lịch sử hoặc coi suite xanh hiện có đã phủ P2.
+
 ## C2d-5b — kiểm chứng theo source riêng
 
 [Handoff](c2d5b-review-approval-original-copy.md#kiểm-chứng) và [inventory](c2d5b-test-inventory.json) ghi collect/selection/JUnit unique/not-run, hash trước/sau, preparation và đối chứng guard. Approve runtime thật trên PostgreSQL/MinIO/journal cô lập, Conda `ras`, chặn HTTP ngoài; Chrome qua Next proxy thật; HTTP pending không patch. Suite cuối **2.188/2.188**, collect **3.713**, not-run **1.525**; web **62/62**. Không cộng lịch sử PR #46 (234/58 reviewer, 1.371 agent). Safety pending tới C4.

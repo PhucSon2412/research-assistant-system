@@ -1,10 +1,31 @@
 # C2d-5b: phê duyệt review và sao chép original qua runtime
 
+**Review PR #47:** [report/P2 và prompt sửa](reviews/pr47-c2d5b-review-approval-original-copy.md). Reviewer chạy selection 281/281, web 62/62; bốn regression teardown proof đầu fail đúng HTTP 500, hai control pass. Chưa merge; safety pending tới C4. Artifact agent vẫn giữ theo source cũ, không ghi thành pass sau sửa.
+
 **Trạng thái:** đã triển khai/kiểm trên nhánh review `feat/m6c2b2c2d5b-review-approval-original-copy`, **chưa merge**. Base fetch/xác minh `8ff5b4ed5f643a4618f70b73550cdcce465181ab` (PR #46 MERGED, chứa head `7938153`/code `1666273`). Head Alembic source trước sửa `0040` (kiểm bằng ScriptDirectory/graph, không query DB dev); thêm `0041`, không sửa migration đã merge. **Safety pending tới C4**; publish/revoke/common-index, provider, C3/C4 riêng.
 
 [Task](tasks/m6c2b2c2d5b-review-approval-original-copy.md) · [Quyết định](decisions.md#triển-khai-boundary-c2d-5b-2026-10-07) · [Inventory](c2d5b-test-inventory.json) · [Caller map](c2d1-caller-inventory.json) · [C2d-5a](c2d5a-review-json-writers.md)
 
 Nhánh giữ nguyên toàn bộ docs orchestrator chưa commit lúc bắt đầu (report PR #46, task C2d-5b, trạng thái merge trong README/decisions/roadmap/testing/AGENTS/caller map) và cập nhật tiếp trên đó.
+
+## Sửa P2 review PR #47
+
+[Report](reviews/pr47-c2d5b-review-approval-original-copy.md) tái hiện: proof đầu và nhánh ID sai nằm ngoài khối chuyển lỗi của attempt; `rollback()`/`close()` của Session proof nằm ngoài `except`, nên lỗi teardown thoát thành HTTP 500 không phải JSON.
+
+Sửa trong `api/review_approval.py` (không đổi `0041`, grants, SQL binding, lock order hay outcome acceptance):
+
+- Helper `_short(function, code)` sở hữu Session ngắn của proof đầu, proof giữa pha, caller-denial (ID sai), response sau known commit và audit từ chối. Luôn thử cả rollback và close; nếu một trong hai lỗi thì `invalidate()` để trả/bỏ connection và dừng bằng `ApiError` có kiểm soát — proof chỉ được tính khi Session đã release sạch, nên không có slot/storage/mutation sau proof lỗi. Denial do chính proof ném (401/403/404/409/422) được giữ; BaseException không phải Exception được ném lại nguyên vẹn (cancellation/ownership thread không đổi).
+- `attempt` bọc nhánh ID sai và proof đầu: lỗi không phải `ApiError` → `503 approval_unavailable`.
+- Mã lỗi: proof/caller-denial `503 approval_unavailable`; response sau known commit `503 approval_response_unavailable` (rows/object giữ).
+
+| Kiểm chứng P2 | Kết quả |
+| --- | --- |
+| 18 regression mới trên code `b7ba608` (ID hợp lệ/sai × rollback/close/cả hai/lỗi trước release; proof giữa pha; response) | **10 fail đúng lỗi** (8 HTTP 500 không JSON, 2 rò connection `checkedout=1`), các control/ca khác pass |
+| Cùng 22 node `-k teardown_fault` sau sửa | **22/22 pass** |
+| Selection sau sửa | **1.727/1.727 pass**: approval 299 (281 cũ + 18 mới, gồm Chrome/Next proxy), writers 220, reads-json 325, reads-originals 330, resources 553; collect 3.731, not-run 2.004; JUnit unique/không thiếu/trùng; 278 hash nguồn trước/sau trùng |
+| Đối chứng guard | **12/12 fail đúng** (10 cũ chạy lại với anchor `respond` mới + `short_proof_teardown` bỏ cả hai lớp → 500, `short_teardown_invalidate` → rò connection). Lượt đầu mutant chỉ bỏ guard trong `_short` sống sót vì wrapper ở `attempt` vẫn bắt lỗi (phòng thủ hai lớp); giữ làm preparation |
+
+Không chạy lại trong lượt sửa: auth/auth-restore (không đổi code auth/helper dùng chung) và web (không đổi web); số trước giữ theo source `b7ba608`. Evidence ngoài repo `%TEMP%/ras-c2d5b-p2-20261008`; PostgreSQL 58475/MinIO 59475/restore 58442 nhãn `c2d5b-p2-20261008` đã dọn đúng 3 container, 24 container có sẵn giữ nguyên. Safety pending tới C4.
 
 ## Phạm vi
 

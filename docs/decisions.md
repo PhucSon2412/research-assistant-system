@@ -1,5 +1,13 @@
 # Nhật ký quyết định
 
+## Sửa P2 review PR #47 (2026-10-08)
+
+Agent sửa đúng P2: helper `_short` sở hữu Session ngắn (proof đầu/giữa, caller-denial, response, audit từ chối), thử cả rollback và close, invalidate khi lỗi và dừng bằng `ApiError` có kiểm soát; `attempt` bọc phase đầu. Không đổi `0041`, grants, binding, lock order, outcome acceptance/retention hay proof response mới. Lựa chọn triển khai scoped cho PR này; safety pending tới C4. [Chi tiết kiểm chứng](c2d5b-review-approval-original-copy.md#sửa-p2-review-pr-47).
+
+## Review PR #47 — C2d-5b (2026-10-07)
+
+Chưa merge: một P2 được tái hiện ở proof đầu/malformed caller-denial, lỗi rollback/close thoát thành HTTP 500. [Review độc lập và prompt sửa](reviews/pr47-c2d5b-review-approval-original-copy.md) tách selection 281/281 + 4 fail đúng lỗi / 2 control pass và 62 web reviewer khỏi artifact 2.188 của agent. Reviewer chỉ sửa docs/count placeholder; không đổi thiết kế, code, migration/grants hoặc safety pending tới C4.
+
 ## Triển khai boundary C2d-5b (2026-10-07)
 
 Theo [task C2d-5b](tasks/m6c2b2c2d5b-review-approval-original-copy.md) và mục giao bên dưới, agent chọn module riêng `api/review_approval.py` cho đúng POST approve; không chuyển writer khác. Base `8ff5b4e`, head source trước sửa `0040`, thêm migration `0041`.
