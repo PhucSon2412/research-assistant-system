@@ -1,4 +1,9 @@
-"""M6b-1 Admin approval into a separate, pending common copy (PostgreSQL + MinIO)."""
+"""M6b-1 Admin approval into a separate, pending common copy (PostgreSQL + MinIO).
+
+Since C2d-5b the HTTP approve is runtime (own proofs/copy/acceptance Sessions);
+fault hooks target ``app.api.review_approval`` instead of the removed legacy
+``promotion.approve`` internals, with the same product invariants.
+"""
 from __future__ import annotations
 
 import hashlib
@@ -12,7 +17,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, OperationalError
 
-from app import promotion
+from app.api import review_approval
 from app.api.routes import reviews
 from app.cli import reconcile_originals
 from app.main import app
@@ -20,6 +25,7 @@ from app.models.enums import AuditOutcome
 from tests.test_review_requests import (A_BODY, DECLARED_RIGHTS, DECLARED_SOURCE, _fixture_rows, close_journaled,
                                         journal_sql_close, original_url, submit, world, write)
 from tests.test_uploads import upload_api  # noqa: F401  (fixture)
+from tests.test_c2c1_bootstrap import installation  # noqa: F401  (runtime fixture, C2d-5b)
 
 A_SHA = hashlib.sha256(A_BODY).hexdigest()
 ADMIN_SOURCE = "Admin-checked: synthetic file supplied by the test author, identical bytes"
@@ -371,9 +377,16 @@ def test_close_committed_during_copy_wins(upload_api, monkeypatch, closing):
     a, _, admin, ids_a, _ = world(api, storage, monkeypatch)
     rid = submit(a, ids_a).json()["request"]["id"]
     keys = object_keys(storage)
+    admin2 = api.admin_browser()
+    a.csrf(), admin2.csrf()
+
     def close():
-        if closing != "epoch":  # withdraw/reject as the routes commit them: journaled (M6c-2b1)
-            close_journaled(api.engine, rid, closing)
+        if closing == "withdraw":  # the runtime routes, journaled (C2d-5a)
+            assert write(a, "POST", f"/review-requests/{rid}/withdraw").status_code == 200
+            return
+        if closing == "reject":
+            assert write(admin2, "POST", f"/admin/review-requests/{rid}/reject",
+                         {"reason_code": "other"}).status_code == 200
             return
         with api.engine.begin() as conn:
             conn.execute(text("""UPDATE library_items SET rights_epoch=rights_epoch+1
@@ -424,66 +437,72 @@ def test_integrity_and_storage_failures_record_nothing(upload_api, monkeypatch):
     storage.put(private_key, io.BytesIO(A_BODY), "text/markdown")
 
     # A database error after the copy rolls everything back and removes the copy.
-    real_audit = promotion._audit
+    real_audit = review_approval.record_event
 
-    def audit_fails(db, admin_, outcome, rid_, **details):
-        if outcome is AuditOutcome.SUCCESS:
+    def audit_fails(db, **kw):
+        if kw["outcome"] is AuditOutcome.SUCCESS:
             raise OperationalError("INSERT audit_events", None, Exception("synthetic DB failure"))
-        real_audit(db, admin_, outcome, rid_, **details)
+        return real_audit(db, **kw)
 
-    monkeypatch.setattr(promotion, "_audit", audit_fails)
+    monkeypatch.setattr(review_approval, "record_event", audit_fails)
     response = approve(admin, api, rid)
     assert (response.status_code, response.json()) == (503, {"error": "approval_unavailable"})
     assert nothing_recorded(api) and object_keys(storage) == keys
     assert api.scalar("SELECT status FROM review_requests WHERE id=:r", r=uuid.UUID(rid)) == "open"
-    monkeypatch.setattr(promotion, "_audit", real_audit)
+    monkeypatch.setattr(review_approval, "record_event", real_audit)
     assert admin.get(original_url(rid, ids_a["file_id"])).status_code == 200  # the grant is still intact
     assert approve(admin, api, rid).status_code == 200
 
 
 def test_uncertain_commit_keeps_referenced_copy_and_reconcile_removes_only_orphans(upload_api, monkeypatch):
+    from sqlalchemy.orm import Session
+    from app.models import AccessRights
     api, storage = upload_api
     a, _, admin, ids_a, _ = world(api, storage, monkeypatch)
     rid = submit(a, ids_a).json()["request"]["id"]
     keys = object_keys(storage)
-    real_audit = promotion._audit
 
     # The commit lands but its acknowledgement is lost.
-    def commit_then_lose_connection(db, admin_, outcome, rid_, **details):
-        real_audit(db, admin_, outcome, rid_, **details)
-        if outcome is AuditOutcome.SUCCESS:
-            real_commit = db.commit
+    class LostAck(Session):
+        def commit(self):
+            super().commit()
+            raise OperationalError("COMMIT", None, Exception("synthetic lost acknowledgement"))
 
-            def commit():
-                db.commit = real_commit
-                real_commit()
-                raise OperationalError("COMMIT", None, Exception("synthetic lost acknowledgement"))
-            db.commit = commit
-
-    monkeypatch.setattr(promotion, "_audit", commit_then_lose_connection)
+    monkeypatch.setattr(review_approval, "Session", LostAck)
     response = approve(admin, api, rid)
     assert (response.status_code, response.json()) == (503, {"error": "approval_outcome_uncertain"})
-    monkeypatch.setattr(promotion, "_audit", real_audit)
+    monkeypatch.setattr(review_approval, "Session", Session)
     assert common_count(api) == 1 and api.scalar("SELECT status FROM review_requests") == "approved"
     kept = api.scalar("SELECT storage_key FROM source_files WHERE file_source='review_approval'")
     assert object_keys(storage) == keys | {kept} and storage.open(kept).read() == A_BODY
     assert approve(admin, api, rid).json() == {"error": "review_request_closed"}  # a retry adds nothing
 
-    # The database cannot even say whether the commit happened: the copy stays for the sweep.
+    # The connection dies before any commit: nothing is committed, but the
+    # rollback cannot be confirmed, so the copy stays for the orphan sweep.
+    # (Legacy promotion answered "uncertain" from a failed SELECT; the runtime
+    # outcome knows commit never started, so it is approval_unavailable.)
     rid2 = submit(a, ids_a).json()["request"]["id"]
 
-    def audit_and_db_down(db, admin_, outcome, rid_, **details):
-        if outcome is AuditOutcome.SUCCESS:
-            def down(*args, **kwargs):
-                raise OperationalError("SELECT", None, Exception("synthetic DB down"))
-            db.scalar = down
-            raise OperationalError("INSERT audit_events", None, Exception("synthetic DB down"))
-        real_audit(db, admin_, outcome, rid_, **details)
+    class Down(Session):
+        down = False
 
-    monkeypatch.setattr(promotion, "_audit", audit_and_db_down)
+        def flush(self, *args, **kwargs):
+            if any(isinstance(o, AccessRights) for o in self.new):
+                Down.down = True
+                raise OperationalError("INSERT access_rights", None, Exception("synthetic DB down"))
+            return super().flush(*args, **kwargs)
+
+        def rollback(self):
+            if Down.down:
+                Down.down = False
+                super().invalidate()
+                raise OperationalError("ROLLBACK", None, Exception("synthetic DB down"))
+            return super().rollback()
+
+    monkeypatch.setattr(review_approval, "Session", Down)
     response = approve(admin, api, rid2)
-    assert (response.status_code, response.json()) == (503, {"error": "approval_outcome_uncertain"})
-    monkeypatch.setattr(promotion, "_audit", real_audit)
+    assert (response.status_code, response.json()) == (503, {"error": "approval_unavailable"})
+    monkeypatch.setattr(review_approval, "Session", Session)
     assert common_count(api) == 1
     orphans = object_keys(storage) - keys - {kept}
     assert len(orphans) == 1

@@ -31,7 +31,7 @@ from app.identity.login import login
 from app.models import ReviewRequest, SourceFile, UserSession
 from app.models.enums import AuditOutcome, RevocationReason, RightsAudience
 from app.storage import get_storage
-from tests.resource_fixtures import source, common_copy, BODY, SHA
+from tests.resource_fixtures import source, common_copy, runtime_approve, BODY, SHA
 from tests.test_auth_safety_foundation import NOW
 from tests.test_c2c1_bootstrap import installation
 from tests.test_c2c2_invitations import world, issue, accept, PASSWORD, EMAIL
@@ -367,11 +367,9 @@ def test_audit_outcome_independent_teardown_no_retry_bytes_or_delete(downloads,m
 
 def close_review(b, ending):
     if ending == 'approved':
-        rights=promotion.RecordedRights('synthetic approval','synthetic author',None,None,'synthetic permission',
-            NOW.date(),RightsAudience.INSTANCE_USERS,True,False,False,None)
-        with Session(b.w.engine) as db:
-            promotion.approve(db,boundary.Principal(b.w.uid,'admin',b.w.actor.session_id,'admin@example.test',None),
-                b.storage,b.review.request,SHA,rights,NOW)
+        # C2d-5b runtime approval: real proofs/copy/journal on the isolated MinIO.
+        runtime_approve(b.w,b.review.request,b.storage,title='synthetic approval',source='synthetic author',
+            evidence='synthetic permission',download=True,search=False)
     elif ending != 'closed_by_recovery':
         close_journaled(b.w.engine,b.review.request,how='withdraw' if ending=='withdrawn' else 'reject')
     else:

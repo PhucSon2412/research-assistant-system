@@ -21,7 +21,7 @@ rejection note, recorded evidence, titles, file bytes or tokens.
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -31,10 +31,10 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_clock, get_db, get_now, get_principal, require_admin, require_trusted_origin
+from app.api.deps import get_clock, get_db, get_principal, require_admin, require_trusted_origin
 from app.api.errors import ApiError
 from app.api.review_publication_reads import review_publication_json
-from app.api import original_downloads, review_writes
+from app.api import original_downloads, review_approval, review_writes
 from app.audit import record_event
 from app.authz import (Principal, m2a_private_derivatives_clause, review_grant_clause,
                       review_history_admin_clause)
@@ -44,7 +44,6 @@ from app.models.enums import AuditActorType, AuditOutcome, ReviewRejectReason, R
 from app.models.review import (DECLARED_TEXT_MAX_CHARS, DECLARED_URL_MAX_CHARS, REJECTION_NOTE_MAX_CHARS,
                                WITHDRAWN_BY_REQUESTER)
 from app.models.rights import RIGHTS_TEXT_MAX_CHARS, RIGHTS_URL_MAX_CHARS, SCOPE_CONDITIONS_MAX_CHARS
-from app.promotion import RecordedRights, approve
 from app.storage import OriginalStorage, get_storage
 
 router = APIRouter(prefix="/review-requests", tags=["review"])
@@ -147,6 +146,14 @@ class ApproveInput(BaseModel):
     evidence_note: str | None = Field(default=None, max_length=RIGHTS_TEXT_MAX_CHARS)
     checked_on: date
     scope: ScopeInput
+
+    @field_validator("confirm_verified", mode="before")
+    @classmethod
+    def _confirmed(cls, value):
+        # Only an explicit JSON true; never false/null/1/"true".
+        if value is not True:
+            raise ValueError("explicit confirmation required")
+        return value
 
     @field_validator("title", "verified_source")
     @classmethod
@@ -412,27 +419,8 @@ def admin_reject(request_id: str, body: RejectInput, request: Request,
 
 
 @admin_router.post("/{request_id}/approve", dependencies=[Depends(require_trusted_origin)])
-def admin_approve(
-    request_id: str,
-    body: ApproveInput,
-    admin: Principal = Depends(require_admin),
-    db: Session = Depends(get_db),
-    now: datetime = Depends(get_now),
-    storage: OriginalStorage = Depends(_storage),
-) -> dict:
-    rid = _parse_id(request_id)
-    if body.license_url is None and body.evidence_note is None:
-        raise ApiError(422, "rights_evidence_required")
-    if body.scope.external_processing and not body.scope.fulltext_search:
-        raise ApiError(422, "rights_scope_inconsistent")
-    # One day of slack for an Admin whose local date is ahead of UTC, as in the DB CHECK.
-    if body.checked_on > now.date() + timedelta(days=1):
-        raise ApiError(422, "checked_on_in_future")
-    rights = RecordedRights(
-        title=body.title, verified_source=body.verified_source, verified_source_url=body.verified_source_url,
-        license_url=body.license_url, evidence_note=body.evidence_note, checked_on=body.checked_on,
-        audience=body.scope.audience, permits_original_download=body.scope.original_download,
-        permits_fulltext_search=body.scope.fulltext_search,
-        permits_external_processing=body.scope.external_processing, scope_conditions=body.scope.conditions)
-    done = approve(db, admin, storage, rid, body.file_checksum_sha256, rights, now)
-    return {"request": _admin_out(done.request, None, done.item.id)}
+async def admin_approve(request_id: str, body: ApproveInput, request: Request,
+                        admin: Principal = Depends(require_admin), settings: Settings = Depends(get_settings),
+                        clock=Depends(get_clock), storage: OriginalStorage = Depends(_storage)) -> dict:
+    # C2d-5b runtime: proofs, unlocked copy and acceptance own their Sessions.
+    return await review_approval.receive(request, admin, request_id, body, clock, settings, storage)

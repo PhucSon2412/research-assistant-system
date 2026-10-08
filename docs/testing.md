@@ -1,10 +1,30 @@
 # Chiến lược kiểm thử
 
+## C2d-5b — sửa P2 PR #47
+
+18 regression teardown mới: trên code cũ 10 fail đúng lỗi (8 HTTP 500, 2 rò connection), sau sửa 22/22 (gồm 4 ca outcome cũ cùng `-k`). Selection sau sửa 1.727/1.727 (approval 299 gồm Chrome, writers 220, reads-json 325, reads-originals 330, resources 553), collect 3.731, not-run 2.004; 12/12 đối chứng. Auth/web không chạy lại (không đổi). [Handoff](c2d5b-review-approval-original-copy.md#sửa-p2-review-pr-47), [inventory `p2_fix`](c2d5b-test-inventory.json).
+
+## Review độc lập PR #47
+
+Head `bac3739`, code `b7ba608`: selection **281/281 API**, web **62/62**, typecheck/build đạt. Regression ngoài repo **4 fail đúng P2 / 2 control pass** chứng minh lỗi teardown proof đầu trả 500 thay JSON 503; không có setup error/skip. [Report](reviews/pr47-c2d5b-review-approval-original-copy.md) ghi source hash, JUnit, selection/not-run, Chrome proxy, artifact agent 2.188 và cleanup riêng. Chưa merge, safety pending tới C4; không cộng lịch sử hoặc coi suite xanh hiện có đã phủ P2.
+
+## C2d-5b — kiểm chứng theo source riêng
+
+[Handoff](c2d5b-review-approval-original-copy.md#kiểm-chứng) và [inventory](c2d5b-test-inventory.json) ghi collect/selection/JUnit unique/not-run, hash trước/sau, preparation và đối chứng guard. Approve runtime thật trên PostgreSQL/MinIO/journal cô lập, Conda `ras`, chặn HTTP ngoài; Chrome qua Next proxy thật; HTTP pending không patch. Suite cuối **2.188/2.188**, collect **3.713**, not-run **1.525**; web **62/62**. Không cộng lịch sử PR #46 (234/58 reviewer, 1.371 agent). Safety pending tới C4.
+
+## C2d-5b — mốc giao trước triển khai (lịch sử)
+
+[Task approve/copy](tasks/m6c2b2c2d5b-review-approval-original-copy.md#7-kiểm-chứng-và-hoàn-thành) yêu cầu runtime/MinIO thật, exact approved/common/right SQL binding trước append, proof trước và sau copy/commit, clock/role/CSRF, cancel/slot/thread/outcome retention, race/restore/proxy/Chrome và pending HTTP không patch. Lượt giao chưa chạy API/web/DB. PR #46 merged `8ff5b4e`; số 234/58 reviewer và 1.371 agent giữ nguồn riêng, không cộng vào task mới. Safety pending tới C4.
+
+## Review độc lập PR #46
+
+Head `7938153`, code `1666273`: **234/234 API** reviewer (233 writer/migration/contract/ORM + 1 Chrome qua proxy), **58/58 web**, typecheck/build đạt. 0 fail/error/skip, 273 hash reviewer trước/sau không đổi; 1.371 JUnit và 272 hash/7 mutant artifact agent đối chiếu riêng. [Report](reviews/pr46-c2d5a-review-json-writers.md) ghi selection, not-run, cleanup và giới hạn. Không phát hiện điểm chặn merge scope ba POST; PR OPEN tại lúc review, sau đó merge `8ff5b4e`; chưa rerun tại merge, safety pending tới C4.
+
 ## C2d-5a — kiểm chứng theo source riêng
 
 [Handoff](c2d5a-review-json-writers.md) và [inventory](c2d5a-test-inventory.json) ghi collect/selection/JUnit unique/not-run, hash trước/sau, preparation failures và đối chứng guard riêng. Runtime thật ba POST; fixture original chỉ còn privileged approve/publish/revoke legacy. Scoped cutover chỉ fixture business, HTTP pending không patch. PostgreSQL/MinIO/journal riêng, Conda `ras`, chặn external HTTP; Chrome/Next proxy thật. Không cộng lịch sử PR #45, không mở safety pending/C4.
 
-## C2d-5a đã giao, chưa kiểm
+## C2d-5a — mốc giao trước triển khai (lịch sử)
 
 [Task ba review JSON writer](tasks/m6c2b2c2d5a-review-json-writers.md#6-kiểm-chứng-cần-có) yêu cầu runtime thật cho cả submit/withdraw/reject; routine/SQL binding trước append, exact pending closure gate, actor/clock và outcome độc lập teardown, proof mới và proxy. Journal fault/restore, race cùng GET/download và migration/roles có evidence riêng; scoped cutover chỉ fixture, pending HTTP không patch. PR #45 đã merge `070cb37`, các số 991/350/57 dưới đây giữ source lịch sử. Lượt giao không chạy API/web; test/inventory mới do coding agent tạo, safety pending tới C4.
 

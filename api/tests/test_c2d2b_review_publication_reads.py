@@ -25,7 +25,7 @@ from app.main import app
 from app.models import DeletionTombstone, LibraryItem, ReviewRequest, UserSession
 from app.models.enums import RevocationReason, RevokedMetadataField, RightsAudience
 from app.review_closing import commit_close
-from tests.resource_fixtures import source, common_copy, MemoryOriginals as BaseMemoryOriginals, SHA
+from tests.resource_fixtures import source, common_copy, runtime_approve, MemoryOriginals as BaseMemoryOriginals, SHA
 from tests.test_c2c1_bootstrap import installation
 from tests.test_c2c2_invitations import world, issue, accept, PASSWORD, EMAIL
 from tests.test_c2d1_final_caller import browser, mutate, close, wait_for
@@ -222,12 +222,9 @@ def test_exact_review_grant_invalid_thin_history_keeps_workflow_count(reads, bad
 
 
 def approve_request(b, *, db=None):
-    rights = promotion.RecordedRights("approved common", "synthetic permission", None, None, "synthetic evidence", NOW.date(),
-                                     RightsAudience.INSTANCE_USERS, False, True, True, None)
-    if db is not None:
-        return promotion.approve(db, b.copy.admin, MemoryOriginals(b.ids), b.ids.request, SHA, rights, NOW)
-    with Session(b.w.engine) as session:
-        return promotion.approve(session, b.copy.admin, MemoryOriginals(b.ids), b.ids.request, SHA, rights, NOW)
+    # C2d-5b: approval is runtime only (own Sessions/proofs); a caller Session is never shared.
+    return runtime_approve(b.w, b.ids.request, MemoryOriginals(b.ids), title="approved common",
+                           source="synthetic permission", evidence="synthetic evidence", search=True, provider=True)
 
 
 def end_review(b, how, db=None):
@@ -328,12 +325,14 @@ def test_common_flags_separate_real_gates(reads, download, search, provider, ind
     assert "storage_key" not in r.text and "COMMON-TEXT" not in r.text
 
 
-def writer_wait(w):
+def writer_wait(w, approval=False):
     deadline = time.monotonic() + 10
     with w.engine.connect() as observer:
         while time.monotonic() < deadline:
+            # Runtime approval (C2d-5b) owns its Sessions, so it carries no label: any writer row wait.
             if observer.scalar(text("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database()"
-                " AND application_name='c2d2b_writer' AND wait_event='transactionid')")):
+                " AND (application_name='c2d2b_writer' OR :approval) AND wait_event='transactionid')"),
+                {"approval": approval}):
                 return
             observer.rollback()
             threading.Event().wait(.005)
@@ -366,7 +365,7 @@ def test_review_request_item_journal_order_both_winners(reads, monkeypatch, how,
             assert entered.wait(15)
             writer = pool.submit(write)
             try:
-                writer_wait(b.w)
+                writer_wait(b.w, approval=how == "approve")
                 assert not writer.done()
             finally:
                 release.set()
@@ -374,14 +373,16 @@ def test_review_request_item_journal_order_both_winners(reads, monkeypatch, how,
             writer.result(20)
             assert r.status_code == 200 and r.json()["request"]["review_available"] is True
         elif how == "approve":
-            # Approval deliberately rolls back its initial metadata transaction
-            # before copy I/O. Pause only AFTER its real request/item locks.
-            record = recovery.record_review_closure
-            def hold_close(*args, **kw):
-                entered.set()
-                assert release.wait(15)
-                return record(*args, **kw)
-            monkeypatch.setattr(recovery, "record_review_closure", hold_close)
+            # Runtime approval proves and copies without locks. Pause only AFTER
+            # its real request UPDATE/private item SHARE and DML, before journal.
+            from app.api import review_approval, review_writes
+            gate = review_writes._gate
+            def hold_close(db, settings, pending=None):
+                if isinstance(pending, review_approval.Approval):
+                    entered.set()
+                    assert release.wait(15)
+                return gate(db, settings, pending)
+            monkeypatch.setattr(review_writes, "_gate", hold_close)
             writer = pool.submit(write)
             assert entered.wait(15)
             reader = pool.submit(b.client.get, b.path("admin_get"))

@@ -1,5 +1,43 @@
 # Nhật ký quyết định
 
+## Sửa P2 review PR #47 (2026-10-08)
+
+Agent sửa đúng P2: helper `_short` sở hữu Session ngắn (proof đầu/giữa, caller-denial, response, audit từ chối), thử cả rollback và close, invalidate khi lỗi và dừng bằng `ApiError` có kiểm soát; `attempt` bọc phase đầu. Không đổi `0041`, grants, binding, lock order, outcome acceptance/retention hay proof response mới. Lựa chọn triển khai scoped cho PR này; safety pending tới C4. [Chi tiết kiểm chứng](c2d5b-review-approval-original-copy.md#sửa-p2-review-pr-47).
+
+## Review PR #47 — C2d-5b (2026-10-07)
+
+Chưa merge: một P2 được tái hiện ở proof đầu/malformed caller-denial, lỗi rollback/close thoát thành HTTP 500. [Review độc lập và prompt sửa](reviews/pr47-c2d5b-review-approval-original-copy.md) tách selection 281/281 + 4 fail đúng lỗi / 2 control pass và 62 web reviewer khỏi artifact 2.188 của agent. Reviewer chỉ sửa docs/count placeholder; không đổi thiết kế, code, migration/grants hoặc safety pending tới C4.
+
+## Triển khai boundary C2d-5b (2026-10-07)
+
+Theo [task C2d-5b](tasks/m6c2b2c2d5b-review-approval-original-copy.md) và mục giao bên dưới, agent chọn module riêng `api/review_approval.py` cho đúng POST approve; không chuyển writer khác. Base `8ff5b4e`, head source trước sửa `0040`, thêm migration `0041`.
+
+- **Routine riêng thay vì mở `0040`:** `ras_auth_review_approval_mirror/confirm` chỉ nhận `approved/approved_by_admin`; `0040` withdraw/reject giữ nguyên ACL/thân hàm. Rationale: domain approval cần thêm coupling common/rights mà withdraw/reject không có.
+- **Binding hàng common mới bằng `xmin`:** item/version/file/rights phải có `xmin` bằng xid của chính transaction (PostgreSQL mint, không nhận GUC/boolean/UUID). Không thêm cột vào bảng nghiệp vụ, không đổi ORM/schema bảng. Hệ quả: acceptance không dùng savepoint (subtransaction fail closed). Python kiểm cùng ràng buộc bằng SQL độc lập.
+- **Outcome:** commit exception luôn `approval_outcome_uncertain` và giữ object; xóa key chỉ khi chưa acceptance hoặc rollback xác nhận trước `commit_started`, sau khi executor settled. Không SELECT/replay để suy commit.
+- **Audit từ chối:** thay `_refuse` (commit bằng principal cũ) bằng writer best-effort riêng User → audit flush → journal exclusive → actor; chỉ ID/mã lý do, lỗi bị nuốt.
+- **Lỗi không phải ApiError** sau known commit → `503 approval_response_unavailable` (trước là 500 nếu ngoại lệ thoát khỏi response).
+- **Config đề xuất cần đo:** pool copy 2, deadline quan sát 90 s, proxy approve 120 s (1–300, ≥ timeout thường); không SLO.
+- **Test legacy:** `promotion.approve` bị bỏ; fixture `common_copy`, race C2d-2b/C2d-4c/C2d-5a và `test_review_approval.py` chuyển sang approve runtime với cùng bất biến; một kỳ vọng đổi có lý do: rollback không xác nhận trước commit trả `approval_unavailable` (outcome biết chưa commit) thay vì `uncertain`, object vẫn giữ cho reconcile.
+
+Đây là lựa chọn scoped của orchestrator/agent theo ủy quyền cho PR này, không là quyết định trực tiếp mới của chủ dự án hay luật kiến trúc vĩnh viễn. [Handoff](c2d5b-review-approval-original-copy.md), [inventory](c2d5b-test-inventory.json). Publish/revoke/index/provider/C3/C4 riêng; safety pending tới C4.
+
+## Giao C2d-5b sau merge PR #46 (2026-10-07)
+
+Git fetch/GitHub CLI xác minh PR #46 MERGED `8ff5b4ed5f643a4618f70b73550cdcce465181ab`, chứa head `7938153`/code `1666273`; merge tree giống head PR. AST graph mã nguồn có một head `0040`, không query revision DB dev. Review 234 API/58 web và artifact 1.371 giữ theo source trước merge, không là pass mới.
+
+Theo ủy quyền thiết kế của chủ dự án, [task C2d-5b](tasks/m6c2b2c2d5b-review-approval-original-copy.md) chuyển đúng POST approve/copy. Chọn attempt own key/spool/slot/executor/outcome, proof ngắn request → private item → journal trước I/O, writer Admin User → request → item → flush approved/common/rights → exclusive journal, proof thin response mới sau known commit. Storage/hash/delete không giữ connection/locks; uncertain hoặc known commit không xóa copy/dựng success từ replay/SELECT.
+
+Cho phép migration mới sau head (dự kiến `0041`) để runtime approval mirror/confirm hẹp, ưu tiên routine riêng giữ `0040` withdraw/reject unchanged. Pending approved closure phải bind đúng transaction/private tuple/actor/time và common/right coupling; force constraints trước append. Append/fsync lỗi chỉ commit positive approval + mirror false khi scalar actor/resource/clock còn hợp lệ cuối; hết TTL không được che bằng nhánh journal failure. Recovery chỉ đóng grant khi snapshot thiếu approval, không dựng common/rights/receipt.
+
+Giá trị thử scoped, **đề xuất cần đo, không SLO**: copy pool riêng 2 mỗi process, copy observation deadline 90 s; exact POST approve proxy 120 s có config validation, route khác không đổi. SDK từng thao tác vẫn có timeout; cancellation/deadline không giết thread hoặc chứng minh handler dừng. Attempt giữ ownership tới thread settled, UI không auto retry và phải diễn đạt outcome chưa xác định khi mất response. Không chọn production routing/cutover/storage journal trong task này.
+
+Lượt giao chỉ khảo sát Git/source và viết docs/caller map; không API/web/DB/MinIO/provider run hoặc tác động dev/.env. Quyết định scoped của orchestrator theo ủy quyền, không là quyết định trực tiếp mới của chủ dự án hay bất biến kiến trúc. Giữ toàn bộ docs review/giao task chưa commit. Approval chưa triển khai, publication/index/provider/C3/C4 riêng, safety pending tới C4.
+
+## Review PR #46 — C2d-5a (2026-10-07)
+
+Không phát hiện điểm chặn merge scope ba POST tại `7938153`; [review độc lập](reviews/pr46-c2d5a-review-json-writers.md) tách 234 API/58 web reviewer khỏi artifact 1.371 của agent. PR OPEN tại lúc review, sau đó merge `8ff5b4e`; chưa rerun tại merge, không mở safety pending tới C4 hoặc coi approval/provider đã chuyển. Chỉ bổ sung docs review và làm rõ nhãn lịch sử, không đổi thiết kế/quyền/migration.
+
 ## Triển khai boundary C2d-5a (2026-10-07)
 
 Theo hợp đồng [task C2d-5a](tasks/m6c2b2c2d5a-review-json-writers.md), agent chọn

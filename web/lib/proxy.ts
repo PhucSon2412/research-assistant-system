@@ -21,10 +21,14 @@ const PROVIDER_ROUTES = new Set(["POST /search", "POST /rag/ask"]);
 
 export const DEFAULT_TIMEOUT_SECONDS = 15;
 export const DEFAULT_PROVIDER_TIMEOUT_SECONDS = 120;
+// C2d-5b: only the exact Admin approve POST copies and verifies an original
+// before answering. Initial value to measure (not an SLO); other routes keep
+// their timeout. A proxy timeout never proves the approval was not saved.
+export const DEFAULT_REVIEW_APPROVAL_TIMEOUT_SECONDS = 120;
 // undici (Node fetch) aborts on its own after 300 s without headers or body.
 export const MAX_TIMEOUT_SECONDS = 300;
 
-export type ProxyConfig = { base: string; timeoutMs: number; providerTimeoutMs: number };
+export type ProxyConfig = { base: string; timeoutMs: number; providerTimeoutMs: number; approvalTimeoutMs: number };
 
 function seconds(raw: string | undefined, fallback: number): number | null {
   if (raw === undefined || raw.trim() === "") return fallback;
@@ -38,11 +42,21 @@ export function loadProxyConfig(env: Record<string, string | undefined>): ProxyC
   const base = env.API_INTERNAL_URL;
   const timeout = seconds(env.WEB_PROXY_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS);
   const provider = seconds(env.WEB_PROXY_PROVIDER_TIMEOUT_SECONDS, DEFAULT_PROVIDER_TIMEOUT_SECONDS);
-  if (!base || timeout === null || provider === null || provider < timeout) return null;
-  return { base: base.replace(/\/+$/, ""), timeoutMs: timeout * 1000, providerTimeoutMs: provider * 1000 };
+  const approval = seconds(env.WEB_PROXY_REVIEW_APPROVAL_TIMEOUT_SECONDS, DEFAULT_REVIEW_APPROVAL_TIMEOUT_SECONDS);
+  if (!base || timeout === null || provider === null || provider < timeout || approval === null
+    || approval < timeout) return null;
+  return { base: base.replace(/\/+$/, ""), timeoutMs: timeout * 1000, providerTimeoutMs: provider * 1000,
+    approvalTimeoutMs: approval * 1000 };
+}
+
+// Exactly POST admin/review-requests/<one segment>/approve; no prefix match.
+function isReviewApproval(method: string, path: string[]): boolean {
+  return method === "POST" && path.length === 4 && path[0] === "admin" && path[1] === "review-requests"
+    && path[3] === "approve";
 }
 
 export function timeoutFor(method: string, path: string[], config: ProxyConfig): number {
+  if (isReviewApproval(method, path)) return config.approvalTimeoutMs;
   return PROVIDER_ROUTES.has(`${method} /${path.join("/")}`) ? config.providerTimeoutMs : config.timeoutMs;
 }
 

@@ -745,28 +745,21 @@ def test_runtime_closure_races_get_history_and_original(writers,monkeypatch,read
 
 
 @pytest.mark.parametrize('first',('approve','withdraw'))
-def test_withdraw_races_legacy_approval_without_moving_approval_scope(writers,monkeypatch,first):
-    from app import promotion
-    from app.models.enums import RightsAudience
-    from tests.test_c2d2b_review_publication_reads import MemoryOriginals as ApprovalStorage
+def test_withdraw_races_runtime_approval_both_orders(writers,monkeypatch,first):
+    # C2d-5b moved approval to runtime; the closure race keeps one journaled close.
+    from app.api import review_approval
+    from tests.resource_fixtures import runtime_approve
     b=writers;opened(b);entered=threading.Event();release=threading.Event()
     real_gate=boundary._gate
-    storage=ApprovalStorage(b.own)
-    rights=promotion.RecordedRights('Synthetic common','Synthetic test author',None,None,'Test permission',NOW.date(),RightsAudience.INSTANCE_USERS,False,False,False,None)
-    def gate(*a,**kw):
-        if first=='withdraw' and not entered.is_set():entered.set();assert release.wait(15)
-        return real_gate(*a,**kw)
+    def gate(db,settings,pending=None):
+        mine=isinstance(pending,review_approval.Approval) if first=='approve' else isinstance(pending,boundary.Closure)
+        if mine and not entered.is_set():entered.set();assert release.wait(15)
+        return real_gate(db,settings,pending)
     monkeypatch.setattr(boundary,'_gate',gate)
+    storage=MemoryOriginals(b.own)
     def approve():
-        with Session(b.w.engine,expire_on_commit=False) as db:
-            real=db.execute
-            def execute(stmt,*a,**kw):
-                out=real(stmt,*a,**kw)
-                if first=='approve' and 'FOR UPDATE' in str(stmt) and not entered.is_set():entered.set();assert release.wait(15)
-                return out
-            db.execute=execute
-            try:return promotion.approve(db,b.admin,storage,b.rid,SHA,rights,NOW).request.status
-            except ApiError as e:return e.code
+        try:return runtime_approve(b.w,b.rid,storage)['request']['status']
+        except ApiError as e:return e.code
     def withdraw():
         with Session(b.w.runtime) as db:
             try:return direct(b,'withdraw',db,boundary.Outcome())['request']['status']

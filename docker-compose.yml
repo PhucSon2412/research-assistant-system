@@ -245,6 +245,8 @@ services:
       # above the API's embedding + generation timeouts; see docs/dev-setup.md.
       WEB_PROXY_TIMEOUT_SECONDS: ${WEB_PROXY_TIMEOUT_SECONDS:-15}
       WEB_PROXY_PROVIDER_TIMEOUT_SECONDS: ${WEB_PROXY_PROVIDER_TIMEOUT_SECONDS:-120}
+      # Exact Admin approve POST only (copy + verify); never below the default above.
+      WEB_PROXY_REVIEW_APPROVAL_TIMEOUT_SECONDS: ${WEB_PROXY_REVIEW_APPROVAL_TIMEOUT_SECONDS:-120}
     ports:
       - "127.0.0.1:${WEB_HOST_PORT:-3000}:3000"
     depends_on:

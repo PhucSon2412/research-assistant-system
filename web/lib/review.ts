@@ -236,6 +236,18 @@ export function makeApproveBody(form: ApproveForm) {
   };
 }
 
+// C2d-5b: a lost/timed-out/cut-off approve response says nothing about whether the
+// approval was saved. The page never re-sends the POST; it asks to reload and check.
+export const APPROVAL_TRANSPORT_CODES = new Set(["api_timeout", "api_unreachable", "api_response_incomplete",
+  "http_error"]);
+export const APPROVAL_OUTCOME_UNKNOWN = "Không xác định được kết quả phê duyệt: phê duyệt có thể đã được lưu. "
+  + "Tải lại trang để kiểm tra trạng thái yêu cầu; không tự gửi lại phê duyệt.";
+
+// `code` is the API/proxy error code, or null when the browser got no response at all.
+export function approvalOutcomeUnknown(code: string | null): boolean {
+  return code === null || APPROVAL_TRANSPORT_CODES.has(code);
+}
+
 export function fileChoiceLabel(file: FileChoice, versions: VersionInfo[]): string {
   const version = versions.find((v) => v.id === file.version_id);
   return `Version ${version?.version_label ?? "(không nhãn)"} · ${file.filename ?? "file gốc"} · ${file.id}`;

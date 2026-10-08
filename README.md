@@ -1,6 +1,16 @@
 # Research Assistant System
 
-**C2d-5a đã triển khai trên nhánh review:** [ba JSON writer review](docs/c2d5a-review-json-writers.md) · [inventory](docs/c2d5a-test-inventory.json). Runtime thật cho submit/withdraw/reject, migration `0040`, pending closure exact binding, actor/clock trước commit và proof response mới. Approval/publication/provider/C3/C4 riêng, **safety pending tới C4**. Kết quả cuối theo source trong inventory; không cộng số lịch sử PR #45.
+**Sửa P2 PR #47 (chưa merge):** proof/caller-denial/response dùng Session ngắn có release kiểm soát; lỗi teardown → JSON 503, không 500, không tiếp tục copy. Regression 10 fail trước sửa → 22/22 sau sửa; selection **1.727/1.727**, 12/12 đối chứng. [Chi tiết](docs/c2d5b-review-approval-original-copy.md#sửa-p2-review-pr-47). Safety pending tới C4.
+
+**Review PR #47: cần sửa một P2 trước merge.** Proof đầu/caller-denial có lỗi teardown thoát thành HTTP 500; reviewer tái hiện 4 fail đúng lỗi / 2 control pass. Selection độc lập 281/281, web 62/62 và typecheck/build đạt; safety pending tới C4. [Report và prompt sửa](docs/reviews/pr47-c2d5b-review-approval-original-copy.md).
+
+**C2d-5b đã triển khai trên nhánh review, chưa merge:** [phê duyệt review và copy original](docs/c2d5b-review-approval-original-copy.md) · [inventory](docs/c2d5b-test-inventory.json). Đúng `POST /admin/review-requests/{request_id}/approve` chạy runtime thật: proof ngắn trước/giữa I/O, copy checksum/readback ngoài DB lock do attempt sở hữu, approved/common/rights/audit/journal cùng transaction qua routine `0041` (binding xmin của chính transaction), commit uncertain giữ object/không success/retry và response thin proof mới. Suite của agent **2.188/2.188 API**, web **62/62**; publish/revoke/index/provider/C3/C4 riêng, **safety pending tới C4**.
+
+**C2d-5b đã giao sau merge PR #46 `8ff5b4e`:** [prompt phê duyệt và copy original](docs/tasks/m6c2b2c2d5b-review-approval-original-copy.md). Đúng một POST approve: proof ngắn trước/sau I/O, runtime approved closure/common/rights coupling, outcome giữ object khi uncertain và proof thin response mới. Đã triển khai trên nhánh review (mục trên), chưa merge; publish/revoke/index/provider/C3/C4 riêng, **safety pending tới C4**.
+
+**Review PR #46 tại `7938153`: không phát hiện điểm chặn merge trong phạm vi C2d-5a.** Reviewer chạy độc lập **234/234 API** (gồm Chrome proxy thật), **58/58 web**, typecheck/build; artifact 1.371 và 7 mutants của agent đối chiếu riêng. PR OPEN tại lúc review, sau đó merge `8ff5b4e`; chưa rerun tại merge, safety **pending tới C4**. [Report và giới hạn](docs/reviews/pr46-c2d5a-review-json-writers.md).
+
+**C2d-5a đã merge PR #46 `8ff5b4e`:** [ba JSON writer review](docs/c2d5a-review-json-writers.md) · [inventory](docs/c2d5a-test-inventory.json). Runtime thật cho submit/withdraw/reject, migration `0040`, pending closure exact binding, actor/clock trước commit và proof response mới. Approval/publication/provider/C3/C4 riêng, **safety pending tới C4**. Kết quả cuối theo source trong inventory; không cộng số lịch sử PR #45.
 
 **Review PR #45 tại `b23ff82`: không phát hiện điểm chặn merge trong phạm vi C2d-4c.** Reviewer chạy độc lập **350/350 API**, **57/57 web** và typecheck; artifact 991 của agent được đối chiếu riêng. [Report và giới hạn](docs/reviews/pr45-c2d4c-original-downloads.md). PR sau đó đã merge `070cb37`; chưa rerun tại merge, safety **pending tới C4**.
 
