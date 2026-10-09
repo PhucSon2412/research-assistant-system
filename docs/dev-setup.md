@@ -1,4 +1,6 @@
-# Môi trường phát triển và schema (M1a–C2d-4b)
+# Môi trường phát triển và schema (M1a–C2d-5c2)
+
+**Mốc source hiện hành:** PR #49 đã merge `859dfe9`, head migration `0042`; không suy revision DB dev. [C2d-5d1 HTTP index request](tasks/m6c2b2c2d5d1-common-index-request.md) đã giao, chưa triển khai/kiểm và chưa có lệnh chạy mới. Worker/provider tách PR sau; **safety pending tới C4**, readiness dev đóng không phải lý do tự mở cutover. Các lệnh/kết quả dưới đây giữ theo task/source đã ghi.
 
 ## C2d-5c2 cô lập
 

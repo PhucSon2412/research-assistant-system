@@ -1,6 +1,10 @@
 # Research Assistant System
 
-**C2d-5c2 trên nhánh review:** đúng POST revoke qua runtime, migration `0042` với mirror/confirm hẹp bind transaction/tombstone/retention, current Admin/clock, outcome độc lập và response proof mới. Append lỗi giữ false mirror/gate đóng; commit exception luôn unknown, không HTTP replay. [Handoff](docs/c2d5c2-common-revoke.md) · [Inventory kiểm chứng mới](docs/c2d5c2-test-inventory.json). Base PR #48 `1eede17`; common-index/provider/C3/C4 riêng; **safety pending tới C4**.
+**Bước tiếp theo: [C2d-5d1 — tạo/trả job index bản chung qua runtime](docs/tasks/m6c2b2c2d5d1-common-index-request.md), đã giao, chưa triển khai/kiểm.** Base PR #49 đã merge `859dfe9`, source migration `0042`; worker/provider tách PR sau. Safety vẫn pending tới C4.
+
+**Review PR #49 tại `f8dc44c`: không phát hiện điểm chặn merge mới trong phạm vi POST revoke.** Reviewer thực chạy **295/295 API**, **66/66 web**, typecheck/build và hai Chrome qua proxy; artifact **529 API/8 mutant** của agent đối chiếu riêng. Raw lượt observer yếu bị ghi đè được giữ là giới hạn evidence. PR đã merge `859dfe9`; chưa rerun tại merge, source `0042`, **safety pending tới C4**. [Report và giới hạn](docs/reviews/pr49-c2d5c2-common-revoke.md).
+
+**C2d-5c2 đã merge PR #49 `859dfe9`:** đúng POST revoke qua runtime, migration `0042` với mirror/confirm hẹp bind transaction/tombstone/retention, current Admin/clock, outcome độc lập và response proof mới. Append lỗi giữ false mirror/gate đóng; commit exception luôn unknown, không HTTP replay. [Handoff](docs/c2d5c2-common-revoke.md) · [Inventory kiểm chứng](docs/c2d5c2-test-inventory.json). Base PR #48 `1eede17`; common-index/worker/provider/C3/C4 riêng; **safety pending tới C4**.
 
 **Review PR #48 tại `654fbac`: không phát hiện điểm chặn merge mới trong phạm vi POST publish.** Reviewer thực chạy **215 API publication + 3 lượt ca setup (216 unique)**, **64 web**, typecheck/build và Chrome proxy; artifact **2.016 API/7 mutants** của agent kiểm riêng. Setup error và container drift vẫn chưa rõ nguyên nhân, giữ riêng với rerun xanh. PR đã merge `1eede17`; chưa rerun tại merge, **safety pending tới C4**. [Report và giới hạn](docs/reviews/pr48-c2d5c1-common-publish.md).
 

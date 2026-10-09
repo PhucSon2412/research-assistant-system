@@ -1,5 +1,13 @@
 # Chiến lược kiểm thử
 
+## Kế hoạch C2d-5d1 sau merge PR #49
+
+[Task HTTP index request](tasks/m6c2b2c2d5d1-common-index-request.md) **đã giao, chưa triển khai/chưa chạy test**. Kiểm runtime/current Admin/strict confirmation/rights/file/epoch, create/reuse một live job, precommit và response clock, race revoke/job/cleanup/auth, commit uncertain/teardown/cancel, không storage/provider/broker send, web busy/unknown và Chrome qua proxy. PG/MinIO/journal cô lập, role runtime thật, HTTP pending giữ gate thật. Hồi quy worker/cleanup chỉ chứng minh tương thích, không chứng nhận đã chuyển chúng; worker/index/provider dispatch tách C2d-5d2, C3/C4 vẫn riêng. Không cộng số PR #49 vào task mới; source `0042`, không suy revision DB dev.
+
+## Review độc lập PR #49 tại f8dc44c
+
+**Review PR #49 tại `f8dc44c`: không phát hiện điểm chặn merge mới trong phạm vi POST revoke.** Reviewer thực chạy **295/295 API**, **66/66 web**, typecheck/build và hai Chrome qua proxy; artifact **529 API/8 mutant** của agent đối chiếu riêng. Raw lượt observer yếu bị ghi đè được giữ là giới hạn evidence. PR OPEN tại lúc review, sau đó merge `859dfe9`; chưa rerun tại merge, source `0042`, **safety pending tới C4**. Selection/JUnit exact và source hashes được kiểm riêng; 3.801 node không chạy lại trong lượt reviewer. PostgreSQL/MinIO/journal cô lập, HTTP ngoài bị chặn; đã dọn đúng tài nguyên thử, giữ chín container có sẵn. [Phạm vi và evidence](reviews/pr49-c2d5c2-common-revoke.md).
+
 ## C2d-5c2 — kiểm mới theo source riêng
 
 [Handoff](c2d5c2-common-revoke.md) · [Inventory](c2d5c2-test-inventory.json). Runtime PostgreSQL/MinIO/identity/journal cô lập, migration/ORM/ACL, SQL body/retention/xmin/cross-transaction và generic confirm bypass, clock/lock/fsync/teardown/cancel, race revoke/publish/cleanup/worker/auth, current response, cleanup/restore/private và content gate. Installed Chrome qua Next production proxy/socket Uvicorn working tree: busy/two synchronous submits/old original 404/normal 15 s 504 known-commit/unknown không re-POST/expired cookie. Pending HTTP giữ gate production thật; business cutover scoped. Selection/JUnit unique/source hashes/pass/fail/not-run và preparation/mutants ghi chính xác trong inventory; không cộng lịch sử PR #48. Worker/cleanup chỉ kiểm tương thích, không chuyển boundary; safety pending tới C4.
