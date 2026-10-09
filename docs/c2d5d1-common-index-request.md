@@ -1,5 +1,11 @@
 # C2d-5d1: yêu cầu lập chỉ mục bản chung qua runtime
 
+**Mốc sau review:** PR #50 đã merge `03b7985`; kết quả giữ theo source trước merge, không rerun. [C2d-5d2a worker runtime/extraction](tasks/m6c2b2c2d5d2a-worker-runtime-extraction.md) là task tiếp đã giao, chưa triển khai/kiểm; provider/index C2d-5d2b và task background khác còn riêng. Safety pending tới C4.
+
+## Review độc lập tại ff5fa82
+
+**Không phát hiện điểm chặn merge mới trong scope một POST index request.** Reviewer thực chạy **200/200 API** (171 mới + 28 migration/ORM + Chrome), **70/70 web**, typecheck/build; 281 source hashes trước/sau khớp. Artifact 923 API/9 mutant và bốn lỗi baseline được đối chiếu riêng, không tính là reviewer chạy lại. [Report đầy đủ](reviews/pr50-c2d5d1-common-index-request.md). PR đã merge **`03b7985`**; chưa rerun tại merge, source `0042`, **safety pending tới C4**. Bốn ca baseline cần xử lý trước tổng hồi quy/C4; worker/provider vẫn riêng. Số agent bên dưới giữ theo source `e283bc6`, không thành pass mới tại head.
+
 [Task](tasks/m6c2b2c2d5d1-common-index-request.md) · [Inventory](c2d5d1-test-inventory.json) · [Revoke](c2d5c2-common-revoke.md) · [Publish](c2d5c1-common-publish.md) · [Caller map](c2d1-caller-inventory.json)
 
 Base đã fetch/xác minh: `origin/main` = merge PR #49

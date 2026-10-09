@@ -1,5 +1,11 @@
 # Chiến lược kiểm thử
 
+**Kế hoạch mới, chưa có kết quả chạy:** [C2d-5d2a worker runtime/extraction](tasks/m6c2b2c2d5d2a-worker-runtime-extraction.md). Runtime/dispatch/claim/lease/checkpoint, S3/parser ngoài DB locks, pending gate thật, commit uncertain và extraction tới `awaiting_index`; Redis/Celery/PG/MinIO/journal cô lập, không provider. Kiểm theo rủi ro và call graph; không cộng số PR #50 thành pass mới. Bốn lỗi baseline giữ debt tổng hồi quy trước C4.
+
+## Review độc lập PR #50 tại ff5fa82
+
+**200/200 API unique pass**, 0 fail/error/skip: 171 index-request mới + 28 migration/ORM + một Chrome qua Next production proxy/socket API; web **70/70**, typecheck/build đạt. 281 source hashes khớp; reviewer không rerun 4.068 node trong collect 4.268 của agent. Artifact agent **923 pass/9 mutant** và 135 file manifest kiểm riêng, không cộng vào lượt reviewer. Bốn ca baseline fail được đối chiếu log/XML base/head, không chạy lại hoặc coi đã sửa. [Report, evidence và giới hạn](reviews/pr50-c2d5d1-common-index-request.md). PR đã merge `03b7985`; chưa rerun tại merge, source `0042`; safety pending tới C4, worker/provider/C3/C4 riêng. Đã dọn đúng hai container/hai volume thử và credentials, giữ chín container có sẵn ID/image/StartedAt.
+
 ## C2d-5d1 — kiểm theo source `e283bc6`
 
 [Handoff](c2d5d1-common-index-request.md) · [Inventory](c2d5d1-test-inventory.json). PostgreSQL/MinIO/journal cô lập (`58579`/`59579`, label `ras.task=c2d5d1-20261009`), role runtime thật, business cutover scoped; bài HTTP pending giữ gate production thật. Bao phủ ACL/strict input, create/reuse/không reset, clock/actor ở acceptance và response, lock wait thật, race index↔revoke/auth/worker legacy, commit uncertain/teardown/cancel, broker down vẫn còn job DB, và Chrome qua Next proxy (unticked, double submit một POST, reuse, 504 unknown không re-POST, role/session bị thu hồi). Kiểm tại `e283bc6`: **923/923 API unique pass**, 0 fail/error/skip (collect 4.268, **3.341 not-run**, 4 node lỗi có sẵn ở base chạy riêng vẫn fail như base); web **70/70**, typecheck/build; Chrome qua Next proxy; **9/9 mutant** bắt assertion. Nhóm: core 200, revoke 171, publish 192, reads 260, content 89, recovery 11. Lượt content đầu lỗi do runner (`--deselect` sai tiền tố) được giữ riêng, không cộng. Worker/cleanup chỉ kiểm tương thích.

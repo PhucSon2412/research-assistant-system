@@ -1,6 +1,8 @@
-# Môi trường phát triển và schema (M1a–C2d-5c2)
+# Môi trường phát triển và schema (M1a–C2d-5d1)
 
-**Mốc source hiện hành:** PR #49 đã merge `859dfe9`, head migration `0042`; không suy revision DB dev. [C2d-5d1 HTTP index request](c2d5d1-common-index-request.md) đã triển khai trên nhánh review (PR mở); lệnh/kết quả cô lập ở mục dưới. Worker/provider tách PR sau; **safety pending tới C4**, readiness dev đóng không phải lý do tự mở cutover. Các lệnh/kết quả dưới đây giữ theo task/source đã ghi.
+**Kế hoạch C2d-5d2a, chưa chạy:** [prompt worker runtime/extraction](tasks/m6c2b2c2d5d2a-worker-runtime-extraction.md). Compose mặc định còn truyền `POSTGRES_USER` cho API/worker/beat; task sẽ kiểm worker/beat bằng override cô lập với runtime credentials tường minh, không nâng/restart dev hoặc tuyên bố cấu hình mặc định đã cutover. Chưa thêm lệnh override chưa được kiểm; safety pending tới C4.
+
+**Mốc source hiện hành:** PR #50 đã merge `03b7985`, head migration `0042`; không suy revision DB dev. [C2d-5d1 HTTP index request](c2d5d1-common-index-request.md) đã merge; lệnh/kết quả cô lập ở mục dưới. Worker/provider tách PR sau; **safety pending tới C4**, readiness dev đóng không phải lý do tự mở cutover. Các lệnh/kết quả dưới đây giữ theo task/source đã ghi.
 
 ## C2d-5d1 cô lập
 

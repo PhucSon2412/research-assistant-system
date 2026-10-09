@@ -1,6 +1,24 @@
 # Nhật ký quyết định
 
-## Triển khai C2d-5d1 trên nhánh review (2026-10-09)
+## Giao C2d-5d2a sau merge PR #50 (2026-10-09)
+
+**Nguồn:** chủ dự án báo đã merge PR #50 và yêu cầu giao agent tiếp theo; orchestrator chọn phạm vi theo ủy quyền trước đó. GitHub/Git xác minh merge **`03b79855221f3d9279cbe5aa677d6a50db59b5ab`**, head PR `ff5fa82` là ancestor và tree khớp merge; source migration `0042`. Không truy vấn DB dev; số kiểm PR #50 giữ theo source review, không chạy lại tại merge.
+
+[Prompt C2d-5d2a](tasks/m6c2b2c2d5d2a-worker-runtime-extraction.md) đã viết, **chưa triển khai/kiểm**. Tách worker/ingest/index thành: **5d2a runtime + dispatch/claim/validate/extract/chunk tới `awaiting_index` → 5d2b document embedding/index/provider dispatch**. Cleanup/reconcile/discovery background còn legacy, query/rerank/RAG provider, tổng hồi quy C2d và C3/C4 có task riêng. Lý do: claim/lease, quyền khi I/O và outcome provider là những rủi ro khác nhau; không gộp việc cấp job đã merge với toàn bộ pipeline vào một PR.
+
+**Lựa chọn scoped của orchestrator, không phải xác nhận trực tiếp mới của chủ dự án:** dùng role runtime hiện có cho worker/beat qua override/script cô lập có credentials tường minh, provision bên ngoài; mặc định Compose/API integration vẫn thuộc C4. Source Compose hiện truyền `POSTGRES_USER` cho API/worker/beat, nên chạy host fixture runtime không chứng minh container mặc định đã chuyển. Không fallback owner/migrator/recovery trong worker. PR 5d2a không dispatch index states hoặc gọi indexer legacy, ngay cả khi có key/price flag; giữ job chờ cho PR 5d2b, không reset state/attempt/reservation. Đây là giới hạn maintenance có chủ đích trước cutover, không phải sản phẩm đã hoàn tất index.
+
+Job chung kiểm quyền ứng dụng theo đúng file/version/rights/epoch/publication, không phụ thuộc tuổi thọ session Admin tạo job. Private job kiểm owner/status active được chứng minh theo latest head/receipt; disabled/held thì pause, không terminal fail hoặc enable/quarantine recovery. Logout/reset credential không tự hủy background job. Checkpoint writer lấy owner User khi cần → item → job/resources → flush FK/citation/audit → journal exclusive trực tiếp → gate/binding/lease/clock mới → commit; I/O S3/parser/broker ở ngoài connection/locks. `recovery.gate_open` hiện đã gồm integrity/cutover; cần bổ sung proof cùng transaction và sau I/O, không mô tả gate đầu là thiếu hoàn toàn cutover. Commit uncertain dừng attempt, không `_fail`/stage tiếp hoặc suy success bằng SELECT; lượt dispatch sau có thể claim lại durable state theo lease/idempotency.
+
+**Trạng thái/giới hạn:** safety pending tới C4, không đọc `.env`/key, thao tác dev hoặc gọi provider. Bốn lỗi baseline PR #50 giữ debt trước tổng hồi quy/C4; không coi đã sửa hoặc mở quyền runtime để né fixture. Test task mới dùng role/PG/MinIO/journal/Redis/Celery cô lập, fake provider bị chặn, pending gate thật riêng. Chưa có test/code mới trong lượt giao task; [review PR #50](reviews/pr50-c2d5d1-common-index-request.md) và evidence cũ giữ nguyên nguồn.
+
+## Review PR #50 (2026-10-09)
+
+Tại head `ff5fa82` (code/test `e283bc6`, diff sau đó chỉ docs), không phát hiện điểm chặn merge scope C2d-5d1 một POST index request. Reviewer thực chạy 200/200 API unique (171 mới, 28 migration/ORM, một Chrome), web 70/70/typecheck/build; 281 source hashes khớp. Artifact agent 923 API/9 mutant và 135 file manifest kiểm riêng; 299 hash agent khớp worktree, tracked source so Git có chuẩn hóa CRLF. PR đã merge `03b7985`; chưa rerun tại merge, source `0042`, safety pending tới C4. [Report](reviews/pr50-c2d5d1-common-index-request.md).
+
+Bốn ca baseline fail có cùng assertion ở base/head theo evidence agent (reviewer không rerun): common-search corruption dùng connection thiếu quyền `session_replication_role`, readiness đòi 200 khi pending, và fixture common-original nhận revoke 409. Đưa vào tổng hồi quy C2d trước C4; không nới gate đổi kỳ vọng để né lỗi. Mutant item-lock chỉ bắt observer lock wait, không kết quả nghiệp vụ; giữ giới hạn. Worker/ingest/index/provider dispatch chưa chuyển; kế toán/routing/storage/operator/cutover vẫn theo quyết định mở, không được phê duyệt bởi review. Reviewer chỉ bổ sung docs; không dev/`.env`/provider/gate change.
+
+## Triển khai C2d-5d1, đã merge PR #50 (2026-10-09)
 
 [Handoff](c2d5d1-common-index-request.md) · [Inventory](c2d5d1-test-inventory.json). Base merge PR #49 `859dfe9`; docs orchestrator commit nguyên trạng `16eda35`; implementation `e283bc6`. Không migration/grants (runtime đã có DML business), source `0042`.
 
