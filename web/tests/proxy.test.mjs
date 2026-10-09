@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
 import {
-  DEFAULT_PROVIDER_TIMEOUT_SECONDS, DEFAULT_REVIEW_APPROVAL_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS, loadProxyConfig,
+  DEFAULT_PROVIDER_TIMEOUT_SECONDS, DEFAULT_REVIEW_APPROVAL_TIMEOUT_SECONDS, DEFAULT_PUBLICATION_TIMEOUT_SECONDS,
+  DEFAULT_TIMEOUT_SECONDS, loadProxyConfig,
   proxyRequest, timeoutFor,
 } from "../lib/proxy.ts";
 
@@ -162,12 +163,13 @@ test("timeout config: defaults, overrides and invalid values fail closed", () =>
   const base = "http://api:8000";
   assert.deepEqual(loadProxyConfig({ API_INTERNAL_URL: base }),
     { base, timeoutMs: DEFAULT_TIMEOUT_SECONDS * 1000, providerTimeoutMs: DEFAULT_PROVIDER_TIMEOUT_SECONDS * 1000,
-      approvalTimeoutMs: DEFAULT_REVIEW_APPROVAL_TIMEOUT_SECONDS * 1000 });
+      approvalTimeoutMs: DEFAULT_REVIEW_APPROVAL_TIMEOUT_SECONDS * 1000,
+      publicationTimeoutMs: DEFAULT_PUBLICATION_TIMEOUT_SECONDS * 1000 });
   assert.equal(DEFAULT_TIMEOUT_SECONDS, 15);
   assert.equal(DEFAULT_PROVIDER_TIMEOUT_SECONDS, 120);
   assert.deepEqual(loadProxyConfig({ API_INTERNAL_URL: `${base}/`, WEB_PROXY_TIMEOUT_SECONDS: "20",
     WEB_PROXY_PROVIDER_TIMEOUT_SECONDS: " 300 " }), { base, timeoutMs: 20_000, providerTimeoutMs: 300_000,
-      approvalTimeoutMs: 120_000 });
+      approvalTimeoutMs: 120_000, publicationTimeoutMs: 120_000 });
   for (const [timeout, provider] of [["0", "120"], ["abc", "120"], ["15", "301"], ["15", "1.5"],
     ["15", "-5"], ["30", "20"], ["15", "1e2"]]) {
     assert.equal(loadProxyConfig({ API_INTERNAL_URL: base, WEB_PROXY_TIMEOUT_SECONDS: timeout,
@@ -177,7 +179,8 @@ test("timeout config: defaults, overrides and invalid values fail closed", () =>
 });
 
 test("only provider-bound routes get the longer budget", () => {
-  const config = { base: "http://api", timeoutMs: 15_000, providerTimeoutMs: 120_000, approvalTimeoutMs: 90_000 };
+  const config = { base: "http://api", timeoutMs: 15_000, providerTimeoutMs: 120_000, approvalTimeoutMs: 90_000,
+    publicationTimeoutMs: 120_000 };
   assert.equal(timeoutFor("POST", ["rag", "ask"], config), 120_000);
   assert.equal(timeoutFor("POST", ["search"], config), 120_000);
   assert.equal(timeoutFor("GET", ["search", "chunks", "c-1"], config), 15_000);
@@ -201,7 +204,8 @@ test("review approval timeout: default 120 s, validated 1-300 and never below th
 });
 
 test("only the exact Admin approve POST gets the approval budget", () => {
-  const config = { base: "http://api", timeoutMs: 15_000, providerTimeoutMs: 120_000, approvalTimeoutMs: 120_000 };
+  const config = { base: "http://api", timeoutMs: 15_000, providerTimeoutMs: 120_000, approvalTimeoutMs: 120_000,
+    publicationTimeoutMs: 15_000 };
   const id = "0f1e2d3c-0000-4000-8000-000000000001";
   assert.equal(timeoutFor("POST", ["admin", "review-requests", id, "approve"], config), 120_000);
   for (const [method, path] of [

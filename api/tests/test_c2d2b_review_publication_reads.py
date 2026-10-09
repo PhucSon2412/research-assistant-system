@@ -294,8 +294,8 @@ def test_common_state_before_final_requery_history(reads, monkeypatch, how, key)
             calls.append(1)
             if how == "publish":
                 storage = MemoryOriginals(b.copy)
-                with Session(b.w.engine) as db:
-                    publication.publish(db, b.copy.admin, storage, b.copy.item, SHA, NOW)
+                from tests.resource_fixtures import runtime_publish
+                runtime_publish(b.w, b.copy.item, storage)
             else:
                 revoke_copy(b)
         return value

@@ -1,10 +1,20 @@
 # Chiến lược kiểm thử
 
+## C2d-5c1 — kiểm chứng nhánh review
+
+[Handoff](c2d5c1-common-publish.md) · [Inventory](c2d5c1-test-inventory.json). Runtime PostgreSQL/MinIO/identity/journal thật; business cutover scoped, HTTP pending gate thật riêng. Selection bao gồm publish mới/legacy publication/restore, approve/P2, C2d-2b reads, C2d-4c originals và resource suites có fixture publish đổi; revoke/cleanup legacy chỉ là đối thủ/setup có nhãn. Web/typecheck/build và installed Chrome qua Next proxy, hash 16 s/504 known-commit/unknown UI không re-POST. Bảy mutants có mục tiêu fail assertion, gồm proof denial sau storage; khôi phục source trước suite cuối. Exact commands/node/JUnit/source hashes/pass/fail/error/skip/not-run/preparation failures trong inventory; không cộng số PR #47. Không dev/`.env`/provider hay API Compose deployment; safety pending tới C4.
+
+Source code `520ac54`: **2.016/2.016 unique API pass**, 0 fail/error/skip; collect **3.923**, **1.907 not-run**. Nhóm publication 215, approval 295, writers 220, reads-json 325, reads-originals 330, resources 631; union khớp JUnit/selection, 283 hashes trước/sau bằng nhau. Web **64/64**, typecheck/build đạt, **7/7 đối chứng** fail assertion. Lượt writer đầu có 219 pass/1 setup 503 ở bootstrap integrity gate, chưa xác định reason; ca riêng và full group rerun trên DB mới/source không đổi pass, observer chỉ ghi trạng thái gate. Giữ error/lượt chuẩn bị riêng, không dùng rerun xóa lỗi lịch sử.
+
+## Review lại P2 PR #47
+
+Head `78fbe1d`, code `50393d1`: reviewer thực chạy **60/60 API chọn + 6/6 ca tái hiện ngoài repo**, tổng 66 unique pass, 0 fail/error/skip. 279 source hash trước/sau khớp; 18 regression mới đều trong selection. 3.671 node inventory API chưa chạy lại; web/Chrome/typecheck/build/auth và mutants không rerun. [Report](reviews/pr47-c2d5b-review-approval-original-copy.md#review-lại-p2-tại-78fbe1d) đối chiếu riêng artifact 1.727/3.731, 2.004 not-run và 12 mutants của agent; không cộng kết quả lịch sử 2.188/281/62. P2 đã xử lý, không phát hiện điểm chặn merge mới trong scope; PR OPEN, safety pending tới C4. Cleanup reviewer xong, 24 container có sẵn nguyên trạng, không dev/`.env`/provider.
+
 ## C2d-5b — sửa P2 PR #47
 
 18 regression teardown mới: trên code cũ 10 fail đúng lỗi (8 HTTP 500, 2 rò connection), sau sửa 22/22 (gồm 4 ca outcome cũ cùng `-k`). Selection sau sửa 1.727/1.727 (approval 299 gồm Chrome, writers 220, reads-json 325, reads-originals 330, resources 553), collect 3.731, not-run 2.004; 12/12 đối chứng. Auth/web không chạy lại (không đổi). [Handoff](c2d5b-review-approval-original-copy.md#sửa-p2-review-pr-47), [inventory `p2_fix`](c2d5b-test-inventory.json).
 
-## Review độc lập PR #47
+## Review độc lập PR #47 trước sửa (lịch sử)
 
 Head `bac3739`, code `b7ba608`: selection **281/281 API**, web **62/62**, typecheck/build đạt. Regression ngoài repo **4 fail đúng P2 / 2 control pass** chứng minh lỗi teardown proof đầu trả 500 thay JSON 503; không có setup error/skip. [Report](reviews/pr47-c2d5b-review-approval-original-copy.md) ghi source hash, JUnit, selection/not-run, Chrome proxy, artifact agent 2.188 và cleanup riêng. Chưa merge, safety pending tới C4; không cộng lịch sử hoặc coi suite xanh hiện có đã phủ P2.
 

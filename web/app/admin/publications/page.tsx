@@ -12,7 +12,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { api, describeError } from "../../../lib/api";
+import { api, describeError, publicationError } from "../../../lib/api";
 import {
   INDEX_ELIGIBILITY_TEXT, INDEX_EXTERNAL_NOTICE, OBJECT_OUTCOME_TEXT, ORIGINAL_DOWNLOAD_TEXT, PUBLICATION_STATE_TEXT,
   REVOCATION_REASONS, fieldList, makeIndexBody, makePublishBody, makeRevokeBody,
@@ -26,19 +26,25 @@ const STATES: PublicationState[] = ["pending", "listed", "revoked"];
 
 function PublishForm({ copy, onDone }: { copy: CommonCopy; onDone: () => void }) {
   const [confirmed, setConfirmed] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const body = makePublishBody(confirmed, copy.file.checksum_sha256);
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!body) return;
+    if (!body || busy) return;
+    setBusy(true);
     setError(null);
     try {
-      await api(`/admin/common-copies/${encodeURIComponent(copy.id)}/publish`, { method: "POST", body });
+      const result = await api<{ item: CommonCopy }>(`/admin/common-copies/${encodeURIComponent(copy.id)}/publish`,
+        { method: "POST", body });
+      if (!result?.item || result.item.id !== copy.id) throw new Error("publication response incomplete");
       onDone();
     } catch (err) {
-      setError(describeError(err));
+      setError(publicationError(err));
       setConfirmed(false);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -49,14 +55,14 @@ function PublishForm({ copy, onDone }: { copy: CommonCopy; onDone: () => void })
         (<Link href={`/items/${copy.duplicate_published_item_id}`}>xem</Link>); API sẽ từ chối công bố bản này.
         Không tự hợp nhất: thu hồi một bản nếu cần.</p>}
       <label>
-        <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />{" "}
+        <input type="checkbox" checked={confirmed} disabled={busy} onChange={(e) => setConfirmed(e.target.checked)} />{" "}
         Tôi xác nhận công bố <strong>metadata</strong> (tiêu đề, version, URL nguồn) của bản này cho mọi tài khoản.
         Sau khi công bố, file gốc chỉ tải được nếu quyền đã ghi cho phép tải và không kèm điều kiện (API quyết
         định ở mỗi lần tải). Công bố <strong>không</strong> mở toàn văn: tìm kiếm và đoạn trích chỉ mở sau khi lập
         chỉ mục theo quyền đã ghi (hỏi đáp dùng cùng quyền); hệ thống đọc lại object chung và kiểm SHA-256 trước
         khi công bố.
       </label>{" "}
-      <button type="submit" disabled={!body}>Công bố metadata</button>
+      <button type="submit" disabled={!body || busy}>Công bố metadata</button>
     </form>
   );
 }

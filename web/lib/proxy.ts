@@ -25,10 +25,14 @@ export const DEFAULT_PROVIDER_TIMEOUT_SECONDS = 120;
 // before answering. Initial value to measure (not an SLO); other routes keep
 // their timeout. A proxy timeout never proves the approval was not saved.
 export const DEFAULT_REVIEW_APPROVAL_TIMEOUT_SECONDS = 120;
+// C2d-5c1: exact publish POST verifies the common original without DB locks.
+// Starting value to measure, not an SLO or proof of a failed mutation on timeout.
+export const DEFAULT_PUBLICATION_TIMEOUT_SECONDS = 120;
 // undici (Node fetch) aborts on its own after 300 s without headers or body.
 export const MAX_TIMEOUT_SECONDS = 300;
 
-export type ProxyConfig = { base: string; timeoutMs: number; providerTimeoutMs: number; approvalTimeoutMs: number };
+export type ProxyConfig = { base: string; timeoutMs: number; providerTimeoutMs: number; approvalTimeoutMs: number;
+  publicationTimeoutMs: number };
 
 function seconds(raw: string | undefined, fallback: number): number | null {
   if (raw === undefined || raw.trim() === "") return fallback;
@@ -43,10 +47,11 @@ export function loadProxyConfig(env: Record<string, string | undefined>): ProxyC
   const timeout = seconds(env.WEB_PROXY_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS);
   const provider = seconds(env.WEB_PROXY_PROVIDER_TIMEOUT_SECONDS, DEFAULT_PROVIDER_TIMEOUT_SECONDS);
   const approval = seconds(env.WEB_PROXY_REVIEW_APPROVAL_TIMEOUT_SECONDS, DEFAULT_REVIEW_APPROVAL_TIMEOUT_SECONDS);
+  const publication = seconds(env.WEB_PROXY_PUBLICATION_TIMEOUT_SECONDS, DEFAULT_PUBLICATION_TIMEOUT_SECONDS);
   if (!base || timeout === null || provider === null || provider < timeout || approval === null
-    || approval < timeout) return null;
+    || approval < timeout || publication === null || publication < timeout) return null;
   return { base: base.replace(/\/+$/, ""), timeoutMs: timeout * 1000, providerTimeoutMs: provider * 1000,
-    approvalTimeoutMs: approval * 1000 };
+    approvalTimeoutMs: approval * 1000, publicationTimeoutMs: publication * 1000 };
 }
 
 // Exactly POST admin/review-requests/<one segment>/approve; no prefix match.
@@ -56,6 +61,8 @@ function isReviewApproval(method: string, path: string[]): boolean {
 }
 
 export function timeoutFor(method: string, path: string[], config: ProxyConfig): number {
+  if (method === "POST" && path.length === 4 && path[0] === "admin" && path[1] === "common-copies"
+    && path[3] === "publish") return config.publicationTimeoutMs;
   if (isReviewApproval(method, path)) return config.approvalTimeoutMs;
   return PROVIDER_ROUTES.has(`${method} /${path.join("/")}`) ? config.providerTimeoutMs : config.timeoutMs;
 }

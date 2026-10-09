@@ -1,5 +1,48 @@
 # Review PR #47 — C2d-5b approval/copy
 
+**Sau review:** PR #47 đã merge `04434e3` ngày 2026-10-08, chứa `50393d1`/`78fbe1d`; merge tree giống head PR. Chưa chạy lại suite tại merge. Kết luận/evidence dưới đây giữ source và thời điểm review, safety pending tới C4; [C2d-5c1](../tasks/m6c2b2c2d5c1-common-publish.md) được giao tiếp theo.
+
+## Review lại P2 tại 78fbe1d
+
+Ngày **2026-10-08**. GitHub CLI xác nhận PR **OPEN, chưa merge**; code sửa `50393d1`, head `78fbe1dfa6251538f52ed8d142f8372384eea865`. Working tree sạch trước kiểm thử. Reviewer chỉ bổ sung tài liệu sau kiểm chứng, không sửa ứng dụng/migration, commit/push/merge hoặc đăng comment PR.
+
+**Kết luận: P2 đã được xử lý; không phát hiện điểm chặn merge mới trong phạm vi C2d-5b.** Safety vẫn **pending tới C4**; kết luận này chỉ áp cho POST approve/copy, không chứng nhận publication/index/provider, C3/C4 hoặc toàn bộ ứng dụng.
+
+### Đối chiếu bản sửa
+
+`_short` sở hữu Session của proof đầu, proof giữa pha, caller-denial khi ID sai, response và audit từ chối. Helper thử cả rollback và close; nếu một thao tác lỗi thì invalidate connection và dừng bằng lỗi có kiểm soát. Proof chỉ được dùng sau release sạch. `attempt` bảo vệ cả nhánh ID sai và proof đầu; lỗi bất ngờ thành JSON `503 approval_unavailable`. Các ApiError auth/nghiệp vụ vẫn giữ mã gốc.
+
+Sau known commit, lỗi release response trả `503 approval_response_unavailable`, giữ hàng DB và object; không trả success hoặc tự retry. Acceptance outcome, `0041`, grants, SQL binding và thứ tự khóa không đổi. Reviewer đối chiếu diff và source hash, không chỉ dựa vào mô tả của agent.
+
+### Kiểm chứng mới của reviewer
+
+| Thực chạy trên source sau sửa | Kết quả |
+| --- | --- |
+| Selection proof/teardown/cancel/outcome/clock/denial/response/pending HTTP | **60/60 pass**, 0 fail/error/skip; 225,39 s, 1 warning |
+| Sáu ca tái hiện độc lập từ lần review trước, giữ nguyên script ngoài repo | **6/6 pass**, 0 fail/error/skip; 18,46 s, 1 warning |
+
+Tổng **66 unique**. Selection 60 chứa đủ 18 regression mới, cả lỗi rollback/close trước khi release và fallback invalidate, cùng các ca outcome/cancellation/clock liên quan. Sáu ca ngoài repo gồm bốn lỗi từng trả 500 và hai control 200/404; giờ bốn lỗi trả JSON 503 đúng hợp đồng. Kiểm no copy/mutation/journal/slot sau proof đầu lỗi và giữ object/rows sau known commit đều đạt.
+
+**279 source hash** API Python/SQL và web trước/sau hai lượt khớp nhau và source tại head review. Không sửa code khi suite chạy. Reviewer chạy 60 node trong inventory API 3.731, **3.671 node chưa chạy lại**; sáu ca ngoài repo không nằm trong inventory đó. Không chạy lại web/typecheck/build, Chrome, auth/auth-restore, toàn bộ suite hoặc mutants trong lượt này. Kết quả reviewer 281 API/62 web/Chrome trước sửa bên dưới giữ nguyên theo source `b7ba608`, không tính thành pass mới.
+
+### Artifact agent đối chiếu riêng
+
+Đã kiểm selection/JUnit của năm group sau sửa: approval 299, writers 220, reads-json 325, reads-originals 330, resources 553. Tổng **1.727 unique pass**, không thiếu/trùng/fail/error/skip; collect **3.731**, **2.004 not-run**. 278 source hash trước/sau khớp current; sau code `50393d1` chỉ đổi docs. Web source không đổi so với lần kiểm lịch sử.
+
+Đối chiếu focused 22 pass và XML trước sửa có đúng 10 failure; 12 XML mutant mạnh đều fail assertion đúng mục tiêu, không setup error, restored hashes khớp. XML mutant yếu bỏ một lớp bắt lỗi vẫn pass được giữ riêng, không tính là phát hiện lỗi. Đây là **đối chiếu evidence của agent**, không phải reviewer chạy lại 1.727 ca, Chrome hoặc 12 mutant. Không cộng số 2.188 của lần triển khai trước.
+
+### Evidence, cleanup và giới hạn
+
+Evidence reviewer ở `%TEMP%\ras-pr47-p2-review-20261008`: `run-review.py`, commands/logs, hai JUnit, source hashes, `verify-review.py`, `review-results.json`, `verify-agent.py`, `agent-artifact-check.json`, cleanup và quality JSON. Evidence agent ở `%TEMP%\ras-c2d5b-p2-20261008`, liên kết trong [inventory `p2_fix`](../c2d5b-test-inventory.json). Hai lượt chuẩn bị checker của reviewer cần sửa cách đọc key inventory/đếm nhóm regression; không sửa ứng dụng và không tính thành failure/pass API.
+
+Conda `C:\Users\ADMIN\.conda\envs\ras`, PostgreSQL/MinIO/journal cô lập, HTTP ngoài bị chặn, **0 provider call**. Đã kiểm ID/name/label/image/port/mount/sole-consumer trước khi dọn **2 container/2 volume của reviewer** và ba file credentials; **24 container có sẵn giữ nguyên ID/image/StartedAt**. Bốn credential sinh cho test không xuất hiện trong evidence. Không đọc/sửa `.env`, tác động stack/DB dev hoặc đổi pricing/gate.
+
+Fault injection không chứng minh lỗi thiết bị/mất điện hoặc journal production bền vững. Không có benchmark, provider live hoặc full cutover. PR vẫn mở để chủ dự án quyết định merge; reviewer chưa thực hiện thao tác ra ngoài.
+
+## Review ban đầu trước sửa (lịch sử)
+
+Phần dưới ghi nguyên phát hiện và kết quả tại `bac3739`/`b7ba608`. P2 này đã đóng theo review lại phía trên; prompt sửa cuối tài liệu được giữ làm lịch sử.
+
 Ngày 2026-10-07. PR **OPEN, chưa merge** tại lúc review. Base `8ff5b4e`; code `b7ba6082dfd49316cea065fd6d03762810bc2244`; head `bac3739420f838c75064a7c9175126dc6bf5963f`. Đúng một POST approve; **safety pending tới C4**. Reviewer chỉ bổ sung docs, không sửa ứng dụng/migration, commit/push/merge hoặc đăng comment PR.
 
 ## Kết luận: cần sửa một P2 trước merge

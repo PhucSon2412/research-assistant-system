@@ -104,6 +104,10 @@ class FileLimits(BaseModel):
     # the attempt still owns slot/temp/key until every storage thread settles.
     approval_copy_max_concurrent: int = Field(default=2, gt=0, le=64)
     approval_copy_deadline_seconds: float = Field(default=90, gt=0, le=600)
+    # C2d-5c1, scoped starting values to measure, not an SLO. Observation
+    # deadline does not kill an SDK thread; its attempt retains the slot.
+    publication_verify_max_concurrent: int = Field(default=2, gt=0, le=64)
+    publication_verify_deadline_seconds: float = Field(default=90, gt=0, le=600)
 
     @model_validator(mode="after")
     def _check_lifetime(self) -> "FileLimits":

@@ -1,10 +1,36 @@
 # Nhật ký quyết định
 
+## Triển khai C2d-5c1 trên nhánh review (2026-10-08)
+
+[Handoff publish](c2d5c1-common-publish.md) và [inventory](c2d5c1-test-inventory.json) ghi source/bằng chứng mới. Chỉ POST publish dùng boundary `api/common_publish.py`: proof ngắn release sạch → hash trực tiếp ngoài DB → acceptance User/item/rights/version/file, flush FK/unique trước journal exclusive → current actor/binding/clock → known commit → response proof mới. Outcome thuộc attempt, không bị rollback/close xóa; commit exception luôn uncertain, không SELECT inference/retry. Runtime business DML đã đủ, không migration/grants; source head vẫn 0041.
+
+Đã tái hiện lỗi setup base của `test_publication`: thiếu fixture installation. Chuyển sang original fixture runtime, owner riêng cho corruption/revoke/cleanup; snapshot dispose cả runtime harness pool và dùng runtime credentials khi phục vụ. Journal prefix identity/approval làm `present` của hai replay passes khác expectation cũ; kiểm exact count hiện hành, giữ nguyên revoke/cleanup/private/ACL. Note metadata legacy đã khác hành vi full-text gate C2d-2b, expectation kiểm note/gate hiện hành. Chi tiết preparation failures và not-run giữ trong inventory, không suy từ pass lịch sử.
+
+Pool 2/process, observed I/O deadline 90 s, exact publish proxy 120 s là lựa chọn scoped theo ủy quyền task, đề xuất cần đo. Không spool/copy/put/delete, không job/index/provider; content gates giữ riêng. Storage vẫn có khe overwrite sau hash trước commit, đã có regression làm rõ giới hạn và download xác minh riêng. Revoke C2d-5c2, cleanup/operator/provider/C3/C4 chưa được chuyển bởi PR này; safety pending tới C4. Giữ toàn bộ docs orchestrator/review PR #47 ở PR mới, không biến kết quả cũ thành pass mới.
+
+Review code trong lượt triển khai phát hiện đường storage failure chỉ kiểm caller trong audit best-effort, lỗi auth/gate bị suppression nên không đủ làm proof denial. Thêm proof common/caller/gate/clock độc lập sau SDK settle và trước denial/audit; logout/reset/CSRF/role/expiry/hold/common-revoke kết hợp missing/same-size corruption có regression và đối chứng riêng. Lỗi audit vẫn không thay controlled denial đã được proof, không tạo publication/retry.
+
+## Giao C2d-5c1 sau merge PR #47 (2026-10-08)
+
+Git fetch/GitHub CLI xác nhận PR #47 MERGED `04434e35e2b016601d3629a2d4afe3feb6042a6b`, chứa code P2 `50393d1` và head `78fbe1d`; merge tree giống head PR. Đọc AST migration có một head `0041` kế thừa `0040`, không query DB dev. Số reviewer 66/agent 1.727 và các kết quả web/Chrome lịch sử giữ source riêng; chưa rerun tại merge. Docs review lại chưa commit được giữ cho PR tiếp theo.
+
+Theo ủy quyền thiết kế của chủ dự án, [task C2d-5c1](tasks/m6c2b2c2d5c1-common-publish.md) chuyển đúng POST publish trước; revoke C2d-5c2 riêng vì cần runtime journal/retention. Nguồn publish hiện hash dưới khóa item/rights, dùng principal/now đầu request, `_refuse` audit bằng caller cũ và response sau commit chưa proof mới. Đây là quan sát tĩnh; chưa tái hiện runtime trong lượt giao.
+
+Chọn attempt sở hữu frozen common tuple/slot/stream/executor/outcome; hash theo chunk ngoài DB, không copy/put/delete original. Proof item SHARE → resources → journal shared; acceptance Admin User NO KEY UPDATE → item UPDATE → rights UPDATE → DML/FK flush → journal exclusive trực tiếp → scalar actor/resource/clock → commit; response transaction mới qua current Admin/common history, không giả định trạng thái còn listed. Runtime business DML đã có quyền, ưu tiên không migration mới; chỉ thêm revision sau head khi có thiếu guard/quyền được chứng minh, không sửa revision đã merge hoặc mở raw protected writes.
+
+Giá trị khởi đầu scoped: publish verify pool 2 mỗi process, deadline quan sát 90 s, proxy đúng POST publish 120 s có config/test. **Đề xuất cần đo, không SLO**; không thành luật kiến trúc vĩnh viễn. Commit unknown không success/ID/retry/replay; known commit hậu kiểm lỗi giữ publication/original. Xác minh SHA-256 vẫn có khe giữa hash và DB commit, không coi immutable object production đã triển khai.
+
+Lượt giao chỉ đọc source/docs/Git và viết docs/caller map, kiểm graph/liên kết; không API/web/PostgreSQL/MinIO/provider test, không dev/`.env` hay gate change. Safety pending tới C4; C3/operator/delivery/journal storage production chưa chốt. Kế toán embedding/routing không được thay bởi task này. Review/triển khai PR #47 bên dưới giữ thời điểm lịch sử khi PR còn OPEN.
+
+## Review lại P2 PR #47 (2026-10-08)
+
+Tại `78fbe1d` (code `50393d1`), reviewer không phát hiện điểm chặn merge mới trong phạm vi approve/copy; P2 teardown đã xử lý. [Report](reviews/pr47-c2d5b-review-approval-original-copy.md#review-lại-p2-tại-78fbe1d) tách **66/66 API reviewer** khỏi artifact **1.727** và 12 mutants của agent. Không thay thiết kế/grants/migration/lock order, không mở safety pending tới C4. PR vẫn OPEN; review ban đầu và prompt sửa bên dưới là lịch sử tại source trước sửa.
+
 ## Sửa P2 review PR #47 (2026-10-08)
 
 Agent sửa đúng P2: helper `_short` sở hữu Session ngắn (proof đầu/giữa, caller-denial, response, audit từ chối), thử cả rollback và close, invalidate khi lỗi và dừng bằng `ApiError` có kiểm soát; `attempt` bọc phase đầu. Không đổi `0041`, grants, binding, lock order, outcome acceptance/retention hay proof response mới. Lựa chọn triển khai scoped cho PR này; safety pending tới C4. [Chi tiết kiểm chứng](c2d5b-review-approval-original-copy.md#sửa-p2-review-pr-47).
 
-## Review PR #47 — C2d-5b (2026-10-07)
+## Review PR #47 — C2d-5b trước sửa (lịch sử, 2026-10-07)
 
 Chưa merge: một P2 được tái hiện ở proof đầu/malformed caller-denial, lỗi rollback/close thoát thành HTTP 500. [Review độc lập và prompt sửa](reviews/pr47-c2d5b-review-approval-original-copy.md) tách selection 281/281 + 4 fail đúng lỗi / 2 control pass và 62 web reviewer khỏi artifact 2.188 của agent. Reviewer chỉ sửa docs/count placeholder; không đổi thiết kế, code, migration/grants hoặc safety pending tới C4.
 

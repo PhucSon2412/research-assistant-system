@@ -28,8 +28,8 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Query
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+from fastapi import APIRouter, Depends, Query, Request
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StrictBool
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -43,7 +43,8 @@ from app.config import Settings, get_settings
 from app.models import (AccessRights, CommonPublication, DeletionTombstone, LibraryItem, PaperVersion,
                         RevocationMetadataRetention, SourceFile, User)
 from app.models.enums import PublicationState, RevocationReason, RevokedMetadataField
-from app.publication import RetentionBasis, live_duplicate, publish, revoke
+from app.publication import RetentionBasis, live_duplicate, revoke
+from app.api import common_publish
 from app.storage import OriginalStorage, get_storage
 
 router = APIRouter(prefix="/admin/pending-publications", tags=["review"])
@@ -68,9 +69,15 @@ class IndexInput(BaseModel):
     confirm_external_processing: Literal[True]
 
 
+def _confirmed(value: bool) -> bool:
+    if not value:
+        raise ValueError("explicit confirmation required")
+    return value
+
+
 class PublishInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    confirm_publish: Literal[True]
+    confirm_publish: Annotated[StrictBool, AfterValidator(_confirmed)]
     # The checksum the Admin saw on the page: publishing names these exact bytes.
     file_checksum_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
@@ -311,16 +318,17 @@ def get_copy(item_id: str, admin: Principal = Depends(require_admin), db: Sessio
 
 
 @copies_router.post("/{item_id}/publish", dependencies=[Depends(require_trusted_origin)])
-def publish_copy(
+async def publish_copy(
+    request: Request,
     item_id: str,
     body: PublishInput,
     admin: Principal = Depends(require_admin),
-    db: Session = Depends(get_db),
-    now: datetime = Depends(get_now),
+    settings: Settings = Depends(get_settings),
+    clock=Depends(get_clock),
     storage: OriginalStorage = Depends(_storage),
 ) -> dict:
-    done = publish(db, admin, storage, _parse_id(item_id), body.file_checksum_sha256, now)
-    return {"item": _copy_out(db, admin, done.item.id, now)}
+    return await common_publish.receive(request, admin, item_id, body.file_checksum_sha256,
+                                        clock, settings, storage)
 
 
 @copies_router.post("/{item_id}/index", dependencies=[Depends(require_trusted_origin)])

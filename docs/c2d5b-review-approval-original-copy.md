@@ -1,8 +1,10 @@
 # C2d-5b: phê duyệt review và sao chép original qua runtime
 
-**Review PR #47:** [report/P2 và prompt sửa](reviews/pr47-c2d5b-review-approval-original-copy.md). Reviewer chạy selection 281/281, web 62/62; bốn regression teardown proof đầu fail đúng HTTP 500, hai control pass. Chưa merge; safety pending tới C4. Artifact agent vẫn giữ theo source cũ, không ghi thành pass sau sửa.
+**Review lại P2 PR #47 tại `78fbe1d`:** P2 đã xử lý, không phát hiện điểm chặn merge mới trong phạm vi approve/copy. Reviewer thực chạy **66/66 API** và đối chiếu riêng artifact **1.727** của agent; web/Chrome không chạy lại trong lượt này. [Report và giới hạn](reviews/pr47-c2d5b-review-approval-original-copy.md#review-lại-p2-tại-78fbe1d). PR đã merge `04434e3`; chưa rerun tại merge, safety pending tới C4.
 
-**Trạng thái:** đã triển khai/kiểm trên nhánh review `feat/m6c2b2c2d5b-review-approval-original-copy`, **chưa merge**. Base fetch/xác minh `8ff5b4ed5f643a4618f70b73550cdcce465181ab` (PR #46 MERGED, chứa head `7938153`/code `1666273`). Head Alembic source trước sửa `0040` (kiểm bằng ScriptDirectory/graph, không query DB dev); thêm `0041`, không sửa migration đã merge. **Safety pending tới C4**; publish/revoke/common-index, provider, C3/C4 riêng.
+**Review trước sửa tại `bac3739` (lịch sử):** [report/P2 và prompt sửa](reviews/pr47-c2d5b-review-approval-original-copy.md). Reviewer chạy selection 281/281, web 62/62; bốn regression teardown proof đầu fail đúng HTTP 500, hai control pass. Chưa merge; safety pending tới C4. Artifact agent vẫn giữ theo source cũ, không ghi thành pass sau sửa.
+
+**Trạng thái:** đã merge PR #47 `04434e3` (2026-10-08), nhánh `feat/m6c2b2c2d5b-review-approval-original-copy`. Kết quả kiểm giữ theo source trước merge, không là pass mới tại merge. Base fetch/xác minh `8ff5b4ed5f643a4618f70b73550cdcce465181ab` (PR #46 MERGED, chứa head `7938153`/code `1666273`). Head Alembic source trước sửa `0040` (kiểm bằng ScriptDirectory/graph, không query DB dev); thêm `0041`, không sửa migration đã merge. **Safety pending tới C4**; publish/revoke/common-index, provider, C3/C4 riêng.
 
 [Task](tasks/m6c2b2c2d5b-review-approval-original-copy.md) · [Quyết định](decisions.md#triển-khai-boundary-c2d-5b-2026-10-07) · [Inventory](c2d5b-test-inventory.json) · [Caller map](c2d1-caller-inventory.json) · [C2d-5a](c2d5a-review-json-writers.md)
 
@@ -128,6 +130,8 @@ Chuyển test legacy: `common_copy`/`runtime_approve`, `original_fixtures` (bỏ
 Cleanup chỉ 3 container thử (DB 58475, MinIO 59475, restore 58442) theo exact ID/tên/nhãn/image/cổng/mount/sole consumer; anonymous volume và credentials generated đã xóa; **24 container có sẵn giữ nguyên ID/image/StartedAt**. Evidence (log/JUnit/node/script) ngoài repo `C:\Users\ADMIN\AppData\Local\Temp\ras-c2d5b-20261007`, đã quét không chứa credential. Không `.env`, dev DB/stack, provider, pricing hay readiness thay đổi.
 
 ## Contract cho task publication sau
+
+[Task C2d-5c1](tasks/m6c2b2c2d5c1-common-publish.md) đã giao sau merge PR #47: chỉ publish. Revoke C2d-5c2 và index/provider riêng, safety pending tới C4. Lượt giao chỉ khảo sát nguồn và viết docs, không kiểm API/web/DB.
 
 - Bản `pending` tạo ở đây có đúng một version/file, rights epoch 0, `file_source=review_approval`, key riêng; publish/revoke/index hiện vẫn legacy đặc quyền trong fixture và chưa runtime.
 - Response approve có thể thấy bản đã published/revoked; không giả định `pending` vĩnh viễn.
