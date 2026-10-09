@@ -489,7 +489,7 @@ def test_worker_item_job_checkpoint_order_and_claim_skip(indexes, monkeypatch, f
             d.execute(text('SELECT id FROM ingestion_jobs WHERE id=:j FOR UPDATE'), {'j': job})
             if first == 'worker': entered.set(); assert release.wait(15)
             d.rollback()
-        with Session(b.w.engine) as d:
+        with Session(b.w.runtime) as d:
             return worker.claim_job(d, job, get_settings(), NOW)
     with ThreadPoolExecutor(2) as pool:
         a = pool.submit(legacy_worker) if first == 'worker' else pool.submit(direct, b)

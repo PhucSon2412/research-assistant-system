@@ -10,11 +10,13 @@ from __future__ import annotations
 import uuid
 
 from celery import Celery
+from celery.signals import beat_init, worker_init, worker_process_init
 
 from app import recovery
 from app.config import get_settings
 from app.db import get_sessionmaker
-from app.ingest.worker import due_job_ids, process_job
+from app.ingest.worker import due_job_ids, process_job, dispatchable
+from app.ingest import runtime
 from app.discovery import run_sync
 from app.citations import reconcile_pending
 from app.clock import utcnow
@@ -22,8 +24,14 @@ from app.db import get_engine
 from app.publication import cleanup_revoked
 from app.storage import get_storage
 
-settings = get_settings()
-celery_app = Celery("ras_ingest", broker=settings.celery_broker_url())
+try:
+    settings = get_settings()
+    if settings.db is None:
+        raise ValueError('worker connection parts required')
+    broker = settings.celery_broker_url()
+except Exception:
+    raise SystemExit('worker_runtime_configuration_required') from None
+celery_app = Celery("ras_ingest", broker=broker)
 celery_app.conf.update(task_ignore_result=True, worker_prefetch_multiplier=1,
                        broker_connection_retry_on_startup=True,
                        beat_schedule={"discover-ingest-jobs": {
@@ -36,24 +44,59 @@ celery_app.conf.update(task_ignore_result=True, worker_prefetch_multiplier=1,
                            "task": "ras.revocation.cleanup", "schedule": settings.retention.cleanup_poll_seconds}})
 
 
+@beat_init.connect
+@worker_init.connect
+@worker_process_init.connect
+def require_runtime_startup(**kwargs):
+    # Provisioning belongs to setup. Default dev credentials are deliberately
+    # NOT changed here; an owner-configured process fails before business tasks.
+    if settings.db is None:
+        raise SystemExit('worker_runtime_configuration_required')
+    try:
+        if kwargs.get('signal') is worker_process_init:
+            get_engine().dispose(close=False)  # never reuse parent DB sockets after fork
+        db = get_sessionmaker()()
+        runtime.short(db, lambda _: runtime.require_runtime(db))
+    except Exception:
+        raise SystemExit('worker_runtime_required') from None
+
+
 def _gate(task: str) -> bool:
-    return recovery.gate_open(settings, get_engine(), task)
+    db = get_sessionmaker()()
+    try:
+        runtime.short(db, lambda _: runtime.require_runtime(db))
+        return recovery.gate_open(settings, get_engine(), task)
+    except Exception:
+        return False
 
 
 @celery_app.task(name="ras.ingest.discover")
 def discover() -> int:
     if not _gate("ras.ingest.discover"):
         return 0
-    with get_sessionmaker()() as db:
-        ids = due_job_ids(db, settings)
+    try:
+        ids = due_job_ids(get_sessionmaker()(), settings)
+    except Exception:
+        return 0
+    sent = 0
     for job_id in ids:
-        ingest_job.delay(str(job_id))
-    return len(ids)
+        if not dispatchable(job_id, settings):
+            break
+        try:
+            ingest_job.delay(str(job_id))
+        except Exception:
+            break  # durable job unchanged; next tick retries after broker recovery
+        sent += 1
+    return sent
 
 
 @celery_app.task(name="ras.ingest.process")
 def ingest_job(job_id: str) -> str:
-    return process_job(uuid.UUID(job_id), settings)
+    try:
+        identifier = uuid.UUID(job_id)
+    except (ValueError, TypeError, AttributeError):
+        return 'invalid_job_id'
+    return process_job(identifier, settings)
 
 
 @celery_app.task(name="ras.discovery.sync")
