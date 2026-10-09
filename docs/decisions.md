@@ -1,5 +1,15 @@
 # Nhật ký quyết định
 
+## Triển khai C2d-5d1 trên nhánh review (2026-10-09)
+
+[Handoff](c2d5d1-common-index-request.md) · [Inventory](c2d5d1-test-inventory.json). Base merge PR #49 `859dfe9`; docs orchestrator commit nguyên trạng `16eda35`; implementation `e283bc6`. Không migration/grants (runtime đã có DML business), source `0042`.
+
+**Đã tái hiện:** `Literal[True]` nhận `1`/`1.0` và tạo job qua HTTP → đổi sang `StrictBool` + validator true như publish/revoke. Form index cũ gửi hai POST khi hai submit cùng tick (mutant Chrome) → ref guard + busy.
+
+**Lựa chọn scoped của agent theo task (chủ dự án chưa trực tiếp xác nhận):** boundary riêng `api/common_index_request.py`; resources sau item khóa `FOR SHARE` (không sửa); job/audit flush trước journal exclusive; không ghi bản ghi journal cho job; live job lệch binding → `409 index_job_binding_changed`, đã yêu cầu hủy → `409 index_job_cancelling` (không re-arm, không tạo job mới); IntegrityError ngoài dedup → `503 index_start_unavailable`; denial nghiệp vụ giữ audit `denied` best-effort trên transaction writer riêng có current proof (thay `_refuse` dùng principal cũ); response thêm `job.cancel_requested` (tương thích). Gỡ helper tự commit `common_index.start`. Giữ proxy 15 s, không config mới. Worker/cleanup/provider giữ nguyên, bàn giao C2d-5d2.
+
+**Mâu thuẫn ghi nhận:** 4 test cũ (`test_common_search` ×2 quyền `session_replication_role`, `test_health` readyz 200 khi safety pending, `test_common_original` helper revoke 409) fail y hệt ở base `859dfe9` và head; không thuộc phạm vi, chưa điều tra nguyên nhân sâu hơn assertion.
+
 ## Giao C2d-5d1 sau merge PR #49 (2026-10-09)
 
 Fetch/GitHub CLI xác nhận PR #49 MERGED `859dfe9793dd9549e3ca9b8f0102361f414d0340`, chứa head `f8dc44ce5e146e5c867534f51a7e866769c1bc6b`; merge tree giống head đã review. AST mã nguồn có một head `0042`; không suy revision DB dev. Số reviewer 295/66 web/hai Chrome và agent 529/8 mutant giữ theo source riêng, chưa rerun tại merge. Giữ report review chưa commit cho PR kế tiếp.

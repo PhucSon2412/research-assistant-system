@@ -1,6 +1,6 @@
 # Research Assistant System
 
-**Bước tiếp theo: [C2d-5d1 — tạo/trả job index bản chung qua runtime](docs/tasks/m6c2b2c2d5d1-common-index-request.md), đã giao, chưa triển khai/kiểm.** Base PR #49 đã merge `859dfe9`, source migration `0042`; worker/provider tách PR sau. Safety vẫn pending tới C4.
+**C2d-5d1 đã triển khai trên nhánh `feat/m6c2b2c2d5d1-common-index-request` (PR mở để review, chưa merge):** đúng `POST /admin/common-copies/{item_id}/index` qua runtime (`api/common_index_request.py`): xác nhận chỉ boolean true, current Admin/session/CSRF/clock, tạo hoặc trả lại đúng một live job bền vững, outcome độc lập, response proof mới; không storage/broker/provider. Kiểm tại `e283bc6`: **923/923 API unique pass**, 0 fail/error/skip (collect 4.268, **3.341 not-run**, 4 node lỗi có sẵn ở base chạy riêng vẫn fail như base); web **70/70**, typecheck/build; Chrome qua Next proxy; **9/9 mutant** bắt assertion. Không migration, source `0042`; worker/ingest/provider là C2d-5d2, **safety pending tới C4**. [Handoff](docs/c2d5d1-common-index-request.md) · [Inventory](docs/c2d5d1-test-inventory.json).
 
 **Review PR #49 tại `f8dc44c`: không phát hiện điểm chặn merge mới trong phạm vi POST revoke.** Reviewer thực chạy **295/295 API**, **66/66 web**, typecheck/build và hai Chrome qua proxy; artifact **529 API/8 mutant** của agent đối chiếu riêng. Raw lượt observer yếu bị ghi đè được giữ là giới hạn evidence. PR đã merge `859dfe9`; chưa rerun tại merge, source `0042`, **safety pending tới C4**. [Report và giới hạn](docs/reviews/pr49-c2d5c2-common-revoke.md).
 

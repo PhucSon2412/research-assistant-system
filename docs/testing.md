@@ -1,5 +1,9 @@
 # Chiến lược kiểm thử
 
+## C2d-5d1 — kiểm theo source `e283bc6`
+
+[Handoff](c2d5d1-common-index-request.md) · [Inventory](c2d5d1-test-inventory.json). PostgreSQL/MinIO/journal cô lập (`58579`/`59579`, label `ras.task=c2d5d1-20261009`), role runtime thật, business cutover scoped; bài HTTP pending giữ gate production thật. Bao phủ ACL/strict input, create/reuse/không reset, clock/actor ở acceptance và response, lock wait thật, race index↔revoke/auth/worker legacy, commit uncertain/teardown/cancel, broker down vẫn còn job DB, và Chrome qua Next proxy (unticked, double submit một POST, reuse, 504 unknown không re-POST, role/session bị thu hồi). Kiểm tại `e283bc6`: **923/923 API unique pass**, 0 fail/error/skip (collect 4.268, **3.341 not-run**, 4 node lỗi có sẵn ở base chạy riêng vẫn fail như base); web **70/70**, typecheck/build; Chrome qua Next proxy; **9/9 mutant** bắt assertion. Nhóm: core 200, revoke 171, publish 192, reads 260, content 89, recovery 11. Lượt content đầu lỗi do runner (`--deselect` sai tiền tố) được giữ riêng, không cộng. Worker/cleanup chỉ kiểm tương thích.
+
 ## Kế hoạch C2d-5d1 sau merge PR #49
 
 [Task HTTP index request](tasks/m6c2b2c2d5d1-common-index-request.md) **đã giao, chưa triển khai/chưa chạy test**. Kiểm runtime/current Admin/strict confirmation/rights/file/epoch, create/reuse một live job, precommit và response clock, race revoke/job/cleanup/auth, commit uncertain/teardown/cancel, không storage/provider/broker send, web busy/unknown và Chrome qua proxy. PG/MinIO/journal cô lập, role runtime thật, HTTP pending giữ gate thật. Hồi quy worker/cleanup chỉ chứng minh tương thích, không chứng nhận đã chuyển chúng; worker/index/provider dispatch tách C2d-5d2, C3/C4 vẫn riêng. Không cộng số PR #49 vào task mới; source `0042`, không suy revision DB dev.

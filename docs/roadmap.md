@@ -1,5 +1,9 @@
 # Roadmap đề xuất
 
+## C2d-5d1 trên nhánh review
+
+[Handoff](c2d5d1-common-index-request.md) · [Inventory](c2d5d1-test-inventory.json): một POST index qua runtime, tạo/trả đúng một live job, current Admin/clock, outcome độc lập và response proof mới; không migration. Kiểm tại `e283bc6`: **923/923 API unique pass**, 0 fail/error/skip (collect 4.268, **3.341 not-run**, 4 node lỗi có sẵn ở base chạy riêng vẫn fail như base); web **70/70**, typecheck/build; Chrome qua Next proxy; **9/9 mutant** bắt assertion. PR mở để review, chưa merge; **safety pending tới C4**. Tiếp theo C2d-5d2 theo danh sách checkpoint trong handoff.
+
 ## Giao C2d-5d1 sau merge PR #49
 
 [Prompt C2d-5d1](tasks/m6c2b2c2d5d1-common-index-request.md) đã giao, **chưa triển khai/kiểm**. Base merge PR #49 `859dfe9`, source `0042`; một POST index nhận boolean xác nhận, tạo/reuse job bền vững đúng file/rights/epoch qua current Admin/clock, outcome độc lập và response proof mới. Không I/O storage/provider hoặc bật pricing; UI chống submit kép/unknown không auto retry. [Quyết định chia scope](decisions.md#giao-c2d-5d1-sau-merge-pr-49-2026-10-09).

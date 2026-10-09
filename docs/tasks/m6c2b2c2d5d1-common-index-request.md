@@ -1,5 +1,7 @@
 # Prompt C2d-5d1: yêu cầu lập chỉ mục bản chung qua runtime
 
+**Cập nhật triển khai:** đã triển khai trên nhánh `feat/m6c2b2c2d5d1-common-index-request` (PR mở, chưa merge); [handoff](../c2d5d1-common-index-request.md) · [inventory](../c2d5d1-test-inventory.json). Nội dung prompt dưới đây giữ nguyên như lúc giao.
+
 PR #49 đã **MERGED** tại `859dfe9793dd9549e3ca9b8f0102361f414d0340` ngày 2026-10-09, chứa head `f8dc44ce5e146e5c867534f51a7e866769c1bc6b`; merge tree giống head đã review. AST mã nguồn có một head migration **0042**. Không truy vấn revision DB dev. Đây là **task đã giao, chưa triển khai/chưa kiểm thử**. Các lựa chọn dưới đây do orchestrator chốt theo ủy quyền của chủ dự án cho phạm vi này; **safety vẫn pending tới C4**.
 
 [Mục lục](../README.md) · [Quyết định giao](../decisions.md#giao-c2d-5d1-sau-merge-pr-49-2026-10-09) · [Roadmap](../roadmap.md) · [Review PR #49](../reviews/pr49-c2d5c2-common-revoke.md) · [Handoff revoke](../c2d5c2-common-revoke.md) · [Caller map](../c2d1-caller-inventory.json)
