@@ -1,7 +1,7 @@
 """Publish through real runtime PostgreSQL, MinIO, identity and journal.
 
 Only the business cutover fixture is scoped. Replica writes are explicitly
-labelled corruption/setup; revoke/cleanup adversaries remain legacy owner code.
+labelled corruption/setup; revoke uses runtime, cleanup remains system code.
 """
 import asyncio
 import hashlib
@@ -137,9 +137,8 @@ def direct(b, *, stopped=None, outcome=None, checksum=None, item=None):
 
 def revoke(b, *, copy=None):
     c = copy or b.copy
-    with Session(b.w.engine) as db:  # legacy journaled adversary, C2d-5c2 separate
-        return publication.revoke(db, b.admin, c.item, RevocationReason.RIGHTS_WITHDRAWN, b.clock(),
-                                  timedelta(hours=24), journal_path=b.w.path)
+    from tests.resource_fixtures import runtime_revoke
+    return runtime_revoke(b.w, c.item, clock=b.clock)
 
 
 def test_runtime_success_metadata_only_fresh_dto_no_provider_or_object_mutation(publishes, monkeypatch):
@@ -757,7 +756,7 @@ def test_snapshot_restore_with_current_journal_never_replays_missing_positive_pu
     with backup(SimpleNamespace(engine=b.w.engine), admin_engine) as snap:
         if snapshot == 'pending':
             assert publish(b).status_code == 200
-        revoke(b)  # legacy journaled owner adversary, not C2d-5c2 runtime
+        revoke(b)  # C2d-5c2 runtime Admin/session/journal boundary
         current = tmp_path / 'current-journal.jsonl'
         current.write_bytes(b.w.path.read_bytes())
         monkeypatch.setenv('RAS_RECOVERY__JOURNAL_PATH', str(current))

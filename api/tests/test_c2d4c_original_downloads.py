@@ -391,9 +391,8 @@ def close_review(b, ending):
 def end_grant(b,branch,ending='withdrawn'):
     if branch=='review':close_review(b,ending)
     else:
-        principal=boundary.Principal(b.w.uid,'admin',b.w.actor.session_id,'admin@example.test',None)
-        with Session(b.w.engine) as db:  # common writer not yet converted; no runtime grant widening
-            publication.revoke(db,principal,b.common.item,RevocationReason.RIGHTS_WITHDRAWN,NOW,timedelta(hours=24))
+        from tests.resource_fixtures import runtime_revoke
+        runtime_revoke(b.w,b.common.item,clock=b.clock)
 
 
 @pytest.mark.parametrize('phase',('storage','postcommit','after_boundary'))

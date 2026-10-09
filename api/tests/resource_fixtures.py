@@ -195,3 +195,15 @@ def runtime_publish(w, item_id, storage, *, checksum=SHA, clock=None, principal=
     return asyncio.run(common_publish.attempt(None, admin, str(item_id), checksum,
         csrf if csrf is not None else w.actor.csrf_token, clock or (lambda: NOW),
         get_settings(), storage, threading.Event()))
+
+
+def runtime_revoke(w, item_id, *, clock=None, principal=None, csrf=None, retain=(), reason='rights_withdrawn'):
+    """Real C2d-5c2 runtime transaction/mirror/append/confirm/fresh response."""
+    import asyncio
+    import threading
+    from app.api import common_revoke
+    from app.api.routes.publications import RevokeInput
+    admin = principal or Principal(w.uid, 'admin', w.actor.session_id, 'admin@example.test', None)
+    body = RevokeInput(confirm_revoke=True, reason_code=reason, retain=list(retain), confirm_retention_basis=bool(retain))
+    return asyncio.run(common_revoke.attempt(None, admin, str(item_id), body,
+        csrf if csrf is not None else w.actor.csrf_token, clock or (lambda: NOW), get_settings(), threading.Event()))

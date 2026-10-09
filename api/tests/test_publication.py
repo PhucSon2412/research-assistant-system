@@ -336,13 +336,12 @@ def admin_principal(api):
 
 
 def revoke_in_own_session(api, copy):
-    """A revoke committed from another session, as a second Admin request would."""
-    from sqlalchemy.orm import Session
-
-    from app.models.enums import RevocationReason
-    with Session(api.setup_engine, expire_on_commit=False) as db:
-        publication.revoke(db, admin_principal(api), uuid.UUID(copy), RevocationReason.RIGHTS_WITHDRAWN,
-                           api.clock.now, timedelta(hours=24))
+    """A separate real runtime Admin/session/CSRF HTTP revoke."""
+    admin = api.admin_browser()
+    admin.csrf()
+    response = revoke(admin, copy, 'rights_withdrawn')
+    assert response.status_code == 200, response.text
+    return response
 
 
 def last_publish_audit(api) -> tuple[str, str | None]:

@@ -35,7 +35,8 @@ from tests.test_private_index import fake_provider, settings_with_fake_key
 from tests.test_publication import MISSING, publish, revoke, revoke_in_own_session
 from tests.test_review_approval import approve
 from tests.test_review_requests import submit, write
-from tests.test_uploads import upload_api  # noqa: F401  (fixture)
+from tests.original_fixtures import upload_api, base_upload_api  # noqa: F401
+from tests.test_c2c1_bootstrap import installation  # noqa: F401
 
 MD_BODY = (b"# Common Index Fixture\n\n## Abstract\nA summary of the indexable method.\n\n## Methods\n"
            b"Indexable result is nine units.\n\n## References\n[1] A. Alpha. Linked Study. 2026.\n")
@@ -519,14 +520,15 @@ def test_revoke_holding_the_item_first_makes_the_worker_wait_without_deadlock(w)
     copy = copy_of(w, w.private["md"], MD_BODY)
     job = started(w, copy)
     holding, release, outcome, result = Event(), Event(), {}, {}
-    real = publication._revoke_rows
+    real = publication._copy
 
-    def held(db, *args, **kwargs):  # item locked FOR UPDATE and updated; jobs not touched yet
-        real(db, *args, **kwargs)
+    def held(db, *args, **kwargs):  # runtime locks jobs before _revoke_rows; pause at item acquisition
+        item=real(db, *args, **kwargs)
         holding.set()
         assert release.wait(10)
+        return item
 
-    w.monkeypatch.setattr(publication, "_revoke_rows", held)
+    w.monkeypatch.setattr(publication, "_copy", held)
     revoker = _revoke_in_thread(w, copy, outcome)
     assert holding.wait(10)
     runner = Thread(target=lambda: result.setdefault("worker", process_job(job, storage=w.storage)))

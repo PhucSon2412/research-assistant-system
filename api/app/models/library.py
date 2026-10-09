@@ -86,6 +86,10 @@ class LibraryItem(Base):
     # Bumped on every revoke/delete (M5/M6); workers compare against the
     # epoch recorded on their job before calling out or publishing.
     rights_epoch: Mapped[int] = mapped_column(BigInteger, server_default=text("0"))
+    # PostgreSQL-minted live transition evidence, never a restore receipt.
+    revocation_transaction_id: Mapped[int | None] = mapped_column(BigInteger)
+    revocation_prior_state: Mapped[str | None] = mapped_column(Text)
+    revocation_prior_epoch: Mapped[int | None] = mapped_column(BigInteger)
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT")
     )

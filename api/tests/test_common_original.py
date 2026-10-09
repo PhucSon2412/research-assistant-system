@@ -95,9 +95,8 @@ def admin_principal(api) -> Principal:
 
 
 def revoke_now(api, item_id) -> None:
-    with Session(api.setup_engine, expire_on_commit=False) as db:
-        publication.revoke(db, admin_principal(api), uuid.UUID(item_id), RevocationReason.RIGHTS_WITHDRAWN,
-                           api.clock.now, timedelta(hours=24))
+    from tests.test_publication import revoke_in_own_session
+    revoke_in_own_session(api,item_id)
 
 
 def test_private_stays_owner_only_and_permitted_common_opens_for_every_account(upload_api, monkeypatch, caplog):

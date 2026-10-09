@@ -7,12 +7,12 @@
 // full-text search and provider processing can be indexed (M6b-2b2b); search and
 // source chunks open for every account while those rights stay live (M6b-2b3a, the
 // API's `search_open`), and RAG uses them as evidence (M6b-2b3b, `rag_open`). Revoking (pending or
-// listed) is final and hides the copy from every page from its commit; cleanup
+// listed) is final and hides ordinary content from its commit; Admin history remains. Cleanup
 // then removes the common object. The API enforces all of it.
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { api, describeError, publicationError } from "../../../lib/api";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { api, describeError, publicationError, revocationError } from "../../../lib/api";
 import {
   INDEX_ELIGIBILITY_TEXT, INDEX_EXTERNAL_NOTICE, OBJECT_OUTCOME_TEXT, ORIGINAL_DOWNLOAD_TEXT, PUBLICATION_STATE_TEXT,
   REVOCATION_REASONS, fieldList, makeIndexBody, makePublishBody, makeRevokeBody,
@@ -110,6 +110,8 @@ function IndexForm({ copy, onDone }: { copy: CommonCopy; onDone: () => void }) {
 
 function RevokeForm({ copy, onDone }: { copy: CommonCopy; onDone: () => void }) {
   const [confirmed, setConfirmed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const sending = useRef(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const body = makeRevokeBody(confirmed, reason);
@@ -117,14 +119,23 @@ function RevokeForm({ copy, onDone }: { copy: CommonCopy; onDone: () => void }) 
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!body) return;
+    if (!body || sending.current) return;
+    sending.current = true;
+    setBusy(true);
     setError(null);
     try {
-      await api(`/admin/common-copies/${encodeURIComponent(copy.id)}/revoke`, { method: "POST", body });
+      const result = await api<{ item: CommonCopy; cancelled_jobs: number }>(
+        `/admin/common-copies/${encodeURIComponent(copy.id)}/revoke`, { method: "POST", body });
+      if (!result?.item || result.item.id !== copy.id || typeof result.cancelled_jobs !== "number") {
+        throw new Error("revocation response incomplete");
+      }
       onDone();
     } catch (err) {
-      setError(describeError(err));
+      setError(revocationError(err));
       setConfirmed(false);
+    } finally {
+      sending.current = false;
+      setBusy(false);
     }
   }
 
@@ -132,19 +143,20 @@ function RevokeForm({ copy, onDone }: { copy: CommonCopy; onDone: () => void }) 
     <form onSubmit={submit} style={{ background: "#fbeeee", padding: "0.5rem", marginTop: "0.5rem" }}>
       <ErrorText message={error} />
       <label>Lý do{" "}
-        <select value={reason} onChange={(e) => setReason(e.target.value)} required>
+        <select value={reason} disabled={busy} onChange={(e) => setReason(e.target.value)} required>
           <option value="">— chọn —</option>
           {Object.entries(REVOCATION_REASONS).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
         </select>
       </label>{" "}
       <label>
-        <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />{" "}
+        <input type="checkbox" checked={confirmed} disabled={busy} onChange={(e) => setConfirmed(e.target.checked)} />{" "}
         Tôi xác nhận {pending ? "hủy bản chờ này" : "thu hồi bản đã công bố này"}. Thao tác là cuối cùng: từ lúc
-        commit, không trang nào hiện bản này. Trong hạn cleanup, hệ thống xóa object chung và metadata (tiêu đề,
+        commit, các trang nội dung thông thường chặn bản này; Admin còn xem lịch sử quyết định.
+        Trong hạn cleanup, hệ thống xóa object chung và metadata (tiêu đề,
         URL nguồn, tên file, nguồn/giấy phép/bằng chứng/điều kiện); trang này không giữ lại trường nào. Bản riêng
         của User không đổi.
       </label>{" "}
-      <button type="submit" disabled={!body}>{pending ? "Hủy bản chờ" : "Thu hồi"}</button>
+      <button type="submit" disabled={!body || busy}>{pending ? "Hủy bản chờ" : "Thu hồi"}</button>
     </form>
   );
 }

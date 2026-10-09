@@ -40,7 +40,8 @@ from tests.test_common_search import build, hit_items, search
 from tests.test_publication import (MISSING, admin_principal, common_file, common_key, key_present, listed_ids,
                                     new_copy, publish, revoke, state)
 from tests.test_review_requests import A_BODY, world
-from tests.test_uploads import upload_api  # noqa: F401  (fixture)
+from tests.original_fixtures import upload_api, base_upload_api  # noqa: F401
+from tests.test_c2c1_bootstrap import installation  # noqa: F401
 
 RECOVERING = (503, {"error": "service_recovering"})
 
@@ -50,7 +51,8 @@ def journal_file():
 
 
 def gate(engine) -> str:
-    return recovery.evaluate(get_settings(), engine).reason
+    status=recovery.evaluate(get_settings(),engine)
+    return 'open' if status.open else status.reason
 
 
 def records(kind=None) -> list[journal.Record]:
@@ -245,8 +247,9 @@ def test_registration_paths_never_take_a_database_with_content_for_a_new_install
     assert not path.exists() and gate(engine) == "journal_missing"
     assert recovery_cli.main(["register-existing"]) == 2  # needs the explicit confirmation
     assert recovery_cli.main(["register-existing", "--confirm-db-is-current"]) == 0
-    assert gate(engine) == "open" and recovery_cli.main(["status"]) == 0
-    assert TestClient(app).get("/readyz").json() == {"status": "ready"}
+    assert recovery.evaluate_integrity(get_settings(),engine).open
+    assert gate(engine) == "auth_safety_pending" and recovery_cli.main(["status"]) == 3
+    assert TestClient(app).get("/readyz").status_code == 503
     with pytest.raises(RecoveryError, match="already_registered"):
         recovery.register_existing(engine, get_settings(), utcnow())
     with pytest.raises(RecoveryError, match="already_registered"):
@@ -284,12 +287,13 @@ def test_db_refuses_tombstones_without_journal_record_and_edits_to_the_mirror(ap
 def test_revocation_is_journaled_and_mirrored_before_it_reports_success(upload_api, monkeypatch):
     w = listed(upload_api, monkeypatch)
     assert revoke(w.admin, w.copy).status_code == 200
-    genesis, approval, rec = records()  # the copy's approval closed its review grant first (M6c-2b1)
+    # Real runtime bootstrap/invite/login now add auth records to this chain.
+    genesis, approval, rec = records()[0], records('review_closure')[-1], records('revocation')[-1]
     assert approval.kind == "review_closure" and approval.body["status"] == "approved"
     assert rec.kind == "revocation" and rec.body["item_id"] == w.copy and rec.prev == approval.hash
     assert set(rec.body) == set(journal.REVOCATION_FIELDS) | {"retentions"}
     assert rec.body["storage_key"] == common_key(w.api, w.copy)
-    assert mirror(w.api.engine) == [(r.seq, r.kind, r.hash, r.line) for r in (genesis, approval, rec)]
+    assert mirror(w.api.engine) == [(r.seq, r.kind, r.hash, r.line) for r in records()]
     tomb = w.api.scalar("SELECT id FROM deletion_tombstones WHERE item_id=:i", i=uuid.UUID(w.copy))
     assert rec.body["id"] == str(tomb)
     assert gate(w.api.engine) == "open"
@@ -298,6 +302,7 @@ def test_revocation_is_journaled_and_mirrored_before_it_reports_success(upload_a
 
 def test_journal_write_failure_still_closes_the_copy_and_keeps_the_gate_shut_until_repaired(upload_api, monkeypatch):
     w = listed(upload_api, monkeypatch)
+    before=records()
     real = journal.append
 
     def broken(*args, **kwargs):
@@ -307,13 +312,13 @@ def test_journal_write_failure_still_closes_the_copy_and_keeps_the_gate_shut_unt
     monkeypatch.setattr(journal, "append", real)
     assert (response.status_code, response.json()) == (503, {"error": "revocation_journal_unavailable"})
     assert state(w.api, w.copy) == "revoked"  # t_rev happened: fail closed
-    assert [r.kind for r in records()] == ["genesis", "review_closure"]
+    assert records()==before
     assert gate(w.api.engine) == "journal_behind_db"
     assert_recovering(w.browsers, [("GET", "/library/items"), ("GET", f"/library/items/{w.ids_a['item_id']}")])
     with pytest.raises(RecoveryError, match="journal_behind_db"):
-        do_recover(w.api.engine, w.storage, w.api.clock.now)
-    report = do_recover(w.api.engine, w.storage, w.api.clock.now, confirm_db_current=True)
-    assert report.journal_repaired == 1 and report.gate == "open"
+        do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
+    report = do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True)
+    assert report.journal_repaired == 1 and report.gate == "ready"
     assert [(r.seq, r.kind, r.hash, r.line) for r in records()] == mirror(w.api.engine)
     assert records("revocation")[0].body["item_id"] == w.copy
     assert w.b.get(f"/library/items/{w.copy}").json() == MISSING
@@ -343,6 +348,7 @@ def test_complete_line_whose_fsync_fails_keeps_the_gate_shut_until_recover_confi
     never confirmed durable. The revocation still commits (fail closed), the API answers an error and the
     gate must stay closed; only recover, after its own successful fsync, confirms the record."""
     w = listed(upload_api, monkeypatch, copies=2)  # the second copy stays pending
+    initial_count=len(records())
     restore = fsync_fails(monkeypatch)
     response = revoke(w.admin, w.copy)
     restore()
@@ -362,16 +368,16 @@ def test_complete_line_whose_fsync_fails_keeps_the_gate_shut_until_recover_confi
         publication.revoke(db, admin_principal(w.api), uuid.UUID(w.copies[1]), RevocationReason.OTHER,
                            w.api.clock.now, timedelta(hours=24))
     assert (caught.value.status_code, caught.value.code) == (503, "service_recovering")
-    assert state(w.api, w.copies[1]) == "pending" and len(records()) == 4  # genesis, 2 approvals, 1 revocation
+    assert state(w.api, w.copies[1]) == "pending" and len(records()) == initial_count+1
     # recover cannot confirm while fsync still fails: the gate stays closed.
     restore = fsync_fails(monkeypatch)
     with pytest.raises(RecoveryError, match="journal_sync_failed"):
-        do_recover(w.api.engine, w.storage, w.api.clock.now)
+        do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
     restore()
     assert unconfirmed(w.api.engine) == [rec.seq] and gate(w.api.engine) == "journal_unconfirmed"
     # Once the file syncs, recover confirms the record (no --confirm-db-is-current: the line is in the file).
-    report = do_recover(w.api.engine, w.storage, w.api.clock.now)
-    assert report.journal_confirmed == 1 and report.journal_repaired == 0 and report.gate == "open"
+    report = do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
+    assert report.journal_confirmed == 1 and report.journal_repaired == 0 and report.gate == "ready"
     assert unconfirmed(w.api.engine) == []
     assert w.b.get(f"/library/items/{w.copy}").json() == MISSING
 
@@ -407,10 +413,10 @@ def test_torn_journal_line_is_moved_aside_and_the_record_restored_from_the_datab
     assert response.json() == {"error": "revocation_journal_unavailable"} and state(w.api, w.copy) == "revoked"
     assert gate(w.api.engine) == "journal_torn"
     with pytest.raises(RecoveryError, match="journal_behind_db"):  # the tail is moved aside, the DB is still ahead
-        do_recover(w.api.engine, w.storage, w.api.clock.now)
+        do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
     assert list(journal_file().parent.glob("revocations.jsonl.torn-*"))
     assert gate(w.api.engine) == "journal_behind_db"
-    assert do_recover(w.api.engine, w.storage, w.api.clock.now, confirm_db_current=True).gate == "open"
+    assert do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True).gate == "open"
     assert [(r.seq, r.hash) for r in records()] == [(m[0], m[2]) for m in mirror(w.api.engine)]
 
 
@@ -420,19 +426,19 @@ def test_torn_tail_of_an_append_that_never_committed_is_dropped_without_confirma
         handle.write(b'{"body":{"id":"')
     assert gate(w.api.engine) == "journal_torn"
     assert_recovering(w.browsers, [("GET", "/library/items")])
-    report = do_recover(w.api.engine, w.storage, w.api.clock.now)
-    assert report.torn_tail_dropped and report.gate == "open"
+    report = do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
+    assert report.torn_tail_dropped and report.gate == "ready"
     assert state(w.api, w.copy) == "listed" and w.copy in listed_ids(w.b)
 
 
 def failing_commit(monkeypatch, *, lands: bool):
     """The first Session.commit after the journal line raises; ``lands``: it committed anyway (lost reply)."""
-    real_record, real_commit = recovery.record_revocation, Session.commit
+    real_execute, real_commit = Session.execute, Session.commit
     armed = []
 
-    def record(*args, **kwargs):
-        out = real_record(*args, **kwargs)
-        armed.append(True)
+    def execute(self, statement, *args, **kwargs):
+        out = real_execute(self, statement, *args, **kwargs)
+        if 'ras_auth_common_revocation_mirror' in str(statement): armed.append(True)
         return out
 
     def commit(self):
@@ -444,50 +450,57 @@ def failing_commit(monkeypatch, *, lands: bool):
                 self.rollback()
             raise OperationalError("COMMIT", {}, Exception("connection lost"))
         return real_commit(self)
-    monkeypatch.setattr(recovery, "record_revocation", record)
+    monkeypatch.setattr(Session, "execute", execute)
     monkeypatch.setattr(Session, "commit", commit)
-    return lambda: (monkeypatch.setattr(recovery, "record_revocation", real_record),
+    return lambda: (monkeypatch.setattr(Session, "execute", real_execute),
                     monkeypatch.setattr(Session, "commit", real_commit))
 
 
 @pytest.mark.parametrize("lands", [False, True], ids=["commit_failed", "commit_outcome_unknown"])
-def test_journaled_revocation_whose_commit_fails_is_replayed_at_once(upload_api, monkeypatch, lands):
+def test_runtime_commit_exception_never_replays_until_operator_recovery(upload_api, monkeypatch, lands):
     w = listed(upload_api, monkeypatch)
     restore = failing_commit(monkeypatch, lands=lands)
     response = revoke(w.admin, w.copy)
     restore()
-    assert response.status_code == 200, response.text
+    assert (response.status_code,response.json()) == (503,{'error':'revocation_outcome_uncertain'})
+    assert state(w.api,w.copy) == ('revoked' if lands else 'listed')
+    assert gate(w.api.engine) == ('open' if lands else 'db_behind_journal')
+    do_recover(w.api.setup_engine,w.storage,w.api.clock.now)
     assert state(w.api, w.copy) == "revoked" and gate(w.api.engine) == "open"
     (rec,) = records("revocation")
-    assert mirror(w.api.engine)[-1][2] == rec.hash
+    assert next(row[2] for row in mirror(w.api.engine) if row[0]==rec.seq) == rec.hash
     via = w.api.scalar("SELECT applied_via FROM revocation_journal_records WHERE seq=:s", s=rec.seq)
     assert via == ("revoke" if lands else "replay")
     assert w.b.get(f"/library/items/{w.copy}").json() == MISSING
 
 
-def test_journaled_revocation_whose_commit_and_replay_fail_keeps_the_gate_shut(upload_api, monkeypatch):
+def test_runtime_commit_exception_never_invokes_replay_and_gate_stays_shut(upload_api, monkeypatch):
     w = listed(upload_api, monkeypatch)
     restore = failing_commit(monkeypatch, lands=False)
     real_replay = recovery.replay_record
 
+    called=[]
     def replay_fails(*args, **kwargs):
+        called.append(True)
         raise OperationalError("SELECT", {}, Exception("database gone"))
     monkeypatch.setattr(recovery, "replay_record", replay_fails)
     response = revoke(w.admin, w.copy)
     restore()
     monkeypatch.setattr(recovery, "replay_record", real_replay)
-    assert (response.status_code, response.json()) == (503, {"error": "revocation_pending_recovery"})
+    assert (response.status_code, response.json()) == (503, {"error": "revocation_outcome_uncertain"})
+    assert not called
     # The DB rolled back, but the journal line is a decision: nothing is served until it is applied.
     assert state(w.api, w.copy) == "listed" and gate(w.api.engine) == "db_behind_journal"
     assert_recovering(w.browsers, [("GET", "/library/items"), ("GET", f"/library/items/{w.copy}")])
-    report = do_recover(w.api.engine, w.storage, w.api.clock.now)  # journal -> DB needs no confirmation
-    assert report.replayed["revoked"] == 1 and report.gate == "open"
+    report = do_recover(w.api.setup_engine, w.storage, w.api.clock.now)  # journal -> DB needs no confirmation
+    assert report.replayed["revoked"] == 1 and report.gate == "ready"
     assert state(w.api, w.copy) == "revoked" and w.copy not in listed_ids(w.b)
 
 
 def test_when_neither_journal_nor_database_take_the_revocation_nothing_changes(upload_api, monkeypatch):
     """The one window where a failed revoke leaves the copy served: the Admin gets 503, no state moved."""
     w = listed(upload_api, monkeypatch)
+    before=records()
     real = journal.append
 
     def broken(*args, **kwargs):
@@ -497,9 +510,9 @@ def test_when_neither_journal_nor_database_take_the_revocation_nothing_changes(u
     response = revoke(w.admin, w.copy)
     restore()
     monkeypatch.setattr(journal, "append", real)
-    assert (response.status_code, response.json()) == (503, {"error": "revocation_unavailable"})
-    assert state(w.api, w.copy) == "listed" and [r.kind for r in records()] == ["genesis", "review_closure"]
-    assert len(mirror(w.api.engine)) == 2 and gate(w.api.engine) == "open"
+    assert (response.status_code, response.json()) == (503, {"error": "revocation_outcome_uncertain"})
+    assert state(w.api, w.copy) == "listed" and records()==before
+    assert len(mirror(w.api.engine)) == len(before) and gate(w.api.engine) == "open"
     assert revoke(w.admin, w.copy).status_code == 200  # a retry revokes it
 
 
@@ -521,19 +534,15 @@ def test_concurrent_revocations_get_consecutive_journal_records(upload_api, monk
     w = listed(upload_api, monkeypatch, copies=3)
     for copy in w.copies[1:]:
         assert publish(w.admin, copy).status_code == 409  # same checksum as the first: stays pending
-    principal = admin_principal(w.api)
     barrier = Barrier(4)
     outcomes: list = []
 
     def run(copy):
-        with Session(w.api.engine, expire_on_commit=False) as db:
-            barrier.wait()
-            try:
-                publication.revoke(db, principal, uuid.UUID(copy), RevocationReason.OTHER, w.api.clock.now,
-                                   timedelta(hours=24))
-                outcomes.append((copy, 200))
-            except ApiError as exc:
-                outcomes.append((copy, exc.status_code, exc.code))
+        browser=w.api.admin_browser();browser.csrf()
+        barrier.wait()
+        response=revoke(browser,copy,'other')
+        outcomes.append((copy,200) if response.status_code==200 else
+                        (copy,response.status_code,response.json()['error']))
     threads = [Thread(target=run, args=(c,)) for c in (w.copies[0], w.copies[1], w.copies[2], w.copies[2])]
     for t in threads:
         t.start()
@@ -542,7 +551,8 @@ def test_concurrent_revocations_get_consecutive_journal_records(upload_api, monk
     assert sorted(o for o in outcomes if o[0] != w.copies[2]) == sorted([(w.copies[0], 200), (w.copies[1], 200)])
     assert sorted(o[1:] for o in outcomes if o[0] == w.copies[2]) == [(200,), (409, "common_copy_revoked")]
     revocations = records("revocation")
-    assert [r.seq for r in records()] == [1, 2, 3, 4, 5, 6, 7]  # genesis, 3 approvals, 3 revocations
+    assert [r.seq for r in records()] == list(range(1,len(records())+1))
+    assert len(revocations)==3
     assert sorted(r.body["item_id"] for r in revocations) == sorted(w.copies)
     assert mirror(w.api.engine) == [(r.seq, r.kind, r.hash, r.line) for r in records()]
     assert gate(w.api.engine) == "open"
@@ -577,9 +587,9 @@ def test_lost_older_or_corrupt_journal_closes_the_gate_and_is_rebuilt_only_on_co
     assert gate(w.api.engine) == "journal_missing"
     assert_recovering(w.browsers, routes)
     with pytest.raises(RecoveryError, match="journal_missing"):
-        do_recover(w.api.engine, w.storage, w.api.clock.now)
-    report = do_recover(w.api.engine, w.storage, w.api.clock.now, confirm_db_current=True)
-    assert report.journal_rebuilt == 3 and report.gate == "open"  # genesis, approval, revocation
+        do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
+    report = do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True)
+    assert report.journal_rebuilt == 3 and report.gate == "ready"  # genesis, approval, revocation
     assert path.read_bytes().startswith(good)  # the same lines, then this recovery's begin/end
 
     older = path.read_bytes().split(b"\n")
@@ -587,8 +597,8 @@ def test_lost_older_or_corrupt_journal_closes_the_gate_and_is_rebuilt_only_on_co
     assert gate(w.api.engine) == "journal_behind_db"
     assert_recovering(w.browsers, routes)
     with pytest.raises(RecoveryError, match="journal_behind_db"):
-        do_recover(w.api.engine, w.storage, w.api.clock.now)
-    assert do_recover(w.api.engine, w.storage, w.api.clock.now, confirm_db_current=True).journal_repaired == 4
+        do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
+    assert do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True).journal_repaired == 4
 
     current = path.read_bytes()
     lines = current.split(b"\n")
@@ -599,7 +609,7 @@ def test_lost_older_or_corrupt_journal_closes_the_gate_and_is_rebuilt_only_on_co
     assert_recovering(w.browsers, routes)
     for confirm in (False, True):  # never rewritten automatically
         with pytest.raises(RecoveryError, match="journal_corrupt"):
-            do_recover(w.api.engine, w.storage, w.api.clock.now, confirm_db_current=confirm)
+            do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=confirm)
     path.write_bytes(current)
     assert gate(w.api.engine) == "open"
     assert w.b.get(f"/library/items/{w.copy}").json() == MISSING
@@ -658,7 +668,7 @@ def test_restore_from_before_a_revocation_serves_and_processes_nothing_until_rec
 
         report = do_recover(snap.engine, storage, api.clock.now)
         assert report.replayed == {"recovery_begin": 1, "revoked": 1, "recovery_end": 1}
-        assert report.cleanup == {"deleted": 2} and report.gate == "open"  # this copy and the one revoked earlier
+        assert report.cleanup == {"deleted": 2} and report.gate == "ready"  # this copy and the one revoked earlier
         with snap.engine.connect() as conn:
             assert conn.scalar(text("SELECT ras_common_copy_derived_left(:i)"), {"i": uuid.UUID(w.ok)}) == []
             assert conn.scalar(text("SELECT count(*) FROM chunks WHERE item_id=:i"), {"i": uuid.UUID(w.ok)}) == 0
@@ -705,7 +715,7 @@ def test_restore_replays_revocations_of_copies_the_snapshot_never_had(upload_api
         # The later copy's approval closed a request the snapshot never had: only its mirror row is added.
         assert report.replayed == {"recovery_begin": 1, "revoked": 1, "recorded_item_absent": 1, "recovery_end": 1,
                                    "recorded_request_absent": 1}
-        assert report.gate == "open"
+        assert report.gate == "ready"
         with snap.engine.connect() as conn:
             assert conn.scalar(text("SELECT count(*) FROM library_items WHERE id=:i"), {"i": uuid.UUID(later)}) == 0
             tomb = conn.execute(text("SELECT purged_at IS NOT NULL, object_outcome FROM deletion_tombstones"
@@ -732,7 +742,7 @@ def test_adopts_a_database_older_than_its_registration(upload_api, monkeypatch, 
         assert gate(old) == "not_registered"
         assert_recovering(w.browsers, [("GET", "/library/items")])
         report = do_recover(old, w.storage, w.api.clock.now)
-        assert report.adopted and report.gate == "open"
+        assert report.adopted and report.gate == "ready"
         assert report.replayed == {"genesis": 1, "recorded_item_absent": 1, "recovery_begin": 1, "recovery_end": 1,
                                    "recorded_request_absent": 1}
         assert mirror(old) == [(r.seq, r.kind, r.hash, r.line) for r in records()]
@@ -761,7 +771,7 @@ def test_cleanup_failure_during_recovery_keeps_the_gate_shut_until_a_rerun_succe
         assert_recovering(w.browsers, [("GET", "/library/items"), ("GET", f"/files/{w.ids_a['file_id']}/original")])
         monkeypatch.setattr(w.storage, "delete", real_delete)
         report = do_recover(snap.engine, w.storage, w.api.clock.now)
-        assert report.gate == "open" and not key_present(w.storage, key)
+        assert report.gate == "ready" and not key_present(w.storage, key)
         kinds = [r.kind for r in records()]
         assert kinds == ["genesis", "review_closure", "revocation", "recovery_begin",
                          "recovery_end"]  # the rerun closed the same run
@@ -787,7 +797,7 @@ def test_a_record_naming_a_private_item_is_refused_and_touches_nothing(upload_ap
     before = item_rows(w.api.engine, w.ids_b["item_id"])
     assert gate(w.api.engine) == "db_behind_journal"
     with pytest.raises(RecoveryError, match="record_names_another_item"):
-        do_recover(w.api.engine, w.storage, w.api.clock.now)
+        do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
     assert item_rows(w.api.engine, w.ids_b["item_id"]) == before
     assert gate(w.api.engine) == "db_behind_journal"  # the refused record and the open recovery are not applied
     assert_recovering(w.browsers, [("GET", f"/library/items/{w.ids_b['item_id']}")])
@@ -843,6 +853,6 @@ def test_objects_restored_from_an_older_object_backup_are_removed_by_recover(upl
     assert gate(w.api.engine) == "open"
     assert w.a.get(f"/files/{common_file(w.api, w.copy)}/original").json() == MISSING
     # ...so the runbook runs `recover` after any restore, and its sweep removes it.
-    report = do_recover(w.api.engine, w.storage, w.api.clock.now)
-    assert report.objects_removed == 1 and report.gate == "open" and not key_present(w.storage, key)
+    report = do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
+    assert report.objects_removed == 1 and report.gate == "ready" and not key_present(w.storage, key)
     assert w.a.get(f"/files/{w.ids_a['file_id']}/original").content == A_BODY

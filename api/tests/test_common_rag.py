@@ -28,7 +28,8 @@ from tests.test_common_search import (MISSING, TAMPERS, build, chunk_ids, copy_o
                                       hit_items, ok_ids, out_of_band, search)
 from tests.test_pdf_ingest import partial_pdf, upload_pdf
 from tests.test_publication import revoke, revoke_in_own_session
-from tests.test_uploads import upload_api  # noqa: F401  (fixture)
+from tests.original_fixtures import upload_api, base_upload_api  # noqa: F401
+from tests.test_c2c1_bootstrap import installation  # noqa: F401
 
 QUESTION = "Sharedcanary result?"
 FORBIDDEN = ("Pendingcanary", "Metacanary", "Revokedcanary", "Refcanary")

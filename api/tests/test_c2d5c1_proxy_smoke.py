@@ -111,7 +111,7 @@ def test_chrome_publish_metadata_checksum_acl_slow_hash_and_unknown_no_repost(pu
                 assert ordinary.json()['item']['fulltext_search_available'] is False
 
                 # Unchanged bytes are a separate candidate, so revoke the first
-                # via the labelled legacy journaled owner adversary before publishing another.
+                # via runtime revoke before publishing another.
                 from tests.test_c2d5c1_common_publish import revoke
                 revoke(b)
                 b.copy = pending(b)

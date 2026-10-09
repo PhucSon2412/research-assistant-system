@@ -29,7 +29,8 @@ from tests.test_private_index import fake_provider, settings_with_fake_key
 from tests.test_publication import MISSING, publish, revoke, revoke_in_own_session
 from tests.test_review_approval import approve
 from tests.test_review_requests import submit
-from tests.test_uploads import upload_api  # noqa: F401  (fixture)
+from tests.original_fixtures import upload_api, base_upload_api  # noqa: F401
+from tests.test_c2c1_bootstrap import installation  # noqa: F401
 
 MAIN = (b"# Shared Search Fixture\n\n## Abstract\nSharedcanary abstract of the method.\n\n## Methods\n"
         b"Sharedcanary result is nine units in the measured run.\n\n## References\n"
@@ -320,7 +321,7 @@ def ok_ids(w) -> dict:
 
 
 def out_of_band(w, sql: str, params: dict) -> None:
-    with w.api.engine.begin() as conn:
+    with w.api.setup_engine.begin() as conn:  # labelled privileged corruption, never HTTP
         conn.execute(text("SET LOCAL session_replication_role = replica"))
         conn.execute(text(sql), {k: v for k, v in params.items() if f":{k}" in sql})
 
