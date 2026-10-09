@@ -568,11 +568,15 @@ def test_restore_current_intent_retention_cleanup_private_intact_idempotent(publ
     b = publishes
     assert publish(b).status_code == 200
     derived(b.w,b.copy,'DERIVED COMMON')
+    with b.w.engine.begin() as c:
+        job = c.scalar(text("INSERT INTO ingestion_jobs(origin,scope_visibility,item_id,version_id,source_file_id,rights_epoch_at_start,idempotency_key,state)"
+            " VALUES('promotion','common',:i,:v,:f,0,:k,'received') RETURNING id"),
+            dict(i=b.copy.item,v=b.copy.version,f=b.copy.file,k=str(uuid.uuid4())))
     with backup(SimpleNamespace(engine=b.w.engine),admin_engine) as snap:
         if snapshot == 'absent':
             with snap.engine.begin() as c:
                 c.execute(text("SET LOCAL session_replication_role='replica'"))
-                for table in ('reference_entries','chunks','sections','metadata_candidates','pdf_pages','common_publications','access_rights','source_files','paper_versions'):
+                for table in ('reference_entries','chunks','sections','metadata_candidates','pdf_pages','ingestion_jobs','common_publications','access_rights','source_files','paper_versions'):
                     c.execute(text(f'DELETE FROM {table} WHERE item_id=:i'),{'i':b.copy.item})
                 c.execute(text('DELETE FROM library_items WHERE id=:i'),{'i':b.copy.item})
         bases = [dict(field='title',policy_source='synthetic policy',scope='this copy',reason='synthetic basis')] if retain else []
@@ -597,6 +601,9 @@ def test_restore_current_intent_retention_cleanup_private_intact_idempotent(publ
             if snapshot == 'present':
                 assert c.scalar(text('SELECT publication_state FROM library_items WHERE id=:i'),{'i':b.copy.item})=='revoked'
                 assert (c.scalar(text('SELECT title FROM library_items WHERE id=:i'),{'i':b.copy.item}) is not None)==retain
+                assert c.execute(text('SELECT cancel_requested,state FROM ingestion_jobs WHERE id=:j'),{'j':job}).one()==(True,'cancelled')
+            else:
+                assert c.scalar(text('SELECT count(*) FROM ingestion_jobs WHERE id=:j'),{'j':job})==0
             assert c.scalar(text('SELECT count(*) FROM chunks WHERE item_id=:i'),{'i':b.copy.item})==0
         report = recovery.recover(snap.engine,b.raw_storage,settings,NOW)
         assert report.reconciliation_complete and not report.safety_ready

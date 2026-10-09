@@ -697,11 +697,15 @@ def test_publish_revoke_real_lock_wait_both_orders_and_current_history_response(
             return real(*a, **kw)
         monkeypatch.setattr(publication, '_cancel_jobs', hold)
     else:
-        real = boundary._binding
+        # Hold the writer item lock before journal acquisition. Revoke now has
+        # a genuine integrity preflight which otherwise waits on journal first.
+        real = boundary._lock_item
         def hold(*a, **kw):
-            entered.set(); assert release.wait(15)
-            return real(*a, **kw)
-        monkeypatch.setattr(boundary, '_binding', hold)
+            result = real(*a, **kw)
+            if kw.get('writer'):
+                entered.set(); assert release.wait(15)
+            return result
+        monkeypatch.setattr(boundary, '_lock_item', hold)
     with ThreadPoolExecutor(2) as pool:
         f = pool.submit(revoke if first == 'revoke' else direct, b)
         try:
