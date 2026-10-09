@@ -33,16 +33,20 @@ MUTANTS=[
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--context',type=Path,required=True);a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--context',type=Path,required=True)
+    p.add_argument('--only',choices=[m[0] for m in MUTANTS])
+    p.add_argument('--prefix',default='mutant',choices=['mutant','strong'])
+    a=p.parse_args()
     report=[]
     for name,path,old,new,node in MUTANTS:
+        if a.only and name!=a.only:continue
         file=ROOT/path;original=file.read_bytes();source=original.decode('utf-8').replace('\r\n','\n')
         if source.count(old)!=(2 if name=='sha256' else 1):raise SystemExit('nonunique mutant anchor: '+name)
         changed=source.replace(old,new,1)
         if name=='item-job':
             changed=changed.replace('.with_for_update(skip_locked=skip).execution_options(populate_existing=True))',
                 '.with_for_update().execution_options(populate_existing=True))',1)
-        xml=a.context/('mutant-'+name+'.xml');log=a.context/('mutant-'+name+'.log')
+        xml=a.context/(a.prefix+'-'+name+'.xml');log=a.context/(a.prefix+'-'+name+'.log')
         if xml.exists() or log.exists():raise SystemExit('refusing to overwrite raw mutant evidence')
         try:
             file.write_bytes(changed.encode('utf-8'))
@@ -58,7 +62,7 @@ def main():
             file.write_bytes(original)
             assert file.read_bytes()==original
         print(name+': '+json.dumps(report[-1]),flush=True)
-    (a.context/'counterchecks.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
+    (a.context/('counterchecks'+('-'+a.prefix if a.prefix!='mutant' else '')+'.json')).write_text(json.dumps(report,indent=2),encoding='utf-8')
     return 0 if all(r['caught'] for r in report) else 1
 
 

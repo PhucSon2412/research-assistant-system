@@ -14,7 +14,7 @@ from app.config import get_settings
 from app.db import get_engine
 from app.identity.sessions import revoke_session
 from app.identity.session_commit import commit_auth
-from app.ingest import worker, checkpoints
+from app.ingest import worker, checkpoints, runtime
 from app.models.enums import SessionRevokeReason
 from tests.test_c2c1_bootstrap import installation  # noqa: F401
 from tests.test_c2c2_invitations import world  # noqa: F401
@@ -113,7 +113,10 @@ def test_claim_revoke_order_business_result_no_deadlock(common,monkeypatch,first
             return original(*args,**kwargs)
         monkeypatch.setattr(publication,'_cancel_jobs',hold)
     def claim():
-        with Session(b.w.runtime) as db:return worker.claim_job(db,b.job,get_settings())
+        try:
+            with Session(b.w.runtime) as db:return worker.claim_job(db,b.job,get_settings())
+        except runtime.Halt as exc:
+            return exc.code
     def revoke():return runtime_revoke(b.w,b.copy.item,clock=b.clock)
     with ThreadPoolExecutor(2) as pool:
         one=pool.submit(claim if first=='claim' else revoke)
@@ -121,13 +124,16 @@ def test_claim_revoke_order_business_result_no_deadlock(common,monkeypatch,first
         two=pool.submit(revoke if first=='claim' else claim)
         try:
             if first=='claim':assert wait_for(b.w.engine,'transactionid')
-            else:assert two.result(5) is None  # SKIP LOCKED item, not job-before-item wait
+            else:two.result(5)  # must settle before releasing revoke's item lock
         finally:release.set()
         a,z=one.result(20),two.result(20)
     assert (z if first=='claim' else a)['item']['publication_state']=='revoked'
     assert jobs(b)[0]['attempt_count']==(1 if first=='claim' else 0)
     assert jobs(b)[0]['cancel_requested'] and not b.opens
     assert count(b,'sections')==count(b,'chunks')==0
+    token = a if first=='claim' else z
+    if first=='revoke':assert token is None  # business SKIP, not a controlled lock error
+    else:assert isinstance(token,uuid.UUID)
 
 
 @pytest.mark.parametrize('change',['fulltext','external','conditions','epoch','checksum','version'])

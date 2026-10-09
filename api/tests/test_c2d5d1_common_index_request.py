@@ -500,8 +500,14 @@ def test_worker_item_job_checkpoint_order_and_claim_skip(indexes, monkeypatch, f
         ar, zr = a.result(20), z.result(20)
     index_result, token = (zr, ar) if first == 'worker' else (ar, zr)
     assert index_result['created'] is False and index_result['job']['id'] == str(job)
-    if first == 'index':  # the waiting worker checkpoint resumes after index released item/job
-        assert token is not None and jobs(b)[0]['state'] == 'validating'
+    # The new response may reacquire item SHARE before the runtime claim. A
+    # SKIP LOCKED claim then leaves the durable job untouched for the next tick.
+    if token is None:
+        assert jobs(b)[0]['state'] == 'received' and jobs(b)[0]['attempt_count'] == 0
+        with Session(b.w.runtime) as d:
+            token = worker.claim_job(d, job, get_settings())
+    assert token is not None and jobs(b)[0]['state'] == 'validating'
+    assert jobs(b)[0]['attempt_count'] == 1
     assert len(jobs(b)) == 1
 
 
@@ -510,7 +516,7 @@ def test_response_reflects_current_job_after_known_commit(indexes, monkeypatch, 
     b = indexes; real = boundary.respond
     def respond(principal, item_id, csrf, clock, settings, outcome):
         if case == 'advance':
-            with Session(b.w.engine) as d:  # legacy worker claim, labelled
+            with Session(b.w.runtime) as d:  # real extraction checkpoint
                 assert worker.claim_job(d, outcome.job_id, get_settings(), NOW)
         else:
             runtime_revoke(b.w, b.copy.item, clock=b.clock)
