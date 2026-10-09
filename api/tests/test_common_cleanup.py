@@ -33,7 +33,8 @@ from tests.test_private_index import fake_provider, settings_with_fake_key
 from tests.test_publication import MISSING, content_routes, publish, revoke, revoke_in_own_session
 from tests.test_review_approval import approve
 from tests.test_review_requests import submit, write
-from tests.test_uploads import upload_api  # noqa: F401  (fixture)
+from tests.original_fixtures import upload_api, base_upload_api  # noqa: F401
+from tests.test_c2c1_bootstrap import installation  # noqa: F401
 
 ARXIV_ID = "2609.00011"
 MD_BODY = (b"# Cleanup Fixture\n\n## Abstract\nA summary of the reviewable method.\n\n## Methods\n"
@@ -70,7 +71,7 @@ def common_copy(api, owner, admin, ids, body: bytes) -> str:
 
 def clone_derived(api, src_item: str, copy: str, canary: str) -> None:
     """Write onto ``copy`` the private pipeline output of ``src_item`` (same bytes), texts + canary."""
-    with api.engine.begin() as conn:
+    with api.setup_engine.begin() as conn:
         dst = uuid.UUID(copy)
         version, file_id = conn.execute(text("SELECT version_id, id FROM source_files WHERE item_id=:i"),
                                         {"i": dst}).one()
@@ -158,7 +159,7 @@ def rows_of(api, item_id: str) -> dict[str, list]:
         "item": "SELECT * FROM library_items WHERE id=:i", "versions": "SELECT * FROM paper_versions WHERE item_id=:i",
         "files": "SELECT * FROM source_files WHERE item_id=:i", "jobs": "SELECT * FROM ingestion_jobs WHERE item_id=:i",
         "attempts": "SELECT a.* FROM ingest_step_attempts a JOIN ingestion_jobs j ON j.id=a.job_id WHERE j.item_id=:i"}
-    with api.engine.connect() as conn:
+    with api.setup_engine.connect() as conn:
         return {name: sorted(tuple(map(str, r)) for r in conn.execute(text(sql), {"i": i}).all())
                 for name, sql in queries.items()}
 
@@ -174,7 +175,7 @@ def derived_left(api, item_id: str) -> list[str]:
 
 def ledger(api, item_id: str) -> list[tuple]:
     """The cost columns of the copy's embedding calls, which cleanup keeps."""
-    with api.engine.connect() as conn:
+    with api.setup_engine.connect() as conn:
         return sorted(tuple(r) for r in conn.execute(text("""SELECT c.id, c.model_id, c.provider, c.response_model_id,
             c.response_provider, c.pipeline_version, c.status, c.dimensions, c.input_tokens, c.reserved_usd,
             c.cost_usd, c.cost_status, c.reserved_day, c.owner_user_id FROM embedding_calls c
@@ -220,7 +221,7 @@ def world(upload_api, monkeypatch):
     api.create_user("a@example.org")
     api.create_user("b@example.org")
     a, b, admin = api.user_browser("a@example.org"), api.user_browser("b@example.org"), api.admin_browser()
-    harvest(api.engine, oai_page([(ARXIV_ID, "Exact Linking Study", 1, "2026-09-28")]))
+    harvest(api.setup_engine, oai_page([(ARXIV_ID, "Exact Linking Study", 1, "2026-09-28")]))
     settings = settings_with_fake_key()
     fake_provider(monkeypatch)
     ids = {"a_md": indexed(storage, a, MD_BODY, settings), "a_pdf": indexed(storage, a, PDF_BODY, settings, pdf=True),
@@ -246,7 +247,7 @@ def test_cleanup_removes_every_derivative_of_the_revoked_copies_and_nothing_else
     assert all(counts["pdf"][t] > 0 for t in DERIVED if t != "metadata_candidates"), counts["pdf"]
     assert api.scalar("""SELECT count(*) FROM reference_citation_links l JOIN reference_entries r ON r.id=l.reference_id
         WHERE r.item_id=:i AND l.match_status='linked'""", i=uuid.UUID(md)) == 1
-    with api.engine.connect() as conn:
+    with api.setup_engine.connect() as conn:
         hashes = conn.scalars(text("SELECT chunk_hash FROM chunks WHERE item_id IN (:m, :p)"),
                               {"m": uuid.UUID(md), "p": uuid.UUID(pdf)}).all()
     assert hashes
@@ -255,7 +256,7 @@ def test_cleanup_removes_every_derivative_of_the_revoked_copies_and_nothing_else
     box = write(browsers["b"], "POST", "/collections", {"name": "B"}).json()["collection"]
     assert write(browsers["b"], "POST", f"/collections/{box['id']}/items", {"item_id": md}).status_code == 201
     assert_blocked(api, browsers, md, "MDCANARY", listed=True)  # a listed copy's derived rows were never served
-    with api.engine.begin() as conn:  # stale links: the backfill would pick both copies' references
+    with api.setup_engine.begin() as conn:  # stale links: the backfill would pick both copies' references
         conn.execute(text("UPDATE reference_citation_links SET matcher_version='old' WHERE reference_id IN"
                           " (SELECT id FROM reference_entries WHERE item_id IN (:m, :o))"),
                      {"m": uuid.UUID(md), "o": uuid.UUID(other)})
@@ -265,10 +266,10 @@ def test_cleanup_removes_every_derivative_of_the_revoked_copies_and_nothing_else
         assert_blocked(api, browsers, copies[name], f"{name.upper()}CANARY")  # from t_rev, rows still present
     assert derived_counts(api, md) == counts["md"]
     # Link writers skip a revoked copy instead of failing on the fence (discovery re-target, backfill).
-    with Session(api.engine) as db:
+    with Session(api.setup_engine) as db:
         citations.reconcile_arxiv_ids(db, [ARXIV_ID])
         db.commit()
-    backfill = citations.reconcile_pending(api.engine, settings_with_fake_key().citations)
+    backfill = citations.reconcile_pending(api.setup_engine, settings_with_fake_key().citations)
     assert backfill["references"] == counts["md"]["reference_entries"]  # the other copy's only (same bytes)
     stale = """SELECT count(*) FROM reference_citation_links l JOIN reference_entries r ON r.id=l.reference_id
         WHERE r.item_id=:i AND l.matcher_version='old'"""
@@ -276,12 +277,12 @@ def test_cleanup_removes_every_derivative_of_the_revoked_copies_and_nothing_else
     assert api.scalar(stale, i=uuid.UUID(other)) == 0
     kept["other"] = rows_of(api, other)
 
-    assert publication.cleanup_revoked(api.engine, storage, api.clock.now, 50) == {"deleted": 2}
+    assert publication.cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 2}
     for name in ("md", "pdf"):
         copy = copies[name]
         assert derived_counts(api, copy) == dict.fromkeys(DERIVED, 0), name
         assert derived_left(api, copy) == []
-        with api.engine.connect() as conn:
+        with api.setup_engine.connect() as conn:
             item = conn.execute(text("SELECT active_index_generation_id, content_status FROM library_items"
                                      " WHERE id=:i"), {"i": uuid.UUID(copy)}).one()
             calls = conn.execute(text("""SELECT c.vector IS NULL, c.chunk_hash IS NULL, c.content_removed_at FROM
@@ -323,12 +324,12 @@ def test_cleanup_removes_every_derivative_of_the_revoked_copies_and_nothing_else
 
     # Rerunning changes nothing.
     before = {name: rows_of(api, copies[name]) for name in copies}
-    assert publication.cleanup_revoked(api.engine, storage, api.clock.now, 50) == {}
+    assert publication.cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {}
     assert {name: rows_of(api, copies[name]) for name in copies} == before
 
     # A scrubbed call still reserved keeps its slot and ceiling until its lease expires; the reaper then
     # marks it uncertain as usual (status/lease updates are not content). Private ingest still works.
-    with api.engine.begin() as conn:
+    with api.setup_engine.begin() as conn:
         conn.execute(text("UPDATE embedding_calls SET lease_until = now() - interval '1 second'"
                           " WHERE status='reserved'"))
     settings = settings_with_fake_key()
@@ -383,7 +384,7 @@ def test_late_writes_after_purge_are_refused_and_cost_stays_reconcilable(world):
     api, storage, browsers, ids, copies = world
     md = copies["md"]
     assert revoke(browsers["admin"], md).status_code == 200
-    with api.engine.connect() as conn:
+    with api.setup_engine.connect() as conn:
         generation = conn.scalar(text("SELECT id FROM index_generations WHERE item_id=:i"), {"i": uuid.UUID(md)})
     # Between t_rev and cleanup the rows still exist, and nothing can be added to or re-published from them.
     for statement, message in (
@@ -393,33 +394,33 @@ def test_late_writes_after_purge_are_refused_and_cost_stays_reconcilable(world):
             ("UPDATE chunks SET text = text || ' again' WHERE item_id=:i", CLOSED),
             ("UPDATE index_entries SET text = text || ' again' WHERE generation_id=:g", CLOSED),
             ("UPDATE index_generations SET state='superseded' WHERE item_id=:i", CLOSED)):
-        with pytest.raises(IntegrityError, match=message), api.engine.begin() as conn:
+        with pytest.raises(IntegrityError, match=message), api.setup_engine.begin() as conn:
             conn.execute(text(statement), {"i": uuid.UUID(md), "g": generation})
     # Revoke already left the index (M6b-2b2b): no active pointer from t_rev, and it cannot come back.
     assert api.scalar("SELECT active_index_generation_id IS NULL AND content_status='metadata_only'"
                       " FROM library_items WHERE id=:i", i=uuid.UUID(md))
-    with pytest.raises(IntegrityError, match="never indexed again"), api.engine.begin() as conn:
+    with pytest.raises(IntegrityError, match="never indexed again"), api.setup_engine.begin() as conn:
         conn.execute(text("UPDATE library_items SET active_index_generation_id=:g WHERE id=:i"),
                      {"i": uuid.UUID(md), "g": generation})
     # Purging with rows left is refused by the DB, whatever the application does (metadata removed first,
     # so the 0023 metadata guard is satisfied and the 0024 derived guard decides).
     with pytest.raises(IntegrityError, match="cleanup must remove derived chunks, embedding_content"), \
-            Session(api.engine) as db:
+            Session(api.setup_engine) as db:
         publication._remove_metadata(db, uuid.UUID(md), api.clock.now)
         db.execute(text("""UPDATE deletion_tombstones SET purged_at=now(), object_outcome='no_object',
             scrubbed_fields='{}', retained_fields='{}' WHERE item_id=:i"""), {"i": uuid.UUID(md)})
     # Only a revoked copy's embedding content can be removed: never a private one.
-    with pytest.raises(IntegrityError, match="only a revoked common copy"), api.engine.begin() as conn:
+    with pytest.raises(IntegrityError, match="only a revoked common copy"), api.setup_engine.begin() as conn:
         conn.execute(text("""UPDATE embedding_calls SET vector=NULL, chunk_hash=NULL, content_removed_at=now()
             WHERE source_file_id=:f"""), {"f": uuid.UUID(ids["a_md"]["file_id"])})
 
-    assert publication.cleanup_revoked(api.engine, storage, api.clock.now, 50) == {"deleted": 1}
+    assert publication.cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 1}
     for statement, message in late_writes(api, md, ids["a_md"]):
-        with pytest.raises(IntegrityError, match=message), api.engine.begin() as conn:
+        with pytest.raises(IntegrityError, match=message), api.setup_engine.begin() as conn:
             conn.execute(text(statement), {"i": uuid.UUID(md)})
     assert derived_left(api, md) == []
     # Late cost reconciliation (status, tokens, cost) is still accepted on a scrubbed call.
-    with api.engine.begin() as conn:
+    with api.setup_engine.begin() as conn:
         call = conn.scalar(text("""UPDATE embedding_calls SET status='completed', cost_usd=0.00002,
             cost_status='usage_price_estimate', input_tokens=7, lease_until=NULL
             WHERE status='reserved' AND source_file_id=(SELECT id FROM source_files WHERE item_id=:i)
@@ -427,14 +428,20 @@ def test_late_writes_after_purge_are_refused_and_cost_stays_reconcilable(world):
     assert call is not None
     assert api.scalar("SELECT vector IS NULL AND chunk_hash IS NULL FROM embedding_calls WHERE id=:c", c=call)
     # Private items are unaffected by the fence.
-    with api.engine.begin() as conn:
+    with api.setup_engine.begin() as conn:
         conn.execute(text("UPDATE chunks SET text = text WHERE item_id=:i"), {"i": uuid.UUID(ids["a_md"]["item_id"])})
 
 
 def wait_for_lock_wait(api) -> None:
     deadline = time.monotonic() + 10
-    while api.scalar("""SELECT count(*) FROM pg_stat_activity WHERE datname=current_database()
-            AND wait_event_type='Lock'""") == 0:
+    # Runtime cannot inspect other users' pg_stat_activity fields. The owner
+    # observes this labelled legacy adversary; no runtime grants are widened.
+    while True:
+        with api.setup_engine.connect() as conn:
+            waiting = conn.scalar(text("""SELECT count(*) FROM pg_stat_activity
+                WHERE datname=current_database() AND wait_event_type='Lock'"""))
+        if waiting:
+            return
         assert time.monotonic() < deadline, "nothing waited for the item lock"
         time.sleep(0.02)
 
@@ -449,7 +456,7 @@ def test_writer_before_revoke_commits_first_and_cleanup_removes_its_rows(world, 
     api, storage, browsers, ids, copies = world
     md = copies["md"]
     before = derived_counts(api, md)
-    conn = api.engine.connect()
+    conn = api.setup_engine.connect()
     tx = conn.begin()
     conn.execute(text(LATE_SECTION), {"i": uuid.UUID(md)})  # holds the item FOR KEY SHARE until commit
     outcome = {}
@@ -470,7 +477,7 @@ def test_writer_before_revoke_commits_first_and_cleanup_removes_its_rows(world, 
     revoker.join(10)
     assert outcome == {"ok": True}
     assert derived_counts(api, md)["sections"] == before["sections"] + 1
-    assert publication.cleanup_revoked(api.engine, storage, api.clock.now, 50) == {"deleted": 1}
+    assert publication.cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 1}
     assert derived_counts(api, md) == dict.fromkeys(DERIVED, 0)
     assert "RACECANARY" not in api.dump_all_text()
 
@@ -497,7 +504,7 @@ def test_writer_waiting_on_a_revoke_is_refused_after_t_rev(world, monkeypatch):
 
     def write_it():
         try:
-            with api.engine.begin() as c:
+            with api.setup_engine.begin() as c:
                 c.execute(text(LATE_SECTION), {"i": uuid.UUID(pdf)})
             outcome["written"] = True
         except IntegrityError as exc:
@@ -515,7 +522,7 @@ def test_writer_waiting_on_a_revoke_is_refused_after_t_rev(world, monkeypatch):
     assert outcome.get("revoked") is True and "written" not in outcome
     assert CLOSED in outcome["refused"]
     assert derived_counts(api, pdf) == before
-    assert publication.cleanup_revoked(api.engine, storage, api.clock.now, 50) == {"deleted": 1}
+    assert publication.cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 1}
     assert derived_counts(api, pdf) == dict.fromkeys(DERIVED, 0)
 
 
@@ -528,14 +535,14 @@ def test_failure_mid_cleanup_rolls_back_everything_and_is_retried(world, monkeyp
     now = api.clock.now
 
     def tomb():
-        with api.engine.connect() as conn:
+        with api.setup_engine.connect() as conn:
             return conn.execute(text("SELECT purged_at, cleanup_attempts, last_cleanup_error FROM deletion_tombstones"
                                      " WHERE item_id=:i"), {"i": uuid.UUID(md)}).one()
 
     # 1. A DB error after the derived rows were deleted: everything rolls back.
     real_finish = publication._finish_jobs
     monkeypatch.setattr(publication, "_finish_jobs", lambda db, item_id, at: db.execute(text("SELECT 1/0")))
-    assert publication.cleanup_revoked(api.engine, storage, now, 50) == {"error:cleanup_failed": 1}
+    assert publication.cleanup_revoked(api.setup_engine, storage, now, 50) == {"error:cleanup_failed": 1}
     assert rows_of(api, md) == rows and tuple(tomb()) == (None, 1, "cleanup_failed")
     monkeypatch.setattr(publication, "_finish_jobs", real_finish)
 
@@ -544,7 +551,7 @@ def test_failure_mid_cleanup_rolls_back_everything_and_is_retried(world, monkeyp
         def size(self, key):
             raise ConnectionError("synthetic S3 outage")
 
-    assert publication.cleanup_revoked(api.engine, Down(), now, 50) == {"error:storage_unavailable": 1}
+    assert publication.cleanup_revoked(api.setup_engine, Down(), now, 50) == {"error:storage_unavailable": 1}
     assert rows_of(api, md) == rows and tuple(tomb()) == (None, 2, "storage_unavailable")
 
     # 3. The object is deleted, then the transaction fails: rows come back, the object stays gone.
@@ -555,7 +562,7 @@ def test_failure_mid_cleanup_rolls_back_everything_and_is_retried(world, monkeyp
         raise RuntimeError("synthetic failure after the object delete")
 
     monkeypatch.setattr(publication, "_remove_metadata", fail_after_object)
-    assert publication.cleanup_revoked(api.engine, storage, now, 50) == {"error:cleanup_failed": 1}
+    assert publication.cleanup_revoked(api.setup_engine, storage, now, 50) == {"error:cleanup_failed": 1}
     assert rows_of(api, md) == rows and tuple(tomb()) == (None, 3, "cleanup_failed")
     assert key not in {k for k, _ in storage.orphan_keys("")}
     detail = browsers["admin"].get(f"/admin/common-copies/{md}").json()["item"]["tombstone"]
@@ -564,7 +571,7 @@ def test_failure_mid_cleanup_rolls_back_everything_and_is_retried(world, monkeyp
     monkeypatch.setattr(publication, "_remove_metadata", real)
 
     # The retry finishes the job.
-    assert publication.cleanup_revoked(api.engine, storage, now, 50) == {"already_absent": 1}
+    assert publication.cleanup_revoked(api.setup_engine, storage, now, 50) == {"already_absent": 1}
     assert derived_counts(api, md) == dict.fromkeys(DERIVED, 0)
     purged_at, attempts, error = tomb()
     assert (purged_at, attempts, error) == (now, 4, None)

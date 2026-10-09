@@ -1,26 +1,11 @@
 """Publish, revoke and clean up reviewed common copies (M6b-2a).
 
-**Publish** moves a ``pending`` copy (M6b-1) to ``listed``: every User then
-sees its *metadata* in the library. ``content_status`` stays
-``metadata_only``; publishing creates no job, index or provider call. The
-original opens only under ``common_original_clause`` (M6b-2b1), and an Admin
-may then index the listed copy through ``app.common_index`` (M6b-2b2b). Order:
-
-1. Lock the item, then its rights, ``FOR UPDATE`` (the order revoke and
-   tombstone replay use) and only then check state, exactly one live
-   AccessRights at the item's epoch, file/version/checksum, the Admin's
-   confirmed checksum and no live publication with the same checksum. Every
-   refusal is decided on this locked state: a revoke either committed before
-   the lock (-> ``common_copy_revoked``) or waits for this transaction. There
-   is deliberately no unlocked pre-check: it read the item and the rights in
-   two statements, so a revoke committing between them surfaced as
-   ``rights_not_publishable``.
-2. Still under the lock, read the *common* object back and compare size and
-   SHA-256 with the common SourceFile and the rights (never the private
-   file's). Missing or different bytes refuse; the item stays ``pending``.
-3. Insert ``common_publications`` and set ``listed``. Its partial unique
-   index lets one live publication per checksum commit, whatever the
-   concurrency; the DB triggers re-check rights and epoch.
+**Publish** is now exclusively ``app.api.common_publish`` (C2d-5c1):
+short runtime proofs, common-original size/SHA-256 outside every DB connection
+and lock, frozen tuple rechecked under the acceptance locks, operation-owned
+commit outcome and a fresh response proof. Only metadata is listed. This module
+keeps the legacy journaled revoke/cleanup exports for the separate C2d-5c2 task
+and labelled test adversaries; it no longer exports a privileged publish helper.
 
 **Revoke** (pending or listed) is one transaction whose commit is ``t_rev``:
 bump ``rights_epoch``, set ``revoked`` (and, for a copy indexed by
@@ -68,7 +53,6 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy import Engine, delete, func, or_, select, text, update
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.errors import ApiError
@@ -81,14 +65,7 @@ from app.models import (AccessRights, Chunk, CollectionItem, CommonPublication, 
                         Section, SourceFile)
 from app.models.enums import (AuditActorType, AuditOutcome, CleanupObjectOutcome, ContentStatus, JobState,
                               PublicationState, RevocationReason, RevokedMetadataField, TombstoneKind)
-from app.promotion import verified_read
 from app.storage import OriginalStorage, is_missing_object
-
-
-@dataclass(frozen=True)
-class Published:
-    item: LibraryItem
-    publication: CommonPublication
 
 
 @dataclass(frozen=True)
@@ -137,94 +114,6 @@ def live_duplicate(db: Session, checksum: str, item_id: uuid.UUID) -> uuid.UUID 
     return db.scalar(select(CommonPublication.item_id).where(
         CommonPublication.file_checksum_sha256 == checksum, CommonPublication.revoked_at.is_(None),
         CommonPublication.item_id != item_id))
-
-
-def _publishable(db: Session, admin: Principal, item: LibraryItem,
-                 confirmed_checksum: str) -> tuple[AccessRights, SourceFile]:
-    """Every DB condition for publishing, or a refusal. ``item`` must be locked ``FOR UPDATE``."""
-    action = "common_copy.publish"
-    if item.publication_state == PublicationState.LISTED.value:
-        raise _refuse(db, admin, action, item.id, 409, "already_published", "already_published")
-    if item.publication_state != PublicationState.PENDING.value:
-        raise _refuse(db, admin, action, item.id, 409, "common_copy_revoked", "revoked")
-    rights = db.scalars(select(AccessRights).where(AccessRights.item_id == item.id).order_by(AccessRights.id)
-                        .with_for_update().execution_options(populate_existing=True)).all()
-    if len(rights) != 1:
-        raise _refuse(db, admin, action, item.id, 409, "rights_not_publishable", "rights_count")
-    (recorded,) = rights
-    if recorded.revoked_at is not None:
-        raise _refuse(db, admin, action, item.id, 409, "rights_not_publishable", "rights_revoked")
-    if recorded.rights_epoch_at_grant != item.rights_epoch:
-        raise _refuse(db, admin, action, item.id, 409, "rights_not_publishable", "epoch_mismatch")
-    source = db.get(SourceFile, recorded.source_file_id, populate_existing=True)
-    if (source is None or source.item_id != item.id or source.version_id != recorded.version_id
-            or source.checksum_sha256 != recorded.file_checksum_sha256):
-        raise _refuse(db, admin, action, item.id, 409, "rights_not_publishable", "file_mismatch")
-    if item.content_status != ContentStatus.METADATA_ONLY.value or item.active_index_generation_id is not None:
-        raise _refuse(db, admin, action, item.id, 409, "rights_not_publishable", "not_metadata_only")
-    if confirmed_checksum != recorded.file_checksum_sha256:
-        raise _refuse(db, admin, action, item.id, 409, "checksum_confirmation_mismatch",
-                      "checksum_confirmation_mismatch")
-    if live_duplicate(db, recorded.file_checksum_sha256, item.id) is not None:
-        raise _refuse(db, admin, action, item.id, 409, "duplicate_published_checksum", "duplicate_published_checksum")
-    return recorded, source
-
-
-def _check_common_object(db: Session, admin: Principal, storage: OriginalStorage, item_id: uuid.UUID,
-                         source: SourceFile, checksum: str) -> None:
-    action = "common_copy.publish"
-    try:
-        intact = verified_read(storage, source.storage_key, source.byte_size, checksum, None)
-    except Exception as exc:
-        if is_missing_object(exc):
-            raise _refuse(db, admin, action, item_id, 409, "common_file_integrity_failed", "object_missing",
-                          AuditOutcome.FAILURE) from None
-        raise _refuse(db, admin, action, item_id, 503, "publication_storage_unavailable", "storage_unavailable",
-                      AuditOutcome.FAILURE) from None
-    if not intact:
-        raise _refuse(db, admin, action, item_id, 409, "common_file_integrity_failed", "checksum_mismatch",
-                      AuditOutcome.FAILURE)
-
-
-def publish(db: Session, admin: Principal, storage: OriginalStorage, item_id: uuid.UUID, confirmed_checksum: str,
-            now: datetime) -> Published:
-    item = _copy(db, admin, item_id, lock=True)  # waits for a concurrent revoke, or makes it wait
-    if item is None:
-        db.rollback()
-        raise ApiError(404, "not_found")
-    recorded, source = _publishable(db, admin, item, confirmed_checksum)
-    # Under the lock: the bytes the common copy serves must still be the reviewed ones.
-    _check_common_object(db, admin, storage, item.id, source, recorded.file_checksum_sha256)
-    try:
-        item.publication_state = PublicationState.LISTED.value
-        item.updated_at = now
-        db.flush()
-        publication = CommonPublication(item_id=item.id, access_rights_id=recorded.id,
-                                        file_checksum_sha256=recorded.file_checksum_sha256,
-                                        verified_byte_size=source.byte_size, published_at=now,
-                                        published_by_user_id=admin.user_id)
-        db.add(publication)
-        db.flush()  # waits on, then loses to, a concurrent live publication of the same checksum
-    except IntegrityError as exc:
-        if "uq_common_publications_live_checksum" in str(exc.orig):
-            raise _refuse(db, admin, "common_copy.publish", item_id, 409, "duplicate_published_checksum",
-                          "duplicate_published_checksum") from None
-        # A DB gate (state/rights/epoch trigger) refused what the locked checks allowed; this
-        # should not happen, but the answer still follows the committed state, not the guess.
-        db.rollback()
-        if db.scalar(select(LibraryItem.publication_state).where(LibraryItem.id == item_id)) == \
-                PublicationState.REVOKED.value:
-            raise _refuse(db, admin, "common_copy.publish", item_id, 409, "common_copy_revoked", "revoked") from None
-        raise _refuse(db, admin, "common_copy.publish", item_id, 409, "rights_not_publishable",
-                      "db_gate") from None
-    _audit(db, admin, "common_copy.publish", AuditOutcome.SUCCESS, item.id, access_rights_id=str(recorded.id),
-           source_file_id=str(source.id))
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise ApiError(503, "publication_unavailable") from None
-    return Published(item, publication)
 
 
 def _cancel_jobs(db: Session, item_id: uuid.UUID, now: datetime) -> int:

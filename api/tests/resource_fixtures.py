@@ -12,7 +12,6 @@ from app.authz import Principal
 from app.identity import invitations
 from app.models import (Chunk, LibraryItem, MetadataCandidate, PaperVersion, PdfPage,
                         ReferenceEntry, ReviewRequest, Section, SourceFile)
-from app import publication
 from tests.helpers import (Harness, Browser, FakeClock, USER_PASSWORD, WEB_ORIGIN, DEV_ENV)
 from tests.test_c2c1_bootstrap import installation
 from tests.test_c2c2_invitations import world as resource_world, issue
@@ -73,14 +72,15 @@ BODY = b"Synthetic identical file bytes for two independent owners."
 SHA = hashlib.sha256(BODY).hexdigest()
 
 
-def source(w, owner, marker):
+def source(w, owner, marker, *, data=BODY):
     with Session(w.engine, expire_on_commit=False) as db:
         item = LibraryItem(visibility="private", owner_user_id=owner, title=marker)
         db.add(item); db.flush()
         version = PaperVersion(item_id=item.id, version_label="v1", coverage="partial")
         db.add(version); db.flush()
         file = SourceFile(item_id=item.id, version_id=version.id, verified_mime="text/markdown",
-                          storage_key=f"synthetic/{item.id}", byte_size=len(BODY), checksum_sha256=SHA)
+                          storage_key=f"synthetic/{item.id}", byte_size=len(data),
+                          checksum_sha256=hashlib.sha256(data).hexdigest())
         db.add(file); db.flush()
         item.active_version_id = version.id
         db.commit()
@@ -154,10 +154,9 @@ def common_copy(w, *, download=False, search=True, provider=False, indexed=True,
     with Session(w.engine) as db:
         version, file, key = db.execute(text("SELECT version_id, id, storage_key FROM source_files WHERE item_id=:i"),
                                         {"i": item}).one()
-    result = SimpleNamespace(item=item, version=version, file=file, key=key, admin=admin)
+    result = SimpleNamespace(item=item, version=version, file=file, key=key, admin=admin, storage=storage)
     if not pending:
-        with Session(w.engine) as db:
-            publication.publish(db, admin, storage, result.item, SHA, NOW)
+        runtime_publish(w, result.item, storage)
     derived(w, result, "COMMON-TEXT")
     if indexed and not pending:
         from app.models import IngestionJob, IndexGeneration
@@ -185,3 +184,14 @@ def common_copy(w, *, download=False, search=True, provider=False, indexed=True,
                 conn.execute(text("UPDATE access_rights SET permits_external_processing=false WHERE item_id=:i"),
                              {"i":result.item})
     return result
+
+
+def runtime_publish(w, item_id, storage, *, checksum=SHA, clock=None, principal=None, csrf=None):
+    """Real runtime publish proof/hash/acceptance/response; no privileged publish setup."""
+    import asyncio
+    import threading
+    from app.api import common_publish
+    admin = principal or Principal(w.uid, "admin", w.actor.session_id, "admin@example.test", None)
+    return asyncio.run(common_publish.attempt(None, admin, str(item_id), checksum,
+        csrf if csrf is not None else w.actor.csrf_token, clock or (lambda: NOW),
+        get_settings(), storage, threading.Event()))

@@ -1392,11 +1392,12 @@ def test_response_reflects_later_publish_or_revoke_through_current_gate(approval
     real = boundary.respond
 
     def respond(principal, approval, *a, **kw):
-        # Legacy privileged writer (not in scope): commits between acceptance and the response proof.
-        with Session(b.w.engine) as db:
-            if writer == 'publish':
-                publication.publish(db, admin_principal(b), b.storage, approval.common_item_id, SHA, NOW)
-            else:
+        if writer == 'publish':
+            from tests.resource_fixtures import runtime_publish
+            runtime_publish(b.w, approval.common_item_id, b.storage)
+        else:
+            # Legacy journaled revoke adversary; C2d-5c2 remains separate.
+            with Session(b.w.engine) as db:
                 publication.revoke(db, admin_principal(b), approval.common_item_id, RevocationReason.OTHER, NOW,
                                    timedelta(days=1))
         return real(principal, approval, *a, **kw)

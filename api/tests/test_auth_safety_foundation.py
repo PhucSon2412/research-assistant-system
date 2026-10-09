@@ -696,59 +696,61 @@ def test_secret_field_and_scalar_errors_are_redacted(engine):
     assert SECRET not in str(err.value.orig)
 
 
-def test_common_publish_download_revoke_cleanup_direct(foundation):
-    import hashlib
-    from io import BytesIO
-    from botocore.response import StreamingBody
-    from botocore.exceptions import ClientError
+def test_common_publish_download_revoke_cleanup_direct(engine, app_env, journal_path, monkeypatch):
+    """Runtime account/approval/publish, then labelled legacy owner revoke/cleanup."""
     from app import publication
     from app.authz import Principal
     from app.common_original import common_original_rows
-    from app.models import AccessRights, PaperVersion, SourceFile, ReviewRequest, DeletionTombstone
+    from app.identity.bootstrap import bootstrap_admin
+    from app.identity.login import login
+    from app.models import SourceFile, DeletionTombstone
     from app.models.enums import RevocationReason
-    from app.review_closing import commit_close
     from app.api.errors import ApiError
-    w=foundation;body=b"synthetic common copy";checksum=hashlib.sha256(body).hexdigest()
-    private_key,common_key=["originals/"+uuid.uuid4().hex for _ in range(2)]
-    class Storage:
-        objects={private_key:body,common_key:body}
-        def open(self,key):return StreamingBody(BytesIO(self.objects[key]),len(self.objects[key]))
-        def delete(self,key):self.objects.pop(key,None)
-        def size(self,key):
-            if key not in self.objects:raise ClientError({"Error":{"Code":"NoSuchKey"}},"HeadObject")
-            return len(self.objects[key])
-    storage=Storage();admin=Principal(w.uid,"admin",uuid.uuid4(),"c1@example.test",None)
-    with Session(w.engine) as db:
-        private=LibraryItem(visibility="private",owner_user_id=w.uid)
-        common=LibraryItem(visibility="common",publication_state="pending",title="synthetic copy")
-        db.add_all([private,common]);db.flush()
-        versions=[PaperVersion(item_id=i.id) for i in (private,common)];db.add_all(versions);db.flush()
-        files=[SourceFile(item_id=i.id,version_id=v.id,storage_key=k,verified_mime="text/markdown",byte_size=len(body),checksum_sha256=checksum)
-               for i,v,k in zip((private,common),versions,(private_key,common_key))];db.add_all(files);db.flush()
-        request=ReviewRequest(item_id=private.id,version_id=versions[0].id,source_file_id=files[0].id,requester_user_id=w.uid,
-            status="open",file_checksum_sha256=checksum,rights_epoch_at_submit=0,notice_version="n",declared_source="source",declared_rights="rights",submitted_at=NOW)
-        db.add(request);db.flush()
-        db.add(AccessRights(item_id=common.id,version_id=versions[1].id,source_file_id=files[1].id,file_checksum_sha256=checksum,
-            origin_kind="review_request",origin_review_request_id=request.id,verified_source="checked",evidence_note="synthetic evidence",
-            checked_on=NOW.date(),reviewer_user_id=w.uid,recorded_at=NOW,scope_audience="instance_users",
-            permits_original_download=True,permits_fulltext_search=False,permits_external_processing=False,rights_epoch_at_grant=0))
-        request.status="approved";request.closed_at=NOW;request.closed_by_user_id=w.uid;request.close_reason_code="approved_by_admin"
-        iid,fid=common.id,files[1].id
-        commit_close(db,request,journal_path=w.path)
-    with Session(w.engine) as db:
-        assert db.execute(common_original_rows(admin)).first() is None
-        with pytest.raises(ApiError):publication.publish(db,admin,storage,iid,"a"*64,NOW)
-        publication.publish(db,admin,storage,iid,checksum,NOW)
-        assert db.execute(common_original_rows(admin)).first()[0].id==fid
-    with pytest.raises(DBAPIError),w.engine.begin() as conn:
-        conn.execute(text("UPDATE library_items SET publication_state='revoked',rights_epoch=rights_epoch+1 WHERE id=:id"),{"id":iid})
-    with Session(w.engine) as db:
-        publication.revoke(db,admin,iid,RevocationReason.RIGHTS_RECORDED_IN_ERROR,NOW,timedelta(seconds=1),journal_path=w.path)
-        assert db.execute(common_original_rows(admin)).first() is None
-    counts=publication.cleanup_revoked(w.engine,storage,NOW+timedelta(seconds=2),100)
-    assert not any(k.startswith("error:") for k in counts),counts
-    publication.cleanup_revoked(w.engine,storage,NOW+timedelta(seconds=2),100)
-    assert common_key not in storage.objects and private_key in storage.objects
-    with Session(w.engine) as db:
-        assert db.get(LibraryItem,iid).title is None
-        assert db.scalar(select(DeletionTombstone.purged_at))==NOW+timedelta(seconds=2)
+    from tests.resource_fixtures import common_copy, runtime_publish, BODY, SHA
+    app_env(engine.url)
+    w = SimpleNamespace(engine=engine, path=journal_path, settings=get_settings())
+    w.runtime = runtime_engine(w)
+    app_env(w.runtime.url)
+    w.settings = get_settings()
+    monkeypatch.setattr(auth_safety, 'cutover', lambda db: 'ready')
+    try:
+        w.uid = bootstrap_admin(w.runtime, email='common-admin@example.test', password=SECRET,
+                                policy=w.settings.password, clock=lambda: NOW).user_id
+        with Session(w.runtime) as db:
+            w.actor = login(db, email='common-admin@example.test', password=SECRET, now=NOW,
+                            settings=w.settings, clock=lambda: NOW)[1]
+        copy = common_copy(w, download=True, search=False, indexed=False, pending=True)
+        admin = Principal(w.uid, 'admin', w.actor.session_id, 'common-admin@example.test', None)
+        with Session(w.runtime) as db:
+            assert db.execute(common_original_rows(admin)).first() is None
+        with pytest.raises(ApiError, match='checksum_confirmation_mismatch'):
+            runtime_publish(w, copy.item, copy.storage, checksum='a'*64)
+        runtime_publish(w, copy.item, copy.storage)
+        with Session(w.runtime) as db:
+            assert db.execute(common_original_rows(admin)).first()[0].id == copy.file
+        with pytest.raises(DBAPIError), engine.begin() as c:
+            c.execute(text("UPDATE library_items SET publication_state='revoked',rights_epoch=rights_epoch+1 WHERE id=:i"),
+                      {'i': copy.item})
+        with Session(engine) as db:  # legacy journaled revoke adversary; no runtime certification
+            publication.revoke(db, admin, copy.item, RevocationReason.RIGHTS_RECORDED_IN_ERROR,
+                               NOW, timedelta(seconds=1), journal_path=w.path)
+        with Session(w.runtime) as db:
+            assert db.execute(common_original_rows(admin)).first() is None
+        # Memory storage implements the legacy cleanup HEAD contract only here.
+        class Storage:
+            def size(self, key):
+                from botocore.exceptions import ClientError
+                if key not in copy.storage.objects:
+                    raise ClientError({'Error': {'Code': 'NoSuchKey'}}, 'HeadObject')
+                return len(copy.storage.objects[key])
+            def delete(self, key):
+                copy.storage.delete(key)
+        counts = publication.cleanup_revoked(engine, Storage(), NOW+timedelta(seconds=2), 100)
+        assert not any(k.startswith('error:') for k in counts), counts
+        assert publication.cleanup_revoked(engine, Storage(), NOW+timedelta(seconds=2), 100) == {}
+        assert copy.key not in copy.storage.objects and list(copy.storage.objects.values()) == [BODY]
+        with Session(engine) as db:
+            assert db.get(LibraryItem, copy.item).title is None
+            assert db.scalar(select(DeletionTombstone.purged_at)) == NOW+timedelta(seconds=2)
+    finally:
+        w.runtime.dispose()

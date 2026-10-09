@@ -115,6 +115,10 @@ const MESSAGES: Record<string, string> = {
   approval_copy_timeout:
     "Sao chép/kiểm file gốc vượt thời gian cho phép; phê duyệt chưa được ghi. Tải lại trang để kiểm tra trạng thái trước khi thử lại.",
   already_published: "Bản này đã được công bố.",
+  publication_busy: "Đang hết lượt kiểm file công bố. Hãy thử lại sau.",
+  publication_verify_timeout: "Hết thời gian chờ kiểm file công bố. Hãy tải lại trạng thái trước khi thao tác tiếp.",
+  publication_outcome_uncertain: "Không xác định được kết quả công bố. Hãy tải lại trạng thái trước khi thao tác tiếp; không tự gửi lại.",
+  publication_response_unavailable: "Công bố đã lưu nhưng chưa lấy được phản hồi mới. Hãy tải lại trạng thái sau khi kết nối hoặc đăng nhập lại.",
   common_copy_revoked: "Bản này đã bị thu hồi; không thể công bố hay thu hồi lại.",
   rights_not_publishable: "Quyền đã ghi không còn đúng cho bản này (đã đổi epoch/thu hồi hoặc lệch file); không công bố.",
   duplicate_published_checksum: "Đã có bản chung đã công bố với cùng SHA-256; không công bố bản trùng.",
@@ -156,6 +160,17 @@ export function describeError(err: unknown): string {
     return err.detail ? `${base} ${err.detail}` : base;
   }
   return "Không kết nối được tới máy chủ.";
+}
+
+// Only the publish form uses this outcome language. A transport failure or
+// lost body never proves a metadata publication did not commit.
+export function publicationError(error: unknown): string {
+  if (!(error instanceof ApiError) || error.status === 502 || error.status === 504
+    || ["publication_outcome_uncertain", "http_error", "api_timeout", "api_unreachable",
+      "api_response_incomplete"].includes(error.code)) {
+    return "Không xác định được kết quả công bố. Hãy tải lại trạng thái trước khi thao tác tiếp; không tự gửi lại.";
+  }
+  return describeError(error);
 }
 
 export function tokenFromHash(): string | null {
