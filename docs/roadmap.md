@@ -2,7 +2,7 @@
 
 ## Giao C2d-5d2a sau merge PR #50
 
-[Prompt worker runtime/extraction](tasks/m6c2b2c2d5d2a-worker-runtime-extraction.md) đã giao, **chưa triển khai/kiểm**. Base merge PR #50 **`03b7985`**, source `0042`. Đích PR: runtime worker/beat trên override cô lập, dispatch ID, claim/lease, validate/extract/chunk có gate/binding/clock/checkpoint mới, tới **`awaiting_index` + `metadata_only`**. Không nối indexer legacy; index states giữ chờ C2d-5d2b. [Quyết định phạm vi và maintenance](decisions.md#giao-c2d-5d2a-sau-merge-pr-50-2026-10-09).
+[Worker runtime/extraction](c2d5d2a-worker-runtime-extraction.md) đã triển khai tại `dfca84a`, PR chưa merge; [inventory](c2d5d2a-test-inventory.json) ghi selection/JUnit/hash và giới hạn. Base merge PR #50 **`03b7985`**, source `0042`. Runtime worker/beat trên override cô lập, dispatch ID, claim/lease, validate/extract/chunk có gate/binding/clock/checkpoint mới, tới **`awaiting_index` + `metadata_only`**. Không nối indexer legacy; index states giữ chờ C2d-5d2b. [Quyết định phạm vi và maintenance](decisions.md#giao-c2d-5d2a-sau-merge-pr-50-2026-10-09).
 
 Thứ tự: **C2d-5d2a extraction → C2d-5d2b document embedding/index/provider → background cleanup/reconcile/discovery còn thiếu boundary → search/query/rerank provider → RAG/generation → tổng hồi quy C2d → C3/C4 theo điều kiện riêng**. Bốn lỗi baseline PR #50 phải được xử lý trước hoàn tất tổng hồi quy/C4; kiểm tương thích không chứng nhận task đã chuyển. Mặc định Compose/API, operator/delivery, storage/journal production, charge thật và cutover chưa mở; **safety pending tới C4**.
 

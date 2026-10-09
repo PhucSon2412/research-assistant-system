@@ -406,3 +406,12 @@ Drill `drill_invitation_restore.py`: project/port/volume riêng, artifact ngoài
 SHA-256 của **19** file code/test/script (17 file ban đầu + hai test sửa) không đổi trong lượt full cuối; không sửa code hoặc chạy mutant song song. Sau khi suite kết thúc, chỉ bỏ một space cuối dòng trong `0032` theo staged diff check; Python AST trước/sau giống nhau, không đổi logic. Inventory, manifest, XML/log, `full-final-verification.json` và đối chiếu whitespace ở temp ngoài repo. Đã dọn container/volume của `ras-invtest` sau khi kiểm đúng quyền sở hữu; hai project drill cũng đã sạch. Đối chiếu cuối: **9 container dev** giữ nguyên ID/image/StartedAt; không migrate/restart dev hoặc đọc/sửa `.env`.
 
 C2d-5a source `1666273`: suite cuối 1.371/1.371 pass, collect 3.468, not-run 2.097; JUnit unique/no missing/duplicates, hash trước/sau trùng. 58 web/typecheck/build và Chrome proxy đạt; 7 đối chứng riêng bắt assertion. Cleanup exact giữ 24 container có sẵn; [inventory](c2d5a-test-inventory.json) lưu toàn bộ lệnh/kết quả/giới hạn, không cộng số lịch sử.
+
+
+## C2d-5d2a worker runtime/extraction
+
+Code `dfca84a`, source migration `0042`; [handoff](c2d5d2a-worker-runtime-extraction.md) · [inventory selection/JUnit/hash](c2d5d2a-test-inventory.json). Conda ras, PG/MinIO/journal/Redis cô lập, host runner đặt settings trước import và chặn HTTP ngoài. Worker/beat thật từ Compose override dùng `c1_runtime`, không operator/recovery credential, Redis outage rồi ba job tới `awaiting_index`/`metadata_only`; không generation/embedding/provider. Cutover-only scoped cho business fixture; pending HTTP/năm task giữ gate production.
+
+Suite mới phủ role/gate, scalar binding/status/lease/clock sau SQL/wait, S3/parser barrier với revoke/hold/disable, retry/reuse/locator/coverage, landed/rollback commit uncertainty và teardown. Tám đối chứng tuần tự bị assertion bắt, source khôi phục trước suite cuối. Regression chọn PR #50/revoke/upload/M2/citations/recovery và schema/fence theo call graph; node ID/JUnit/hash và các lượt chuẩn bị lỗi được giữ riêng, không gọi toàn API inventory xanh. Bốn lỗi baseline PR #50 không sửa/rerun/tính pass; web không đổi nên Chrome/npm không chạy. Không index/provider/cutover/C3/C4 certification; safety pending tới C4.
+
+Sealed cuối tại `dfca84a`: **549/549 API unique pass**, collect 4343, 3794 not-run, 0 failure/error/skip/missing/duplicate/extra; 293 source hashes trước/sau trùng. 8 cơ chế đối chứng/9 lượt raw (1 yếu không tính); lỗi chuẩn bị và lượt sealed đầu giữ riêng trong inventory.

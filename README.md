@@ -1,6 +1,8 @@
 # Research Assistant System
 
-**Task tiếp C2d-5d2a đã giao, chưa triển khai/kiểm:** [worker runtime, claim và extraction](docs/tasks/m6c2b2c2d5d2a-worker-runtime-extraction.md). Base PR #50 đã merge `03b7985`, source `0042`; xử lý tới `awaiting_index`/`metadata_only`, embedding/index/provider tách C2d-5d2b. Role runtime kiểm bằng override cô lập; mặc định Compose/API cutover còn riêng. **Safety pending tới C4.**
+**C2d-5d2a đã triển khai, PR chờ review:** [worker runtime/extraction](docs/c2d5d2a-worker-runtime-extraction.md) · [selection/JUnit/hash và giới hạn](docs/c2d5d2a-test-inventory.json). Code `dfca84a`, base PR #50 `03b7985`, source `0042`, không migration/grants. Runtime worker/beat trên override cô lập, dispatch UUID, proof/lease/clock mới mỗi checkpoint, S3/parser ngoài DB; dừng `awaiting_index`/`metadata_only`. Index/provider chờ C2d-5d2b, background task khác và mặc định Compose/API cutover còn riêng. **Safety pending tới C4.**
+
+Kiểm sealed tại `dfca84a`: **549 API unique pass**, 0 fail/error/skip; collect 4343, **3794 not-run**; 8 cơ chế đối chứng đạt (9 lượt raw, 1 yếu không tính). Bốn lỗi baseline PR #50 chưa sửa; kết quả và giới hạn trong inventory, không cộng pass lịch sử.
 
 **Review PR #50 tại `ff5fa82`: không phát hiện điểm chặn merge mới trong scope một POST index request.** Reviewer thực chạy **200/200 API**, **70/70 web**, typecheck/build và Chrome qua proxy; artifact **923 API/9 mutant** của agent đối chiếu riêng. Bốn ca lỗi baseline giữ riêng cho tổng hồi quy trước C4; không gọi toàn inventory đã xanh. PR đã merge **`03b7985`**; chưa rerun tại merge, source `0042`, **safety pending tới C4**; worker/provider/C3/C4 riêng. [Report và giới hạn](docs/reviews/pr50-c2d5d1-common-index-request.md).
 
