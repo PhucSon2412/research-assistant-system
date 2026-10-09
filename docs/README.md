@@ -1,12 +1,18 @@
 # Tài liệu dự án
 
-**Sửa P2 PR #47 (chưa merge):** proof/caller-denial/response dùng Session ngắn có release kiểm soát; lỗi teardown → JSON 503, không 500, không tiếp tục copy. Regression 10 fail trước sửa → 22/22 sau sửa; selection **1.727/1.727**, 12/12 đối chứng. [Chi tiết](c2d5b-review-approval-original-copy.md#sửa-p2-review-pr-47). Safety pending tới C4.
+C2d-5c1 code `520ac54`: **2.016 unique API pass**, **64 web pass**, typecheck/build và Chrome proxy đạt; 1.907 API not-run, 7 đối chứng bắt đúng assertion, 283 source hashes khớp. Lỗi chuẩn bị và giới hạn được ghi riêng trong [handoff](c2d5c1-common-publish.md), không cộng pass lịch sử.
 
-**Review PR #47: cần sửa một P2 trước merge.** Proof đầu/caller-denial có lỗi teardown thoát thành HTTP 500; reviewer tái hiện 4 fail đúng lỗi / 2 control pass. Selection độc lập 281/281, web 62/62 và typecheck/build đạt; safety pending tới C4. [Report và prompt sửa](reviews/pr47-c2d5b-review-approval-original-copy.md).
+**C2d-5c1 triển khai trên nhánh review:** [handoff publish metadata](c2d5c1-common-publish.md) · [inventory](c2d5c1-test-inventory.json) · [task](tasks/m6c2b2c2d5c1-common-publish.md). Chỉ POST publish: proof/caller/clock mới, hash ngoài DB locks, outcome độc lập và response proof mới. Base PR #47 `04434e3`, source migration `0041`, không grants/migration mới; PR để review, không merge. Revoke C2d-5c2 và index/provider/C3/C4 riêng, **safety pending tới C4**. Kết quả hiện hành trong inventory, không cộng lịch sử bên dưới.
 
-**C2d-5b đã triển khai trên nhánh review, chưa merge:** [phê duyệt review và copy original](c2d5b-review-approval-original-copy.md) · [inventory](c2d5b-test-inventory.json). Đúng `POST /admin/review-requests/{request_id}/approve` chạy runtime thật: proof ngắn trước/giữa I/O, copy checksum/readback ngoài DB lock do attempt sở hữu, approved/common/rights/audit/journal cùng transaction qua routine `0041` (binding xmin của chính transaction), commit uncertain giữ object/không success/retry và response thin proof mới. Suite của agent **2.188/2.188 API**, web **62/62**; publish/revoke/index/provider/C3/C4 riêng, **safety pending tới C4**.
+**Review lại P2 PR #47 tại `78fbe1d`: đã sửa P2, không phát hiện điểm chặn merge mới trong phạm vi approve/copy.** Reviewer thực chạy **66/66 API**; artifact **1.727** của agent đối chiếu riêng. [Report và giới hạn](reviews/pr47-c2d5b-review-approval-original-copy.md#review-lại-p2-tại-78fbe1d). PR đã merge `04434e3`; chưa rerun tại merge, safety pending tới C4; kết quả web/Chrome trước sửa giữ theo source lịch sử.
 
-**C2d-5b đã giao sau merge PR #46 `8ff5b4e`:** [prompt phê duyệt và copy original](tasks/m6c2b2c2d5b-review-approval-original-copy.md). Đúng một POST approve: proof ngắn trước/sau I/O, runtime approved closure/common/rights coupling, outcome giữ object khi uncertain và proof thin response mới. Đã triển khai trên nhánh review (mục trên), chưa merge; publish/revoke/index/provider/C3/C4 riêng, **safety pending tới C4**.
+**Sửa P2 PR #47 (đã merge `04434e3`):** proof/caller-denial/response dùng Session ngắn có release kiểm soát; lỗi teardown → JSON 503, không 500, không tiếp tục copy. Regression 10 fail trước sửa → 22/22 sau sửa; selection **1.727/1.727**, 12/12 đối chứng. [Chi tiết](c2d5b-review-approval-original-copy.md#sửa-p2-review-pr-47). Safety pending tới C4.
+
+**Review trước sửa PR #47 tại `bac3739` (lịch sử):** Proof đầu/caller-denial có lỗi teardown thoát thành HTTP 500; reviewer tái hiện 4 fail đúng lỗi / 2 control pass. Selection độc lập 281/281, web 62/62 và typecheck/build đạt; safety pending tới C4. [Report và prompt sửa lịch sử](reviews/pr47-c2d5b-review-approval-original-copy.md).
+
+**C2d-5b đã merge PR #47 `04434e3`:** [phê duyệt review và copy original](c2d5b-review-approval-original-copy.md) · [inventory](c2d5b-test-inventory.json). Đúng `POST /admin/review-requests/{request_id}/approve` chạy runtime thật: proof ngắn trước/giữa I/O, copy checksum/readback ngoài DB lock do attempt sở hữu, approved/common/rights/audit/journal cùng transaction qua routine `0041` (binding xmin của chính transaction), commit uncertain giữ object/không success/retry và response thin proof mới. Kết quả ban đầu của agent tại `b7ba608`: **2.188/2.188 API**, web **62/62**; publish/revoke/index/provider/C3/C4 riêng, **safety pending tới C4**.
+
+**C2d-5b đã giao sau merge PR #46 `8ff5b4e`:** [prompt phê duyệt và copy original](tasks/m6c2b2c2d5b-review-approval-original-copy.md). Đúng một POST approve: proof ngắn trước/sau I/O, runtime approved closure/common/rights coupling, outcome giữ object khi uncertain và proof thin response mới. Đã merge PR #47 `04434e3` (mục trên); publish/revoke/index/provider/C3/C4 riêng, **safety pending tới C4**.
 
 **Review PR #46 tại `7938153`: không phát hiện điểm chặn merge trong phạm vi C2d-5a.** Reviewer chạy độc lập **234/234 API** (gồm Chrome proxy thật), **58/58 web**, typecheck/build; artifact 1.371 và 7 mutants của agent đối chiếu riêng. PR OPEN tại lúc review, sau đó merge `8ff5b4e`; chưa rerun tại merge, safety **pending tới C4**. [Report và giới hạn](reviews/pr46-c2d5a-review-json-writers.md).
 
@@ -54,6 +60,9 @@ Khi có thay đổi quyết định, cập nhật tài liệu liên quan cùng t
 
 | Tài liệu | Nội dung |
 | --- | --- |
+| [Bàn giao C2d-5c1](c2d5c1-common-publish.md) | POST publish runtime, hash ngoài DB, outcome độc lập, response proof mới và giới hạn |
+| [Inventory C2d-5c1](c2d5c1-test-inventory.json) | Unique selection/JUnit/hashes/mutants/not-run; bằng chứng mới, không cộng lịch sử |
+| [Prompt C2d-5c1](tasks/m6c2b2c2d5c1-common-publish.md) | Hợp đồng giao; đã triển khai trên nhánh review, chưa merge; xem handoff/inventory mới |
 | [Prompt C2d-4c](tasks/m6c2b2c2d4c-original-downloads.md) | Hai GET/ba gate quyền; checksum/spool ngoài DB, audit/response proof mới, thu hồi/cancellation và proxy; đã giao, chưa triển khai |
 | [Review PR #44](reviews/pr44-c2d4b-upload-original.md) | P2 tại b578082 giữ lịch sử; review lại 76 API và hai ca riêng đạt; PR đã merge dd8bdc6 |
 | [Bàn giao C2d-4b](c2d4b-upload-original.md) | Phase/lock map, SHA-256 readback, response proof mới, race/cancellation/uncertain, config/proxy và giới hạn |

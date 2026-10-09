@@ -1,7 +1,7 @@
 {
-  "base": "8ff5b4ed5f643a4618f70b73550cdcce465181ab",
+  "base": "04434e35e2b016601d3629a2d4afe3feb6042a6b",
   "source_migration": "0041",
-  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4. Final read clock corrected after predicate SQL; /auth/sessions uses the shared final caller. Details in docs/c2d-final-read-clock.md. C2d-4a adds GET upload notice final caller and POST intent actor/binding/TTL before commit plus fresh token proof after known commit. C2d-4b PUT original merged PR #44 at dd8bdc6 with unlocked staging, atomic consume and a new exact response proof. C2d-4c implements exactly two original GETs/three separate gates, short scalar proofs, shared verified spools, known audit commit then fresh response proof, current caller/clock and cancellation ownership. Other writers/provider callers stay open. See docs/tasks/m6c2b2c2d4c-original-downloads.md. PR #45 merged at 070cb37. C2d-5a submit/withdraw/admin_reject merged PR #46 at 8ff5b4e: runtime domain closure routines, exact transaction pending binding, current actor/clock and new response proof; approval and other writers/provider callers remain open. C2d-5b approval/copy task is assigned but not implemented/tested; see docs/tasks/m6c2b2c2d5b-review-approval-original-copy.md. C2d-5b implemented on review branch (not merged): POST approve uses api/review_approval.py, runtime approval mirror/confirm routines 0041, owned copy outside DB locks and a new thin response proof; publish/revoke/index/provider callers remain open. See docs/c2d5b-review-approval-original-copy.md.",
+  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4. Final read clock corrected after predicate SQL; /auth/sessions uses the shared final caller. Details in docs/c2d-final-read-clock.md. C2d-4a adds GET upload notice final caller and POST intent actor/binding/TTL before commit plus fresh token proof after known commit. C2d-4b PUT original merged PR #44 at dd8bdc6 with unlocked staging, atomic consume and a new exact response proof. C2d-4c implements exactly two original GETs/three separate gates, short scalar proofs, shared verified spools, known audit commit then fresh response proof, current caller/clock and cancellation ownership. Other writers/provider callers stay open. See docs/tasks/m6c2b2c2d4c-original-downloads.md. PR #45 merged at 070cb37. C2d-5a submit/withdraw/admin_reject merged PR #46 at 8ff5b4e: runtime domain closure routines, exact transaction pending binding, current actor/clock and new response proof; approval and other writers/provider callers remain open. C2d-5b merged PR #47 at 04434e3: POST approve uses api/review_approval.py, runtime approval mirror/confirm routines 0041, owned copy outside DB locks and a new thin response proof; revoke/index/provider callers remain open. See docs/c2d5b-review-approval-original-copy.md. C2d-5c1 POST publish implemented on review branch: app.api.common_publish, short proof, unlocked streamed hash, exact acceptance/current actor/clock and a new response proof; see docs/c2d5c1-common-publish.md. No migration/grants, not merged. Revoke C2d-5c2 and index/provider/C3/C4 remain separate; safety pending.",
   "safety": "pending until C4",
   "route_count": 63,
   "routes": [
@@ -669,7 +669,7 @@
       "path": "/admin/pending-publications",
       "function": "list_pending",
       "source": "api/app/api/routes/publications.py",
-      "line": 283,
+      "line": 290,
       "dependencies": [
         "require_admin",
         "get_db",
@@ -687,7 +687,7 @@
       "path": "/admin/pending-publications/{item_id}",
       "function": "get_pending",
       "source": "api/app/api/routes/publications.py",
-      "line": 291,
+      "line": 298,
       "dependencies": [
         "require_admin",
         "get_db",
@@ -705,7 +705,7 @@
       "path": "/admin/common-copies",
       "function": "list_copies",
       "source": "api/app/api/routes/publications.py",
-      "line": 298,
+      "line": 305,
       "dependencies": [
         "require_admin",
         "get_db",
@@ -723,7 +723,7 @@
       "path": "/admin/common-copies/{item_id}",
       "function": "get_copy",
       "source": "api/app/api/routes/publications.py",
-      "line": 307,
+      "line": 314,
       "dependencies": [
         "require_admin",
         "get_db",
@@ -741,24 +741,27 @@
       "path": "/admin/common-copies/{item_id}/publish",
       "function": "publish_copy",
       "source": "api/app/api/routes/publications.py",
-      "line": 314,
+      "line": 321,
       "dependencies": [
         "require_admin",
-        "get_db",
-        "get_now",
+        "get_settings",
+        "get_clock",
         "_storage"
       ],
       "group": "publication-write",
-      "final_status": "open C2d",
+      "final_status": "C2d-5c1 runtime/current Admin/session/CSRF/clock; unlocked hash, exact acceptance, independent outcome, new response proof; safety pending C4",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d5c1-common-publish.md#phase-khóa-và-clock",
+      "task": "docs/tasks/m6c2b2c2d5c1-common-publish.md",
+      "boundary_helper": "app.api.common_publish.receive",
+      "contract": "short common proof -> unlocked streamed SHA-256 -> Admin User/item/rights acceptance -> flush -> exclusive journal current actor/resource/clock -> commit -> new response proof; no retry after uncertain commit"
     },
     {
       "method": "POST",
       "path": "/admin/common-copies/{item_id}/index",
       "function": "index_copy",
       "source": "api/app/api/routes/publications.py",
-      "line": 327,
+      "line": 335,
       "dependencies": [
         "require_admin",
         "get_db",
@@ -774,7 +777,7 @@
       "path": "/admin/common-copies/{item_id}/revoke",
       "function": "revoke_copy",
       "source": "api/app/api/routes/publications.py",
-      "line": 341,
+      "line": 349,
       "dependencies": [
         "require_admin",
         "get_db",
@@ -807,7 +810,7 @@
       "path": "/review-requests/notice",
       "function": "notice",
       "source": "api/app/api/routes/reviews.py",
-      "line": 308,
+      "line": 315,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -825,7 +828,7 @@
       "path": "/review-requests",
       "function": "list_own",
       "source": "api/app/api/routes/reviews.py",
-      "line": 315,
+      "line": 322,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -843,7 +846,7 @@
       "path": "/review-requests",
       "function": "submit",
       "source": "api/app/api/routes/reviews.py",
-      "line": 347,
+      "line": 354,
       "dependencies": [
         "require_trusted_origin",
         "get_principal",
@@ -863,7 +866,7 @@
       "path": "/review-requests/{request_id}",
       "function": "get_own",
       "source": "api/app/api/routes/reviews.py",
-      "line": 324,
+      "line": 331,
       "dependencies": [
         "get_principal",
         "get_db",
@@ -881,7 +884,7 @@
       "path": "/review-requests/{request_id}/withdraw",
       "function": "withdraw",
       "source": "api/app/api/routes/reviews.py",
-      "line": 355,
+      "line": 362,
       "dependencies": [
         "require_trusted_origin",
         "get_principal",
@@ -901,7 +904,7 @@
       "path": "/admin/review-requests",
       "function": "admin_list",
       "source": "api/app/api/routes/reviews.py",
-      "line": 331,
+      "line": 338,
       "dependencies": [
         "require_admin",
         "get_db",
@@ -919,7 +922,7 @@
       "path": "/admin/review-requests/{request_id}",
       "function": "admin_get",
       "source": "api/app/api/routes/reviews.py",
-      "line": 340,
+      "line": 347,
       "dependencies": [
         "require_admin",
         "get_db",
@@ -937,7 +940,7 @@
       "path": "/admin/review-requests/{request_id}/files/{file_id}/original",
       "function": "admin_original",
       "source": "api/app/api/routes/reviews.py",
-      "line": 394,
+      "line": 401,
       "dependencies": [
         "require_admin",
         "_storage",
@@ -960,7 +963,7 @@
       "path": "/admin/review-requests/{request_id}/reject",
       "function": "admin_reject",
       "source": "api/app/api/routes/reviews.py",
-      "line": 407,
+      "line": 414,
       "dependencies": [
         "require_trusted_origin",
         "require_admin",
@@ -989,7 +992,7 @@
         "_storage"
       ],
       "group": "review-write-file",
-      "final_status": "implemented C2d-5b on review branch (not merged); safety pending C4",
+      "final_status": "merged C2d-5b PR #47 at 04434e3; safety pending C4",
       "direct_transaction_calls": [],
       "contract_map": "docs/c2d5b-review-approval-original-copy.md",
       "task": "docs/tasks/m6c2b2c2d5b-review-approval-original-copy.md",
@@ -1202,5 +1205,10 @@
   "c2d4c_code_commit": "4c49919203db085dacd0778b3ce62e6787fd3823",
   "c2d5b_routes": [
     "POST /admin/review-requests/{request_id}/approve"
-  ]
+  ],
+  "c2d5c1_routes": [
+    "POST /admin/common-copies/{item_id}/publish"
+  ],
+  "c2d5c1_handoff": "docs/c2d5c1-common-publish.md",
+  "c2d5c1_inventory": "docs/c2d5c1-test-inventory.json"
 }

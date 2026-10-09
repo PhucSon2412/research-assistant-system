@@ -1,6 +1,6 @@
 # Prompt C2d-5b: phê duyệt review và sao chép original
 
-**Đã triển khai trên nhánh review `feat/m6c2b2c2d5b-review-approval-original-copy`, chưa merge; [handoff](../c2d5b-review-approval-original-copy.md) / [inventory](../c2d5b-test-inventory.json) ghi kết quả theo source.** Lúc giao: PR #46 đã MERGED `8ff5b4ed5f643a4618f70b73550cdcce465181ab` ngày 2026-10-07, chứa head `7938153`/code `1666273`. Head migration mã nguồn đã kiểm là `0040`, không suy revision DB dev. Safety **pending tới C4**.
+**Đã merge PR #47 `04434e3` ngày 2026-10-08; kết quả giữ theo source trước merge; [handoff](../c2d5b-review-approval-original-copy.md) / [inventory](../c2d5b-test-inventory.json) ghi kết quả theo source.** Lúc giao: PR #46 đã MERGED `8ff5b4ed5f643a4618f70b73550cdcce465181ab` ngày 2026-10-07, chứa head `7938153`/code `1666273`. Head migration mã nguồn đã kiểm là `0040`, không suy revision DB dev. Safety **pending tới C4**.
 
 [Mục lục](../README.md) · [Quyết định giao](../decisions.md#giao-c2d-5b-sau-merge-pr-46-2026-10-07) · [C2d-5a](../c2d5a-review-json-writers.md) · [Review PR #46](../reviews/pr46-c2d5a-review-json-writers.md) · [Caller inventory](../c2d1-caller-inventory.json)
 
