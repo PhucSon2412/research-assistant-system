@@ -134,6 +134,21 @@ const MESSAGES: Record<string, string> = {
     "Quyền có thể đã bị đóng nhưng nhật ký thu hồi chưa được xác nhận. Hệ thống cần recovery; hãy tải lại trạng thái sau phục hồi, không tự gửi lại.",
   revocation_pending_recovery:
     "Nhật ký đã ghi việc thu hồi nhưng database chưa áp dụng; hệ thống tạm ngừng phục vụ tới khi quản trị viên chạy phục hồi.",
+  index_start_unavailable: "Chưa tạo được job lập chỉ mục; không có job mới. Tải lại trạng thái trước khi thử lại.",
+  index_start_outcome_uncertain:
+    "Không xác định được kết quả yêu cầu lập chỉ mục: job có thể đã được tạo. Hãy tải lại trạng thái; không tự gửi lại.",
+  index_start_response_unavailable:
+    "Yêu cầu lập chỉ mục đã được lưu nhưng chưa lấy được phản hồi mới. Hãy tải lại trạng thái; không tự gửi lại.",
+  index_job_binding_changed: "Job lập chỉ mục hiện có không còn khớp bản chung này; không tạo job mới. Liên hệ quản trị viên.",
+  index_job_cancelling: "Job lập chỉ mục hiện có đã bị yêu cầu hủy; không tạo hay xếp hàng job mới lúc này.",
+  index_binding_changed: "Dữ liệu bản chung hoặc job đã thay đổi trong lúc xử lý; chưa tạo job. Tải lại trạng thái.",
+  already_indexed: "Bản này đã được lập chỉ mục.",
+  extraction_rejected: "Lần trích xuất trước đã bị từ chối (cần review/không đủ nội dung); không tự chạy lại.",
+  common_copy_not_published: "Bản chưa công bố; chưa lập chỉ mục được.",
+  rights_not_current: "Quyền đã ghi không còn khớp trạng thái hiện tại (epoch, publication hoặc file).",
+  fulltext_not_permitted: "Quyền không cho tìm kiếm toàn văn; không lập chỉ mục.",
+  external_processing_not_permitted: "Quyền không cho gửi qua provider; không lập chỉ mục.",
+  blocked_by_conditions: "Có điều kiện sử dụng hệ thống chưa thi hành được; không lập chỉ mục.",
   service_recovering: "Hệ thống đang tạm ngừng phục vụ để kiểm tra/phục hồi dữ liệu thu hồi. Thử lại sau.",
   resource_scope_changed: "Danh sách hoặc quyền truy cập đã thay đổi trong lúc tải. Hãy tải lại trang.",
   resource_write_outcome_uncertain: "Chưa xác nhận kết quả thay đổi. Kiểm tra lại sau khi kết nối hoặc đăng nhập; không tự gửi lại thao tác.",
@@ -182,6 +197,18 @@ export function revocationError(error: unknown): string {
     || ["revocation_outcome_uncertain", "http_error", "api_timeout", "api_unreachable",
       "api_response_incomplete"].includes(error.code)) {
     return "Không xác định được kết quả thu hồi. Hãy tải lại trạng thái; không tự gửi lại.";
+  }
+  return describeError(error);
+}
+
+// C2d-5d1: only the index form uses this. A lost/timed-out reply or an unknown
+// commit never proves no job was created; the page never re-sends the POST.
+export function indexRequestError(error: unknown): string {
+  if (!(error instanceof ApiError) || error.status === 502 || error.status === 504
+    || ["index_start_outcome_uncertain", "http_error", "api_timeout", "api_unreachable",
+      "api_response_incomplete"].includes(error.code)) {
+    return "Không xác định được kết quả yêu cầu lập chỉ mục: job có thể đã được tạo. Hãy tải lại trạng thái; "
+      + "không tự gửi lại.";
   }
   return describeError(error);
 }

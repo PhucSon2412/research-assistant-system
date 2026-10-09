@@ -1,5 +1,17 @@
 # Chiến lược kiểm thử
 
+## C2d-5d1 — kiểm theo source `e283bc6`
+
+[Handoff](c2d5d1-common-index-request.md) · [Inventory](c2d5d1-test-inventory.json). PostgreSQL/MinIO/journal cô lập (`58579`/`59579`, label `ras.task=c2d5d1-20261009`), role runtime thật, business cutover scoped; bài HTTP pending giữ gate production thật. Bao phủ ACL/strict input, create/reuse/không reset, clock/actor ở acceptance và response, lock wait thật, race index↔revoke/auth/worker legacy, commit uncertain/teardown/cancel, broker down vẫn còn job DB, và Chrome qua Next proxy (unticked, double submit một POST, reuse, 504 unknown không re-POST, role/session bị thu hồi). Kiểm tại `e283bc6`: **923/923 API unique pass**, 0 fail/error/skip (collect 4.268, **3.341 not-run**, 4 node lỗi có sẵn ở base chạy riêng vẫn fail như base); web **70/70**, typecheck/build; Chrome qua Next proxy; **9/9 mutant** bắt assertion. Nhóm: core 200, revoke 171, publish 192, reads 260, content 89, recovery 11. Lượt content đầu lỗi do runner (`--deselect` sai tiền tố) được giữ riêng, không cộng. Worker/cleanup chỉ kiểm tương thích.
+
+## Kế hoạch C2d-5d1 sau merge PR #49
+
+[Task HTTP index request](tasks/m6c2b2c2d5d1-common-index-request.md) **đã giao, chưa triển khai/chưa chạy test**. Kiểm runtime/current Admin/strict confirmation/rights/file/epoch, create/reuse một live job, precommit và response clock, race revoke/job/cleanup/auth, commit uncertain/teardown/cancel, không storage/provider/broker send, web busy/unknown và Chrome qua proxy. PG/MinIO/journal cô lập, role runtime thật, HTTP pending giữ gate thật. Hồi quy worker/cleanup chỉ chứng minh tương thích, không chứng nhận đã chuyển chúng; worker/index/provider dispatch tách C2d-5d2, C3/C4 vẫn riêng. Không cộng số PR #49 vào task mới; source `0042`, không suy revision DB dev.
+
+## Review độc lập PR #49 tại f8dc44c
+
+**Review PR #49 tại `f8dc44c`: không phát hiện điểm chặn merge mới trong phạm vi POST revoke.** Reviewer thực chạy **295/295 API**, **66/66 web**, typecheck/build và hai Chrome qua proxy; artifact **529 API/8 mutant** của agent đối chiếu riêng. Raw lượt observer yếu bị ghi đè được giữ là giới hạn evidence. PR OPEN tại lúc review, sau đó merge `859dfe9`; chưa rerun tại merge, source `0042`, **safety pending tới C4**. Selection/JUnit exact và source hashes được kiểm riêng; 3.801 node không chạy lại trong lượt reviewer. PostgreSQL/MinIO/journal cô lập, HTTP ngoài bị chặn; đã dọn đúng tài nguyên thử, giữ chín container có sẵn. [Phạm vi và evidence](reviews/pr49-c2d5c2-common-revoke.md).
+
 ## C2d-5c2 — kiểm mới theo source riêng
 
 [Handoff](c2d5c2-common-revoke.md) · [Inventory](c2d5c2-test-inventory.json). Runtime PostgreSQL/MinIO/identity/journal cô lập, migration/ORM/ACL, SQL body/retention/xmin/cross-transaction và generic confirm bypass, clock/lock/fsync/teardown/cancel, race revoke/publish/cleanup/worker/auth, current response, cleanup/restore/private và content gate. Installed Chrome qua Next production proxy/socket Uvicorn working tree: busy/two synchronous submits/old original 404/normal 15 s 504 known-commit/unknown không re-POST/expired cookie. Pending HTTP giữ gate production thật; business cutover scoped. Selection/JUnit unique/source hashes/pass/fail/not-run và preparation/mutants ghi chính xác trong inventory; không cộng lịch sử PR #48. Worker/cleanup chỉ kiểm tương thích, không chuyển boundary; safety pending tới C4.

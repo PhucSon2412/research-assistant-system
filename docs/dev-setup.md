@@ -1,4 +1,10 @@
-# Môi trường phát triển và schema (M1a–C2d-4b)
+# Môi trường phát triển và schema (M1a–C2d-5c2)
+
+**Mốc source hiện hành:** PR #49 đã merge `859dfe9`, head migration `0042`; không suy revision DB dev. [C2d-5d1 HTTP index request](c2d5d1-common-index-request.md) đã triển khai trên nhánh review (PR mở); lệnh/kết quả cô lập ở mục dưới. Worker/provider tách PR sau; **safety pending tới C4**, readiness dev đóng không phải lý do tự mở cutover. Các lệnh/kết quả dưới đây giữ theo task/source đã ghi.
+
+## C2d-5d1 cô lập
+
+[Handoff](c2d5d1-common-index-request.md) · [Inventory](c2d5d1-test-inventory.json). Conda `C:\Users\ADMIN\.conda\envs\ras\python.exe`; PostgreSQL `127.0.0.1:58579`, MinIO `59579`, label `ras.task=c2d5d1-20261009`; socket API `58589`/Next `53589`/Chrome installed headless. Runner ngoài repo (`run.py`) đặt explicit admin/runtime/recovery/storage và key provider trống trước import, chặn HTTP ngoài; không đọc `.env`, không chạm stack dev. Lệnh đã chạy: `python run.py <tests> -q --junitxml=...` từ gốc repo, `npm test|run typecheck|run build --prefix web`. Pytest rootdir là `api/`: `--deselect` dùng node ID `tests/...`. Không migration mới; source `0042`. **Safety pending tới C4.**
 
 ## C2d-5c2 cô lập
 

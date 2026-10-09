@@ -1,6 +1,8 @@
 # Prompt C2d-5c2: thu hồi bản chung qua runtime và journal
 
-PR #48 đã **MERGED** tại `1eede17c1eed82fa7a00f7018fe01b4362ce30a9` ngày 2026-10-09, chứa code `520ac54` và head `654fbac`; `origin/main` tại merge này, tree giống head PR. Head migration mã nguồn **0041** kế thừa 0040, kiểm bằng AST; không query revision DB dev. Đây là **task đã giao, chưa triển khai/chưa kiểm thử**. Các quyết định scoped dưới đây do orchestrator chọn theo ủy quyền; **safety pending tới C4**.
+**Task lịch sử đã triển khai và merge PR #49 `859dfe9`** (source `0042`), xem [handoff](../c2d5c2-common-revoke.md). Task tiếp theo là [C2d-5d1 HTTP index request](m6c2b2c2d5d1-common-index-request.md); không dùng prompt này giao lại revoke. Nội dung phía dưới giữ hợp đồng tại lúc giao, không phải kết quả test hoặc trạng thái base hiện hành.
+
+Tại lúc giao: PR #48 đã **MERGED** tại `1eede17c1eed82fa7a00f7018fe01b4362ce30a9` ngày 2026-10-09, chứa code `520ac54` và head `654fbac`; `origin/main` tại merge này, tree giống head PR. Head migration mã nguồn **0041** kế thừa 0040, kiểm bằng AST; không query revision DB dev. Các quyết định scoped dưới đây do orchestrator chọn theo ủy quyền; **safety pending tới C4**.
 
 [Mục lục](../README.md) · [Quyết định giao](../decisions.md#giao-c2d-5c2-sau-merge-pr-48-2026-10-09) · [Handoff publish](../c2d5c1-common-publish.md) · [Review PR #48](../reviews/pr48-c2d5c1-common-publish.md) · [Caller map](../c2d1-caller-inventory.json)
 

@@ -16,11 +16,13 @@ current index needs vectors from OpenRouter, so it cannot complete, and a
 keyword-only index is not silently built instead. Without
 ``permits_fulltext_search`` nothing is extracted at all.
 
-``start`` locks the item ``FOR UPDATE`` (the order revoke, publish and cleanup
-use: item first, then the job) and either returns the unfinished promotion job
-of the file or inserts a new one; a partial unique index keeps it to one per
-file whatever the concurrency. The job pins item, version, file and
-``rights_epoch_at_start``; its key, label and audit carry IDs only.
+The HTTP request that queues a job is ``app.api.common_index_request``
+(C2d-5d1): Admin User, then the item ``FOR UPDATE`` (the order revoke, publish
+and cleanup use: item first, then the job), then it returns the unfinished
+promotion job of the file or inserts a new one; a partial unique index keeps it
+to one per file whatever the concurrency. The job pins item, version, file and
+``rights_epoch_at_start``; its key, label and audit carry IDs only. The legacy
+self-committing ``start`` helper was removed with that conversion.
 
 Indexing is not opening by itself: search, the chunk viewer and the chunk,
 coverage, reference and metadata-candidate routes serve an ``indexed`` copy only
@@ -32,21 +34,16 @@ common copies yet.
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
-from datetime import datetime
 
-from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.errors import ApiError
-from app.audit import record_event
-from app.authz import Principal, common_fulltext_items_clause, review_copy_admin_clause
+from app.authz import common_fulltext_items_clause
 from app.config import Settings
 from app.models import (AccessRights, CommonPublication, DeletionTombstone, IndexGeneration, IngestionJob, LibraryItem,
                         SourceFile)
-from app.models.enums import (AuditActorType, AuditOutcome, ContentStatus, JobOrigin, JobState, PublicationState,
-                              RightsAudience, VerifiedMime, Visibility)
+from app.models.enums import (ContentStatus, JobOrigin, JobState, PublicationState, RightsAudience, VerifiedMime,
+                              Visibility)
 
 INDEXABLE = "indexable"
 # Deterministic extraction outcomes: running the same pipeline on the same bytes gives the same answer.
@@ -119,72 +116,6 @@ def latest_job(db: Session, item_id: uuid.UUID) -> IngestionJob | None:
     return db.scalar(select(IngestionJob).where(IngestionJob.item_id == item_id,
                                                 IngestionJob.origin == JobOrigin.PROMOTION.value)
                      .order_by(IngestionJob.created_at.desc(), IngestionJob.id.desc()).limit(1))
-
-
-@dataclass(frozen=True)
-class Started:
-    job: IngestionJob
-    created: bool
-
-
-def _audit(db: Session, admin: Principal, outcome: AuditOutcome, item_id: uuid.UUID, **details: str) -> None:
-    record_event(db, action="common_copy.index.start", outcome=outcome, actor_type=AuditActorType.USER,
-                 actor_user_id=admin.user_id, target_type="library_item", target_id=str(item_id), details=details)
-
-
-def _refuse(db: Session, admin: Principal, item_id: uuid.UUID, code: str, reason: str) -> ApiError:
-    db.rollback()
-    try:
-        _audit(db, admin, AuditOutcome.DENIED, item_id, reason_code=reason)
-        db.commit()
-    except Exception:  # the refusal stands even if its audit row cannot be written
-        db.rollback()
-    return ApiError(409, code)
-
-
-def start(db: Session, admin: Principal, item_id: uuid.UUID, now: datetime) -> Started:
-    """Start (or return the running) index job of one published reviewed copy."""
-    item = db.scalar(select(LibraryItem).where(LibraryItem.id == item_id, review_copy_admin_clause(admin))
-                     .with_for_update().execution_options(populate_existing=True))
-    if item is None:
-        db.rollback()
-        raise ApiError(404, "not_found")
-    reason, _, source = block_reason(db, item)
-    if reason is not None:
-        raise _refuse(db, admin, item.id, REFUSAL_CODES[reason], reason)
-    running = live_job(db, source.id)
-    if running is not None:  # a repeated click, or a request that lost the race to this job
-        db.commit()
-        return Started(running, False)
-    if item.content_status == ContentStatus.INDEXED.value or item.active_index_generation_id is not None:
-        raise _refuse(db, admin, item.id, "already_indexed", "already_indexed")
-    previous = latest_job(db, item.id)
-    if previous is not None and previous.state in EXTRACTION_REJECTED:
-        raise _refuse(db, admin, item.id, "extraction_rejected", previous.state)
-    seq = db.scalar(select(func.count()).select_from(IngestionJob).where(
-        IngestionJob.source_file_id == source.id)) + 1
-    job = IngestionJob(origin=JobOrigin.PROMOTION.value, actor_user_id=admin.user_id, source_label=JOB_LABEL,
-                       scope_visibility=Visibility.COMMON.value, scope_owner_user_id=None, item_id=item.id,
-                       version_id=source.version_id, source_file_id=source.id,
-                       idempotency_key=f"promotion:{source.id}:{seq}", rights_epoch_at_start=item.rights_epoch,
-                       state=JobState.RECEIVED.value, created_at=now, updated_at=now)
-    db.add(job)
-    try:
-        db.flush()
-    except IntegrityError:  # cannot happen under the item lock; the partial unique index is the backstop
-        db.rollback()
-        running = live_job(db, source.id)
-        if running is None:
-            raise ApiError(503, "index_start_unavailable") from None
-        db.commit()
-        return Started(running, False)
-    _audit(db, admin, AuditOutcome.SUCCESS, item.id, job_id=str(job.id), source_file_id=str(source.id))
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise ApiError(503, "index_start_unavailable") from None
-    return Started(job, True)
 
 
 def provider_ready(settings: Settings) -> bool:

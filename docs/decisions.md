@@ -1,5 +1,33 @@
 # Nhật ký quyết định
 
+## Triển khai C2d-5d1 trên nhánh review (2026-10-09)
+
+[Handoff](c2d5d1-common-index-request.md) · [Inventory](c2d5d1-test-inventory.json). Base merge PR #49 `859dfe9`; docs orchestrator commit nguyên trạng `16eda35`; implementation `e283bc6`. Không migration/grants (runtime đã có DML business), source `0042`.
+
+**Đã tái hiện:** `Literal[True]` nhận `1`/`1.0` và tạo job qua HTTP → đổi sang `StrictBool` + validator true như publish/revoke. Form index cũ gửi hai POST khi hai submit cùng tick (mutant Chrome) → ref guard + busy.
+
+**Lựa chọn scoped của agent theo task (chủ dự án chưa trực tiếp xác nhận):** boundary riêng `api/common_index_request.py`; resources sau item khóa `FOR SHARE` (không sửa); job/audit flush trước journal exclusive; không ghi bản ghi journal cho job; live job lệch binding → `409 index_job_binding_changed`, đã yêu cầu hủy → `409 index_job_cancelling` (không re-arm, không tạo job mới); IntegrityError ngoài dedup → `503 index_start_unavailable`; denial nghiệp vụ giữ audit `denied` best-effort trên transaction writer riêng có current proof (thay `_refuse` dùng principal cũ); response thêm `job.cancel_requested` (tương thích). Gỡ helper tự commit `common_index.start`. Giữ proxy 15 s, không config mới. Worker/cleanup/provider giữ nguyên, bàn giao C2d-5d2.
+
+**Mâu thuẫn ghi nhận:** 4 test cũ (`test_common_search` ×2 quyền `session_replication_role`, `test_health` readyz 200 khi safety pending, `test_common_original` helper revoke 409) fail y hệt ở base `859dfe9` và head; không thuộc phạm vi, chưa điều tra nguyên nhân sâu hơn assertion.
+
+## Giao C2d-5d1 sau merge PR #49 (2026-10-09)
+
+Fetch/GitHub CLI xác nhận PR #49 MERGED `859dfe9793dd9549e3ca9b8f0102361f414d0340`, chứa head `f8dc44ce5e146e5c867534f51a7e866769c1bc6b`; merge tree giống head đã review. AST mã nguồn có một head `0042`; không suy revision DB dev. Số reviewer 295/66 web/hai Chrome và agent 529/8 mutant giữ theo source riêng, chưa rerun tại merge. Giữ report review chưa commit cho PR kế tiếp.
+
+**Đã xác nhận:** chủ dự án báo đã merge PR và yêu cầu giao agent tiếp theo; quyền chọn thiết kế hợp lý đã được ủy quyền. **Lựa chọn scoped của orchestrator:** tách common-index thành **C2d-5d1 một POST tạo/trả job** rồi **C2d-5d2 worker/ingest/index và provider dispatch**; search/provider → RAG/provider → tổng hồi quy C2d theo sau. C3/operator/delivery và C4/cutover/storage vẫn riêng, safety pending. [Prompt đầy đủ](tasks/m6c2b2c2d5d1-common-index-request.md).
+
+Quan sát tĩnh: route index dùng principal/get_now đầu request; `common_index.start` tự commit ở cả create/reuse, có rollback/SELECT sau IntegrityError và `_refuse` audit caller cũ; response `_copy_out` chưa proof mới. Job đã có exact file/version/epoch và partial unique live promotion job; worker dispatch đọc DB. Đây chưa phải lỗi đã tái hiện trong lượt giao.
+
+Chọn acceptance Admin User → item → rights/publication/job/version/file → flush FK/audit → journal exclusive trực tiếp → current actor/binding/clock → commit. Response là transaction/proof mới theo quyền Admin xem lịch sử và exact retained job; state có thể đã tiến/cancelled/revoked/scrubbed, `created` thuộc attempt. Commit exception luôn uncertain, không SELECT inference/retry/replay/DTO; known commit hậu kiểm lỗi giữ job. Release lỗi là JSON 503, không rò connection. Không áp ngoại lệ restriction-only của revoke cho writer tạo job.
+
+Giữ boolean xác nhận tường minh, eligibility fulltext + external processing/conditions/file rights hiện hành, dedup live job và không reindex. Không storage/provider/broker send trong endpoint; thiếu key/pricing chưa verified vẫn cho tạo job chờ. Job bền vững không buộc vào tuổi session Admin sau POST; worker PR sau dùng quyền bản chung/gate/lease tại checkpoint. UI busy/ref guard và unknown outcome không tự POST; normal proxy timeout 15 s giữ nguyên. Runtime business grants đã có; ưu tiên không migration, thêm revision sau head thực tế chỉ khi thiếu guard/quyền được chứng minh.
+
+**Cần xác nhận ở mốc sau:** storage journal production, operator/delivery/cutover và kế toán/provider pricing/routing còn theo các quyết định mở hiện hành, không ngăn PR cô lập này và không được tự coi là đã duyệt. Lượt giao chỉ khảo sát Git/source/docs/interpreter và kiểm tài liệu; không API/web/PG/MinIO/browser/provider test hoặc thao tác dev/`.env`.
+
+## Review PR #49 (2026-10-09)
+
+**Review PR #49 tại `f8dc44c`: không phát hiện điểm chặn merge mới trong phạm vi POST revoke.** Reviewer thực chạy **295/295 API**, **66/66 web**, typecheck/build và hai Chrome qua proxy; artifact **529 API/8 mutant** của agent đối chiếu riêng. Raw lượt observer yếu bị ghi đè được giữ là giới hạn evidence. PR OPEN tại lúc review, sau đó merge `859dfe9`; chưa rerun tại merge, source `0042`, **safety pending tới C4**. Reviewer chỉ cập nhật docs, không đổi implementation/migration/grants. Kết quả mới tách theo source khỏi số lịch sử, không mở gate hoặc coi cleanup/worker đã chuyển runtime. [Report](reviews/pr49-c2d5c2-common-revoke.md).
+
 ## Triển khai C2d-5c2 trên nhánh review (2026-10-09)
 
 [Handoff](c2d5c2-common-revoke.md) và [inventory](c2d5c2-test-inventory.json) ghi kiểm mới, giữ riêng kết quả PR #48. Fetch xác minh base merge `1eede17`, tạo nhánh đúng task và giữ docs orchestrator. Chỉ POST revoke dùng `api/common_revoke.py`; không S3/hash/delete/provider. Khóa Admin User → item → rights/publication/jobs/version/file → flush → journal exclusive; response own Session với item/resources SHARE và proof/clock mới. Revoke không áp eligibility publish/index. Không audit denial bằng `_refuse` cũ.

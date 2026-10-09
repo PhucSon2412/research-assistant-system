@@ -129,6 +129,18 @@ export function makeIndexBody(confirmed: boolean) {
   return confirmed ? { confirm_external_processing: true as const } : null;
 }
 
+// C2d-5d1 response: the current state of one durable job. `created` belongs to this
+// attempt; it never means text was indexed or a provider has run.
+export type IndexRequestResult = { item: CommonCopy; job: { id: string; state: string; cancel_requested: boolean };
+  created: boolean };
+
+export function isIndexRequestResult(value: unknown, itemId: string): value is IndexRequestResult {
+  const result = value as IndexRequestResult | null;
+  return !!result && typeof result === "object" && result.item?.id === itemId && typeof result.created === "boolean"
+    && typeof result.job?.id === "string" && typeof result.job?.state === "string"
+    && typeof result.job?.cancel_requested === "boolean";
+}
+
 // Why the API would refuse to index a copy now (`index.eligibility`); the API decides, the page only explains.
 export const INDEX_ELIGIBILITY_TEXT: Record<IndexEligibility, string> = {
   indexable: "lập chỉ mục được (quyền cho tìm kiếm toàn văn và gửi qua provider, không kèm điều kiện)",

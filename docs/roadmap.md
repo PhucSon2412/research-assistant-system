@@ -1,13 +1,18 @@
 # Roadmap đề xuất
 
-## C2d-5c2 trên nhánh review
+## C2d-5d1 trên nhánh review
 
-[Thu hồi runtime](c2d5c2-common-revoke.md) · [Inventory mới](c2d5c2-test-inventory.json): chỉ POST revoke, migration `0042`, exact transaction-bound mirror/confirm và retention, current actor/clock, false mirror fail closed, uncertain outcome/response proof mới và UI không tự POST lại. Base merge PR #48 `1eede17`; kết quả lịch sử giữ riêng. Tiếp theo common-index/worker boundary → search/provider → RAG/provider → tổng hồi quy C2d; không coi kiểm tương thích worker/cleanup là đã chuyển chúng. **Safety pending tới C4; không bắt đầu C3/C4.**
+[Handoff](c2d5d1-common-index-request.md) · [Inventory](c2d5d1-test-inventory.json): một POST index qua runtime, tạo/trả đúng một live job, current Admin/clock, outcome độc lập và response proof mới; không migration. Kiểm tại `e283bc6`: **923/923 API unique pass**, 0 fail/error/skip (collect 4.268, **3.341 not-run**, 4 node lỗi có sẵn ở base chạy riêng vẫn fail như base); web **70/70**, typecheck/build; Chrome qua Next proxy; **9/9 mutant** bắt assertion. PR mở để review, chưa merge; **safety pending tới C4**. Tiếp theo C2d-5d2 theo danh sách checkpoint trong handoff.
 
-## Giao C2d-5c2 sau merge PR #48
+## Giao C2d-5d1 sau merge PR #49
 
-PR #48 đã merge `1eede17`; [prompt revoke](tasks/m6c2b2c2d5c2-common-revoke.md) đã giao, **chưa triển khai/kiểm**. Một POST revoke: runtime routine journal hẹp (revision mới sau 0041), current Admin/clock/binding, thu hồi/tombstone/epoch/cancel/retention cùng transaction, outcome độc lập và response proof mới. Nhánh append lỗi giữ false mirror/gate đóng; unknown commit không tự replay để suy success. Tiếp theo common-index/worker → search/provider → RAG/provider → tổng hồi quy C2d; C3/C4 riêng, safety pending. Không cộng kết quả review/agent PR #48 vào task này.
+[Prompt C2d-5d1](tasks/m6c2b2c2d5d1-common-index-request.md) đã giao, **chưa triển khai/kiểm**. Base merge PR #49 `859dfe9`, source `0042`; một POST index nhận boolean xác nhận, tạo/reuse job bền vững đúng file/rights/epoch qua current Admin/clock, outcome độc lập và response proof mới. Không I/O storage/provider hoặc bật pricing; UI chống submit kép/unknown không auto retry. [Quyết định chia scope](decisions.md#giao-c2d-5d1-sau-merge-pr-49-2026-10-09).
 
+Thứ tự tiếp: **C2d-5d1 HTTP job request → C2d-5d2 worker/ingest/index/provider dispatch → search/provider → RAG/provider → tổng hồi quy C2d**. Chi tiết worker sẽ giao sau khảo sát source/bàn giao C2d-5d1; không coi kiểm tương thích là đã chuyển worker/cleanup. C3/operator/delivery và C4/cutover/storage độc lập riêng; **safety pending tới C4**.
+
+## C2d-5c2 đã merge PR #49
+
+[Thu hồi runtime](c2d5c2-common-revoke.md) · [Inventory](c2d5c2-test-inventory.json) · [Review](reviews/pr49-c2d5c2-common-revoke.md): chỉ POST revoke, migration `0042`, exact transaction-bound mirror/confirm và retention, current actor/clock, false mirror fail closed, uncertain outcome/response proof mới và UI không tự POST lại. Merge `859dfe9` chứa head `f8dc44c`; chưa rerun tại merge. [Prompt revoke](tasks/m6c2b2c2d5c2-common-revoke.md) là task lịch sử sau merge PR #48 `1eede17`; đã triển khai trong PR #49. Không cộng kết quả PR #48 hoặc #49 vào task mới. **Safety pending tới C4.**
 
 ## C2d-5c1 sau merge PR #47
 
@@ -23,7 +28,7 @@ PR #48 đã merge `1eede17`; [prompt revoke](tasks/m6c2b2c2d5c2-common-revoke.md
 
 PR #45 đã merge `070cb37` ngày 2026-10-07, source `0039`. [Task C2d-5a đã giao](tasks/m6c2b2c2d5a-review-json-writers.md): đúng ba POST submit/withdraw/reject, actor/role/resource/clock trước commit, typed closure mirror runtime hẹp, pending gate có binding và proof response mới. Đã merge PR #46 `8ff5b4e`, migration `0040`; [handoff](c2d5a-review-json-writers.md) / [inventory](c2d5a-test-inventory.json) ghi kiểm chứng theo source. Approval/copy và publication/provider/C3/C4 còn riêng. [Quyết định scoped](decisions.md#giao-c2d-5a-sau-merge-pr-45-2026-10-07), safety pending tới C4.
 
-C2d-5b approval/copy đã merge PR #47 `04434e3` → C2d-5c1 publish → C2d-5c2 revoke → common-index → search/provider → RAG/provider → tổng hồi quy C2d. Chưa coi các nhóm đó đã được triển khai hoặc toàn T14 đã đạt. C3 operator/delivery và C4 cutover/storage độc lập giữ riêng. Các mốc PR #45 trước merge bên dưới là lịch sử.
+C2d-5b approval/copy đã merge PR #47 `04434e3`, C2d-5c1 publish đã merge PR #48 `1eede17`, C2d-5c2 revoke đã merge PR #49 `859dfe9`. Tiếp theo C2d-5d1 HTTP index request → C2d-5d2 worker/index/provider dispatch → search/provider → RAG/provider → tổng hồi quy C2d. Các nhóm tiếp theo chưa triển khai, chưa coi toàn T14 đã đạt. C3 operator/delivery và C4 cutover/storage độc lập giữ riêng. Các mốc PR #45 trước merge bên dưới là lịch sử.
 
 ## C2d-4c sau merge PR #44
 

@@ -12,11 +12,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { api, describeError, publicationError, revocationError } from "../../../lib/api";
+import { api, describeError, indexRequestError, publicationError, revocationError } from "../../../lib/api";
 import {
   INDEX_ELIGIBILITY_TEXT, INDEX_EXTERNAL_NOTICE, OBJECT_OUTCOME_TEXT, ORIGINAL_DOWNLOAD_TEXT, PUBLICATION_STATE_TEXT,
-  REVOCATION_REASONS, fieldList, makeIndexBody, makePublishBody, makeRevokeBody,
-  type CommonCopy, type PublicationState,
+  REVOCATION_REASONS, fieldList, isIndexRequestResult, makeIndexBody, makePublishBody, makeRevokeBody,
+  type CommonCopy, type IndexRequestResult, type PublicationState,
 } from "../../../lib/review";
 import { ErrorText, Shell, useSession } from "../../components/session";
 
@@ -69,21 +69,35 @@ function PublishForm({ copy, onDone }: { copy: CommonCopy; onDone: () => void })
 
 function IndexForm({ copy, onDone }: { copy: CommonCopy; onDone: () => void }) {
   const [confirmed, setConfirmed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const sending = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const body = makeIndexBody(confirmed);
   const index = copy.index;
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!body) return;
+    // The ref blocks a second submit in the same tick, before `busy` re-renders.
+    if (!body || sending.current) return;
+    sending.current = true;
+    setBusy(true);
     setError(null);
+    let accepted = false;
     try {
-      await api(`/admin/common-copies/${encodeURIComponent(copy.id)}/index`, { method: "POST", body });
-      onDone();
+      const result = await api<IndexRequestResult>(
+        `/admin/common-copies/${encodeURIComponent(copy.id)}/index`, { method: "POST", body });
+      if (!isIndexRequestResult(result, copy.id)) throw new Error("index response incomplete");
+      accepted = true;
     } catch (err) {
-      setError(describeError(err));
+      setError(indexRequestError(err));
+    } finally {
+      sending.current = false;
+      setBusy(false);
       setConfirmed(false);
     }
+    // A durable job is not indexed text; refresh shows its current state. A failed
+    // refresh is reported by the list itself, never as a failed POST.
+    if (accepted) onDone();
   }
 
   return (
@@ -98,10 +112,10 @@ function IndexForm({ copy, onDone }: { copy: CommonCopy; onDone: () => void }) {
       {index.eligibility === "indexable" && copy.content_status !== "indexed" && (
         <form onSubmit={submit}>
           <label>
-            <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />{" "}
+            <input type="checkbox" checked={confirmed} disabled={busy} onChange={(e) => setConfirmed(e.target.checked)} />{" "}
             Tôi xác nhận lập chỉ mục bản này. {INDEX_EXTERNAL_NOTICE}
           </label>{" "}
-          <button type="submit" disabled={!body}>{index.job ? "Chạy lại / xem job" : "Lập chỉ mục"}</button>
+          <button type="submit" disabled={!body || busy}>{index.job ? "Chạy lại / xem job" : "Lập chỉ mục"}</button>
         </form>
       )}
     </div>

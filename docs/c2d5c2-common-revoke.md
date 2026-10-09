@@ -1,5 +1,11 @@
 # C2d-5c2: thu hồi bản chung qua runtime
 
+**Đã merge PR #49 `859dfe9793dd9549e3ca9b8f0102361f414d0340` ngày 2026-10-09**, tree khớp head `f8dc44c`. Chưa rerun tại merge; bằng chứng bên dưới giữ source lịch sử. Tiếp theo [C2d-5d1 HTTP index request](tasks/m6c2b2c2d5d1-common-index-request.md), worker/index/provider dispatch tách PR sau; safety pending tới C4.
+
+## Review độc lập tại f8dc44c
+
+**Review PR #49 tại `f8dc44c`: không phát hiện điểm chặn merge mới trong phạm vi POST revoke.** Reviewer thực chạy **295/295 API**, **66/66 web**, typecheck/build và hai Chrome qua proxy; artifact **529 API/8 mutant** của agent đối chiếu riêng. Raw lượt observer yếu bị ghi đè được giữ là giới hạn evidence. PR OPEN tại lúc review, sau đó merge `859dfe9`; source `0042`, **safety pending tới C4**. [Report](reviews/pr49-c2d5c2-common-revoke.md). Reviewer không sửa code; số agent bên dưới giữ nguyên theo từng source, không thành pass mới ở head hoặc merge.
+
 [Task](tasks/m6c2b2c2d5c2-common-revoke.md) · [Inventory](c2d5c2-test-inventory.json) · [Publish](c2d5c1-common-publish.md)
 
 Base đã fetch/xác minh: PR #48 MERGED, `origin/main` chứa

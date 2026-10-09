@@ -1,0 +1,2186 @@
+{
+ "task": "C2d-5d1 POST /admin/common-copies/{item_id}/index",
+ "base": "859dfe9793dd9549e3ca9b8f0102361f414d0340",
+ "branch": "feat/m6c2b2c2d5d1-common-index-request",
+ "orchestrator_docs_commit": "16eda350ed32eb84fa3b6b432374be5de1f9319b",
+ "implementation_commit": "e283bc6400efdefd4641838ce4d94f4ccee3baaa",
+ "head_policy": "All API groups and web ran at the implementation commit; later commits change docs only. Final PR head is in the PR description, not re-run.",
+ "source_migration": "0042",
+ "new_migrations": [],
+ "grants": "unchanged (runtime business DML grants already present)",
+ "safety": "pending until C4; scoped business cutover only in fixtures, unpatched pending HTTP tested separately",
+ "orchestrator_docs": {
+  "original_paths": [
+   " M AGENTS.md",
+   " M README.md",
+   " M docs/README.md",
+   " M docs/c2d1-caller-inventory.json",
+   " M docs/c2d5c2-common-revoke.md",
+   " M docs/decisions.md",
+   " M docs/dev-setup.md",
+   " M docs/roadmap.md",
+   " M docs/tasks/m6c2b2c2d5c2-common-revoke.md",
+   " M docs/testing.md",
+   "?? docs/reviews/pr49-c2d5c2-common-revoke.md",
+   "?? docs/tasks/m6c2b2c2d5d1-common-index-request.md"
+  ],
+  "original_tracked_patch": {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\orchestrator.patch",
+   "sha256": "1c4ac29735ee5498d7fa4a1f4d9c4bc0ff1c77b5fda07b9bcb063cbdc4fc376d"
+  },
+  "untracked_copies": [
+   {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\orchestrator-untracked\\docs\\reviews\\pr49-c2d5c2-common-revoke.md",
+    "sha256": "c6422d3a9901c1762973e6f7c0a0307f4c1920a82adcad0e3199451a23b018a2"
+   },
+   {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\orchestrator-untracked\\docs\\tasks\\m6c2b2c2d5d1-common-index-request.md",
+    "sha256": "5728e6b183da19362161aef80bc014e6d8c59c96203ed85a1a6f3d91ac4fc644"
+   }
+  ],
+  "policy": "Committed unchanged in 16eda35 before any other change; historical results not converted to current passes."
+ },
+ "environment": {
+  "python": "C:\\Users\\ADMIN\\.conda\\envs\\ras\\python.exe",
+  "postgres_port": 58579,
+  "minio_port": 59579,
+  "api_socket": 58589,
+  "next_proxy": 53589,
+  "label": "ras.task=c2d5d1-20261009",
+  "provider": "Keys explicitly blank; external httpx sync/async blocked; Celery dispatch patched to fail in index fixtures; no provider call.",
+  "chrome": "Installed Chrome headless -> Next production build -> Uvicorn socket working tree; not Compose API image.",
+  "dev": "No .env/key read/write, dev DB query/migration/restart, provider, pricing_verified or safety cutover."
+ },
+ "api": {
+  "collected": 4268,
+  "collection_nodes": {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\collect-final.nodes.json",
+   "sha256": "aeb0e7941348d1efb248eadbec532010a42e133671b034ca9fa7297e4e7d4c68"
+  },
+  "collect": {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\collect-final.log",
+   "sha256": "414425433b5e6885829ad9961c0c7671a9af8dc795c39d15a6b71eba2b27cb76"
+  },
+  "selected_unique": 923,
+  "pass_count": 923,
+  "fail": 0,
+  "error": 0,
+  "skip": 0,
+  "not_run": 3341,
+  "known_base_failures": {
+   "nodes": [
+    "api/tests/test_common_original.py::test_common_original_refused_unless_live_rights_open_that_exact_file",
+    "api/tests/test_common_search.py::test_chunk_of_another_file_or_version_of_the_copy_stays_closed",
+    "api/tests/test_common_search.py::test_forbidden_copies_never_take_a_top_k_slot",
+    "api/tests/test_health.py::test_readyz_ok_after_migration"
+   ],
+   "head_result": {
+    "executions": 4,
+    "unique": 4,
+    "pass_count": 0,
+    "fail": 4,
+    "error": 0,
+    "skip": 0,
+    "failed_nodes": [
+     "api/tests/test_common_original.py::test_common_original_refused_unless_live_rights_open_that_exact_file",
+     "api/tests/test_common_search.py::test_chunk_of_another_file_or_version_of_the_copy_stays_closed",
+     "api/tests/test_common_search.py::test_forbidden_copies_never_take_a_top_k_slot",
+     "api/tests/test_health.py::test_readyz_ok_after_migration"
+    ],
+    "nodes": [
+     "api/tests/test_common_original.py::test_common_original_refused_unless_live_rights_open_that_exact_file",
+     "api/tests/test_common_search.py::test_chunk_of_another_file_or_version_of_the_copy_stays_closed",
+     "api/tests/test_common_search.py::test_forbidden_copies_never_take_a_top_k_slot",
+     "api/tests/test_health.py::test_readyz_ok_after_migration"
+    ]
+   },
+   "base_result": {
+    "executions": 4,
+    "unique": 4,
+    "pass_count": 0,
+    "fail": 4,
+    "error": 0,
+    "skip": 0,
+    "failed_nodes": [
+     "api/tests/test_common_original.py::test_common_original_refused_unless_live_rights_open_that_exact_file",
+     "api/tests/test_common_search.py::test_chunk_of_another_file_or_version_of_the_copy_stays_closed",
+     "api/tests/test_common_search.py::test_forbidden_copies_never_take_a_top_k_slot",
+     "api/tests/test_health.py::test_readyz_ok_after_migration"
+    ],
+    "nodes": [
+     "api/tests/test_common_original.py::test_common_original_refused_unless_live_rights_open_that_exact_file",
+     "api/tests/test_common_search.py::test_chunk_of_another_file_or_version_of_the_copy_stays_closed",
+     "api/tests/test_common_search.py::test_forbidden_copies_never_take_a_top_k_slot",
+     "api/tests/test_health.py::test_readyz_ok_after_migration"
+    ]
+   },
+   "base_junit": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-base-compat-failures.xml",
+    "sha256": "964c5e80dc2d5fefaf6522fc1aba945a61243bc2415ddf468816d8bc46724963"
+   },
+   "base_log": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-base-compat-failures.log",
+    "sha256": "e271c1ebd1aa7b8b42b3572cb56493dcba276bd3479126d1549734ddd3a02c4c"
+   },
+   "note": "Fail identically on base 859dfe9 (git archive, same isolated environment) and at head; deselected from the content group and run separately. Not caused or fixed by this PR; assertions: session_replication_role privilege (2), readyz expects 200 while safety is pending (1), legacy revoke helper returns 409 (1). Root causes not investigated further."
+  },
+  "groups": {
+   "core": {
+    "args": [
+     "api/tests/test_c2d5d1_common_index_request.py",
+     "api/tests/test_c2d5d1_proxy_smoke.py",
+     "api/tests/test_migrations.py"
+    ],
+    "tested_commit": "e283bc6400efdefd4641838ce4d94f4ccee3baaa",
+    "returncode": 0,
+    "result": {
+     "executions": 200,
+     "unique": 200,
+     "pass_count": 200,
+     "fail": 0,
+     "error": 0,
+     "skip": 0,
+     "failed_nodes": [],
+     "nodes": [
+      "api/tests/test_c2d5d1_common_index_request.py::test_broker_unavailable_job_still_durable_for_discovery",
+      "api/tests/test_c2d5d1_common_index_request.py::test_cancel_keeps_thread_owned_until_settle[attempt-before_commit]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_cancel_keeps_thread_owned_until_settle[attempt-response]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_cancel_keeps_thread_owned_until_settle[disconnect-before_commit]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_cancel_keeps_thread_owned_until_settle[disconnect-response]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_cancel_keeps_thread_owned_until_settle[receive-before_commit]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_cancel_keeps_thread_owned_until_settle[receive-response]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_commit_exception_http_is_controlled_json",
+      "api/tests/test_c2d5d1_common_index_request.py::test_commit_exception_uncertain_no_select_retry_or_ids[both-False]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_commit_exception_uncertain_no_select_retry_or_ids[both-True]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_commit_exception_uncertain_no_select_retry_or_ids[close-False]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_commit_exception_uncertain_no_select_retry_or_ids[close-True]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_commit_exception_uncertain_no_select_retry_or_ids[none-False]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_commit_exception_uncertain_no_select_retry_or_ids[none-True]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_commit_exception_uncertain_no_select_retry_or_ids[rollback-False]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_commit_exception_uncertain_no_select_retry_or_ids[rollback-True]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[binding-dependency-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[binding-dependency-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[binding-response-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[binding-response-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[csrf-dependency-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[csrf-dependency-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[csrf-response-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[csrf-response-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[disable-dependency-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[disable-dependency-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[disable-response-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[disable-response-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[generation-dependency-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[generation-dependency-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[generation-response-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[generation-response-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[head-dependency-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[head-dependency-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[head-response-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[head-response-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[held-dependency-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[held-dependency-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[held-response-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[held-response-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[hold-dependency-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[hold-dependency-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[hold-response-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[hold-response-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[logout-dependency-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[logout-dependency-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[logout-response-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[logout-response-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[quarantine-dependency-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[quarantine-dependency-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[quarantine-response-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[quarantine-response-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[receipt-dependency-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[receipt-dependency-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[receipt-response-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[receipt-response-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[reset-dependency-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[reset-dependency-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[reset-response-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[reset-response-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[role-dependency-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[role-dependency-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[role-response-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_actor_and_gate_not_dependency_snapshot[role-response-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[-1-absolute-accept-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[-1-absolute-accept-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[-1-absolute-response-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[-1-absolute-response-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[-1-idle-accept-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[-1-idle-accept-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[-1-idle-response-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[-1-idle-response-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[0-absolute-accept-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[0-absolute-accept-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[0-absolute-response-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[0-absolute-response-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[0-idle-accept-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[0-idle-accept-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[0-idle-response-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[0-idle-response-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[1-absolute-accept-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[1-absolute-accept-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[1-absolute-response-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[1-absolute-response-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[1-idle-accept-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[1-idle-accept-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[1-idle-response-create]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[1-idle-response-reuse]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_real_row_or_journal_lock_wait[False-item]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_real_row_or_journal_lock_wait[False-job]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_real_row_or_journal_lock_wait[False-journal]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_real_row_or_journal_lock_wait[False-rights]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_real_row_or_journal_lock_wait[False-user]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_real_row_or_journal_lock_wait[True-item]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_real_row_or_journal_lock_wait[True-job]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_real_row_or_journal_lock_wait[True-journal]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_real_row_or_journal_lock_wait[True-rights]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_current_clock_after_real_row_or_journal_lock_wait[True-user]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_denial_teardown_failure_controlled[both_before]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_denial_teardown_failure_controlled[close_before]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_denial_teardown_failure_controlled[rollback_before]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_existing_job_returned_untouched_never_reset_or_rebound[awaiting_index]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_existing_job_returned_untouched_never_reset_or_rebound[cancel_requested]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_existing_job_returned_untouched_never_reset_or_rebound[claimed]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_existing_job_returned_untouched_never_reset_or_rebound[epoch]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_existing_job_returned_untouched_never_reset_or_rebound[finished]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_existing_job_returned_untouched_never_reset_or_rebound[other_actor]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_fault_before_commit_rolls_back_no_job[audit]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_fault_before_commit_rolls_back_no_job[audit_fk]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_fault_before_commit_rolls_back_no_job[binding]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_fault_before_commit_rolls_back_no_job[job_insert]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_fault_before_commit_rolls_back_no_job[journal_lock]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_index_and_revoke_race_item_first_no_deadlock[index]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_index_and_revoke_race_item_first_no_deadlock[revoke]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_ineligible_tuple_closed_no_job_and_code_only_audit[already_indexed-already_indexed-already_indexed]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_ineligible_tuple_closed_no_job_and_code_only_audit[checksum-rights_not_current-rights_not_current]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_ineligible_tuple_closed_no_job_and_code_only_audit[conditions-blocked_by_conditions-blocked_by_conditions]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_ineligible_tuple_closed_no_job_and_code_only_audit[epoch-rights_not_current-rights_not_current]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_ineligible_tuple_closed_no_job_and_code_only_audit[fulltext_rejected-extraction_rejected-fulltext_rejected]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_ineligible_tuple_closed_no_job_and_code_only_audit[needs_review-extraction_rejected-needs_review]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_ineligible_tuple_closed_no_job_and_code_only_audit[no_fulltext-fulltext_not_permitted-fulltext_not_permitted]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_ineligible_tuple_closed_no_job_and_code_only_audit[no_provider-external_processing_not_permitted-external_processing_not_permitted]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_ineligible_tuple_closed_no_job_and_code_only_audit[not_published-common_copy_not_published-not_published]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_ineligible_tuple_closed_no_job_and_code_only_audit[publication_revoked-rights_not_current-rights_not_current]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_ineligible_tuple_closed_no_job_and_code_only_audit[revoked-common_copy_revoked-revoked]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_ineligible_tuple_closed_no_job_and_code_only_audit[rights_revoked-rights_not_current-rights_not_current]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_ineligible_tuple_closed_no_job_and_code_only_audit[size-rights_not_current-rights_not_current]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_input_and_acl_no_side_effect[anonymous]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_input_and_acl_no_side_effect[csrf]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_input_and_acl_no_side_effect[empty]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_input_and_acl_no_side_effect[extra]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_input_and_acl_no_side_effect[malformed]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_input_and_acl_no_side_effect[missing]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_input_and_acl_no_side_effect[missing_confirm]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_input_and_acl_no_side_effect[no_origin]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_input_and_acl_no_side_effect[origin]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_input_and_acl_no_side_effect[private]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_input_and_acl_no_side_effect[user]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_integrity_conflict_outside_locked_dedup_is_controlled",
+      "api/tests/test_c2d5d1_common_index_request.py::test_known_commit_teardown_failure_keeps_job_no_dto_no_leak[accept-both_before]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_known_commit_teardown_failure_keeps_job_no_dto_no_leak[accept-close_after]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_known_commit_teardown_failure_keeps_job_no_dto_no_leak[accept-close_before]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_known_commit_teardown_failure_keeps_job_no_dto_no_leak[accept-rollback_after]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_known_commit_teardown_failure_keeps_job_no_dto_no_leak[accept-rollback_before]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_known_commit_teardown_failure_keeps_job_no_dto_no_leak[response-both_before]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_known_commit_teardown_failure_keeps_job_no_dto_no_leak[response-close_after]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_known_commit_teardown_failure_keeps_job_no_dto_no_leak[response-close_before]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_known_commit_teardown_failure_keeps_job_no_dto_no_leak[response-rollback_after]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_known_commit_teardown_failure_keeps_job_no_dto_no_leak[response-rollback_before]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_late_formatter_denial_rechecks_current_actor",
+      "api/tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[0]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[1.0]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[1_0]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[1_1]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[False]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[None]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[confirm8]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[confirm9]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[true]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[yes]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_pending_http_unpatched_gate_no_mutation",
+      "api/tests/test_c2d5d1_common_index_request.py::test_response_reflects_current_job_after_known_commit[advance]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_response_reflects_current_job_after_known_commit[cleanup]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_response_reflects_current_job_after_known_commit[revoke]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_runtime_create_then_reuse_exact_binding_no_storage_provider_or_journal",
+      "api/tests/test_c2d5d1_common_index_request.py::test_session_writer_races_index_no_deadlock_new_response_proof[auth]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_session_writer_races_index_no_deadlock_new_response_proof[index]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_two_concurrent_requests_one_job_one_success_audit[other]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_two_concurrent_requests_one_job_one_success_audit[same]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_worker_item_job_checkpoint_order_and_claim_skip[index]",
+      "api/tests/test_c2d5d1_common_index_request.py::test_worker_item_job_checkpoint_order_and_claim_skip[worker]",
+      "api/tests/test_c2d5d1_proxy_smoke.py::test_chrome_index_unticked_busy_reuse_unknown_no_repost_and_denials",
+      "api/tests/test_migrations.py::test_0005_preserves_received_m1c_job_and_original_metadata",
+      "api/tests/test_migrations.py::test_0007_backfills_handoff_without_completing_job",
+      "api/tests/test_migrations.py::test_0009_upgrades_database_with_m2b_pdf_data",
+      "api/tests/test_migrations.py::test_0010_backfills_existing_embedding_calls_by_owner",
+      "api/tests/test_migrations.py::test_0011_upgrades_m3a_data_without_changing_it",
+      "api/tests/test_migrations.py::test_0012_backfills_existing_search_usage_warnings",
+      "api/tests/test_migrations.py::test_0013_marks_prelease_reservations_uncertain_without_releasing_cost",
+      "api/tests/test_migrations.py::test_0015_upgrades_m3b_database_with_existing_data",
+      "api/tests/test_migrations.py::test_0016_upgrades_m3c_database_with_data",
+      "api/tests/test_migrations.py::test_0018_preserves_existing_license_provenance",
+      "api/tests/test_migrations.py::test_0019_keeps_existing_references_and_backfill_links_them",
+      "api/tests/test_migrations.py::test_0020_upgrades_m5b_database_with_data_and_binds_review_requests",
+      "api/tests/test_migrations.py::test_0021_upgrades_m6a_database_keeps_common_listed_and_requests",
+      "api/tests/test_migrations.py::test_0022_upgrades_m6b1_database_keeps_pending_and_listed_then_gates_publication",
+      "api/tests/test_migrations.py::test_0023_removes_metadata_of_copies_already_purged_under_0022",
+      "api/tests/test_migrations.py::test_0024_removes_derived_rows_of_copies_purged_under_0023_and_fences_writes",
+      "api/tests/test_migrations.py::test_0025_pins_promotion_jobs_and_charges_common_calls_to_the_application",
+      "api/tests/test_migrations.py::test_0025_refuses_a_promotion_job_it_cannot_pin",
+      "api/tests/test_migrations.py::test_0026_leaves_registration_to_the_operator_and_imports_existing_tombstones",
+      "api/tests/test_migrations.py::test_0027_backfills_revoke_records_unconfirmed_so_recover_must_confirm_them",
+      "api/tests/test_migrations.py::test_0027_downgrades_only_a_database_never_registered",
+      "api/tests/test_migrations.py::test_collection_membership_foreign_keys_restrict",
+      "api/tests/test_migrations.py::test_downgrade_to_base_and_upgrade_again",
+      "api/tests/test_migrations.py::test_empty_database_upgrades_to_head",
+      "api/tests/test_migrations.py::test_migration_sql_seeds_no_accounts",
+      "api/tests/test_migrations.py::test_orm_models_match_migrated_schema",
+      "api/tests/test_migrations.py::test_rerunning_upgrade_is_a_noop",
+      "api/tests/test_migrations.py::test_upgrade_from_0001_keeps_existing_data"
+     ]
+    },
+    "junit": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-core.xml",
+     "sha256": "f280f1f10c066af44eb8a4297830ea5b231683353341f48df22a43971fa2c060"
+    },
+    "log": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-core.log",
+     "sha256": "4db9dd7199ae95e35441630fb40e550b91c79279510187cd7425d79d15e589d0"
+    },
+    "selection": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-core.nodes.json",
+     "sha256": "7060fb58d1ab0a49b2e69ef52f5b527469b293d94303b8f4882732a8ba864cff"
+    },
+    "collect_log": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-core-collect.log",
+     "sha256": "e7d6a4cd7fcaca81dcac5aae7b5cb9c4783279799b94fb7072135f2713c3d687"
+    }
+   },
+   "revoke": {
+    "args": [
+     "api/tests/test_c2d5c2_common_revoke.py",
+     "api/tests/test_c2d5c2_proxy_smoke.py"
+    ],
+    "tested_commit": "e283bc6400efdefd4641838ce4d94f4ccee3baaa",
+    "returncode": 0,
+    "result": {
+     "executions": 171,
+     "unique": 171,
+     "pass_count": 171,
+     "fail": 0,
+     "error": 0,
+     "skip": 0,
+     "failed_nodes": [],
+     "nodes": [
+      "api/tests/test_c2d5c2_common_revoke.py::test_actual_audit_foreign_key_fails_before_any_journal_byte",
+      "api/tests/test_c2d5c2_common_revoke.py::test_append_fault_commits_false_restriction_even_ttl_crosses[False-full]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_append_fault_commits_false_restriction_even_ttl_crosses[False-none]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_append_fault_commits_false_restriction_even_ttl_crosses[False-torn]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_append_fault_commits_false_restriction_even_ttl_crosses[True-full]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_append_fault_commits_false_restriction_even_ttl_crosses[True-none]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_append_fault_commits_false_restriction_even_ttl_crosses[True-torn]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_cancel_keeps_thread_owned_until_settle_restriction_after_append[attempt-before_intent]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_cancel_keeps_thread_owned_until_settle_restriction_after_append[attempt-during_append]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_cancel_keeps_thread_owned_until_settle_restriction_after_append[disconnect-before_intent]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_cancel_keeps_thread_owned_until_settle_restriction_after_append[disconnect-during_append]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_cancel_keeps_thread_owned_until_settle_restriction_after_append[receive-before_intent]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_cancel_keeps_thread_owned_until_settle_restriction_after_append[receive-during_append]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_cleanup_tombstone_item_vs_response_share_real_wait_no_upgrade[cleanup]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_cleanup_tombstone_item_vs_response_share_real_wait_no_upgrade[response]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_cleanup_wins_before_new_response_scrubbed_and_count_from_attempt[False]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_cleanup_wins_before_new_response_scrubbed_and_count_from_attempt[True]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_commit_exception_never_selects_replays_or_responds[both-False]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_commit_exception_never_selects_replays_or_responds[both-True]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_commit_exception_never_selects_replays_or_responds[close-False]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_commit_exception_never_selects_replays_or_responds[close-True]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_commit_exception_never_selects_replays_or_responds[none-False]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_commit_exception_never_selects_replays_or_responds[none-True]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_commit_exception_never_selects_replays_or_responds[rollback-False]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_commit_exception_never_selects_replays_or_responds[rollback-True]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_corrupt_target_controlled_without_journal[epoch]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_corrupt_target_controlled_without_journal[missing_file]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_corrupt_target_controlled_without_journal[no_rights]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_corrupt_target_controlled_without_journal[wrong_checksum]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_corrupt_target_controlled_without_journal[wrong_version]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[binding-dependency]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[binding-response]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[csrf-dependency]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[csrf-response]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[disable-dependency]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[disable-response]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[generation-dependency]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[generation-response]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[head-dependency]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[head-response]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[held-dependency]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[held-response]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[hold-dependency]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[hold-response]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[logout-dependency]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[logout-response]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[quarantine-dependency]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[quarantine-response]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[receipt-dependency]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[receipt-response]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[reset-dependency]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[reset-response]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[role-dependency]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_actor_and_gate_not_dependency_snapshot[role-response]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_final_predicate[-1-absolute-postfsync]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_final_predicate[-1-absolute-preappend]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_final_predicate[-1-absolute-response]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_final_predicate[-1-idle-postfsync]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_final_predicate[-1-idle-preappend]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_final_predicate[-1-idle-response]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_final_predicate[0-absolute-postfsync]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_final_predicate[0-absolute-preappend]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_final_predicate[0-absolute-response]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_final_predicate[0-idle-postfsync]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_final_predicate[0-idle-preappend]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_final_predicate[0-idle-response]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_final_predicate[1-absolute-postfsync]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_final_predicate[1-absolute-preappend]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_final_predicate[1-absolute-response]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_final_predicate[1-idle-postfsync]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_final_predicate[1-idle-preappend]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_final_predicate[1-idle-response]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_real_row_or_journal_lock_wait[False-item]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_real_row_or_journal_lock_wait[False-journal]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_real_row_or_journal_lock_wait[False-rights]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_real_row_or_journal_lock_wait[False-user]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_real_row_or_journal_lock_wait[True-item]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_real_row_or_journal_lock_wait[True-journal]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_real_row_or_journal_lock_wait[True-rights]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_current_clock_after_real_row_or_journal_lock_wait[True-user]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_false_commit_keeps_journal_error_primary_over_teardown[both_before]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_false_commit_keeps_journal_error_primary_over_teardown[close_before]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_false_commit_keeps_journal_error_primary_over_teardown[rollback_before]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_false_mirror_uncommitted_is_not_confirmable_by_other_transaction",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[access_rights_id-00000000-0000-0000-0000-000000000001]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[extra-forbidden]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[id-00000000-0000-0000-0000-000000000001]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[item_id-00000000-0000-0000-0000-000000000001]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[prior_publication_state-listed]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[purge_due_at-2026-10-06T09:00:00+00:00]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[reason_code-bad]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[reason_code-rights_expired]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[recorded_at-2026-10-03T09:00:01+00:00]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[recorded_by_user_id-00000000-0000-0000-0000-000000000001]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[retentions-None]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[retentions-value19]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[rights_epoch-1]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[rights_epoch-2]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[rights_epoch-None]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[rights_epoch-True]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[source_file_id-00000000-0000-0000-0000-000000000001]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[storage_key-None]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[storage_key-originals/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[target_kind-private]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[version_id-00000000-0000-0000-0000-000000000001]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_independent_sql_rejects_mismatched_or_malformed_body_before_byte[version_id-None]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_input_and_acl_no_mutation[csrf]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_input_and_acl_no_mutation[malformed]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_input_and_acl_no_mutation[missing]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_input_and_acl_no_mutation[missing_confirm]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_input_and_acl_no_mutation[origin]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_input_and_acl_no_mutation[private]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_input_and_acl_no_mutation[reason]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_input_and_acl_no_mutation[retention_duplicate]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_input_and_acl_no_mutation[retention_missing_confirmation]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_input_and_acl_no_mutation[retention_nonbool]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_input_and_acl_no_mutation[user]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_late_formatter_denial_rechecks_current_actor",
+      "api/tests/test_c2d5c2_common_revoke.py::test_literal_boolean_only[0]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_literal_boolean_only[1_0]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_literal_boolean_only[1_1]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_literal_boolean_only[False]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_literal_boolean_only[None]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_literal_boolean_only[true]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_pending_http_unpatched_gate_no_mutation",
+      "api/tests/test_c2d5c2_common_revoke.py::test_restore_current_intent_retention_cleanup_private_intact_idempotent[absent-False]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_restore_current_intent_retention_cleanup_private_intact_idempotent[absent-True]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_restore_current_intent_retention_cleanup_private_intact_idempotent[present-False]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_restore_current_intent_retention_cleanup_private_intact_idempotent[present-True]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_revoke_needs_no_content_or_publish_eligibility[conditions]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_revoke_needs_no_content_or_publish_eligibility[corrupt_object]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_revoke_needs_no_content_or_publish_eligibility[indexed]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_revoke_needs_no_content_or_publish_eligibility[missing_object]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_revoke_needs_no_content_or_publish_eligibility[no_permits]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_runtime_success_atomic_fresh_history_no_storage_or_private_change[False]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_runtime_success_atomic_fresh_history_no_storage_or_private_change[True]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_savepoint_subtransaction_xmin_fails_closed[python]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_savepoint_subtransaction_xmin_fails_closed[sql]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_session_writer_races_revoke_no_deadlock_new_response_proof[auth]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_session_writer_races_revoke_no_deadlock_new_response_proof[revoke]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_sql_envelope_validation[envelope_type]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_sql_envelope_validation[extra]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_sql_envelope_validation[hash]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_sql_envelope_validation[kind]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_sql_envelope_validation[null_line]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_sql_envelope_validation[prev]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_sql_envelope_validation[seq]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_sql_fault_before_append_vs_after_durable_intent[audit]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_sql_fault_before_append_vs_after_durable_intent[confirm]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_sql_fault_before_append_vs_after_durable_intent[mirror]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_sql_retention_basis_exact_values_before_append[confirmed_by_user_id-00000000-0000-0000-0000-000000000001]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_sql_retention_basis_exact_values_before_append[field-source_url]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_sql_retention_basis_exact_values_before_append[policy_source-another policy]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_sql_retention_basis_exact_values_before_append[reason-another reason]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_sql_retention_basis_exact_values_before_append[recorded_at-2026-10-03T09:00:01+00:00]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_sql_retention_basis_exact_values_before_append[scope-None]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_sql_retention_basis_exact_values_before_append[scope-another copy]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_teardown_failure_is_controlled_no_dto_no_leak[accept-both_before]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_teardown_failure_is_controlled_no_dto_no_leak[accept-close_after]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_teardown_failure_is_controlled_no_dto_no_leak[accept-close_before]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_teardown_failure_is_controlled_no_dto_no_leak[accept-rollback_after]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_teardown_failure_is_controlled_no_dto_no_leak[accept-rollback_before]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_teardown_failure_is_controlled_no_dto_no_leak[response-both_before]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_teardown_failure_is_controlled_no_dto_no_leak[response-close_after]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_teardown_failure_is_controlled_no_dto_no_leak[response-close_before]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_teardown_failure_is_controlled_no_dto_no_leak[response-rollback_after]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_teardown_failure_is_controlled_no_dto_no_leak[response-rollback_before]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_two_runtime_revokes_one_epoch_and_one_journal_with_lock_wait",
+      "api/tests/test_c2d5c2_common_revoke.py::test_worker_item_job_checkpoint_order_and_late_write_fence[revoke]",
+      "api/tests/test_c2d5c2_common_revoke.py::test_worker_item_job_checkpoint_order_and_late_write_fence[worker]",
+      "api/tests/test_c2d5c2_proxy_smoke.py::test_chrome_revoke_busy_old_link_unknown_no_repost_cookie"
+     ]
+    },
+    "junit": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-revoke.xml",
+     "sha256": "6fb3f88714dc9458e1905ce62413e844861b9198de5c94e08407420471c4f4ee"
+    },
+    "log": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-revoke.log",
+     "sha256": "e6038eaac59e8430048c06d065ed88997d03993194aa17e88917742fee358264"
+    },
+    "selection": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-revoke.nodes.json",
+     "sha256": "9af7390d2a17c2533edea559bce18b9440ecc15ee3f40a12ebf840908495de0c"
+    },
+    "collect_log": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-revoke-collect.log",
+     "sha256": "af73a576d4f8af896347c7eb870c504083a81f39efc1a8dc848274abb71295cf"
+    }
+   },
+   "publish": {
+    "args": [
+     "api/tests/test_c2d5c1_common_publish.py",
+     "api/tests/test_c2d5c1_proxy_smoke.py"
+    ],
+    "tested_commit": "e283bc6400efdefd4641838ce4d94f4ccee3baaa",
+    "returncode": 0,
+    "result": {
+     "executions": 192,
+     "unique": 192,
+     "pass_count": 192,
+     "fail": 0,
+     "error": 0,
+     "skip": 0,
+     "failed_nodes": [],
+     "nodes": [
+      "api/tests/test_c2d5c1_common_publish.py::test_30_mib_real_minio_hash_bounded_chunks_and_memory",
+      "api/tests/test_c2d5c1_common_publish.py::test_acceptance_lock_wait_uses_current_clock_not_proof_time[False-item]",
+      "api/tests/test_c2d5c1_common_publish.py::test_acceptance_lock_wait_uses_current_clock_not_proof_time[False-journal]",
+      "api/tests/test_c2d5c1_common_publish.py::test_acceptance_lock_wait_uses_current_clock_not_proof_time[False-user]",
+      "api/tests/test_c2d5c1_common_publish.py::test_acceptance_lock_wait_uses_current_clock_not_proof_time[True-item]",
+      "api/tests/test_c2d5c1_common_publish.py::test_acceptance_lock_wait_uses_current_clock_not_proof_time[True-journal]",
+      "api/tests/test_c2d5c1_common_publish.py::test_acceptance_lock_wait_uses_current_clock_not_proof_time[True-user]",
+      "api/tests/test_c2d5c1_common_publish.py::test_audit_denial_failure_keeps_original_business_denial",
+      "api/tests/test_c2d5c1_common_publish.py::test_commit_exception_preserves_independent_uncertain_outcome_without_select_or_retry[api-both-False]",
+      "api/tests/test_c2d5c1_common_publish.py::test_commit_exception_preserves_independent_uncertain_outcome_without_select_or_retry[api-both-True]",
+      "api/tests/test_c2d5c1_common_publish.py::test_commit_exception_preserves_independent_uncertain_outcome_without_select_or_retry[api-close-False]",
+      "api/tests/test_c2d5c1_common_publish.py::test_commit_exception_preserves_independent_uncertain_outcome_without_select_or_retry[api-close-True]",
+      "api/tests/test_c2d5c1_common_publish.py::test_commit_exception_preserves_independent_uncertain_outcome_without_select_or_retry[api-none-False]",
+      "api/tests/test_c2d5c1_common_publish.py::test_commit_exception_preserves_independent_uncertain_outcome_without_select_or_retry[api-none-True]",
+      "api/tests/test_c2d5c1_common_publish.py::test_commit_exception_preserves_independent_uncertain_outcome_without_select_or_retry[api-rollback-False]",
+      "api/tests/test_c2d5c1_common_publish.py::test_commit_exception_preserves_independent_uncertain_outcome_without_select_or_retry[api-rollback-True]",
+      "api/tests/test_c2d5c1_common_publish.py::test_commit_exception_preserves_independent_uncertain_outcome_without_select_or_retry[runtime-both-False]",
+      "api/tests/test_c2d5c1_common_publish.py::test_commit_exception_preserves_independent_uncertain_outcome_without_select_or_retry[runtime-both-True]",
+      "api/tests/test_c2d5c1_common_publish.py::test_commit_exception_preserves_independent_uncertain_outcome_without_select_or_retry[runtime-close-False]",
+      "api/tests/test_c2d5c1_common_publish.py::test_commit_exception_preserves_independent_uncertain_outcome_without_select_or_retry[runtime-close-True]",
+      "api/tests/test_c2d5c1_common_publish.py::test_commit_exception_preserves_independent_uncertain_outcome_without_select_or_retry[runtime-none-False]",
+      "api/tests/test_c2d5c1_common_publish.py::test_commit_exception_preserves_independent_uncertain_outcome_without_select_or_retry[runtime-none-True]",
+      "api/tests/test_c2d5c1_common_publish.py::test_commit_exception_preserves_independent_uncertain_outcome_without_select_or_retry[runtime-rollback-False]",
+      "api/tests/test_c2d5c1_common_publish.py::test_commit_exception_preserves_independent_uncertain_outcome_without_select_or_retry[runtime-rollback-True]",
+      "api/tests/test_c2d5c1_common_publish.py::test_concurrent_publish_unique_winner_with_runtime_admins[duplicate_checksum]",
+      "api/tests/test_c2d5c1_common_publish.py::test_concurrent_publish_unique_winner_with_runtime_admins[same_item]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[binding-dependency]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[binding-hash]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[binding-response]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[csrf-dependency]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[csrf-hash]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[csrf-response]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[disable-dependency]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[disable-hash]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[disable-response]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[generation-dependency]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[generation-hash]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[generation-response]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[head-dependency]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[head-hash]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[head-response]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[held-dependency]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[held-hash]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[held-response]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[hold-dependency]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[hold-hash]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[hold-response]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[logout-dependency]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[logout-hash]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[logout-response]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[quarantine-dependency]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[quarantine-hash]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[quarantine-response]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[receipt-dependency]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[receipt-hash]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[receipt-response]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[reset-dependency]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[reset-hash]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[reset-response]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[revoke-dependency]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[revoke-hash]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[revoke-response]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[role-dependency]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[role-hash]",
+      "api/tests/test_c2d5c1_common_publish.py::test_current_actor_head_receipt_csrf_and_gate_at_every_boundary[role-response]",
+      "api/tests/test_c2d5c1_common_publish.py::test_deadline_and_cancel_keep_slot_until_storage_thread_settles_no_acceptance[attempt_cancel]",
+      "api/tests/test_c2d5c1_common_publish.py::test_deadline_and_cancel_keep_slot_until_storage_thread_settles_no_acceptance[deadline]",
+      "api/tests/test_c2d5c1_common_publish.py::test_deadline_and_cancel_keep_slot_until_storage_thread_settles_no_acceptance[disconnect]",
+      "api/tests/test_c2d5c1_common_publish.py::test_deadline_and_cancel_keep_slot_until_storage_thread_settles_no_acceptance[receive_cancel]",
+      "api/tests/test_c2d5c1_common_publish.py::test_explicit_boolean_confirmation_only[0]",
+      "api/tests/test_c2d5c1_common_publish.py::test_explicit_boolean_confirmation_only[1_0]",
+      "api/tests/test_c2d5c1_common_publish.py::test_explicit_boolean_confirmation_only[1_1]",
+      "api/tests/test_c2d5c1_common_publish.py::test_explicit_boolean_confirmation_only[False]",
+      "api/tests/test_c2d5c1_common_publish.py::test_explicit_boolean_confirmation_only[None]",
+      "api/tests/test_c2d5c1_common_publish.py::test_explicit_boolean_confirmation_only[true]",
+      "api/tests/test_c2d5c1_common_publish.py::test_frozen_binding_change_during_hash_refuses_old_verified_bytes[checksum]",
+      "api/tests/test_c2d5c1_common_publish.py::test_frozen_binding_change_during_hash_refuses_old_verified_bytes[epoch]",
+      "api/tests/test_c2d5c1_common_publish.py::test_frozen_binding_change_during_hash_refuses_old_verified_bytes[flags]",
+      "api/tests/test_c2d5c1_common_publish.py::test_frozen_binding_change_during_hash_refuses_old_verified_bytes[key]",
+      "api/tests/test_c2d5c1_common_publish.py::test_frozen_binding_change_during_hash_refuses_old_verified_bytes[rights]",
+      "api/tests/test_c2d5c1_common_publish.py::test_frozen_binding_change_during_hash_refuses_old_verified_bytes[size]",
+      "api/tests/test_c2d5c1_common_publish.py::test_hash_has_no_connection_or_db_locks_and_writers_commit[auth]",
+      "api/tests/test_c2d5c1_common_publish.py::test_hash_has_no_connection_or_db_locks_and_writers_commit[revoke]",
+      "api/tests/test_c2d5c1_common_publish.py::test_input_acl_no_storage_or_mutation[anonymous]",
+      "api/tests/test_c2d5c1_common_publish.py::test_input_acl_no_storage_or_mutation[checksum]",
+      "api/tests/test_c2d5c1_common_publish.py::test_input_acl_no_storage_or_mutation[csrf]",
+      "api/tests/test_c2d5c1_common_publish.py::test_input_acl_no_storage_or_mutation[malformed]",
+      "api/tests/test_c2d5c1_common_publish.py::test_input_acl_no_storage_or_mutation[missing]",
+      "api/tests/test_c2d5c1_common_publish.py::test_input_acl_no_storage_or_mutation[missing_confirm]",
+      "api/tests/test_c2d5c1_common_publish.py::test_input_acl_no_storage_or_mutation[origin]",
+      "api/tests/test_c2d5c1_common_publish.py::test_input_acl_no_storage_or_mutation[other_user]",
+      "api/tests/test_c2d5c1_common_publish.py::test_input_acl_no_storage_or_mutation[owner]",
+      "api/tests/test_c2d5c1_common_publish.py::test_input_acl_no_storage_or_mutation[private]",
+      "api/tests/test_c2d5c1_common_publish.py::test_known_commit_with_response_or_teardown_failure_retains_publication[both]",
+      "api/tests/test_c2d5c1_common_publish.py::test_known_commit_with_response_or_teardown_failure_retains_publication[close]",
+      "api/tests/test_c2d5c1_common_publish.py::test_known_commit_with_response_or_teardown_failure_retains_publication[response]",
+      "api/tests/test_c2d5c1_common_publish.py::test_known_commit_with_response_or_teardown_failure_retains_publication[rollback]",
+      "api/tests/test_c2d5c1_common_publish.py::test_metadata_publication_does_not_require_or_widen_content_permissions[flags0]",
+      "api/tests/test_c2d5c1_common_publish.py::test_metadata_publication_does_not_require_or_widen_content_permissions[flags1]",
+      "api/tests/test_c2d5c1_common_publish.py::test_metadata_publication_does_not_require_or_widen_content_permissions[flags2]",
+      "api/tests/test_c2d5c1_common_publish.py::test_overwrite_after_last_hash_exposes_documented_storage_gap",
+      "api/tests/test_c2d5c1_common_publish.py::test_pending_http_real_gate_without_override_no_storage_or_publish",
+      "api/tests/test_c2d5c1_common_publish.py::test_publish_revoke_real_lock_wait_both_orders_and_current_history_response[publish]",
+      "api/tests/test_c2d5c1_common_publish.py::test_publish_revoke_real_lock_wait_both_orders_and_current_history_response[revoke]",
+      "api/tests/test_c2d5c1_common_publish.py::test_resource_binding_corruption_refused[active_generation]",
+      "api/tests/test_c2d5c1_common_publish.py::test_resource_binding_corruption_refused[checksum]",
+      "api/tests/test_c2d5c1_common_publish.py::test_resource_binding_corruption_refused[epoch]",
+      "api/tests/test_c2d5c1_common_publish.py::test_resource_binding_corruption_refused[file]",
+      "api/tests/test_c2d5c1_common_publish.py::test_resource_binding_corruption_refused[origin]",
+      "api/tests/test_c2d5c1_common_publish.py::test_resource_binding_corruption_refused[review]",
+      "api/tests/test_c2d5c1_common_publish.py::test_resource_binding_corruption_refused[revoked]",
+      "api/tests/test_c2d5c1_common_publish.py::test_resource_binding_corruption_refused[rights_count]",
+      "api/tests/test_c2d5c1_common_publish.py::test_resource_binding_corruption_refused[status]",
+      "api/tests/test_c2d5c1_common_publish.py::test_resource_binding_corruption_refused[tombstone]",
+      "api/tests/test_c2d5c1_common_publish.py::test_resource_binding_corruption_refused[version]",
+      "api/tests/test_c2d5c1_common_publish.py::test_response_after_revoke_cleanup_uses_new_history_proof_no_stale_dto[False]",
+      "api/tests/test_c2d5c1_common_publish.py::test_response_after_revoke_cleanup_uses_new_history_proof_no_stale_dto[True]",
+      "api/tests/test_c2d5c1_common_publish.py::test_runtime_success_metadata_only_fresh_dto_no_provider_or_object_mutation",
+      "api/tests/test_c2d5c1_common_publish.py::test_slot_cap_no_additional_storage_read_while_busy",
+      "api/tests/test_c2d5c1_common_publish.py::test_snapshot_restore_with_current_journal_never_replays_missing_positive_publication[listed]",
+      "api/tests/test_c2d5c1_common_publish.py::test_snapshot_restore_with_current_journal_never_replays_missing_positive_publication[pending]",
+      "api/tests/test_c2d5c1_common_publish.py::test_stop_after_final_binding_before_commit_rolls_back_without_mutation",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_close_before_release_fault_is_controlled_and_releases_socket",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_denial_requires_fresh_caller_gate_and_resource_proof[common_revoke-missing]",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_denial_requires_fresh_caller_gate_and_resource_proof[common_revoke-same_size]",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_denial_requires_fresh_caller_gate_and_resource_proof[csrf-missing]",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_denial_requires_fresh_caller_gate_and_resource_proof[csrf-same_size]",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_denial_requires_fresh_caller_gate_and_resource_proof[expiry-missing]",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_denial_requires_fresh_caller_gate_and_resource_proof[expiry-same_size]",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_denial_requires_fresh_caller_gate_and_resource_proof[hold-missing]",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_denial_requires_fresh_caller_gate_and_resource_proof[hold-same_size]",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_denial_requires_fresh_caller_gate_and_resource_proof[logout-missing]",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_denial_requires_fresh_caller_gate_and_resource_proof[logout-same_size]",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_denial_requires_fresh_caller_gate_and_resource_proof[reset-missing]",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_denial_requires_fresh_caller_gate_and_resource_proof[reset-same_size]",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_denial_requires_fresh_caller_gate_and_resource_proof[role-missing]",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_denial_requires_fresh_caller_gate_and_resource_proof[role-same_size]",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_integrity_stream_and_close_failures_do_not_publish[close]",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_integrity_stream_and_close_failures_do_not_publish[large]",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_integrity_stream_and_close_failures_do_not_publish[missing]",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_integrity_stream_and_close_failures_do_not_publish[open]",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_integrity_stream_and_close_failures_do_not_publish[read]",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_integrity_stream_and_close_failures_do_not_publish[same_size]",
+      "api/tests/test_c2d5c1_common_publish.py::test_storage_integrity_stream_and_close_failures_do_not_publish[truncated]",
+      "api/tests/test_c2d5c1_common_publish.py::test_teardown_faults_before_and_after_release_never_leak_or_return_dto[both-accept]",
+      "api/tests/test_c2d5c1_common_publish.py::test_teardown_faults_before_and_after_release_never_leak_or_return_dto[both-denial]",
+      "api/tests/test_c2d5c1_common_publish.py::test_teardown_faults_before_and_after_release_never_leak_or_return_dto[both-malformed]",
+      "api/tests/test_c2d5c1_common_publish.py::test_teardown_faults_before_and_after_release_never_leak_or_return_dto[both-proof]",
+      "api/tests/test_c2d5c1_common_publish.py::test_teardown_faults_before_and_after_release_never_leak_or_return_dto[both-response]",
+      "api/tests/test_c2d5c1_common_publish.py::test_teardown_faults_before_and_after_release_never_leak_or_return_dto[both_before_release-accept]",
+      "api/tests/test_c2d5c1_common_publish.py::test_teardown_faults_before_and_after_release_never_leak_or_return_dto[both_before_release-denial]",
+      "api/tests/test_c2d5c1_common_publish.py::test_teardown_faults_before_and_after_release_never_leak_or_return_dto[both_before_release-malformed]",
+      "api/tests/test_c2d5c1_common_publish.py::test_teardown_faults_before_and_after_release_never_leak_or_return_dto[both_before_release-proof]",
+      "api/tests/test_c2d5c1_common_publish.py::test_teardown_faults_before_and_after_release_never_leak_or_return_dto[both_before_release-response]",
+      "api/tests/test_c2d5c1_common_publish.py::test_teardown_faults_before_and_after_release_never_leak_or_return_dto[close-accept]",
+      "api/tests/test_c2d5c1_common_publish.py::test_teardown_faults_before_and_after_release_never_leak_or_return_dto[close-denial]",
+      "api/tests/test_c2d5c1_common_publish.py::test_teardown_faults_before_and_after_release_never_leak_or_return_dto[close-malformed]",
+      "api/tests/test_c2d5c1_common_publish.py::test_teardown_faults_before_and_after_release_never_leak_or_return_dto[close-proof]",
+      "api/tests/test_c2d5c1_common_publish.py::test_teardown_faults_before_and_after_release_never_leak_or_return_dto[close-response]",
+      "api/tests/test_c2d5c1_common_publish.py::test_teardown_faults_before_and_after_release_never_leak_or_return_dto[rollback-accept]",
+      "api/tests/test_c2d5c1_common_publish.py::test_teardown_faults_before_and_after_release_never_leak_or_return_dto[rollback-denial]",
+      "api/tests/test_c2d5c1_common_publish.py::test_teardown_faults_before_and_after_release_never_leak_or_return_dto[rollback-malformed]",
+      "api/tests/test_c2d5c1_common_publish.py::test_teardown_faults_before_and_after_release_never_leak_or_return_dto[rollback-proof]",
+      "api/tests/test_c2d5c1_common_publish.py::test_teardown_faults_before_and_after_release_never_leak_or_return_dto[rollback-response]",
+      "api/tests/test_c2d5c1_common_publish.py::test_ttl_sampled_after_last_resource_and_predicate_sql[-1-absolute-accept]",
+      "api/tests/test_c2d5c1_common_publish.py::test_ttl_sampled_after_last_resource_and_predicate_sql[-1-absolute-proof]",
+      "api/tests/test_c2d5c1_common_publish.py::test_ttl_sampled_after_last_resource_and_predicate_sql[-1-absolute-respond]",
+      "api/tests/test_c2d5c1_common_publish.py::test_ttl_sampled_after_last_resource_and_predicate_sql[-1-idle-accept]",
+      "api/tests/test_c2d5c1_common_publish.py::test_ttl_sampled_after_last_resource_and_predicate_sql[-1-idle-proof]",
+      "api/tests/test_c2d5c1_common_publish.py::test_ttl_sampled_after_last_resource_and_predicate_sql[-1-idle-respond]",
+      "api/tests/test_c2d5c1_common_publish.py::test_ttl_sampled_after_last_resource_and_predicate_sql[0-absolute-accept]",
+      "api/tests/test_c2d5c1_common_publish.py::test_ttl_sampled_after_last_resource_and_predicate_sql[0-absolute-proof]",
+      "api/tests/test_c2d5c1_common_publish.py::test_ttl_sampled_after_last_resource_and_predicate_sql[0-absolute-respond]",
+      "api/tests/test_c2d5c1_common_publish.py::test_ttl_sampled_after_last_resource_and_predicate_sql[0-idle-accept]",
+      "api/tests/test_c2d5c1_common_publish.py::test_ttl_sampled_after_last_resource_and_predicate_sql[0-idle-proof]",
+      "api/tests/test_c2d5c1_common_publish.py::test_ttl_sampled_after_last_resource_and_predicate_sql[0-idle-respond]",
+      "api/tests/test_c2d5c1_common_publish.py::test_ttl_sampled_after_last_resource_and_predicate_sql[1-absolute-accept]",
+      "api/tests/test_c2d5c1_common_publish.py::test_ttl_sampled_after_last_resource_and_predicate_sql[1-absolute-proof]",
+      "api/tests/test_c2d5c1_common_publish.py::test_ttl_sampled_after_last_resource_and_predicate_sql[1-absolute-respond]",
+      "api/tests/test_c2d5c1_common_publish.py::test_ttl_sampled_after_last_resource_and_predicate_sql[1-idle-accept]",
+      "api/tests/test_c2d5c1_common_publish.py::test_ttl_sampled_after_last_resource_and_predicate_sql[1-idle-proof]",
+      "api/tests/test_c2d5c1_common_publish.py::test_ttl_sampled_after_last_resource_and_predicate_sql[1-idle-respond]",
+      "api/tests/test_c2d5c1_common_publish.py::test_verification_config_defaults_and_upper_bounds",
+      "api/tests/test_c2d5c1_common_publish.py::test_verification_config_limits_fail_closed[-1-publication_verify_deadline_seconds]",
+      "api/tests/test_c2d5c1_common_publish.py::test_verification_config_limits_fail_closed[-1-publication_verify_max_concurrent]",
+      "api/tests/test_c2d5c1_common_publish.py::test_verification_config_limits_fail_closed[0-publication_verify_deadline_seconds]",
+      "api/tests/test_c2d5c1_common_publish.py::test_verification_config_limits_fail_closed[0-publication_verify_max_concurrent]",
+      "api/tests/test_c2d5c1_common_publish.py::test_verification_config_limits_fail_closed[bad-publication_verify_deadline_seconds]",
+      "api/tests/test_c2d5c1_common_publish.py::test_verification_config_limits_fail_closed[bad-publication_verify_max_concurrent]",
+      "api/tests/test_c2d5c1_common_publish.py::test_verification_config_limits_fail_closed[inf-publication_verify_deadline_seconds]",
+      "api/tests/test_c2d5c1_common_publish.py::test_verification_config_limits_fail_closed[inf-publication_verify_max_concurrent]",
+      "api/tests/test_c2d5c1_proxy_smoke.py::test_chrome_publish_metadata_checksum_acl_slow_hash_and_unknown_no_repost"
+     ]
+    },
+    "junit": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-publish.xml",
+     "sha256": "64bc059b385395f468985073ae551ef86c53d8722dc7c0425ec09b1d2dc5ce4d"
+    },
+    "log": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-publish.log",
+     "sha256": "6cf5151e44a51ed6ac48aad1c9c2d2b5ebd81fce9445a345dd6080709a9e345e"
+    },
+    "selection": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-publish.nodes.json",
+     "sha256": "f571db78d9ce96f7acbbe502f96090e80c51d70294276f8c3a948d3c408a5a96"
+    },
+    "collect_log": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-publish-collect.log",
+     "sha256": "fe4f17b87b6155a13f46056ac71cf751c494e847cf90fff69a29a35bffc1b126"
+    }
+   },
+   "reads": {
+    "args": [
+     "api/tests/test_c2d2b_review_publication_reads.py"
+    ],
+    "tested_commit": "e283bc6400efdefd4641838ce4d94f4ccee3baaa",
+    "returncode": 0,
+    "result": {
+     "executions": 260,
+     "unique": 260,
+     "pass_count": 260,
+     "fail": 0,
+     "error": 0,
+     "skip": 0,
+     "failed_nodes": [],
+     "nodes": [
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[ahead-admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[ahead-admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[ahead-copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[ahead-copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[ahead-notice]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[ahead-own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[ahead-own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[ahead-pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[ahead-pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[disable-admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[disable-admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[disable-copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[disable-copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[disable-notice]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[disable-own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[disable-own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[disable-pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[disable-pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[generation-admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[generation-admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[generation-copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[generation-copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[generation-notice]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[generation-own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[generation-own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[generation-pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[generation-pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[head-admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[head-admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[head-copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[head-copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[head-notice]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[head-own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[head-own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[head-pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[head-pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[held-admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[held-admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[held-copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[held-copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[held-notice]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[held-own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[held-own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[held-pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[held-pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[hold-admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[hold-admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[hold-copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[hold-copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[hold-notice]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[hold-own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[hold-own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[hold-pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[hold-pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[latest_credential-admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[latest_credential-admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[latest_credential-copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[latest_credential-copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[latest_credential-notice]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[latest_credential-own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[latest_credential-own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[latest_credential-pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[latest_credential-pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[latest_status-admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[latest_status-admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[latest_status-copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[latest_status-copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[latest_status-notice]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[latest_status-own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[latest_status-own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[latest_status-pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[latest_status-pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[quarantine-admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[quarantine-admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[quarantine-copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[quarantine-copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[quarantine-notice]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[quarantine-own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[quarantine-own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[quarantine-pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[quarantine-pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[receipt_credential-admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[receipt_credential-admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[receipt_credential-copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[receipt_credential-copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[receipt_credential-notice]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[receipt_credential-own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[receipt_credential-own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[receipt_credential-pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[receipt_credential-pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[receipt_status-admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[receipt_status-admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[receipt_status-copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[receipt_status-copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[receipt_status-notice]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[receipt_status-own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[receipt_status-own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[receipt_status-pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[receipt_status-pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[revoke-admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[revoke-admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[revoke-copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[revoke-copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[revoke-notice]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[revoke-own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[revoke-own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[revoke-pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[revoke-pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[unconfirmed-admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[unconfirmed-admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[unconfirmed-copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[unconfirmed-copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[unconfirmed-notice]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[unconfirmed-own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[unconfirmed-own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[unconfirmed-pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[unconfirmed-pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[wrong_receipt-admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[wrong_receipt-admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[wrong_receipt-copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[wrong_receipt-copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[wrong_receipt-notice]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[wrong_receipt-own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[wrong_receipt-own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[wrong_receipt-pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_after_real_dependency[wrong_receipt-pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_writer_waits_final_shared_without_user_row_lock[admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_auth_writer_waits_final_shared_without_user_row_lock[copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_cleanup_tombstone_then_item_no_reader_tombstone_lock[cleanup]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_cleanup_tombstone_then_item_no_reader_tombstone_lock[reader]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_close_between_candidate_and_final_no_private_dto[admin_get-approve]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_close_between_candidate_and_final_no_private_dto[admin_get-recovery]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_close_between_candidate_and_final_no_private_dto[admin_get-reject]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_close_between_candidate_and_final_no_private_dto[admin_get-withdraw]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_close_between_candidate_and_final_no_private_dto[admin_list-approve]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_close_between_candidate_and_final_no_private_dto[admin_list-recovery]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_close_between_candidate_and_final_no_private_dto[admin_list-reject]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_close_between_candidate_and_final_no_private_dto[admin_list-withdraw]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_flags_separate_real_gates[False-True-False-True-False]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_flags_separate_real_gates[False-True-True-False-False]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_flags_separate_real_gates[True-False-False-False-False]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_flags_separate_real_gates[True-True-True-False-True]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_flags_separate_real_gates[True-True-True-True-False]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_invalid_tuple_closes_flags_history_remains[checksum]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_invalid_tuple_closes_flags_history_remains[epoch]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_invalid_tuple_closes_flags_history_remains[file]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_invalid_tuple_closes_flags_history_remains[publication]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_invalid_tuple_closes_flags_history_remains[tombstone]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_invalid_tuple_closes_flags_history_remains[version]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_revoke_item_before_journal_race[reader]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_revoke_item_before_journal_race[writer]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_state_before_final_requery_history[copy_get-publish]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_state_before_final_requery_history[copy_get-revoke]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_state_before_final_requery_history[copy_list-publish]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_state_before_final_requery_history[copy_list-revoke]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_state_before_final_requery_history[pending_get-publish]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_state_before_final_requery_history[pending_get-revoke]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_state_before_final_requery_history[pending_list-publish]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_common_state_before_final_requery_history[pending_list-revoke]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_current_admin_after_last_resource_sql[admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_current_admin_after_last_resource_sql[admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_current_admin_after_last_resource_sql[copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_current_admin_after_last_resource_sql[copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_current_admin_after_last_resource_sql[pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_current_admin_after_last_resource_sql[pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_dirty_session_rejected_before_autoflush",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_empty_pages_still_final_caller[admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_empty_pages_still_final_caller[copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_empty_pages_still_final_caller[own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_empty_pages_still_final_caller[pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_exact_review_grant_invalid_thin_history_keeps_workflow_count[checksum]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_exact_review_grant_invalid_thin_history_keeps_workflow_count[epoch]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_exact_review_grant_invalid_thin_history_keeps_workflow_count[file]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_exact_review_grant_invalid_thin_history_keeps_workflow_count[owner]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_exact_review_grant_invalid_thin_history_keeps_workflow_count[version]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_exact_review_grant_invalid_thin_history_keeps_workflow_count[visibility]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[absolute-28799-200-admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[absolute-28799-200-admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[absolute-28799-200-copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[absolute-28799-200-copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[absolute-28799-200-notice]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[absolute-28799-200-own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[absolute-28799-200-own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[absolute-28799-200-pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[absolute-28799-200-pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[absolute-28800-401-admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[absolute-28800-401-admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[absolute-28800-401-copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[absolute-28800-401-copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[absolute-28800-401-notice]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[absolute-28800-401-own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[absolute-28800-401-own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[absolute-28800-401-pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[absolute-28800-401-pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[idle-1799-200-admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[idle-1799-200-admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[idle-1799-200-copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[idle-1799-200-copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[idle-1799-200-notice]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[idle-1799-200-own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[idle-1799-200-own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[idle-1799-200-pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[idle-1799-200-pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[idle-1800-401-admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[idle-1800-401-admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[idle-1800-401-copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[idle-1800-401-copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[idle-1800-401-notice]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[idle-1800-401-own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[idle-1800-401-own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[idle-1800-401-pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_final_clock_after_resource_sql[idle-1800-401-pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_fresh_clock_after_observed_resource_row_wait[1799-200-admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_fresh_clock_after_observed_resource_row_wait[1799-200-copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_fresh_clock_after_observed_resource_row_wait[1799-200-pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_fresh_clock_after_observed_resource_row_wait[1800-401-admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_fresh_clock_after_observed_resource_row_wait[1800-401-copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_fresh_clock_after_observed_resource_row_wait[1800-401-pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_nine_success_same_transaction_fresh_proofs_no_dml[admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_nine_success_same_transaction_fresh_proofs_no_dml[admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_nine_success_same_transaction_fresh_proofs_no_dml[copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_nine_success_same_transaction_fresh_proofs_no_dml[copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_nine_success_same_transaction_fresh_proofs_no_dml[notice]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_nine_success_same_transaction_fresh_proofs_no_dml[own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_nine_success_same_transaction_fresh_proofs_no_dml[own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_nine_success_same_transaction_fresh_proofs_no_dml[pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_nine_success_same_transaction_fresh_proofs_no_dml[pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_only_page_requests_and_granted_items_locked",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_real_a_b_same_hash_owner_sql_count_page_detail_and_admin_grant",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_real_pending_nine_http[admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_real_pending_nine_http[admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_real_pending_nine_http[copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_real_pending_nine_http[copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_real_pending_nine_http[notice]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_real_pending_nine_http[own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_real_pending_nine_http[own_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_real_pending_nine_http[pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_real_pending_nine_http[pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_review_lock_order_observed_before_journal_and_no_auth_rows",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_review_request_item_journal_order_both_winners[reader-approve]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_review_request_item_journal_order_both_winners[reader-reject]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_review_request_item_journal_order_both_winners[reader-withdraw]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_review_request_item_journal_order_both_winners[writer-approve]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_review_request_item_journal_order_both_winners[writer-reject]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_review_request_item_journal_order_both_winners[writer-withdraw]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_revoked_cleanup_policy_no_private_source_rehydration[False]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_revoked_cleanup_policy_no_private_source_rehydration[True]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_scope_churn_bounded_no_locks_after_journal",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_six_current_admin_not_dependency_role[admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_six_current_admin_not_dependency_role[admin_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_six_current_admin_not_dependency_role[copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_six_current_admin_not_dependency_role[copy_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_six_current_admin_not_dependency_role[pending_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_six_current_admin_not_dependency_role[pending_list]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_thin_closed_history_still_final_clock[approve]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_thin_closed_history_still_final_clock[withdraw]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_uuid_and_missing_contract_auth_precedence[admin_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_uuid_and_missing_contract_auth_precedence[copy_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_uuid_and_missing_contract_auth_precedence[own_get]",
+      "api/tests/test_c2d2b_review_publication_reads.py::test_uuid_and_missing_contract_auth_precedence[pending_get]"
+     ]
+    },
+    "junit": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-reads.xml",
+     "sha256": "40828773ce7e8c202f361e599aa7b922a87ee3dc6306cfa33f4308de253bc6e4"
+    },
+    "log": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-reads.log",
+     "sha256": "d39116cd71a3bd5fb7a5cdf5a1607689aca3f4e82de862225705724dc289fa05"
+    },
+    "selection": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-reads.nodes.json",
+     "sha256": "f88977b2e6c34db0d83f1fac193164aaf3b0cbe60b79c91c536399d7ed218e2a"
+    },
+    "collect_log": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-reads-collect.log",
+     "sha256": "b4cff1c21369ddd602bdfbae02590151b946d72694759cf7dca0c011bff32986"
+    }
+   },
+   "content2": {
+    "args": [
+     "api/tests/test_common_index.py",
+     "api/tests/test_common_search.py",
+     "api/tests/test_common_rag.py",
+     "api/tests/test_publication.py",
+     "api/tests/test_common_cleanup.py",
+     "api/tests/test_common_original.py",
+     "api/tests/test_health.py",
+     "--deselect",
+     "tests/test_common_search.py::test_forbidden_copies_never_take_a_top_k_slot",
+     "--deselect",
+     "tests/test_common_search.py::test_chunk_of_another_file_or_version_of_the_copy_stays_closed",
+     "--deselect",
+     "tests/test_health.py::test_readyz_ok_after_migration",
+     "--deselect",
+     "tests/test_common_original.py::test_common_original_refused_unless_live_rights_open_that_exact_file"
+    ],
+    "tested_commit": "e283bc6400efdefd4641838ce4d94f4ccee3baaa",
+    "returncode": 0,
+    "result": {
+     "executions": 89,
+     "unique": 89,
+     "pass_count": 89,
+     "fail": 0,
+     "error": 0,
+     "skip": 0,
+     "failed_nodes": [],
+     "nodes": [
+      "api/tests/test_common_cleanup.py::test_cleanup_removes_every_derivative_of_the_revoked_copies_and_nothing_else",
+      "api/tests/test_common_cleanup.py::test_failure_mid_cleanup_rolls_back_everything_and_is_retried",
+      "api/tests/test_common_cleanup.py::test_late_writes_after_purge_are_refused_and_cost_stays_reconcilable",
+      "api/tests/test_common_cleanup.py::test_writer_before_revoke_commits_first_and_cleanup_removes_its_rows",
+      "api/tests/test_common_cleanup.py::test_writer_waiting_on_a_revoke_is_refused_after_t_rev",
+      "api/tests/test_common_index.py::test_a_job_reusing_every_completed_call_still_hashes_before_publishing",
+      "api/tests/test_common_index.py::test_an_unchanged_head_fingerprint_does_not_stand_in_for_the_hash[1-next_call]",
+      "api/tests/test_common_index.py::test_an_unchanged_head_fingerprint_does_not_stand_in_for_the_hash[3-publish]",
+      "api/tests/test_common_index.py::test_cleanup_removes_rows_of_the_real_common_pipeline_and_nothing_private",
+      "api/tests/test_common_index.py::test_common_calls_are_charged_to_the_application_only",
+      "api/tests/test_common_index.py::test_download_permission_is_not_needed_and_other_states_are_refused",
+      "api/tests/test_common_index.py::test_pdf_without_enough_body_is_not_indexed_and_not_retried",
+      "api/tests/test_common_index.py::test_publish_holding_the_lock_wins_then_revoke_leaves_the_index_at_t_rev",
+      "api/tests/test_common_index.py::test_published_copy_indexes_through_the_shared_pipeline_and_opens_search_and_rag[md]",
+      "api/tests/test_common_index.py::test_published_copy_indexes_through_the_shared_pipeline_and_opens_search_and_rag[pdf]",
+      "api/tests/test_common_index.py::test_rate_limit_retry_and_a_new_job_reuse_completed_embeddings_and_extraction",
+      "api/tests/test_common_index.py::test_revoke_before_any_provider_call_cancels_without_sending",
+      "api/tests/test_common_index.py::test_revoke_commits_while_the_index_step_reads_the_object[before_any_call]",
+      "api/tests/test_common_index.py::test_revoke_commits_while_the_index_step_reads_the_object[before_publish]",
+      "api/tests/test_common_index.py::test_revoke_commits_while_the_index_step_reads_the_object[before_second_call]",
+      "api/tests/test_common_index.py::test_revoke_during_the_provider_call_stores_and_publishes_nothing",
+      "api/tests/test_common_index.py::test_revoke_holding_the_item_first_makes_the_worker_wait_without_deadlock",
+      "api/tests/test_common_index.py::test_revoke_queued_just_before_publish_wins_and_nothing_is_published",
+      "api/tests/test_common_index.py::test_rights_that_do_not_permit_indexing_are_refused_before_any_job[scope0-fulltext_not_permitted]",
+      "api/tests/test_common_index.py::test_rights_that_do_not_permit_indexing_are_refused_before_any_job[scope1-external_processing_not_permitted]",
+      "api/tests/test_common_index.py::test_rights_that_do_not_permit_indexing_are_refused_before_any_job[scope2-blocked_by_conditions]",
+      "api/tests/test_common_index.py::test_same_size_replacement_of_the_common_object_is_caught[before_extraction]",
+      "api/tests/test_common_index.py::test_same_size_replacement_of_the_common_object_is_caught[during_call]",
+      "api/tests/test_common_index.py::test_schema_pins_promotion_jobs_and_gates_the_indexed_state",
+      "api/tests/test_common_index.py::test_the_object_is_hashed_before_every_call_and_before_publish",
+      "api/tests/test_common_index.py::test_worker_holding_item_and_job_first_makes_revoke_wait_then_ends_cancelled",
+      "api/tests/test_common_original.py::test_early_disconnect_or_spool_failure_gives_the_slot_back",
+      "api/tests/test_common_original.py::test_epoch_change_or_session_end_during_verification_blocks_the_response",
+      "api/tests/test_common_original.py::test_missing_replaced_or_unreadable_object_sends_no_bytes",
+      "api/tests/test_common_original.py::test_private_stays_owner_only_and_permitted_common_opens_for_every_account",
+      "api/tests/test_common_original.py::test_revoke_after_the_last_check_waits_and_the_checked_response_completes",
+      "api/tests/test_common_original.py::test_revoke_committed_during_verification_blocks_the_response",
+      "api/tests/test_common_original.py::test_session_expiring_while_the_object_is_read_gets_no_bytes",
+      "api/tests/test_common_original.py::test_spool_slots_bound_concurrent_verified_downloads",
+      "api/tests/test_common_original.py::test_verified_original_frees_slot_and_file_on_every_exit",
+      "api/tests/test_common_rag.py::test_a_half_opt_in_fails_closed_and_sends_nothing",
+      "api/tests/test_common_rag.py::test_any_change_between_retrieval_and_response_withholds_the_answer[before_generation]",
+      "api/tests/test_common_rag.py::test_any_change_between_retrieval_and_response_withholds_the_answer[during_generation]",
+      "api/tests/test_common_rag.py::test_citation_links_the_original_only_through_the_download_gate",
+      "api/tests/test_common_rag.py::test_comparison_cites_exactly_the_two_resolved_papers[hybrid]",
+      "api/tests/test_common_rag.py::test_comparison_cites_exactly_the_two_resolved_papers[keyword]",
+      "api/tests/test_common_rag.py::test_every_account_asks_the_permitted_copy_and_never_anothers_private[hybrid]",
+      "api/tests/test_common_rag.py::test_every_account_asks_the_permitted_copy_and_never_anothers_private[keyword]",
+      "api/tests/test_common_rag.py::test_generation_on_common_evidence_is_charged_to_the_asking_user",
+      "api/tests/test_common_rag.py::test_partial_pdf_common_copy_reports_the_coverage_of_its_permitted_version",
+      "api/tests/test_common_rag.py::test_revoke_before_generation_sends_nothing",
+      "api/tests/test_common_rag.py::test_revoke_committed_before_the_response_lock_withholds_the_answer",
+      "api/tests/test_common_rag.py::test_revoke_during_generation_withholds_the_answer",
+      "api/tests/test_common_rag.py::test_revoke_waiting_on_the_response_lock_lets_that_answer_finish",
+      "api/tests/test_common_rag.py::test_same_bytes_in_another_private_library_are_never_evidence",
+      "api/tests/test_common_rag.py::test_searchable_common_text_without_provider_rights_is_withheld[hybrid]",
+      "api/tests/test_common_rag.py::test_searchable_common_text_without_provider_rights_is_withheld[keyword]",
+      "api/tests/test_common_search.py::test_download_is_a_separate_gate_from_search",
+      "api/tests/test_common_search.py::test_every_account_searches_the_permitted_common_copy_and_no_one_elses_private",
+      "api/tests/test_common_search.py::test_item_collection_and_derived_reads_serve_only_the_permitted_copy",
+      "api/tests/test_common_search.py::test_rerank_gets_common_text_only_while_rights_permit_external_processing",
+      "api/tests/test_common_search.py::test_revoke_before_rerank_sends_nothing",
+      "api/tests/test_common_search.py::test_revoke_before_retrieval_blocks_new_requests_before_cleanup",
+      "api/tests/test_common_search.py::test_revoke_committed_before_the_response_lock_withholds_it",
+      "api/tests/test_common_search.py::test_revoke_during_rerank_withholds_the_response",
+      "api/tests/test_common_search.py::test_revoke_waiting_on_the_response_lock_lets_that_response_finish",
+      "api/tests/test_common_search.py::test_serving_gate_rechecks_rights_publication_epoch_and_generation",
+      "api/tests/test_health.py::test_healthz_is_up_without_database",
+      "api/tests/test_health.py::test_m5a_discovery_routes_registered",
+      "api/tests/test_health.py::test_readyz_requires_migrated_database",
+      "api/tests/test_health.py::test_review_routes_registered_with_publish_and_revoke_only_on_common_copies",
+      "api/tests/test_publication.py::test_cancel_pending_copy_revokes_it_without_a_publication",
+      "api/tests/test_publication.py::test_cleanup_removes_only_the_common_object_and_is_safe_to_repeat",
+      "api/tests/test_publication.py::test_cleanup_removes_revoked_metadata_by_default",
+      "api/tests/test_publication.py::test_concurrent_same_checksum_publishes_one_wins_by_the_db_constraint",
+      "api/tests/test_publication.py::test_db_refuses_a_purge_that_leaves_metadata_without_basis",
+      "api/tests/test_publication.py::test_exact_checksum_duplicate_is_refused_and_told_only_to_the_admin",
+      "api/tests/test_publication.py::test_publish_holding_the_lock_wins_and_revoke_then_revokes_it",
+      "api/tests/test_publication.py::test_publish_lists_metadata_only_and_nothing_else",
+      "api/tests/test_publication.py::test_publish_needs_confirmation_and_live_rights_at_the_current_epoch",
+      "api/tests/test_publication.py::test_publish_racing_revoke_never_leaves_a_revoked_copy_listed",
+      "api/tests/test_publication.py::test_publish_refuses_missing_or_altered_common_object",
+      "api/tests/test_publication.py::test_publish_waiting_on_a_revoke_that_holds_the_lock_answers_common_copy_revoked",
+      "api/tests/test_publication.py::test_restored_backup_is_gated_until_recover_replays_the_journal",
+      "api/tests/test_publication.py::test_revocation_keeps_only_fields_with_a_recorded_basis",
+      "api/tests/test_publication.py::test_revoke_committed_before_publish_locks_answers_common_copy_revoked",
+      "api/tests/test_publication.py::test_revoke_during_publish_checks_never_answers_rights_not_publishable",
+      "api/tests/test_publication.py::test_revoke_hides_the_copy_from_t_rev_and_touches_nothing_else",
+      "api/tests/test_publication.py::test_schema_keeps_publication_and_revocation_consistent"
+     ]
+    },
+    "junit": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-content2.xml",
+     "sha256": "17aea2052a8b0551c643d2aa3b8511797c43262abe7354b11872322035fe372d"
+    },
+    "log": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-content2.log",
+     "sha256": "260df1be05013ba213d10f7ecdfaeb120944837f9f904e8ddedf2ca354d05854"
+    },
+    "selection": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-content2.nodes.json",
+     "sha256": "e7494496657de64ade313156b347572343348d0bc409d375cb2da6f05f22b729"
+    },
+    "collect_log": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-content2-collect.log",
+     "sha256": "018a9feb282ab7a8f47597da8d442908b986df4e927e7e9bfaf7e0d0686e63ad"
+    }
+   },
+   "recovery": {
+    "args": [
+     "api/tests/test_recovery.py",
+     "-k",
+     "registration_paths or journal_verifies or cached_read or revocation_is_journaled or journal_write_failure or complete_line or runtime_commit or neither_journal or concurrent_revocations"
+    ],
+    "tested_commit": "e283bc6400efdefd4641838ce4d94f4ccee3baaa",
+    "returncode": 0,
+    "result": {
+     "executions": 11,
+     "unique": 11,
+     "pass_count": 11,
+     "fail": 0,
+     "error": 0,
+     "skip": 0,
+     "failed_nodes": [],
+     "nodes": [
+      "api/tests/test_recovery.py::test_cached_read_follows_appends_and_replacements",
+      "api/tests/test_recovery.py::test_complete_line_whose_fsync_fails_keeps_the_gate_shut_until_recover_confirms_it",
+      "api/tests/test_recovery.py::test_concurrent_revocations_get_consecutive_journal_records",
+      "api/tests/test_recovery.py::test_journal_verifies_its_chain_and_refuses_every_tampering",
+      "api/tests/test_recovery.py::test_journal_write_failure_still_closes_the_copy_and_keeps_the_gate_shut_until_repaired",
+      "api/tests/test_recovery.py::test_registration_paths_never_take_a_database_with_content_for_a_new_install",
+      "api/tests/test_recovery.py::test_revocation_is_journaled_and_mirrored_before_it_reports_success",
+      "api/tests/test_recovery.py::test_runtime_commit_exception_never_invokes_replay_and_gate_stays_shut",
+      "api/tests/test_recovery.py::test_runtime_commit_exception_never_replays_until_operator_recovery[commit_failed]",
+      "api/tests/test_recovery.py::test_runtime_commit_exception_never_replays_until_operator_recovery[commit_outcome_unknown]",
+      "api/tests/test_recovery.py::test_when_neither_journal_nor_database_take_the_revocation_nothing_changes"
+     ]
+    },
+    "junit": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-recovery.xml",
+     "sha256": "de994bd3abf523a40b81905c1afffad99d145bb8d96af7246637252379dc5de6"
+    },
+    "log": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-recovery.log",
+     "sha256": "2dfc52eafad3ae8fb98a29088bbf1d5d57a000f2a33f7f1f464a7dc54f91b082"
+    },
+    "selection": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-recovery.nodes.json",
+     "sha256": "65271217b4aa3caa9085b013a29d8b985f0da7168956e71e0f03b99e9175c2ec"
+    },
+    "collect_log": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-recovery-collect.log",
+     "sha256": "bacf675098b2e2b15060f852aef4713b9d520b3fc77b8e5b106714ff0afba4cc"
+    }
+   },
+   "known": {
+    "args": [
+     "api/tests/test_common_search.py::test_forbidden_copies_never_take_a_top_k_slot",
+     "api/tests/test_common_search.py::test_chunk_of_another_file_or_version_of_the_copy_stays_closed",
+     "api/tests/test_health.py::test_readyz_ok_after_migration",
+     "api/tests/test_common_original.py::test_common_original_refused_unless_live_rights_open_that_exact_file"
+    ],
+    "tested_commit": "e283bc6400efdefd4641838ce4d94f4ccee3baaa",
+    "returncode": 1,
+    "result": {
+     "executions": 4,
+     "unique": 4,
+     "pass_count": 0,
+     "fail": 4,
+     "error": 0,
+     "skip": 0,
+     "failed_nodes": [
+      "api/tests/test_common_original.py::test_common_original_refused_unless_live_rights_open_that_exact_file",
+      "api/tests/test_common_search.py::test_chunk_of_another_file_or_version_of_the_copy_stays_closed",
+      "api/tests/test_common_search.py::test_forbidden_copies_never_take_a_top_k_slot",
+      "api/tests/test_health.py::test_readyz_ok_after_migration"
+     ],
+     "nodes": [
+      "api/tests/test_common_original.py::test_common_original_refused_unless_live_rights_open_that_exact_file",
+      "api/tests/test_common_search.py::test_chunk_of_another_file_or_version_of_the_copy_stays_closed",
+      "api/tests/test_common_search.py::test_forbidden_copies_never_take_a_top_k_slot",
+      "api/tests/test_health.py::test_readyz_ok_after_migration"
+     ]
+    },
+    "junit": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-known.xml",
+     "sha256": "784597c3bf6f03b19a7cbb11771f67f5c1341c065f5a8858675c318c5495681e"
+    },
+    "log": {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-known.log",
+     "sha256": "31cd1d611061f8022bcc930ef1f34ec17943373f56e6da0e1c609d1c65d8608b"
+    },
+    "selection": null,
+    "collect_log": null
+   }
+  }
+ },
+ "runner_failed_attempts": {
+  "final-content (attempt 1)": {
+   "result": {
+    "executions": 29,
+    "unique": 29,
+    "pass_count": 28,
+    "fail": 1,
+    "error": 0,
+    "skip": 0,
+    "failed_nodes": [
+     "api/tests/test_common_search.py::test_forbidden_copies_never_take_a_top_k_slot"
+    ]
+   },
+   "junit": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-content.xml",
+    "sha256": "073cc6bd55d72ef71ea14fe6efa46036f0e21608677542a7b237d7085725b366"
+   },
+   "log": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-content.log",
+    "sha256": "8475ccd0d3bdd8b4ca07f29cb38506e8a460c86de3ff9dc831aef11e1ac7a2c8"
+   },
+   "selection": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-content.nodes.json",
+    "sha256": "07b01079107dade77bebcc1553c531c3f20db87322ab2bd28a51d519a283de17"
+   },
+   "groups": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\groups-attempt1.json",
+    "sha256": "3e442598f4d02a2c0074836520796b3a45a9447634636eaf4396592c34e72b85"
+   },
+   "tested_commit": "e283bc6400efdefd4641838ce4d94f4ccee3baaa",
+   "note": "Runner bug: --deselect used api/tests/... while pytest rootdir is api/ (node IDs tests/...), so the four known base failures stayed selected and -x stopped at the first one after 28 passes. Kept as raw evidence; content2 re-collected with fixed deselect and run separately. The 28 passes are not added to the union (content2 re-ran them)."
+  }
+ },
+ "suite_logs": [
+  {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-suite-run.log",
+   "sha256": "6ae6d9c60b30e01607478fa8510340b0cf7fe4c0c4b89d34c62f3e40ba144be5"
+  },
+  {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-suite-run2.log",
+   "sha256": "ed39382c081ef76d59ec516adad152257cda75651db62700e4ceea31eda97a3c"
+  }
+ ],
+ "source": {
+  "file_count": 299,
+  "unchanged_during_suite": true,
+  "before": {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\source-before.json",
+   "sha256": "046be5a39df23b571055491a8c917b5cd5e3613d6784be180042d979000a6949"
+  },
+  "after": {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\source-after.json",
+   "sha256": "046be5a39df23b571055491a8c917b5cd5e3613d6784be180042d979000a6949"
+  }
+ },
+ "mutants": [
+  {
+   "name": "literal",
+   "file": "api/app/api/routes/publications.py",
+   "args": [
+    "api/tests/test_c2d5d1_common_index_request.py",
+    "-k",
+    "literal_boolean_true_only"
+   ],
+   "returncode": 1,
+   "tests": 10,
+   "failures": 2,
+   "errors": 0,
+   "skipped": 0,
+   "nodes": [
+    "tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[0]",
+    "tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[1.0]",
+    "tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[1_0]",
+    "tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[1_1]",
+    "tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[False]",
+    "tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[None]",
+    "tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[confirm8]",
+    "tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[confirm9]",
+    "tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[true]",
+    "tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[yes]"
+   ],
+   "caught_assertion": true,
+   "restored_file_sha256": "8e18cc84be7116e74a5bd79da4c05b1a525d268f9c73f3a44fbedfe14e4db53d",
+   "command": [
+    "C:\\Users\\ADMIN\\.conda\\envs\\ras\\python.exe",
+    "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\run.py",
+    "api/tests/test_c2d5d1_common_index_request.py",
+    "-k",
+    "literal_boolean_true_only",
+    "-q",
+    "--tb=short",
+    "-p",
+    "no:cacheprovider",
+    "--junitxml=C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-literal.xml"
+   ],
+   "junit": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-literal.xml",
+    "sha256": "d1fdc7b482e22b28be651e7b6adc6b0ee33d493fe620020b668be03ef483f837"
+   },
+   "log": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-literal.log",
+    "sha256": "2d97dfa07764734798f0a2f9461c534f52acf40da16c45e2e8a6b69bdfc70516"
+   }
+  },
+  {
+   "name": "final-clock",
+   "file": "api/app/api/common_index_request.py",
+   "args": [
+    "api/tests/test_c2d5d1_common_index_request.py",
+    "-k",
+    "current_clock_after_final_predicate and accept and idle and create"
+   ],
+   "returncode": 1,
+   "tests": 3,
+   "failures": 2,
+   "errors": 0,
+   "skipped": 0,
+   "nodes": [
+    "tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[-1-idle-accept-create]",
+    "tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[0-idle-accept-create]",
+    "tests/test_c2d5d1_common_index_request.py::test_current_clock_after_final_predicate[1-idle-accept-create]"
+   ],
+   "caught_assertion": true,
+   "restored_file_sha256": "0341ae0fd085e202d0ed9da0b3630143681a8091ef7d30c9f50d7c4b9be4fba2",
+   "command": [
+    "C:\\Users\\ADMIN\\.conda\\envs\\ras\\python.exe",
+    "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\run.py",
+    "api/tests/test_c2d5d1_common_index_request.py",
+    "-k",
+    "current_clock_after_final_predicate and accept and idle and create",
+    "-q",
+    "--tb=short",
+    "-p",
+    "no:cacheprovider",
+    "--junitxml=C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-final-clock.xml"
+   ],
+   "junit": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-final-clock.xml",
+    "sha256": "76094015e4f75beeaa7a16bf4d1e71a542e2e3129a56e83018191eae9a33730f"
+   },
+   "log": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-final-clock.log",
+    "sha256": "b1ec127037b0c62af0101186d63baeaefb8aefa814bafd14db7c9e3efde9b9ef"
+   }
+  },
+  {
+   "name": "outcome-fact",
+   "file": "api/app/api/common_index_request.py",
+   "args": [
+    "api/tests/test_c2d5d1_common_index_request.py",
+    "-k",
+    "commit_exception_uncertain and none"
+   ],
+   "returncode": 1,
+   "tests": 2,
+   "failures": 2,
+   "errors": 0,
+   "skipped": 0,
+   "nodes": [
+    "tests/test_c2d5d1_common_index_request.py::test_commit_exception_uncertain_no_select_retry_or_ids[none-False]",
+    "tests/test_c2d5d1_common_index_request.py::test_commit_exception_uncertain_no_select_retry_or_ids[none-True]"
+   ],
+   "caught_assertion": true,
+   "restored_file_sha256": "0341ae0fd085e202d0ed9da0b3630143681a8091ef7d30c9f50d7c4b9be4fba2",
+   "command": [
+    "C:\\Users\\ADMIN\\.conda\\envs\\ras\\python.exe",
+    "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\run.py",
+    "api/tests/test_c2d5d1_common_index_request.py",
+    "-k",
+    "commit_exception_uncertain and none",
+    "-q",
+    "--tb=short",
+    "-p",
+    "no:cacheprovider",
+    "--junitxml=C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-outcome-fact.xml"
+   ],
+   "junit": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-outcome-fact.xml",
+    "sha256": "44b8b3c9042140b275a87a9e9254972e99a8ac4e5984f853425f6b90bd4661c7"
+   },
+   "log": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-outcome-fact.log",
+    "sha256": "5e27ef9fd16b4f396e441633beca7cbae30a319d50a4ede3eb867da5f66616c8"
+   }
+  },
+  {
+   "name": "reuse-binding",
+   "file": "api/app/api/common_index_request.py",
+   "args": [
+    "api/tests/test_c2d5d1_common_index_request.py",
+    "-k",
+    "existing_job_returned_untouched and epoch"
+   ],
+   "returncode": 1,
+   "tests": 1,
+   "failures": 1,
+   "errors": 0,
+   "skipped": 0,
+   "nodes": [
+    "tests/test_c2d5d1_common_index_request.py::test_existing_job_returned_untouched_never_reset_or_rebound[epoch]"
+   ],
+   "caught_assertion": true,
+   "restored_file_sha256": "0341ae0fd085e202d0ed9da0b3630143681a8091ef7d30c9f50d7c4b9be4fba2",
+   "command": [
+    "C:\\Users\\ADMIN\\.conda\\envs\\ras\\python.exe",
+    "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\run.py",
+    "api/tests/test_c2d5d1_common_index_request.py",
+    "-k",
+    "existing_job_returned_untouched and epoch",
+    "-q",
+    "--tb=short",
+    "-p",
+    "no:cacheprovider",
+    "--junitxml=C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-reuse-binding.xml"
+   ],
+   "junit": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-reuse-binding.xml",
+    "sha256": "e343effdd3eeae9302a7054a306ee74fbc3bacd4ac46321327b5101bc9e782df"
+   },
+   "log": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-reuse-binding.log",
+    "sha256": "bccc61f55131e0854c0ee7e777ed6b14a505cf585bfc16fcfefbf6d48d5ff43a"
+   }
+  },
+  {
+   "name": "item-lock",
+   "file": "api/app/api/common_index_request.py",
+   "args": [
+    "api/tests/test_c2d5d1_common_index_request.py",
+    "-k",
+    "two_concurrent and other"
+   ],
+   "returncode": 1,
+   "tests": 1,
+   "failures": 1,
+   "errors": 0,
+   "skipped": 0,
+   "nodes": [
+    "tests/test_c2d5d1_common_index_request.py::test_two_concurrent_requests_one_job_one_success_audit[other]"
+   ],
+   "caught_assertion": true,
+   "restored_file_sha256": "0341ae0fd085e202d0ed9da0b3630143681a8091ef7d30c9f50d7c4b9be4fba2",
+   "command": [
+    "C:\\Users\\ADMIN\\.conda\\envs\\ras\\python.exe",
+    "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\run.py",
+    "api/tests/test_c2d5d1_common_index_request.py",
+    "-k",
+    "two_concurrent and other",
+    "-q",
+    "--tb=short",
+    "-p",
+    "no:cacheprovider",
+    "--junitxml=C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-item-lock.xml"
+   ],
+   "junit": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-item-lock.xml",
+    "sha256": "588cd922f4b5e5ea690996156e9d793d0b01d42a29b7b3cfa65537e6fb779389"
+   },
+   "log": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-item-lock.log",
+    "sha256": "6a0c3d8d5286b82d071e0a07e33918a01ab150530771ffbc09c95a457cfdd301"
+   }
+  },
+  {
+   "name": "late-denial-actor",
+   "file": "api/app/api/common_index_request.py",
+   "args": [
+    "api/tests/test_c2d5d1_common_index_request.py",
+    "-k",
+    "late_formatter_denial"
+   ],
+   "returncode": 1,
+   "tests": 1,
+   "failures": 1,
+   "errors": 0,
+   "skipped": 0,
+   "nodes": [
+    "tests/test_c2d5d1_common_index_request.py::test_late_formatter_denial_rechecks_current_actor"
+   ],
+   "caught_assertion": true,
+   "restored_file_sha256": "0341ae0fd085e202d0ed9da0b3630143681a8091ef7d30c9f50d7c4b9be4fba2",
+   "command": [
+    "C:\\Users\\ADMIN\\.conda\\envs\\ras\\python.exe",
+    "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\run.py",
+    "api/tests/test_c2d5d1_common_index_request.py",
+    "-k",
+    "late_formatter_denial",
+    "-q",
+    "--tb=short",
+    "-p",
+    "no:cacheprovider",
+    "--junitxml=C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-late-denial-actor.xml"
+   ],
+   "junit": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-late-denial-actor.xml",
+    "sha256": "173c9cb994a96b9c327a652b276bfedca2bd9d78dfe90ef5f490c9afebdef8ec"
+   },
+   "log": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-late-denial-actor.log",
+    "sha256": "be1346a090531101cef3f221e80c175d2a8a55117285b0b58fa6fa7378ca7e3f"
+   }
+  },
+  {
+   "name": "cancel-stop",
+   "file": "api/app/api/common_index_request.py",
+   "args": [
+    "api/tests/test_c2d5d1_common_index_request.py",
+    "-k",
+    "cancel_keeps_thread_owned and before_commit"
+   ],
+   "returncode": 1,
+   "tests": 3,
+   "failures": 3,
+   "errors": 0,
+   "skipped": 0,
+   "nodes": [
+    "tests/test_c2d5d1_common_index_request.py::test_cancel_keeps_thread_owned_until_settle[attempt-before_commit]",
+    "tests/test_c2d5d1_common_index_request.py::test_cancel_keeps_thread_owned_until_settle[disconnect-before_commit]",
+    "tests/test_c2d5d1_common_index_request.py::test_cancel_keeps_thread_owned_until_settle[receive-before_commit]"
+   ],
+   "caught_assertion": true,
+   "restored_file_sha256": "0341ae0fd085e202d0ed9da0b3630143681a8091ef7d30c9f50d7c4b9be4fba2",
+   "command": [
+    "C:\\Users\\ADMIN\\.conda\\envs\\ras\\python.exe",
+    "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\run.py",
+    "api/tests/test_c2d5d1_common_index_request.py",
+    "-k",
+    "cancel_keeps_thread_owned and before_commit",
+    "-q",
+    "--tb=short",
+    "-p",
+    "no:cacheprovider",
+    "--junitxml=C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-cancel-stop.xml"
+   ],
+   "junit": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-cancel-stop.xml",
+    "sha256": "63caab9714ece00a8f8bd2b3521ad97b2a0e6fa56f4b06e6e2cb138d0a209d96"
+   },
+   "log": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-cancel-stop.log",
+    "sha256": "5e78cfd41389746e0d1550ed7ab52604f9d6b79ab798f2dd7bc5a789cae2b2cc"
+   }
+  },
+  {
+   "name": "lock-order",
+   "file": "api/app/api/common_index_request.py",
+   "args": [
+    "api/tests/test_c2d5d1_common_index_request.py",
+    "-k",
+    "runtime_create_then_reuse"
+   ],
+   "returncode": 1,
+   "tests": 1,
+   "failures": 1,
+   "errors": 0,
+   "skipped": 0,
+   "nodes": [
+    "tests/test_c2d5d1_common_index_request.py::test_runtime_create_then_reuse_exact_binding_no_storage_provider_or_journal"
+   ],
+   "caught_assertion": true,
+   "restored_file_sha256": "0341ae0fd085e202d0ed9da0b3630143681a8091ef7d30c9f50d7c4b9be4fba2",
+   "command": [
+    "C:\\Users\\ADMIN\\.conda\\envs\\ras\\python.exe",
+    "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\run.py",
+    "api/tests/test_c2d5d1_common_index_request.py",
+    "-k",
+    "runtime_create_then_reuse",
+    "-q",
+    "--tb=short",
+    "-p",
+    "no:cacheprovider",
+    "--junitxml=C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-lock-order.xml"
+   ],
+   "junit": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-lock-order.xml",
+    "sha256": "7034ed9e9e507f6840ac641bc14a0d3b63c0921d3710838711a8eaf45fb7c8e7"
+   },
+   "log": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-lock-order.log",
+    "sha256": "ae485a2a3932abb83f90bacccc67de711f7a0ccf9e978987c4ebef1fcac0c456"
+   }
+  },
+  {
+   "name": "web-ref-guard",
+   "file": "web/app/admin/publications/page.tsx",
+   "returncode": 1,
+   "tests": 1,
+   "failures": 1,
+   "errors": 0,
+   "skipped": 0,
+   "nodes": [
+    "tests/test_c2d5d1_proxy_smoke.py::test_chrome_index_unticked_busy_reuse_unknown_no_repost_and_denials"
+   ],
+   "caught_assertion": true,
+   "restored_file_sha256": "0bd95062803433886e916e943060be2359a37e8b4b9d2c1edcfa91a99fa8d032",
+   "command": [
+    "C:\\Users\\ADMIN\\.conda\\envs\\ras\\python.exe",
+    "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\run.py",
+    "api/tests/test_c2d5d1_proxy_smoke.py",
+    "-q",
+    "--tb=short",
+    "-p",
+    "no:cacheprovider",
+    "--junitxml=C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-web-ref-guard.xml"
+   ],
+   "junit": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-web-ref-guard.xml",
+    "sha256": "6fbb3d14d7c102bcd52bbd62f3dfbb8e66e417d668356ff5568e0b9ae72b3bac"
+   },
+   "log": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant-web-ref-guard.log",
+    "sha256": "7d443d4b2b9ca6c4978002b8f32ec29c4fbfe1c66ad2ea49613be5bfbe485091"
+   },
+   "note": "production web build with mutant, then source restored and production build re-run"
+  }
+ ],
+ "mutant_source": {
+  "before": {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\source-pre-mutants.json",
+   "sha256": "420cb66ac55a8918bdc49b617e0a6f87e7cc3014878bfa4943f042f0268fb942"
+  },
+  "after": {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\source-post-mutants.json",
+   "sha256": "420cb66ac55a8918bdc49b617e0a6f87e7cc3014878bfa4943f042f0268fb942"
+  },
+  "after_web": {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\source-post-web-mutant.json",
+   "sha256": "420cb66ac55a8918bdc49b617e0a6f87e7cc3014878bfa4943f042f0268fb942"
+  },
+  "note": "Mutants ran on the pre-commit working tree. Its only difference from the tested commit is the import order of web/app/admin/publications/page.tsx; all API files are byte-identical. Source restored and hash-checked after each mutant."
+ },
+ "preparations": {
+  "prep-base-compat-failures.xml": {
+   "result": {
+    "executions": 4,
+    "unique": 4,
+    "pass_count": 0,
+    "fail": 4,
+    "error": 0,
+    "skip": 0,
+    "failed_nodes": [
+     "api/tests/test_common_original.py::test_common_original_refused_unless_live_rights_open_that_exact_file",
+     "api/tests/test_common_search.py::test_chunk_of_another_file_or_version_of_the_copy_stays_closed",
+     "api/tests/test_common_search.py::test_forbidden_copies_never_take_a_top_k_slot",
+     "api/tests/test_health.py::test_readyz_ok_after_migration"
+    ]
+   },
+   "junit": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-base-compat-failures.xml",
+    "sha256": "964c5e80dc2d5fefaf6522fc1aba945a61243bc2415ddf468816d8bc46724963"
+   },
+   "log": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-base-compat-failures.log",
+    "sha256": "e271c1ebd1aa7b8b42b3572cb56493dcba276bd3479126d1549734ddd3a02c4c"
+   }
+  },
+  "prep-base-sanity.xml": {
+   "result": {
+    "executions": 7,
+    "unique": 7,
+    "pass_count": 7,
+    "fail": 0,
+    "error": 0,
+    "skip": 0,
+    "failed_nodes": []
+   },
+   "junit": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-base-sanity.xml",
+    "sha256": "210b6e78bb8a34869da35f3e06ab4725010cd72a1782d3706bc20deb3a3fb7fb"
+   },
+   "log": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-base-sanity.log",
+    "sha256": "197195df619f2306bbe64c80c9a23fb559844d0e9fba441a7b22bfdc040bbbe8"
+   }
+  },
+  "prep-chrome-1.xml": {
+   "result": {
+    "executions": 1,
+    "unique": 1,
+    "pass_count": 0,
+    "fail": 1,
+    "error": 0,
+    "skip": 0,
+    "failed_nodes": [
+     "api/tests/test_c2d5d1_proxy_smoke.py::test_chrome_index_unticked_busy_reuse_unknown_no_repost_and_denials"
+    ]
+   },
+   "junit": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-chrome-1.xml",
+    "sha256": "d213b57376006704869c4badb599c9711f67697b71ef865d22584204cb7fb9ca"
+   },
+   "log": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-chrome-1.log",
+    "sha256": "9fff0e07940179b5603080fbff83fdb52c7f80c30c82a3e981dd8c7f9e613937"
+   }
+  },
+  "prep-chrome-2.xml": {
+   "result": {
+    "executions": 1,
+    "unique": 1,
+    "pass_count": 1,
+    "fail": 0,
+    "error": 0,
+    "skip": 0,
+    "failed_nodes": []
+   },
+   "junit": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-chrome-2.xml",
+    "sha256": "765c2c8eac1254523c8e1598c20be53f27c28fbc9f0ed9c01a41d792d61d7da1"
+   },
+   "log": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-chrome-2.log",
+    "sha256": "ea5823d6b4205da56ec11f72e81babba65e78a8bb9c07e17caafe4ca8cb7b05c"
+   }
+  },
+  "prep-compat-1.xml": {
+   "result": {
+    "executions": 93,
+    "unique": 93,
+    "pass_count": 89,
+    "fail": 4,
+    "error": 0,
+    "skip": 0,
+    "failed_nodes": [
+     "api/tests/test_common_original.py::test_common_original_refused_unless_live_rights_open_that_exact_file",
+     "api/tests/test_common_search.py::test_chunk_of_another_file_or_version_of_the_copy_stays_closed",
+     "api/tests/test_common_search.py::test_forbidden_copies_never_take_a_top_k_slot",
+     "api/tests/test_health.py::test_readyz_ok_after_migration"
+    ]
+   },
+   "junit": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-compat-1.xml",
+    "sha256": "d85caabd8b1076e1504ad7f2249427d43a7e72f679bbc48654871194d7ce219c"
+   },
+   "log": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-compat-1.log",
+    "sha256": "e09e03685619cedb2fb75ec3ec2bdb4f8b4e53dd39b4d5b29385cc63aa991b55"
+   }
+  },
+  "prep-new-1.xml": {
+   "result": {
+    "executions": 170,
+    "unique": 170,
+    "pass_count": 164,
+    "fail": 6,
+    "error": 0,
+    "skip": 0,
+    "failed_nodes": [
+     "api/tests/test_c2d5d1_common_index_request.py::test_index_and_revoke_race_item_first_no_deadlock[index]",
+     "api/tests/test_c2d5d1_common_index_request.py::test_ineligible_tuple_closed_no_job_and_code_only_audit[already_indexed-already_indexed-already_indexed]",
+     "api/tests/test_c2d5d1_common_index_request.py::test_ineligible_tuple_closed_no_job_and_code_only_audit[rights_revoked-rights_not_current-rights_not_current]",
+     "api/tests/test_c2d5d1_common_index_request.py::test_input_and_acl_no_side_effect[anonymous]",
+     "api/tests/test_c2d5d1_common_index_request.py::test_response_reflects_current_job_after_known_commit[revoke]",
+     "api/tests/test_c2d5d1_common_index_request.py::test_session_writer_races_index_no_deadlock_new_response_proof[index]"
+    ]
+   },
+   "junit": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-new-1.xml",
+    "sha256": "e6551f6afd0dc1ea8afb8f4eae4fe8681a99d5586dcfaa5fd57f08fe8a3837b1"
+   },
+   "log": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-new-1.log",
+    "sha256": "90acfd9b0e73e9aeea8849551c48ed5802cde821b4709775cab7fed3ea7ab7ed"
+   }
+  },
+  "prep-new-2.xml": {
+   "result": {
+    "executions": 20,
+    "unique": 20,
+    "pass_count": 20,
+    "fail": 0,
+    "error": 0,
+    "skip": 0,
+    "failed_nodes": []
+   },
+   "junit": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-new-2.xml",
+    "sha256": "0f0d891589e2aa414c90ba9479b8038b549aa3671e35d1270caba2bf44bf5155"
+   },
+   "log": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-new-2.log",
+    "sha256": "ed3ce40fe63fcd7aa4afdabac1752b731cbc5719f5eeeccded3e87023ec01eb2"
+   }
+  },
+  "prep-new-3.xml": {
+   "result": {
+    "executions": 2,
+    "unique": 2,
+    "pass_count": 2,
+    "fail": 0,
+    "error": 0,
+    "skip": 0,
+    "failed_nodes": []
+   },
+   "junit": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-new-3.xml",
+    "sha256": "9f991370bcb13110fa6df01194c7bfc07ae45c7211752d6bed3f81446d2d1944"
+   },
+   "log": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-new-3.log",
+    "sha256": "804cb08c2ac5fa3259e810d21003e2a8f1691e6c18c9df5efcc7cb44238637e1"
+   }
+  },
+  "prep-repro-base-literal.xml": {
+   "result": {
+    "executions": 10,
+    "unique": 10,
+    "pass_count": 8,
+    "fail": 2,
+    "error": 0,
+    "skip": 0,
+    "failed_nodes": [
+     "api/tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[1.0]",
+     "api/tests/test_c2d5d1_common_index_request.py::test_literal_boolean_true_only[1_0]"
+    ]
+   },
+   "junit": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-repro-base-literal.xml",
+    "sha256": "cbfefd8b9a8e3adaaafe40171c2eeca24f49ce1f51482ac064e3217474cae217"
+   },
+   "log": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-repro-base-literal.log",
+    "sha256": "bf88dfa4d03fb0e0cdb2894f5edebeb6458b219e22c4740b67606dd7d67e57a3"
+   }
+  },
+  "prep-mutants-crlf/": {
+   "files": [
+    {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-mutants-crlf\\mutant-final-clock.log",
+     "sha256": "03901539ba188738a60ebc6b76ad2c97729769704a10c2de8456c34c4b4294a2"
+    },
+    {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-mutants-crlf\\mutant-final-clock.xml",
+     "sha256": "b1fb34add773adf05f3478f1b2c51cbfbb8f1fd02d3bb4656f9fb3579b77998f"
+    },
+    {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-mutants-crlf\\mutant-literal.log",
+     "sha256": "9f63e06a958890de7db49a7fbde128f51d5179d02a20340c5e857eafd1dea792"
+    },
+    {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-mutants-crlf\\mutant-literal.xml",
+     "sha256": "64fe4f92c6021a4c7226af6b6fea517d2ff98f837acdce677b2520b9c80d01c3"
+    },
+    {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-mutants-crlf\\mutants-run.log",
+     "sha256": "bcbc6f6fa0e724e0fc5c435dc9024cfbb923e0f41767ef13cc829200547ba229"
+    },
+    {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-mutants-crlf\\source-post-mutants-stray.json",
+     "sha256": "420cb66ac55a8918bdc49b617e0a6f87e7cc3014878bfa4943f042f0268fb942"
+    },
+    {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-mutants-crlf\\source-post-mutants.json",
+     "sha256": "563ca62c761309960e60e74e4d05621100085972c0c529df5f4f308a90661eb4"
+    },
+    {
+     "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prep-mutants-crlf\\source-pre-mutants.json",
+     "sha256": "563ca62c761309960e60e74e4d05621100085972c0c529df5f4f308a90661eb4"
+    }
+   ],
+   "note": "First mutant pass on files accidentally rewritten with CRLF; two mutants ran, the third anchor failed. Files normalized to LF, this folder kept separately, all mutants re-run; not counted."
+  }
+ },
+ "preparation_notes": [
+  "prep-base-sanity: base 859dfe9 source, 1 revoke literal test + 1 legacy index test (7 executions) passed; environment check only.",
+  "prep-repro-base-literal: new literal test against the unchanged base route; confirm_external_processing=1 and 1.0 returned 200 and created a job (2 failures = reproduced bug). Not a final pass.",
+  "prep-new-1: first full run of the new file at the working tree: 164 pass/6 fail. Causes: anonymous case sent X-CSRF-Token without csrf cookie (CSRF 403 precedes auth); rights_revoked/already_indexed setup violated real CHECK constraints; index-first races waited on the journal advisory lock not transactionid (observer widened to row/advisory wait); revoke-only DTO already had filename null (assert evidence_note/purged_at instead). Production code unchanged by these fixes.",
+  "prep-new-2: the 20 affected nodes passed after test-setup fixes.",
+  "prep-new-3: strengthened concurrency test (second Admin, pause after create decision) 2/2 pass.",
+  "prep-chrome-1: Playwright selector regex containing '/' failed to parse; regex changed, prep-chrome-2 passed.",
+  "prep-compat-1: legacy content/publication/cleanup/original/health groups: 89 pass/4 fail; the same 4 nodes fail identically on base 859dfe9 (prep-base-compat-failures), recorded as known base failures.",
+  "prep-mutants-crlf: Python edits had rewritten touched files with CRLF; multi-line mutant anchor failed. Files normalized to LF (originals were LF), all mutants re-run from scratch; first pass kept separately.",
+  "prep-web-build: production web build before Chrome preparation runs.",
+  "final-content attempt 1 (final suite): runner --deselect path used the api/ prefix while pytest rootdir is api/; the four known base failures stayed selected and -x stopped after 28 passes/1 known failure. Runner fixed (outside repo), content2 re-collected (89) and run under a new name; attempt 1 raw XML/log kept, not counted."
+ ],
+ "web": {
+  "tests": 70,
+  "pass_count": 70,
+  "fail": 0,
+  "typecheck": "pass",
+  "build": "pass",
+  "tested_commit": "e283bc6400efdefd4641838ce4d94f4ccee3baaa",
+  "new_tests": "web/tests/index-request.test.mjs (4)",
+  "artifacts": [
+   {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-web-test.log",
+    "sha256": "b1a52b1139f1a99b373fabbe3a87764e4f4623625af9ecd3a26bfb9c7a8444d6"
+   },
+   {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-web-typecheck.log",
+    "sha256": "f0acf39fc7e47e43f93cd13730a54098557a06054c1c5e81e56f6e749d8303ff"
+   },
+   {
+    "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final-web-build.log",
+    "sha256": "3eb511040a233763bc43d828a884e2378dd28501d016319c2089c5b8fd716eaf"
+   }
+  ]
+ },
+ "cleanup": {
+  "status": "completed",
+  "label": "ras.task=c2d5d1-20261009",
+  "containers_removed": [
+   "1dc97a06129cbf7de9d86db20f409ca7c22e13587074cd80a9be8e81144cc307",
+   "469964f29b467c5d682a9ab4c9965c7cbd87092f0962813b619e785b3a6b00a3"
+  ],
+  "volumes_removed": [
+   "a41bb7511288272b595fc491e0cab9b5cd165f1767e1e362fa49bbd6e988bf5f",
+   "6df65b1ddedc53cb91ed9d0d2b2b0f8616188aaf4e7cdb78afda886ef7a13f67"
+  ],
+  "ownership_and_sole_consumers": [
+   {
+    "name": "a41bb7511288272b595fc491e0cab9b5cd165f1767e1e362fa49bbd6e988bf5f",
+    "owner": "1dc97a06129cbf7de9d86db20f409ca7c22e13587074cd80a9be8e81144cc307",
+    "metadata": {
+     "CreatedAt": "2026-10-09T09:24:56Z",
+     "Driver": "local",
+     "Labels": {
+      "com.docker.volume.anonymous": ""
+     },
+     "Mountpoint": "/var/lib/docker/volumes/a41bb7511288272b595fc491e0cab9b5cd165f1767e1e362fa49bbd6e988bf5f/_data",
+     "Name": "a41bb7511288272b595fc491e0cab9b5cd165f1767e1e362fa49bbd6e988bf5f",
+     "Options": null,
+     "Scope": "local"
+    }
+   },
+   {
+    "name": "6df65b1ddedc53cb91ed9d0d2b2b0f8616188aaf4e7cdb78afda886ef7a13f67",
+    "owner": "469964f29b467c5d682a9ab4c9965c7cbd87092f0962813b619e785b3a6b00a3",
+    "metadata": {
+     "CreatedAt": "2026-10-09T09:24:55Z",
+     "Driver": "local",
+     "Labels": {
+      "com.docker.volume.anonymous": ""
+     },
+     "Mountpoint": "/var/lib/docker/volumes/6df65b1ddedc53cb91ed9d0d2b2b0f8616188aaf4e7cdb78afda886ef7a13f67/_data",
+     "Name": "6df65b1ddedc53cb91ed9d0d2b2b0f8616188aaf4e7cdb78afda886ef7a13f67",
+     "Options": null,
+     "Scope": "local"
+    }
+   }
+  ],
+  "credentials_deleted": [
+   "credentials.json",
+   "postgres.env",
+   "minio.env"
+  ],
+  "baseline_initial_count": 9,
+  "baseline_unchanged_before_after_cleanup": true,
+  "baseline_matches_initial_id_image_startedat": true,
+  "remaining_labelled": []
+ },
+ "quality": {
+  "files": 23,
+  "changed_files": [
+   "AGENTS.md",
+   "README.md",
+   "api/app/api/common_index_request.py",
+   "api/app/api/routes/publications.py",
+   "api/app/common_index.py",
+   "api/tests/test_c2d5d1_common_index_request.py",
+   "api/tests/test_c2d5d1_proxy_smoke.py",
+   "docs/README.md",
+   "docs/c2d1-caller-inventory.json",
+   "docs/c2d5c2-common-revoke.md",
+   "docs/c2d5d1-common-index-request.md",
+   "docs/c2d5d1-test-inventory.json",
+   "docs/decisions.md",
+   "docs/dev-setup.md",
+   "docs/reviews/pr49-c2d5c2-common-revoke.md",
+   "docs/roadmap.md",
+   "docs/tasks/m6c2b2c2d5c2-common-revoke.md",
+   "docs/tasks/m6c2b2c2d5d1-common-index-request.md",
+   "docs/testing.md",
+   "web/app/admin/publications/page.tsx",
+   "web/lib/api.ts",
+   "web/lib/review.ts",
+   "web/tests/index-request.test.mjs"
+  ],
+  "generated_credential_fingerprint_hits": [],
+  "artifact_generated_credential_hits": [],
+  "fingerprints_checked": 4,
+  "fingerprint_method": "SHA-256 of every 48-byte window of lowercase hex runs; values never printed.",
+  "control_char_files": [],
+  "missing_local_links": [],
+  "crlf_files": [
+   "AGENTS.md",
+   "README.md",
+   "docs/README.md",
+   "docs/c2d5c2-common-revoke.md",
+   "docs/decisions.md",
+   "docs/dev-setup.md",
+   "docs/reviews/pr49-c2d5c2-common-revoke.md",
+   "docs/roadmap.md",
+   "docs/testing.md"
+  ]
+ },
+ "runner_artifacts": [
+  {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\run.py",
+   "sha256": "0e854b7344816b354d968d583c91b879133897a52e6a2c0b7620c4b8737b61c6"
+  },
+  {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\run-base.py",
+   "sha256": "d7ea30ea79e9d88e050563e9f0efc89477f5232394ce019693dd58a744b3e692"
+  },
+  {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\prerequisite.py",
+   "sha256": "d8932e3bed96ff2b787ff7eb229ee3f899a5ba636bb0b7b080a734fbaa88899e"
+  },
+  {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\evidence.py",
+   "sha256": "c90ccfdee2a1ab7f674f703f9c6a19e7a518a50277ddd1e8e0da17a128e59525"
+  },
+  {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\final_suite.py",
+   "sha256": "6cd7e1aaa222bf79f89b7a0aee7ba83c6bdfeae9cca63fd623f66b76204b2d95"
+  },
+  {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutants.py",
+   "sha256": "79bf7e818806e75b5255428b1d1d8c26032a32797d1fc3909b6c9fedcf4c6a58"
+  },
+  {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\mutant_web.py",
+   "sha256": "96c973d39e9fce4eb9a8688597f952aff7154f4fce88f29843e53b2e8c1d660e"
+  },
+  {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\report.py",
+   "sha256": "3fd0608531508e0052177fef7a9e35b4ebcbb2d8f96b0c59626333a60ef3d450"
+  },
+  {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\make_base_runner.py",
+   "sha256": "30f7a7361c3f2e57744135a74a573376ddadfb761491db1b26cae06e7b79a5c1"
+  }
+ ],
+ "baseline_artifacts": [
+  {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\baseline-after-cleanup.json",
+   "sha256": "bca9689a34297bd20dee035307bff19a7695897cdda2e8d2a5a22e53ef824d2f"
+  },
+  {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\baseline-before-cleanup.json",
+   "sha256": "d8b81fad90dc159b2c53b62b103f4e78648127b222614abeed37a309b8758d80"
+  },
+  {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\baseline-initial.jsonl",
+   "sha256": "71c47f8d3ed476c2a414530e24101b31d74c6898a1016c8dea23171953be20f8"
+  },
+  {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\baseline-initial.time",
+   "sha256": "c3be4ea95cda071b0a5d3e2d9c284cebebf08df201de198454aced8ce2b35330"
+  },
+  {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\baseline-pre-final.json",
+   "sha256": "d8b81fad90dc159b2c53b62b103f4e78648127b222614abeed37a309b8758d80"
+  },
+  {
+   "path": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5d1-20261009\\baseline-pre-mutants.json",
+   "sha256": "d8b81fad90dc159b2c53b62b103f4e78648127b222614abeed37a309b8758d80"
+  }
+ ],
+ "limitations": [
+  "No full business HTTP/C3/C4 cutover or safety readiness.",
+  "No Compose API image/deployment; Chrome via Next production build and Uvicorn socket working tree.",
+  "Lost-response Chrome case is an in-process barrier past the 15 s proxy budget, not a network fault.",
+  "Commit/teardown fault injection is not crash or power-loss evidence.",
+  "Worker/beat/cleanup/search/RAG only compatibility-tested; not converted to runtime boundaries.",
+  "Not-run nodes are not passes; four known base failures remain failing at base and head.",
+  "No provider calls/charges, pricing_verified unchanged, no SLO/benchmark."
+ ]
+}
