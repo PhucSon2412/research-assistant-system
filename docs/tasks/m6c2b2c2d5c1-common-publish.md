@@ -1,6 +1,6 @@
 # Prompt C2d-5c1: công bố metadata bản chung qua runtime
 
-PR #47 đã **MERGED** tại `04434e35e2b016601d3629a2d4afe3feb6042a6b` ngày 2026-10-08, chứa code P2 `50393d1` và head `78fbe1d`. Fetch xác nhận `origin/main` tại merge này, tree giống head PR; head migration mã nguồn `0041`. Không kiểm revision DB dev. Đây là hợp đồng giao task; **đã triển khai trên nhánh review, chưa merge**. [Handoff](../c2d5c1-common-publish.md) và [inventory mới](../c2d5c1-test-inventory.json) ghi bằng chứng hiện hành; safety **pending tới C4**.
+PR #47 đã **MERGED** tại `04434e35e2b016601d3629a2d4afe3feb6042a6b` ngày 2026-10-08, chứa code P2 `50393d1` và head `78fbe1d`. Fetch xác nhận `origin/main` tại merge này, tree giống head PR; head migration mã nguồn `0041`. Không kiểm revision DB dev. Đây là hợp đồng giao task; **đã merge PR #48 `1eede17` (2026-10-09)**. Kết quả giữ source review riêng; [task C2d-5c2](m6c2b2c2d5c2-common-revoke.md) đã giao, chưa triển khai. [Handoff](../c2d5c1-common-publish.md) và [inventory mới](../c2d5c1-test-inventory.json) ghi bằng chứng hiện hành; safety **pending tới C4**.
 
 [Mục lục](../README.md) · [Quyết định giao](../decisions.md#giao-c2d-5c1-sau-merge-pr-47-2026-10-08) · [Handoff approve](../c2d5b-review-approval-original-copy.md) · [Review P2](../reviews/pr47-c2d5b-review-approval-original-copy.md#review-lại-p2-tại-78fbe1d) · [Caller map](../c2d1-caller-inventory.json)
 

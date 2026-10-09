@@ -1,8 +1,12 @@
 # Tài liệu dự án
 
+**C2d-5c2 trên nhánh review:** một POST revoke qua runtime, revision `0042`, mirror/confirm transaction-bound, current Admin/clock và fresh response proof. False mirror giữ gate đóng; uncertain commit không HTTP replay. [Handoff](c2d5c2-common-revoke.md) · [Inventory mới](c2d5c2-test-inventory.json) · [Task](tasks/m6c2b2c2d5c2-common-revoke.md). Base PR #48 `1eede17`; **safety pending tới C4**, common-index/provider/C3/C4 riêng.
+
+**Review PR #48 tại `654fbac`: không phát hiện điểm chặn merge mới trong phạm vi POST publish.** Reviewer thực chạy **215 API publication + 3 lượt ca setup (216 unique)**, **64 web**, typecheck/build và Chrome proxy; artifact **2.016 API/7 mutants** của agent kiểm riêng. Setup error và container drift vẫn chưa rõ nguyên nhân, giữ riêng với rerun xanh. PR đã merge `1eede17`; chưa rerun tại merge, **safety pending tới C4**. [Report và giới hạn](reviews/pr48-c2d5c1-common-publish.md).
+
 C2d-5c1 code `520ac54`: **2.016 unique API pass**, **64 web pass**, typecheck/build và Chrome proxy đạt; 1.907 API not-run, 7 đối chứng bắt đúng assertion, 283 source hashes khớp. Lỗi chuẩn bị và giới hạn được ghi riêng trong [handoff](c2d5c1-common-publish.md), không cộng pass lịch sử.
 
-**C2d-5c1 triển khai trên nhánh review:** [handoff publish metadata](c2d5c1-common-publish.md) · [inventory](c2d5c1-test-inventory.json) · [task](tasks/m6c2b2c2d5c1-common-publish.md). Chỉ POST publish: proof/caller/clock mới, hash ngoài DB locks, outcome độc lập và response proof mới. Base PR #47 `04434e3`, source migration `0041`, không grants/migration mới; PR để review, không merge. Revoke C2d-5c2 và index/provider/C3/C4 riêng, **safety pending tới C4**. Kết quả hiện hành trong inventory, không cộng lịch sử bên dưới.
+**C2d-5c1 đã merge PR #48 `1eede17`:** [handoff publish metadata](c2d5c1-common-publish.md) · [inventory](c2d5c1-test-inventory.json) · [task](tasks/m6c2b2c2d5c1-common-publish.md). Chỉ POST publish: proof/caller/clock mới, hash ngoài DB locks, outcome độc lập và response proof mới. Base PR #47 `04434e3`, source migration `0041`, không grants/migration mới; kết quả giữ theo source review trước merge. Revoke C2d-5c2 và index/provider/C3/C4 riêng, **safety pending tới C4**. Kết quả hiện hành trong inventory, không cộng lịch sử bên dưới.
 
 **Review lại P2 PR #47 tại `78fbe1d`: đã sửa P2, không phát hiện điểm chặn merge mới trong phạm vi approve/copy.** Reviewer thực chạy **66/66 API**; artifact **1.727** của agent đối chiếu riêng. [Report và giới hạn](reviews/pr47-c2d5b-review-approval-original-copy.md#review-lại-p2-tại-78fbe1d). PR đã merge `04434e3`; chưa rerun tại merge, safety pending tới C4; kết quả web/Chrome trước sửa giữ theo source lịch sử.
 
@@ -60,6 +64,8 @@ Khi có thay đổi quyết định, cập nhật tài liệu liên quan cùng t
 
 | Tài liệu | Nội dung |
 | --- | --- |
+| [Prompt C2d-5c2](tasks/m6c2b2c2d5c2-common-revoke.md) | Thu hồi runtime/journal domain; đã giao, chưa triển khai/kiểm; safety pending |
+| [Review PR #48](reviews/pr48-c2d5c1-common-publish.md) | Review độc lập 216 unique/64 web; artifact agent riêng, setup/drift chưa rõ nguyên nhân; safety pending |
 | [Bàn giao C2d-5c1](c2d5c1-common-publish.md) | POST publish runtime, hash ngoài DB, outcome độc lập, response proof mới và giới hạn |
 | [Inventory C2d-5c1](c2d5c1-test-inventory.json) | Unique selection/JUnit/hashes/mutants/not-run; bằng chứng mới, không cộng lịch sử |
 | [Prompt C2d-5c1](tasks/m6c2b2c2d5c1-common-publish.md) | Hợp đồng giao; đã triển khai trên nhánh review, chưa merge; xem handoff/inventory mới |
