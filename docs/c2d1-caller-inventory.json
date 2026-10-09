@@ -1,7 +1,7 @@
 {
-  "base": "04434e35e2b016601d3629a2d4afe3feb6042a6b",
-  "source_migration": "0041",
-  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4. Final read clock corrected after predicate SQL; /auth/sessions uses the shared final caller. Details in docs/c2d-final-read-clock.md. C2d-4a adds GET upload notice final caller and POST intent actor/binding/TTL before commit plus fresh token proof after known commit. C2d-4b PUT original merged PR #44 at dd8bdc6 with unlocked staging, atomic consume and a new exact response proof. C2d-4c implements exactly two original GETs/three separate gates, short scalar proofs, shared verified spools, known audit commit then fresh response proof, current caller/clock and cancellation ownership. Other writers/provider callers stay open. See docs/tasks/m6c2b2c2d4c-original-downloads.md. PR #45 merged at 070cb37. C2d-5a submit/withdraw/admin_reject merged PR #46 at 8ff5b4e: runtime domain closure routines, exact transaction pending binding, current actor/clock and new response proof; approval and other writers/provider callers remain open. C2d-5b merged PR #47 at 04434e3: POST approve uses api/review_approval.py, runtime approval mirror/confirm routines 0041, owned copy outside DB locks and a new thin response proof; revoke/index/provider callers remain open. See docs/c2d5b-review-approval-original-copy.md. C2d-5c1 POST publish implemented on review branch: app.api.common_publish, short proof, unlocked streamed hash, exact acceptance/current actor/clock and a new response proof; see docs/c2d5c1-common-publish.md. No migration/grants, not merged. Revoke C2d-5c2 and index/provider/C3/C4 remain separate; safety pending.",
+  "base": "1eede17c1eed82fa7a00f7018fe01b4362ce30a9",
+  "source_migration": "0042",
+  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4. Final read clock corrected after predicate SQL; /auth/sessions uses the shared final caller. Details in docs/c2d-final-read-clock.md. C2d-4a adds GET upload notice final caller and POST intent actor/binding/TTL before commit plus fresh token proof after known commit. C2d-4b PUT original merged PR #44 at dd8bdc6 with unlocked staging, atomic consume and a new exact response proof. C2d-4c implements exactly two original GETs/three separate gates, short scalar proofs, shared verified spools, known audit commit then fresh response proof, current caller/clock and cancellation ownership. Other writers/provider callers stay open. See docs/tasks/m6c2b2c2d4c-original-downloads.md. PR #45 merged at 070cb37. C2d-5a submit/withdraw/admin_reject merged PR #46 at 8ff5b4e: runtime domain closure routines, exact transaction pending binding, current actor/clock and new response proof; approval and other writers/provider callers remain open. C2d-5b merged PR #47 at 04434e3: POST approve uses api/review_approval.py, runtime approval mirror/confirm routines 0041, owned copy outside DB locks and a new thin response proof; revoke/index/provider callers remain open. See docs/c2d5b-review-approval-original-copy.md. C2d-5c1 POST publish merged PR #48 at 1eede17: app.api.common_publish, short proof, unlocked streamed hash, exact acceptance/current actor/clock and a new response proof; see docs/c2d5c1-common-publish.md. No migration/grants. C2d-5c2 POST revoke uses app.api.common_revoke: runtime transaction-bound mirror/confirm 0042, current actor/clock, restriction + false mirror on append fault, independent uncertain commit outcome and new response proof. Generic auth confirm excludes revocation. See docs/c2d5c2-common-revoke.md. Index/worker/provider/C3/C4 remain separate; safety pending.",
   "safety": "pending until C4",
   "route_count": 63,
   "routes": [
@@ -779,15 +779,18 @@
       "source": "api/app/api/routes/publications.py",
       "line": 349,
       "dependencies": [
+        "require_trusted_origin",
         "require_admin",
-        "get_db",
-        "get_now",
-        "get_settings"
+        "get_settings",
+        "get_clock"
       ],
       "group": "publication-write",
-      "final_status": "open C2d",
+      "final_status": "C2d-5c2 runtime implemented on review branch; safety pending C4",
       "direct_transaction_calls": [],
-      "contract_map": "docs/c2d1-final-caller-reads.md#inventory-caller-hiện-hành-và-phần-còn-mở"
+      "contract_map": "docs/c2d5c2-common-revoke.md#boundary-và-quyền",
+      "task": "docs/tasks/m6c2b2c2d5c2-common-revoke.md",
+      "boundary_helper": "app.api.common_revoke.receive",
+      "contract": "Admin User -> item -> rights/publication/jobs/version/file -> flush -> exclusive journal; current actor/binding/clock; narrow mirror/confirm 0042, independent outcome, own Session response proof; no HTTP recovery/commit inference."
     },
     {
       "method": "POST",
@@ -1148,7 +1151,7 @@
     "api/app/api/routes/collections.py": "4666935d67e658e45f289f0f1af6d59e3f8c2af720bd4c7d6ab13c132f44a93d",
     "api/app/api/routes/discovery.py": "e045d1d79fb7f4a3e957bcaf1e3f218d3d0ed335e5a637c4613fdd6faf7236be",
     "api/app/api/routes/library.py": "2b3fbdca987b870cbf2a953f8f224bac983debc86118e0a245c8897cd699592b",
-    "api/app/api/routes/publications.py": "86e948371e60d0a84eb5083e71ec3d5fbf719c8c9ee3fef996ecb4b1702661e1",
+    "api/app/api/routes/publications.py": "5aaea5d6b644d9112dd67e8723a7971a95887973328665e736ba9845b86c3d1c",
     "api/app/api/routes/rag.py": "fa890ce04f01282e215198acf7016e6537c9afe58a06f90950b0b3521df4c84b",
     "api/app/api/routes/reviews.py": "f721e6487b38303829956bc9d81557d8469212440530fd75b6a64b30befaffc7",
     "api/app/api/routes/search.py": "5b8c8b1c8afa24821d041d7bd9a765915b5ea8baf10d873c8a8d6803816321e7",

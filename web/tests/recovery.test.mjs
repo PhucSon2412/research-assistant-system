@@ -38,7 +38,7 @@ test("uncertain auth transaction never claims password reset or disable succeede
 
 test("recovery gate and journal errors have plain messages (M6c-1)", () => {
   assert.match(describeError(new ApiError(503, "service_recovering")), /tạm ngừng phục vụ/);
-  assert.match(describeError(new ApiError(503, "revocation_journal_unavailable")), /đã bị thu hồi.*nhật ký/);
+  assert.match(describeError(new ApiError(503, "revocation_journal_unavailable")), /có thể đã bị đóng.*nhật ký/);
   assert.match(describeError(new ApiError(503, "revocation_pending_recovery")), /chưa áp dụng.*phục hồi/);
   // An unfinished revocation is never shown as "not revoked".
   for (const code of ["revocation_journal_unavailable", "revocation_pending_recovery"]) {

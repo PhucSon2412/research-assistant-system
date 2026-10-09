@@ -1,5 +1,31 @@
 # Chiến lược kiểm thử
 
+## C2d-5c2 — kiểm mới theo source riêng
+
+[Handoff](c2d5c2-common-revoke.md) · [Inventory](c2d5c2-test-inventory.json). Runtime PostgreSQL/MinIO/identity/journal cô lập, migration/ORM/ACL, SQL body/retention/xmin/cross-transaction và generic confirm bypass, clock/lock/fsync/teardown/cancel, race revoke/publish/cleanup/worker/auth, current response, cleanup/restore/private và content gate. Installed Chrome qua Next production proxy/socket Uvicorn working tree: busy/two synchronous submits/old original 404/normal 15 s 504 known-commit/unknown không re-POST/expired cookie. Pending HTTP giữ gate production thật; business cutover scoped. Selection/JUnit unique/source hashes/pass/fail/not-run và preparation/mutants ghi chính xác trong inventory; không cộng lịch sử PR #48. Worker/cleanup chỉ kiểm tương thích, không chuyển boundary; safety pending tới C4.
+
+Union **529/529 API unique pass**, 0 fail/error/skip: 528 tại `964b9f6` + một Chrome
+publish tại `30cb729` (chỉ test Chrome đổi, production/shared fixtures giữ nguyên).
+Collect 4.096, not-run 3.567, 295 source hashes khớp trước/sau trong mỗi vòng.
+Web 66/66 + typecheck/build đạt (source web `79cfd95` không đổi); cả hai Chrome
+đã nằm trong API selection; 8/8 mutant bắt assertion. Cleanup tổng 4 container/
+4 volume, hai bộ ba file credentials thử; 9 baseline giữ ID/image từ snapshot
+đầu, StartedAt chỉ có đối chiếu từ inspect sau đó. Lượt seal đầu 201 core
+pass/publish 166 pass + 1 observer fail giữ riêng; raw XML/log mutant observer yếu
+bị rerun ghi đè, còn summary/hash và giới hạn rõ trong handoff/inventory.
+Chrome publish bổ sung ban đầu fail `asyncio.run()` trong event loop Playwright
+sync; test sửa riêng dùng executor thread, lỗi và lượt pass giữ source tách biệt.
+
+## Kế hoạch C2d-5c2 sau merge PR #48 (mốc giao lịch sử)
+
+[Task revoke runtime](tasks/m6c2b2c2d5c2-common-revoke.md#6-web-fixtures-và-kiểm-chứng) yêu cầu runtime/SQL binding/privilege, literal confirmation/retention, clock sau lock/SQL/fsync, append none/torn/full-fsync-error, uncertain commit/teardown, race publish/revoke/cleanup/worker, content gate trước cleanup, restore và Chrome proxy/unknown outcome. Chạy nhóm mới và caller/fixture bị tác động; pending HTTP riêng không patch. **Lượt giao chưa chạy test nào**; 216 unique/64 web reviewer và 2.016/7 mutants agent PR #48 là lịch sử theo source trước merge, không pass mới. Safety pending tới C4.
+
+
+## Review độc lập PR #48 (2026-10-09)
+
+215/215 publication + ba lượt ca setup writer, **216 unique/218 executions**, 0 fail/error/skip; 283 source hashes reviewer khớp trước/sau. Web 64/64, typecheck/build và Chrome proxy đạt. Artifact 2.016 unique/7 mutant của agent kiểm riêng; reviewer không rerun 3.707 node. Setup error ban đầu và baseline drift giữ riêng, chưa tìm nguyên nhân. [Report](reviews/pr48-c2d5c1-common-publish.md) ghi limits/cleanup; PR OPEN, safety pending tới C4.
+
+
 ## C2d-5c1 — kiểm chứng nhánh review
 
 [Handoff](c2d5c1-common-publish.md) · [Inventory](c2d5c1-test-inventory.json). Runtime PostgreSQL/MinIO/identity/journal thật; business cutover scoped, HTTP pending gate thật riêng. Selection bao gồm publish mới/legacy publication/restore, approve/P2, C2d-2b reads, C2d-4c originals và resource suites có fixture publish đổi; revoke/cleanup legacy chỉ là đối thủ/setup có nhãn. Web/typecheck/build và installed Chrome qua Next proxy, hash 16 s/504 known-commit/unknown UI không re-POST. Bảy mutants có mục tiêu fail assertion, gồm proof denial sau storage; khôi phục source trước suite cuối. Exact commands/node/JUnit/source hashes/pass/fail/error/skip/not-run/preparation failures trong inventory; không cộng số PR #47. Không dev/`.env`/provider hay API Compose deployment; safety pending tới C4.

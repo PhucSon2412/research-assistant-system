@@ -4,8 +4,9 @@
 short runtime proofs, common-original size/SHA-256 outside every DB connection
 and lock, frozen tuple rechecked under the acceptance locks, operation-owned
 commit outcome and a fresh response proof. Only metadata is listed. This module
-keeps the legacy journaled revoke/cleanup exports for the separate C2d-5c2 task
-and labelled test adversaries; it no longer exports a privileged publish helper.
+keeps system cleanup/replay primitives and a legacy revoke helper for labelled
+system/adversary tests. HTTP revoke exclusively uses ``app.api.common_revoke``
+(C2d-5c2); it never invokes this legacy helper's replay/commit inference.
 
 **Revoke** (pending or listed) is one transaction whose commit is ``t_rev``:
 bump ``rights_epoch``, set ``revoked`` (and, for a copy indexed by
@@ -18,7 +19,7 @@ it appends the tombstone's record to the revocation journal file (``fsync``)
 and mirrors it in the same transaction (M6c-1, ``app.recovery``); the
 failure paths of that step are described there. From that commit every normal
 route (library list/count/detail, collections) drops the item in SQL; file,
-chunk, search and RAG never served it. Private items and other common copies
+chunk, search and RAG recheck their own rights gates. Private items and other common copies
 are untouched.
 
 **Cleanup** works from unpurged tombstones, each in its own transaction, and

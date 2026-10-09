@@ -1,5 +1,20 @@
 # Môi trường phát triển và schema (M1a–C2d-4b)
 
+## C2d-5c2 cô lập
+
+[Handoff](c2d5c2-common-revoke.md) · [Inventory commands/JUnit/source](c2d5c2-test-inventory.json). Conda hiện có `C:\Users\ADMIN\.conda\envs\ras\python.exe`; PostgreSQL `127.0.0.1:58479`, MinIO `59479`, label `ras.task=c2d5c2-20261009`; socket API `58489`/Next `53489`/Chrome installed headless. Credentials/journal/evidence ngoài repo, explicit admin/runtime/recovery/storage trước import, provider keys trống và chặn HTTP ngoài; không fallback `.env` hoặc dev. Migration source `0042`, không suy revision DB dev. HTTP revoke qua runtime, fixtures operator/corruption dùng engine riêng có nhãn; cleanup/recovery/worker chưa chuyển boundary. Normal proxy revoke 15 s; không thêm pool/deadline/config. Business cutover scoped, pending HTTP không patch; safety pending tới C4. Các lệnh Compose dev và kết quả lịch sử bên dưới không là lệnh môi trường thử này.
+
+Kiểm cuối gồm 528 ca tại `964b9f6` và một Chrome publish tại `30cb729`, chỉ test
+Chrome đổi để gọi fixture runtime qua executor ngoài event loop Playwright sync.
+Vòng bổ sung dùng socket API `58486`/Next `53486`; source production/shared fixtures
+giữ nguyên. Tổng cleanup hai vòng: 4 container/4 volume, hai bộ ba file credentials;
+9 baseline giữ nguyên theo các mốc metadata đã ghi trong inventory.
+
+## C2d-5c2 — mốc giao trước triển khai (lịch sử)
+
+PR #48 đã merge `1eede17` ngày 2026-10-09; source AST head `0041`, không query revision DB dev. [Prompt revoke](tasks/m6c2b2c2d5c2-common-revoke.md) chưa triển khai hoặc có lệnh runtime mới được kiểm. Cần môi trường thử PostgreSQL/MinIO/journal/credentials riêng, explicit test URLs trước import, Conda ras, không đọc `.env` hay migrate/restart dev. Không cập nhật runbook vận hành bằng lệnh chưa chạy. Safety pending tới C4; provider/pricing không đổi. Kết quả/lệnh các mốc bên dưới giữ thời điểm lịch sử.
+
+
 ## C2d-5b cô lập
 
 Host Conda `C:\Users\ADMIN\.conda\envs\ras\python.exe` (interpreter/pip đã kiểm), PostgreSQL riêng `127.0.0.1:58475`, MinIO riêng `127.0.0.1:59475`, label `ras.task=c2d5b-20261007`; credentials generated ngoài repo, đặt `RAS_TEST_DATABASE_ADMIN_URL`, `RAS_STORAGE__*`, `RAS_C1_*` trước import fixture, không fallback `.env`. Restore C2c2 dùng container riêng `58442` (label lịch sử bắt buộc + owner C2d-5b). Proxy smoke: Uvicorn `58476`, Next `53476`, Chrome headless đã cài; `npm run build --prefix web` trước smoke. Wrapper/evidence ngoài repo `%TEMP%/ras-c2d5b-20261007` (`run.py`, `final_runs.py`, `mutants.py`); lệnh/kết quả thực chạy trong [inventory](c2d5b-test-inventory.json). Biến mới: `RAS_FILES__APPROVAL_COPY_MAX_CONCURRENT` (2), `RAS_FILES__APPROVAL_COPY_DEADLINE_SECONDS` (90), `WEB_PROXY_REVIEW_APPROVAL_TIMEOUT_SECONDS` (120) — giá trị đề xuất cần đo. Không dev DB/restart/provider/pricing/readiness. Safety pending tới C4.

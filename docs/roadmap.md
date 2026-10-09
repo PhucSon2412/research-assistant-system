@@ -1,8 +1,17 @@
 # Roadmap đề xuất
 
+## C2d-5c2 trên nhánh review
+
+[Thu hồi runtime](c2d5c2-common-revoke.md) · [Inventory mới](c2d5c2-test-inventory.json): chỉ POST revoke, migration `0042`, exact transaction-bound mirror/confirm và retention, current actor/clock, false mirror fail closed, uncertain outcome/response proof mới và UI không tự POST lại. Base merge PR #48 `1eede17`; kết quả lịch sử giữ riêng. Tiếp theo common-index/worker boundary → search/provider → RAG/provider → tổng hồi quy C2d; không coi kiểm tương thích worker/cleanup là đã chuyển chúng. **Safety pending tới C4; không bắt đầu C3/C4.**
+
+## Giao C2d-5c2 sau merge PR #48
+
+PR #48 đã merge `1eede17`; [prompt revoke](tasks/m6c2b2c2d5c2-common-revoke.md) đã giao, **chưa triển khai/kiểm**. Một POST revoke: runtime routine journal hẹp (revision mới sau 0041), current Admin/clock/binding, thu hồi/tombstone/epoch/cancel/retention cùng transaction, outcome độc lập và response proof mới. Nhánh append lỗi giữ false mirror/gate đóng; unknown commit không tự replay để suy success. Tiếp theo common-index/worker → search/provider → RAG/provider → tổng hồi quy C2d; C3/C4 riêng, safety pending. Không cộng kết quả review/agent PR #48 vào task này.
+
+
 ## C2d-5c1 sau merge PR #47
 
-[Prompt publish](tasks/m6c2b2c2d5c1-common-publish.md) đã triển khai trên nhánh review: [handoff](c2d5c1-common-publish.md), [inventory](c2d5c1-test-inventory.json). PR để review, chưa merge; base PR #47 `04434e3`, head source `0041`, không migration/grants mới, không suy revision DB dev. Một POST publish: short proof → hash ngoài DB → Admin User/item/rights/flush/journal exclusive/current actor → known commit → response proof mới. Pool 2/deadline 90 s/proxy exact POST 120 s là đề xuất cần đo. Tiếp theo C2d-5c2 revoke với runtime mirror/confirm/retention/cleanup riêng; common-index/search/provider/RAG/provider/C3/C4 vẫn riêng. **Safety pending tới C4**; số lịch sử không thành pass hiện hành.
+[Prompt publish](tasks/m6c2b2c2d5c1-common-publish.md) đã merge PR #48 `1eede17`: [handoff](c2d5c1-common-publish.md), [inventory](c2d5c1-test-inventory.json). Kết quả giữ source review trước merge; base PR #47 `04434e3`, head source `0041`, không migration/grants mới, không suy revision DB dev. Một POST publish: short proof → hash ngoài DB → Admin User/item/rights/flush/journal exclusive/current actor → known commit → response proof mới. Pool 2/deadline 90 s/proxy exact POST 120 s là đề xuất cần đo. Tiếp theo C2d-5c2 revoke với runtime mirror/confirm/retention/cleanup riêng; common-index/search/provider/RAG/provider/C3/C4 vẫn riêng. **Safety pending tới C4**; số lịch sử không thành pass hiện hành.
 
 ## C2d-5b sau merge PR #46
 

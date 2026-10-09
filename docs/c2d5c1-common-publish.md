@@ -1,8 +1,10 @@
 # C2d-5c1 — công bố metadata bản chung qua runtime
 
+**Review độc lập PR #48 (2026-10-09):** không phát hiện điểm chặn merge mới trong scope publish; 215 publication + ba lượt setup (**216 unique**), 64 web/typecheck/build/Chrome đạt. [Report](reviews/pr48-c2d5c1-common-publish.md) tách artifact agent và giữ setup error/container drift chưa rõ nguyên nhân. PR đã merge `1eede17`; chưa rerun tại merge, safety pending tới C4.
+
 [Task](tasks/m6c2b2c2d5c1-common-publish.md) · [Inventory](c2d5c1-test-inventory.json) · [Caller map](c2d1-caller-inventory.json)
 
-Phạm vi duy nhất là `POST /admin/common-copies/{item_id}/publish`. Base đã fetch và xác minh là PR #47 MERGED `04434e35e2b016601d3629a2d4afe3feb6042a6b`; tree bằng head PR `78fbe1d`. Nhánh `feat/m6c2b2c2d5c1-common-publish`. Head migration mã nguồn vẫn **0041**, không thêm migration/grants. Không kiểm revision DB dev. PR để review, không merge; **safety pending tới C4**.
+Phạm vi duy nhất là `POST /admin/common-copies/{item_id}/publish`. Base đã fetch và xác minh là PR #47 MERGED `04434e35e2b016601d3629a2d4afe3feb6042a6b`; tree bằng head PR `78fbe1d`. Nhánh `feat/m6c2b2c2d5c1-common-publish`. Head migration mã nguồn vẫn **0041**, không thêm migration/grants. Không kiểm revision DB dev. PR #48 đã merge `1eede17`; kết quả giữ theo source trước merge, **safety pending tới C4**.
 
 Code chốt `520ac546abb4812dc1b2744e93437d4288dd5c57`; commit docs/inventory nằm sau code này. Đã đối chiếu selection với JUnit: **2.016/2.016 unique API pass**, 0 fail/error/skip, collect **3.923**, **1.907 not-run** ghi từng node trong inventory. Sáu nhóm không trùng/thiếu: publication 215 (191 ca publish mới, Chrome, legacy publication/foundation và schema), approval 295, review writers 220, JSON reads 325, original downloads 330, resources/citations/cleanup 631. **283 source hashes** trước/sau khớp; **7/7 mutants** fail assertion đúng mục tiêu, 0 setup error. Web **64/64**, typecheck/build đạt; Chrome proxy thật có trong selection. Đây là kết quả mới, không cộng preparation hay lịch sử PR #47.
 
@@ -85,3 +87,5 @@ Sau khi tiếp tục task bị usage limit, phép inspect metadata thấy 24 con
 ## Bàn giao C2d-5c2
 
 Revoke riêng cần runtime boundary: Admin User → item → rights/publication/jobs → flush toàn DML/FK → journal exclusive; mirror/confirm hẹp, tombstone/rights_epoch/cancel/retention cùng known commit, outcome độc lập và response proof mới. Cleanup/recovery phải giữ journal/tombstone/metadata contract. Race C2d-5c1 dùng **legacy journaled owner revoke** có nhãn; không gọi đó là triển khai hay pass runtime C2d-5c2.
+
+**Đã giao sau merge PR #48 (2026-10-09):** [Prompt C2d-5c2](tasks/m6c2b2c2d5c2-common-revoke.md) chốt một POST revoke qua runtime/mirror-confirm domain, authorization/failure matrix, outcome và response proof mới. Chưa triển khai hoặc kiểm chứng task này; các race legacy owner nêu trên không thành pass runtime revoke.

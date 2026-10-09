@@ -43,8 +43,8 @@ from app.config import Settings, get_settings
 from app.models import (AccessRights, CommonPublication, DeletionTombstone, LibraryItem, PaperVersion,
                         RevocationMetadataRetention, SourceFile, User)
 from app.models.enums import PublicationState, RevocationReason, RevokedMetadataField
-from app.publication import RetentionBasis, live_duplicate, revoke
-from app.api import common_publish
+from app.publication import live_duplicate
+from app.api import common_publish, common_revoke
 from app.storage import OriginalStorage, get_storage
 
 router = APIRouter(prefix="/admin/pending-publications", tags=["review"])
@@ -101,11 +101,11 @@ class RetentionInput(BaseModel):
 
 class RevokeInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    confirm_revoke: Literal[True]
+    confirm_revoke: Annotated[StrictBool, AfterValidator(_confirmed)]
     reason_code: RevocationReason
     # Default: nothing kept. Each entry is confirmed by the revoking Admin.
     retain: list[RetentionInput] = Field(default_factory=list, max_length=len(RevokedMetadataField))
-    confirm_retention_basis: bool = False
+    confirm_retention_basis: StrictBool = False
 
 
 def _storage(settings: Settings = Depends(get_settings)) -> OriginalStorage:
@@ -346,20 +346,12 @@ def index_copy(
 
 
 @copies_router.post("/{item_id}/revoke", dependencies=[Depends(require_trusted_origin)])
-def revoke_copy(
+async def revoke_copy(
+    request: Request,
     item_id: str,
     body: RevokeInput,
     admin: Principal = Depends(require_admin),
-    db: Session = Depends(get_db),
-    now: datetime = Depends(get_now),
     settings: Settings = Depends(get_settings),
+    clock=Depends(get_clock),
 ) -> dict:
-    fields = [r.field for r in body.retain]
-    if len(set(fields)) != len(fields):
-        raise ApiError(422, "retention_field_repeated")
-    if body.retain and not body.confirm_retention_basis:
-        raise ApiError(422, "retention_confirmation_required")
-    retain = tuple(RetentionBasis(r.field, r.policy_source, r.scope, r.reason) for r in body.retain)
-    done = revoke(db, admin, _parse_id(item_id), body.reason_code, now, settings.retention.deleted_cleanup_deadline,
-                  retain, journal_path=settings.recovery.journal_path)
-    return {"item": _copy_out(db, admin, done.item.id, now), "cancelled_jobs": done.cancelled_jobs}
+    return await common_revoke.receive(request, admin, item_id, body, clock, settings)

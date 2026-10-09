@@ -11,6 +11,7 @@ import socket
 import subprocess
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import httpx
 import uvicorn
@@ -111,9 +112,14 @@ def test_chrome_publish_metadata_checksum_acl_slow_hash_and_unknown_no_repost(pu
                 assert ordinary.json()['item']['fulltext_search_available'] is False
 
                 # Unchanged bytes are a separate candidate, so revoke the first
-                # via the labelled legacy journaled owner adversary before publishing another.
+                # via runtime revoke before publishing another.
                 from tests.test_c2d5c1_common_publish import revoke
-                revoke(b)
+                def revoke_copy():
+                    # Playwright's sync driver owns a loop on this thread;
+                    # the async runtime fixture must settle on its own thread.
+                    with ThreadPoolExecutor(1) as executor:
+                        return executor.submit(revoke, b).result(30)
+                revoke_copy()
                 b.copy = pending(b)
                 delay['seconds'] = 16
                 confirm, submit, section = form(b.copy)
@@ -124,7 +130,7 @@ def test_chrome_publish_metadata_checksum_acl_slow_hash_and_unknown_no_repost(pu
                 assert rsp.value.headers.get('cache-control') == 'no-store'
                 page.get_by_text('Không có bản nào.', exact=True).wait_for()
 
-                revoke(b)
+                revoke_copy()
                 b.copy = pending(b)
                 delay['seconds'] = 0
                 reply_delay['seconds'] = 25  # known commit, proxy loses the response
@@ -143,7 +149,7 @@ def test_chrome_publish_metadata_checksum_acl_slow_hash_and_unknown_no_repost(pu
 
                 # Network response loss is also unknown: route.abort only loses
                 # this browser response, no artificial API success or auth override.
-                revoke(b)
+                revoke_copy()
                 b.copy = pending(b)
                 page.route('**/api/admin/common-copies/*/publish', lambda route: route.abort('failed'))
                 before = len(posts)

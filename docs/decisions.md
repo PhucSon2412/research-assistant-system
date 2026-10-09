@@ -1,5 +1,39 @@
 # Nhật ký quyết định
 
+## Triển khai C2d-5c2 trên nhánh review (2026-10-09)
+
+[Handoff](c2d5c2-common-revoke.md) và [inventory](c2d5c2-test-inventory.json) ghi kiểm mới, giữ riêng kết quả PR #48. Fetch xác minh base merge `1eede17`, tạo nhánh đúng task và giữ docs orchestrator. Chỉ POST revoke dùng `api/common_revoke.py`; không S3/hash/delete/provider. Khóa Admin User → item → rights/publication/jobs/version/file → flush → journal exclusive; response own Session với item/resources SHARE và proof/clock mới. Revoke không áp eligibility publish/index. Không audit denial bằng `_refuse` cũ.
+
+Revision `0042` sau `0041` mint prior state/epoch/transaction trong trigger và dùng xmin top transaction cho tombstone/rights/publication/bases/audit. SQL mirror kiểm độc lập body/envelope/hash/chain/exact tuple, mirror false trước byte/constraints; confirmer exact line/cùng transaction sau fsync. Savepoint/subtransaction bị từ chối, không dùng ở acceptance. Generic `ras_auth_confirm(seq)` cũ có thể bypass domain mới: loại riêng `revocation` khỏi generic, giữ domain auth khác và đường repair recovery; thêm runtime regression/đối chứng cho đường vòng này. Không raw journal/auth grants hoặc recovery connection cho HTTP.
+
+Giữ failure matrix scoped đã giao: lỗi chính append/fsync commit restriction + false mirror + 503 dù TTL trôi qua, không normal-gate rollback nhánh đóng. Thành công fsync kiểm lại caller/gate/clock; commit ném lỗi luôn uncertain, không SELECT inference/replay/retry/DTO. Outcome giữ qua teardown; cancel trước intent rollback, sau append attempt hoàn tất restriction tới thread settle và không DTO khi disconnected. UI guard đồng bộ chống submit kép, unknown/no auto POST; proxy revoke normal 15 s.
+
+Hồi quy cũ có các kỳ vọng lạc source: auth runtime thêm records vào chain; full gate reason là ready/pending thay open; old commit exception tự replay trái task mới; barrier worker sau job lock dẫn đến SKIP LOCKED. Cập nhật chứng cứ/count theo exact record/seq, operator recovery dùng engine riêng, current gate không bị mở; chuyển barrier về lúc vừa khóa item để quan sát worker checkpoint. Snapshot item absent không sinh retention rows vì không có metadata, căn cứ vẫn ở mirrored line. Các lượt lỗi chuẩn bị và mutant lock observer yếu giữ riêng, không gọi setup failure là mutant bắt được. Không thay ACL/domain expectation để né lỗi.
+
+Rà caller sau lượt 528 tại `964b9f6` phát hiện Chrome publish cũ cũng gọi fixture revoke mới. Lượt bổ sung bắt `asyncio.run()` trên event loop của Playwright sync. Sửa riêng test Chrome (`30cb729`) để gọi helper runtime qua executor thread, không fallback helper đặc quyền và không đổi production/shared fixtures. Kiểm bổ sung dùng vòng PG/MinIO cô lập mới sau cleanup vòng đầu; inventory tách source hai vòng, không gọi đó là rerun toàn bộ tại head mới. Summary/hash của lượt mutant observer yếu ban đầu còn, raw XML/log bị rerun ghi đè được ghi là giới hạn evidence.
+
+Các lựa chọn chỉ scoped C2d-5c2; worker/cleanup/reconcile/search/RAG/provider chưa chuyển boundary. Safety pending tới C4; không dev/`.env`/provider/pricing/cutover hoặc Compose API deployment.
+
+## Giao C2d-5c2 sau merge PR #48 (2026-10-09)
+
+Fetch/GitHub CLI xác nhận PR #48 MERGED `1eede17c1eed82fa7a00f7018fe01b4362ce30a9`, chứa code `520ac54` và head `654fbac`; tree giống head PR. AST có một head source `0041` kế thừa `0040`, không query DB dev. Review 216 unique/64 web và artifact 2.016/7 mutants giữ riêng, chưa rerun tại merge. Docs review chưa commit được giữ cho PR kế tiếp.
+
+Theo ủy quyền, [task C2d-5c2](tasks/m6c2b2c2d5c2-common-revoke.md) chuyển đúng POST revoke trước common-index/provider. Quan sát tĩnh: route còn Session/now đầu request, raw mirror `_journal_decision` xung đột protected journal runtime, legacy commit lỗi tự replay/SELECT và response chưa proof mới; lượt giao chưa tái hiện runtime. Chọn migration mới sau head (dự kiến 0042) với routine live-revocation mirror/confirm hẹp, transaction-bound tombstone/retention, không mở raw auth/journal write hoặc recovery connection cho HTTP.
+
+Khóa Admin User → item → rights/publication/jobs/resources cần thiết → flush DML/FK/audit → journal exclusive trực tiếp → exact tuple/current actor/clock → mirror false/append/fsync/confirm → commit → response proof mới. Không S3/hash/delete trong revoke; t_rev vẫn commit DB. Known commit gỡ active/indexed và cancel jobs ngay; cleanup/restore giữ hợp đồng cũ, không chuyển các writer đó trong PR này.
+
+Nhánh lỗi từ chính append/fsync giữ quyết định hạn chế đã được current Admin xác nhận ngay trước append: commit restriction + false mirror và 503, không normal-gate làm rollback mất nhánh fail closed; đây là lựa chọn scoped tương tự C2d-5a, phải kiểm TTL/boundary và không mở ngoại lệ cho grant writer/lỗi SQL khác. Nhánh append thành công kiểm lại gate/binding/current caller/clock sau fsync; HTTP commit exception luôn uncertain, không replay/SELECT inference/retry/success. Valid journal intent có thể được recovery áp dù HTTP lỗi; không gọi đó là chứng minh POST commit.
+
+Giữ timeout proxy revoke normal, không thêm pool/deadline file. UI unticked/busy và unknown outcome không tự POST lại; retention vẫn API, mặc định xóa metadata. Revoke không đòi metadata_only/permits như publish, không cần object còn đọc được. Scope/failure/race/restore/test inventory chi tiết trong task; không biến lựa chọn này thành bất biến vĩnh viễn.
+
+Lượt giao chỉ đọc source/docs/Git, dùng Conda ras kiểm interpreter/pip/AST và viết docs/caller map. Chưa chạy API/web/DB/MinIO/Chrome/mutants/provider, không dev/`.env` hoặc pricing/gate change. Setup writer 503 và baseline drift lịch sử PR #48 vẫn chưa rõ nguyên nhân; không xóa bằng rerun xanh. Safety pending tới C4, C3/operator/delivery/journal production còn riêng.
+
+
+## Review PR #48 — C2d-5c1 (2026-10-09)
+
+Tại `654fbac` (code `520ac54`), reviewer không phát hiện điểm chặn merge mới trong POST publish metadata; [report](reviews/pr48-c2d5c1-common-publish.md) tách kiểm độc lập 216 unique/64 web khỏi artifact 2.016/7 mutants agent. Giữ thiết kế scoped, source 0041/grants và safety pending tới C4. Setup writer 503 và container drift ban đầu chưa rõ nguyên nhân; rerun xanh không xóa giới hạn evidence. PR OPEN, chưa merge.
+
+
 ## Triển khai C2d-5c1 trên nhánh review (2026-10-08)
 
 [Handoff publish](c2d5c1-common-publish.md) và [inventory](c2d5c1-test-inventory.json) ghi source/bằng chứng mới. Chỉ POST publish dùng boundary `api/common_publish.py`: proof ngắn release sạch → hash trực tiếp ngoài DB → acceptance User/item/rights/version/file, flush FK/unique trước journal exclusive → current actor/binding/clock → known commit → response proof mới. Outcome thuộc attempt, không bị rollback/close xóa; commit exception luôn uncertain, không SELECT inference/retry. Runtime business DML đã đủ, không migration/grants; source head vẫn 0041.

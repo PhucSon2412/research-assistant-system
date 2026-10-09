@@ -125,9 +125,13 @@ const MESSAGES: Record<string, string> = {
   common_file_integrity_failed: "Object của bản chung bị thiếu hoặc không khớp SHA-256; bản vẫn ở trạng thái chờ.",
   publication_storage_unavailable: "Không đọc được object của bản chung; chưa công bố. Thử lại sau.",
   publication_unavailable: "Không ghi được việc công bố; bản vẫn ở trạng thái chờ. Thử lại sau.",
-  revocation_unavailable: "Không ghi được việc thu hồi; bản chưa bị thu hồi. Thử lại ngay.",
+  revocation_unavailable: "Chưa hoàn tất thu hồi. Hãy tải lại trạng thái trước khi thao tác tiếp.",
+  revocation_target_invalid: "Dữ liệu bản chung không khớp để thu hồi. Hãy tải lại trạng thái và liên hệ quản trị viên.",
+  revocation_binding_changed: "Dữ liệu thu hồi đã thay đổi. Hãy tải lại trạng thái; không tự gửi lại.",
+  revocation_outcome_uncertain: "Không xác định được kết quả thu hồi. Hãy tải lại trạng thái; không tự gửi lại.",
+  revocation_response_unavailable: "Thu hồi đã lưu nhưng chưa lấy được phản hồi mới. Hãy tải lại trạng thái; không tự gửi lại.",
   revocation_journal_unavailable:
-    "Bản đã bị thu hồi nhưng không ghi được nhật ký thu hồi; hệ thống tạm ngừng phục vụ tới khi quản trị viên sửa nhật ký.",
+    "Quyền có thể đã bị đóng nhưng nhật ký thu hồi chưa được xác nhận. Hệ thống cần recovery; hãy tải lại trạng thái sau phục hồi, không tự gửi lại.",
   revocation_pending_recovery:
     "Nhật ký đã ghi việc thu hồi nhưng database chưa áp dụng; hệ thống tạm ngừng phục vụ tới khi quản trị viên chạy phục hồi.",
   service_recovering: "Hệ thống đang tạm ngừng phục vụ để kiểm tra/phục hồi dữ liệu thu hồi. Thử lại sau.",
@@ -169,6 +173,15 @@ export function publicationError(error: unknown): string {
     || ["publication_outcome_uncertain", "http_error", "api_timeout", "api_unreachable",
       "api_response_incomplete"].includes(error.code)) {
     return "Không xác định được kết quả công bố. Hãy tải lại trạng thái trước khi thao tác tiếp; không tự gửi lại.";
+  }
+  return describeError(error);
+}
+
+export function revocationError(error: unknown): string {
+  if (!(error instanceof ApiError) || error.status === 502 || error.status === 504
+    || ["revocation_outcome_uncertain", "http_error", "api_timeout", "api_unreachable",
+      "api_response_incomplete"].includes(error.code)) {
+    return "Không xác định được kết quả thu hồi. Hãy tải lại trạng thái; không tự gửi lại.";
   }
   return describeError(error);
 }

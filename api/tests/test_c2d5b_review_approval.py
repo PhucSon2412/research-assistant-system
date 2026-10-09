@@ -1396,10 +1396,8 @@ def test_response_reflects_later_publish_or_revoke_through_current_gate(approval
             from tests.resource_fixtures import runtime_publish
             runtime_publish(b.w, approval.common_item_id, b.storage)
         else:
-            # Legacy journaled revoke adversary; C2d-5c2 remains separate.
-            with Session(b.w.engine) as db:
-                publication.revoke(db, admin_principal(b), approval.common_item_id, RevocationReason.OTHER, NOW,
-                                   timedelta(days=1))
+            from tests.resource_fixtures import runtime_revoke
+            runtime_revoke(b.w,approval.common_item_id,clock=b.clock,reason='other')
         return real(principal, approval, *a, **kw)
 
     monkeypatch.setattr(boundary, 'respond', respond)
