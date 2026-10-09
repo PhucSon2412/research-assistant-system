@@ -19,6 +19,7 @@ from app.ingest.worker import _begin, _extract, _validate, claim_job, process_jo
 from app.models import IngestionJob
 from app.models import SourceFile
 from tests.test_uploads import intent, send, upload_api
+from tests.test_c2c1_bootstrap import installation  # noqa: F401
 
 
 def upload_pdf(browser, original: bytes) -> dict:
@@ -103,7 +104,7 @@ def image_only_pdf() -> bytes:
 
 
 def test_pdf_classification_threshold_denominator_and_uncertainty(app_env):
-    settings = Settings(database_url="postgresql+psycopg://dummy:dummy@localhost/dummy")
+    settings = Settings(db=None, database_url="postgresql+psycopg://dummy:dummy@localhost/dummy")
     settings.pdf_body = PdfBodyThreshold(min_body_page_ratio=.7, min_chars_per_body_page=100,
                                           min_total_body_chars=2000)
     pages = [Page(1, "Title\nAbstract\nSummary\n", 612, 792),
@@ -135,7 +136,7 @@ def test_pdf_classification_threshold_denominator_and_uncertainty(app_env):
     "References Cited", "Literature Cited", "2. References and Notes:",
 ])
 def test_pdf_bibliography_heading_variants_never_become_body(app_env, heading):
-    settings = Settings(database_url="postgresql+psycopg://dummy:dummy@localhost/dummy")
+    settings = Settings(db=None, database_url="postgresql+psycopg://dummy:dummy@localhost/dummy")
     pages = [Page(1, "Introduction\n" + BODY_LINE * 35, 612, 792),
              Page(2, heading + "\n[1] A cited work. 2020.\n", 612, 792)]
     result = classify(pages, settings)
@@ -148,7 +149,7 @@ def test_pdf_bibliography_heading_variants_never_become_body(app_env, heading):
 
 
 def test_pdf_uncertain_bibliography_boundary_is_quarantined(app_env):
-    settings = Settings(database_url="postgresql+psycopg://dummy:dummy@localhost/dummy")
+    settings = Settings(db=None, database_url="postgresql+psycopg://dummy:dummy@localhost/dummy")
     pages = [Page(1, "Introduction\n" + BODY_LINE * 35, 612, 792),
              Page(2, "References to Earlier Work\n[1] A cited work. 2020.\n", 612, 792)]
     result = classify(pages, settings)
@@ -160,7 +161,7 @@ def test_pdf_uncertain_bibliography_boundary_is_quarantined(app_env):
 
 
 def test_successfully_parsed_blank_page_between_body_pages_counts_as_missing(app_env):
-    settings = Settings(database_url="postgresql+psycopg://dummy:dummy@localhost/dummy")
+    settings = Settings(db=None, database_url="postgresql+psycopg://dummy:dummy@localhost/dummy")
     pages = [Page(1, "Introduction\n" + "a" * 1100, 612, 792),
              Page(2, "", 612, 792),
              Page(3, "Methods\n" + "b" * 1100, 612, 792)]
@@ -177,7 +178,7 @@ def test_successfully_parsed_blank_page_between_body_pages_counts_as_missing(app
 
 
 def test_blank_cover_and_bibliography_pages_are_not_body_pages(app_env):
-    settings = Settings(database_url="postgresql+psycopg://dummy:dummy@localhost/dummy")
+    settings = Settings(db=None, database_url="postgresql+psycopg://dummy:dummy@localhost/dummy")
     pages = [Page(1, "", 612, 792),
              Page(2, "Introduction\n" + "a" * 2200, 612, 792),
              Page(3, "References\n[1] Citation.\n", 612, 792),
@@ -190,7 +191,7 @@ def test_blank_cover_and_bibliography_pages_are_not_body_pages(app_env):
 
 
 def test_scan_figures_margin_and_two_column_uncertainty(app_env):
-    settings = Settings(database_url="postgresql+psycopg://dummy:dummy@localhost/dummy")
+    settings = Settings(db=None, database_url="postgresql+psycopg://dummy:dummy@localhost/dummy")
     scan = classify([Page(1, "", 612, 792), Page(2, "", 612, 792)], settings)
     assert scan.disposition == "needs_review" and scan.coverage == "none"
     sparse = classify([Page(1, "Introduction\nFigure 1\nEquation (1)\n", 612, 792)], settings)
@@ -209,7 +210,7 @@ def test_scan_figures_margin_and_two_column_uncertainty(app_env):
 
 def test_parser_real_text_multpage_and_corruption(app_env, monkeypatch):
     original = full_pdf()
-    settings = Settings(database_url="postgresql+psycopg://dummy:dummy@localhost/dummy")
+    settings = Settings(db=None, database_url="postgresql+psycopg://dummy:dummy@localhost/dummy")
     pages = parse(original, 4, settings)
     assert len(pages) == 4
     assert "Introduction" in pages[1].text

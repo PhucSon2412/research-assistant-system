@@ -1,0 +1,18 @@
+# Isolated runtime check only. Default dev/API integration remains C4.
+# Merge with docker-compose.yml using an explicit external --env-file and -p.
+# Provision login roles separately; never give operator/recovery credentials here.
+services:
+  worker:
+    environment:
+      RAS_DB__USER: ${RAS_WORKER_RUNTIME_USER:?supply provisioned runtime login}
+      RAS_DB__PASSWORD: ${RAS_WORKER_RUNTIME_PASSWORD:?supply external runtime password}
+      RAS_EMBEDDING__API_KEY: ""
+      RAS_EMBEDDING__PRICING_VERIFIED: "false"
+      RAS_DISCOVERY__ENABLED: "false"
+  beat:
+    environment:
+      RAS_DB__USER: ${RAS_WORKER_RUNTIME_USER:?supply provisioned runtime login}
+      RAS_DB__PASSWORD: ${RAS_WORKER_RUNTIME_PASSWORD:?supply external runtime password}
+      RAS_EMBEDDING__API_KEY: ""
+      RAS_EMBEDDING__PRICING_VERIFIED: "false"
+      RAS_DISCOVERY__ENABLED: "false"

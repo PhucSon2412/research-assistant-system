@@ -1,6 +1,16 @@
-# Môi trường phát triển và schema (M1a–C2d-5c2)
+# Môi trường phát triển và schema (M1a–C2d-5d2a)
 
-**Mốc source hiện hành:** PR #49 đã merge `859dfe9`, head migration `0042`; không suy revision DB dev. [C2d-5d1 HTTP index request](c2d5d1-common-index-request.md) đã triển khai trên nhánh review (PR mở); lệnh/kết quả cô lập ở mục dưới. Worker/provider tách PR sau; **safety pending tới C4**, readiness dev đóng không phải lý do tự mở cutover. Các lệnh/kết quả dưới đây giữ theo task/source đã ghi.
+**C2d-5d2a:** [handoff worker runtime/extraction](c2d5d2a-worker-runtime-extraction.md), [selection/JUnit/hash](c2d5d2a-test-inventory.json). Code `dfca84a`, source `0042`, không migration/grants mới. Compose mặc định còn truyền `POSTGRES_USER` cho API/worker/beat; runtime check sẽ từ chối owner. Không áp override/restart dev hoặc tuyên bố mặc định đã cutover; safety pending tới C4.
+
+## C2d-5d2a cô lập
+
+Host chỉ Conda `C:\Users\ADMIN\.conda\envs\ras\python.exe`. Runner `scripts/c2d5d2a_test_host.py --context <thư mục ngoài repo> setup` tạo project ngẫu nhiên `rasc2d5d2a*`, PostgreSQL/MinIO/Redis port cao riêng và credentials bên ngoài repo. Lệnh này đã chạy với context `%TEMP%\ras-c2d5d2a-20261009-run`; project `rasc2d5d2acb44053b`. Test chạy bằng cùng script với action `test <node/file> -q --junitxml=<ngoài repo>`; selection/argv thật ở inventory. Không dùng `.env`; env thử luôn tường minh. Setup/provision owner chỉ ở host/fixture gắn nhãn, worker không có credential đó.
+
+Smoke `test_c2d5d2a_process_smoke.py` đã thực chạy Compose gốc + `scripts/compose.worker-runtime.yml` + overlay thử ngoài repo, explicit `--env-file`/project/network; runtime credentials bắt buộc `RAS_WORKER_RUNTIME_USER`/`RAS_WORKER_RUNTIME_PASSWORD`, không default. Image thử dựng bằng lệnh đã chạy `docker build -t rasc2d5d2a-worker:20261009 api` (PowerShell wrapper trả 1 nhưng raw build hoàn tất; image ID kiểm riêng). Source app mount read-only; identity/permissions và UUID payload ghi từ worker/beat. Chỉ schedule extraction trong harness; Redis thật stop/start. Key provider trống, pricing false; harness chặn egress ngoài PG/MinIO/Redis. Đừng dùng cấu hình này làm chứng nhận discovery/reconcile/cleanup runtime hoặc C4; phần business của ba task đó còn legacy.
+
+Tám đối chứng đã chạy tuần tự qua `scripts/c2d5d2a_counterchecks.py --context <context thử>` bằng Conda, XML/log riêng và khôi phục đúng bytes trước suite cuối. Raw preparation, manifest source/JUnit và lỗi/not-run ngoài repo; không commit paper/journal/secret. Bốn lỗi baseline PR #50 giữ debt riêng. Không web/proxy thay đổi, không Chrome/npm ở task này.
+
+**Mốc merge hiện hành:** PR #50 đã merge `03b7985`, head migration `0042`; không suy revision DB dev. [C2d-5d1 HTTP index request](c2d5d1-common-index-request.md) đã merge; lệnh/kết quả cô lập ở mục dưới. Extraction worker C2d-5d2a ở handoff trên, PR chưa merge; index/provider tiếp C2d-5d2b. **Safety pending tới C4**, readiness dev đóng không phải lý do tự mở cutover. Các lệnh/kết quả dưới đây giữ theo task/source đã ghi.
 
 ## C2d-5d1 cô lập
 

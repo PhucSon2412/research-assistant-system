@@ -1,5 +1,11 @@
 # Chiến lược kiểm thử
 
+**Kế hoạch mới, chưa có kết quả chạy:** [C2d-5d2a worker runtime/extraction](tasks/m6c2b2c2d5d2a-worker-runtime-extraction.md). Runtime/dispatch/claim/lease/checkpoint, S3/parser ngoài DB locks, pending gate thật, commit uncertain và extraction tới `awaiting_index`; Redis/Celery/PG/MinIO/journal cô lập, không provider. Kiểm theo rủi ro và call graph; không cộng số PR #50 thành pass mới. Bốn lỗi baseline giữ debt tổng hồi quy trước C4.
+
+## Review độc lập PR #50 tại ff5fa82
+
+**200/200 API unique pass**, 0 fail/error/skip: 171 index-request mới + 28 migration/ORM + một Chrome qua Next production proxy/socket API; web **70/70**, typecheck/build đạt. 281 source hashes khớp; reviewer không rerun 4.068 node trong collect 4.268 của agent. Artifact agent **923 pass/9 mutant** và 135 file manifest kiểm riêng, không cộng vào lượt reviewer. Bốn ca baseline fail được đối chiếu log/XML base/head, không chạy lại hoặc coi đã sửa. [Report, evidence và giới hạn](reviews/pr50-c2d5d1-common-index-request.md). PR đã merge `03b7985`; chưa rerun tại merge, source `0042`; safety pending tới C4, worker/provider/C3/C4 riêng. Đã dọn đúng hai container/hai volume thử và credentials, giữ chín container có sẵn ID/image/StartedAt.
+
 ## C2d-5d1 — kiểm theo source `e283bc6`
 
 [Handoff](c2d5d1-common-index-request.md) · [Inventory](c2d5d1-test-inventory.json). PostgreSQL/MinIO/journal cô lập (`58579`/`59579`, label `ras.task=c2d5d1-20261009`), role runtime thật, business cutover scoped; bài HTTP pending giữ gate production thật. Bao phủ ACL/strict input, create/reuse/không reset, clock/actor ở acceptance và response, lock wait thật, race index↔revoke/auth/worker legacy, commit uncertain/teardown/cancel, broker down vẫn còn job DB, và Chrome qua Next proxy (unticked, double submit một POST, reuse, 504 unknown không re-POST, role/session bị thu hồi). Kiểm tại `e283bc6`: **923/923 API unique pass**, 0 fail/error/skip (collect 4.268, **3.341 not-run**, 4 node lỗi có sẵn ở base chạy riêng vẫn fail như base); web **70/70**, typecheck/build; Chrome qua Next proxy; **9/9 mutant** bắt assertion. Nhóm: core 200, revoke 171, publish 192, reads 260, content 89, recovery 11. Lượt content đầu lỗi do runner (`--deselect` sai tiền tố) được giữ riêng, không cộng. Worker/cleanup chỉ kiểm tương thích.
@@ -400,3 +406,12 @@ Drill `drill_invitation_restore.py`: project/port/volume riêng, artifact ngoài
 SHA-256 của **19** file code/test/script (17 file ban đầu + hai test sửa) không đổi trong lượt full cuối; không sửa code hoặc chạy mutant song song. Sau khi suite kết thúc, chỉ bỏ một space cuối dòng trong `0032` theo staged diff check; Python AST trước/sau giống nhau, không đổi logic. Inventory, manifest, XML/log, `full-final-verification.json` và đối chiếu whitespace ở temp ngoài repo. Đã dọn container/volume của `ras-invtest` sau khi kiểm đúng quyền sở hữu; hai project drill cũng đã sạch. Đối chiếu cuối: **9 container dev** giữ nguyên ID/image/StartedAt; không migrate/restart dev hoặc đọc/sửa `.env`.
 
 C2d-5a source `1666273`: suite cuối 1.371/1.371 pass, collect 3.468, not-run 2.097; JUnit unique/no missing/duplicates, hash trước/sau trùng. 58 web/typecheck/build và Chrome proxy đạt; 7 đối chứng riêng bắt assertion. Cleanup exact giữ 24 container có sẵn; [inventory](c2d5a-test-inventory.json) lưu toàn bộ lệnh/kết quả/giới hạn, không cộng số lịch sử.
+
+
+## C2d-5d2a worker runtime/extraction
+
+Code `dfca84a`, source migration `0042`; [handoff](c2d5d2a-worker-runtime-extraction.md) · [inventory selection/JUnit/hash](c2d5d2a-test-inventory.json). Conda ras, PG/MinIO/journal/Redis cô lập, host runner đặt settings trước import và chặn HTTP ngoài. Worker/beat thật từ Compose override dùng `c1_runtime`, không operator/recovery credential, Redis outage rồi ba job tới `awaiting_index`/`metadata_only`; không generation/embedding/provider. Cutover-only scoped cho business fixture; pending HTTP/năm task giữ gate production.
+
+Suite mới phủ role/gate, scalar binding/status/lease/clock sau SQL/wait, S3/parser barrier với revoke/hold/disable, retry/reuse/locator/coverage, landed/rollback commit uncertainty và teardown. Tám đối chứng tuần tự bị assertion bắt, source khôi phục trước suite cuối. Regression chọn PR #50/revoke/upload/M2/citations/recovery và schema/fence theo call graph; node ID/JUnit/hash và các lượt chuẩn bị lỗi được giữ riêng, không gọi toàn API inventory xanh. Bốn lỗi baseline PR #50 không sửa/rerun/tính pass; web không đổi nên Chrome/npm không chạy. Không index/provider/cutover/C3/C4 certification; safety pending tới C4.
+
+Sealed cuối tại `dfca84a`: **549/549 API unique pass**, collect 4343, 3794 not-run, 0 failure/error/skip/missing/duplicate/extra; 293 source hashes trước/sau trùng. 8 cơ chế đối chứng/9 lượt raw (1 yếu không tính); lỗi chuẩn bị và lượt sealed đầu giữ riêng trong inventory.

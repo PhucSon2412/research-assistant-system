@@ -1,7 +1,7 @@
 {
   "base": "1eede17c1eed82fa7a00f7018fe01b4362ce30a9",
   "source_migration": "0042",
-  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4. Final read clock corrected after predicate SQL; /auth/sessions uses the shared final caller. Details in docs/c2d-final-read-clock.md. C2d-4a adds GET upload notice final caller and POST intent actor/binding/TTL before commit plus fresh token proof after known commit. C2d-4b PUT original merged PR #44 at dd8bdc6 with unlocked staging, atomic consume and a new exact response proof. C2d-4c implements exactly two original GETs/three separate gates, short scalar proofs, shared verified spools, known audit commit then fresh response proof, current caller/clock and cancellation ownership. Other writers/provider callers stay open. See docs/tasks/m6c2b2c2d4c-original-downloads.md. PR #45 merged at 070cb37. C2d-5a submit/withdraw/admin_reject merged PR #46 at 8ff5b4e: runtime domain closure routines, exact transaction pending binding, current actor/clock and new response proof; approval and other writers/provider callers remain open. C2d-5b merged PR #47 at 04434e3: POST approve uses api/review_approval.py, runtime approval mirror/confirm routines 0041, owned copy outside DB locks and a new thin response proof; revoke/index/provider callers remain open. See docs/c2d5b-review-approval-original-copy.md. C2d-5c1 POST publish merged PR #48 at 1eede17: app.api.common_publish, short proof, unlocked streamed hash, exact acceptance/current actor/clock and a new response proof; see docs/c2d5c1-common-publish.md. No migration/grants. C2d-5c2 POST revoke merged PR #49 at 859dfe9 and uses app.api.common_revoke: runtime transaction-bound mirror/confirm 0042, current actor/clock, restriction + false mirror on append fault, independent uncertain commit outcome and new response proof. Generic auth confirm excludes revocation. See docs/c2d5c2-common-revoke.md. Index/worker/provider/C3/C4 remain separate; safety pending. C2d-5d1 is assigned after PR #49: exactly the common index POST, durable create/reuse job, current actor/clock and a new response proof. It is not implemented or tested yet; worker/index/provider dispatch is a separate C2d-5d2 task. Existing route dependencies and source hashes remain historical, not a new source scan. See docs/tasks/m6c2b2c2d5d1-common-index-request.md. C2d-5d1 POST index (branch, tested at e283bc6) uses app.api.common_index_request: Admin User -> item -> rights/publication/jobs/version/file -> flush -> exclusive journal current actor/binding/clock -> commit -> new response proof; no storage/broker/provider. Worker/cleanup/provider callers remain open (C2d-5d2).",
+  "scope": "Current route inventory: C2d-1 reads, C2d-2a 13 GET, C2d-2b 9 GET, C2d-3 six JSON resource writers. Remaining callers stay open; safety pending until C4. Final read clock corrected after predicate SQL; /auth/sessions uses the shared final caller. Details in docs/c2d-final-read-clock.md. C2d-4a adds GET upload notice final caller and POST intent actor/binding/TTL before commit plus fresh token proof after known commit. C2d-4b PUT original merged PR #44 at dd8bdc6 with unlocked staging, atomic consume and a new exact response proof. C2d-4c implements exactly two original GETs/three separate gates, short scalar proofs, shared verified spools, known audit commit then fresh response proof, current caller/clock and cancellation ownership. Other writers/provider callers stay open. See docs/tasks/m6c2b2c2d4c-original-downloads.md. PR #45 merged at 070cb37. C2d-5a submit/withdraw/admin_reject merged PR #46 at 8ff5b4e: runtime domain closure routines, exact transaction pending binding, current actor/clock and new response proof; approval and other writers/provider callers remain open. C2d-5b merged PR #47 at 04434e3: POST approve uses api/review_approval.py, runtime approval mirror/confirm routines 0041, owned copy outside DB locks and a new thin response proof; revoke/index/provider callers remain open. See docs/c2d5b-review-approval-original-copy.md. C2d-5c1 POST publish merged PR #48 at 1eede17: app.api.common_publish, short proof, unlocked streamed hash, exact acceptance/current actor/clock and a new response proof; see docs/c2d5c1-common-publish.md. No migration/grants. C2d-5c2 POST revoke merged PR #49 at 859dfe9 and uses app.api.common_revoke: runtime transaction-bound mirror/confirm 0042, current actor/clock, restriction + false mirror on append fault, independent uncertain commit outcome and new response proof. Generic auth confirm excludes revocation. See docs/c2d5c2-common-revoke.md. Index/worker/provider/C3/C4 remain separate; safety pending. C2d-5d1 merged PR #50 at 03b7985: exactly the common index POST, durable create/reuse job, current actor/clock and a new response proof. Worker/index/provider dispatch is split into C2d-5d2a extraction (implemented, dedicated inventory below) and C2d-5d2b embedding/index/provider (pending). Existing route dependencies and source hashes remain historical, not a new source scan. See docs/tasks/m6c2b2c2d5d1-common-index-request.md. C2d-5d1 POST index (merged PR #50, tested at e283bc6 before merge) uses app.api.common_index_request: Admin User -> item -> rights/publication/jobs/version/file -> flush -> exclusive journal current actor/binding/clock -> commit -> new response proof; no storage/broker/provider. At the PR #50 merge worker/cleanup/provider callers remained open; the current extraction/background map below records C2d-5d2a separately. C2d-5d2a code dfca84a: runtime isolated worker/beat, ID dispatch, owner/item/job/resource/journal checkpoints, unlocked extraction to awaiting_index; index/provider and other background business boundaries remain open. See docs/c2d5d2a-worker-runtime-extraction.md. Historical route hashes/line numbers were not regenerated.",
   "safety": "pending until C4",
   "route_count": 63,
   "routes": [
@@ -1222,27 +1222,56 @@
     "base": "859dfe9793dd9549e3ca9b8f0102361f414d0340",
     "merged_pr": 49,
     "source_migration": "0042",
-    "status": "implemented on branch feat/m6c2b2c2d5d1-common-index-request (PR open, not merged); tested at e283bc6",
+    "status": "merged PR #50 at 03b7985; tested at e283bc6 before merge; no rerun at merge",
     "task": "docs/tasks/m6c2b2c2d5d1-common-index-request.md",
     "routes": [
       "POST /admin/common-copies/{item_id}/index"
     ],
-    "next": "C2d-5d2 worker/ingest/index/provider dispatch; open checkpoints listed in docs/c2d5d1-common-index-request.md#bàn-giao-c2d-5d2-checkpoint-worker-còn-mở",
+    "next": "C2d-5d2a runtime dispatch/claim/extraction to awaiting_index, then C2d-5d2b document embedding/index/provider; other background callers separate",
     "safety": "pending until C4",
     "inventory_note": "Existing base, line numbers and source_sha256 are historical fields. Planning does not claim a regenerated source or runtime inventory.",
     "implementation_commit": "e283bc6400efdefd4641838ce4d94f4ccee3baaa",
     "handoff": "docs/c2d5d1-common-index-request.md",
     "inventory": "docs/c2d5d1-test-inventory.json",
-    "legacy_helpers": "app.common_index.start/_refuse/Started removed (no callers). block_reason/live_job/latest_job/status remain read-only and shared with worker/GET formatter."
+    "legacy_helpers": "app.common_index.start/_refuse/Started removed (no callers). block_reason/live_job/latest_job/status remain read-only and shared with worker/GET formatter.",
+    "merge_commit": "03b79855221f3d9279cbe5aa677d6a50db59b5ab"
   },
   "c2d5d1_routes": [
     "POST /admin/common-copies/{item_id}/index"
   ],
   "c2d5d2_open_callers": [
-    "celery ras.ingest.discover -> app.ingest.worker.due_job_ids (beat; recovery.gate_open only)",
-    "celery ras.ingest.process -> app.ingest.worker.process_job (gate_open once; claim_job job SKIP LOCKED without item lock)",
-    "app.ingest.worker _begin/_finish/_fail via _lock_item_then_job (item -> job FOR UPDATE, lease, block_reason; no journal/actor proof)",
-    "app.ingest.indexer.process_index (embedding provider; gate_open before each call, rehash/_check_unchanged)",
-    "celery ras.revocation.cleanup -> app.publication.cleanup_revoked (owner engine, tombstone -> item)"
-  ]
+    "app.ingest.indexer._gate/_reserve/_verified_unlocked/process_index/_provider_failure/_publish: legacy, disconnected from extraction worker; C2d-5d2b",
+    "celery ras.discovery.sync -> discovery.run_sync: runtime login and entry gate only; business boundary legacy",
+    "celery ras.citations.reconcile -> citations.reconcile_pending: runtime login and entry gate only; business boundary legacy",
+    "celery ras.revocation.cleanup -> publication.cleanup_revoked: runtime login and entry gate only; business boundary legacy",
+    "recovery/operator/CLI and search/query/rerank/RAG providers: separate tasks, no cutover certification"
+  ],
+  "c2d5d2a_plan": {
+    "assigned_date": "2026-10-09",
+    "verified_merge_base": "03b79855221f3d9279cbe5aa677d6a50db59b5ab",
+    "source_migration": "0042",
+    "status": "implemented at dfca84a; isolated verification in dedicated inventory; PR not merged",
+    "task": "docs/tasks/m6c2b2c2d5d2a-worker-runtime-extraction.md",
+    "safety": "pending until C4",
+    "entrypoints": [
+      "ras.ingest.discover -> due_job_ids -> ID-only broker send",
+      "ras.ingest.process -> process_job -> claim/begin/validate/extract/chunk/finish/fail"
+    ],
+    "completion": "awaiting_index with extraction_finished_at; metadata_only; no active generation or provider calls",
+    "role_scope": "existing runtime role via explicit isolated worker/beat override; default Compose/API cutover remains C4",
+    "out_of_scope": [
+      "document embedding/index/provider dispatch (C2d-5d2b)",
+      "full background cleanup/reconcile/discovery boundary conversion",
+      "query/rerank/RAG providers",
+      "C3/C4 and dev stack changes"
+    ],
+    "inventory_note": "Extraction caller map updated only. Existing HTTP route lines/source hashes remain historical.",
+    "implementation_commit": "dfca84ac04a68bbce29abe0e9d1b87ac51da28ac",
+    "handoff": "docs/c2d5d2a-worker-runtime-extraction.md",
+    "inventory": "docs/c2d5d2a-test-inventory.json",
+    "checkpoint": "runtime short entry -> private owner User if needed -> item -> job -> exact resources -> flush constraints/citation -> exclusive final journal -> scalar binding/state/status/fresh clock -> known commit -> clean release",
+    "io": "detached frozen proof; S3 actual size/SHA256 and parser without DB checkout; fresh gate/binding/lease proof before IO, after read and result checkpoint",
+    "index": "awaiting_index/indexing/retry resume indexing preserved with index_pending; no provider/indexer call or reservation mutation",
+    "other_tasks": "five task entry gates checked; only two ingest tasks converted; discovery/reconcile/cleanup business still legacy"
+  }
 }

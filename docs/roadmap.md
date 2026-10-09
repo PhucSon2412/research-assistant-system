@@ -1,14 +1,20 @@
 # Roadmap đề xuất
 
-## C2d-5d1 trên nhánh review
+## Giao C2d-5d2a sau merge PR #50
 
-[Handoff](c2d5d1-common-index-request.md) · [Inventory](c2d5d1-test-inventory.json): một POST index qua runtime, tạo/trả đúng một live job, current Admin/clock, outcome độc lập và response proof mới; không migration. Kiểm tại `e283bc6`: **923/923 API unique pass**, 0 fail/error/skip (collect 4.268, **3.341 not-run**, 4 node lỗi có sẵn ở base chạy riêng vẫn fail như base); web **70/70**, typecheck/build; Chrome qua Next proxy; **9/9 mutant** bắt assertion. PR mở để review, chưa merge; **safety pending tới C4**. Tiếp theo C2d-5d2 theo danh sách checkpoint trong handoff.
+[Worker runtime/extraction](c2d5d2a-worker-runtime-extraction.md) đã triển khai tại `dfca84a`, PR chưa merge; [inventory](c2d5d2a-test-inventory.json) ghi selection/JUnit/hash và giới hạn. Base merge PR #50 **`03b7985`**, source `0042`. Runtime worker/beat trên override cô lập, dispatch ID, claim/lease, validate/extract/chunk có gate/binding/clock/checkpoint mới, tới **`awaiting_index` + `metadata_only`**. Không nối indexer legacy; index states giữ chờ C2d-5d2b. [Quyết định phạm vi và maintenance](decisions.md#giao-c2d-5d2a-sau-merge-pr-50-2026-10-09).
+
+Thứ tự: **C2d-5d2a extraction → C2d-5d2b document embedding/index/provider → background cleanup/reconcile/discovery còn thiếu boundary → search/query/rerank provider → RAG/generation → tổng hồi quy C2d → C3/C4 theo điều kiện riêng**. Bốn lỗi baseline PR #50 phải được xử lý trước hoàn tất tổng hồi quy/C4; kiểm tương thích không chứng nhận task đã chuyển. Mặc định Compose/API, operator/delivery, storage/journal production, charge thật và cutover chưa mở; **safety pending tới C4**.
+
+## C2d-5d1 đã merge PR #50
+
+[Handoff](c2d5d1-common-index-request.md) · [Inventory](c2d5d1-test-inventory.json): một POST index qua runtime, tạo/trả đúng một live job, current Admin/clock, outcome độc lập và response proof mới; không migration. Kiểm tại `e283bc6`: **923/923 API unique pass**, 0 fail/error/skip (collect 4.268, **3.341 not-run**, 4 node lỗi có sẵn ở base chạy riêng vẫn fail như base); web **70/70**, typecheck/build; Chrome qua Next proxy; **9/9 mutant** bắt assertion. PR đã merge `03b7985`; chưa rerun tại merge, **safety pending tới C4**. Tiếp theo C2d-5d2a theo prompt ở trên.
 
 ## Giao C2d-5d1 sau merge PR #49
 
-[Prompt C2d-5d1](tasks/m6c2b2c2d5d1-common-index-request.md) đã giao, **chưa triển khai/kiểm**. Base merge PR #49 `859dfe9`, source `0042`; một POST index nhận boolean xác nhận, tạo/reuse job bền vững đúng file/rights/epoch qua current Admin/clock, outcome độc lập và response proof mới. Không I/O storage/provider hoặc bật pricing; UI chống submit kép/unknown không auto retry. [Quyết định chia scope](decisions.md#giao-c2d-5d1-sau-merge-pr-49-2026-10-09).
+[Prompt C2d-5d1](tasks/m6c2b2c2d5d1-common-index-request.md) là mốc giao ban đầu; task đã triển khai và merge PR #50 `03b7985`. Base merge PR #49 `859dfe9`, source `0042`; một POST index nhận boolean xác nhận, tạo/reuse job bền vững đúng file/rights/epoch qua current Admin/clock, outcome độc lập và response proof mới. Không I/O storage/provider hoặc bật pricing; UI chống submit kép/unknown không auto retry. [Quyết định chia scope](decisions.md#giao-c2d-5d1-sau-merge-pr-49-2026-10-09).
 
-Thứ tự tiếp: **C2d-5d1 HTTP job request → C2d-5d2 worker/ingest/index/provider dispatch → search/provider → RAG/provider → tổng hồi quy C2d**. Chi tiết worker sẽ giao sau khảo sát source/bàn giao C2d-5d1; không coi kiểm tương thích là đã chuyển worker/cleanup. C3/operator/delivery và C4/cutover/storage độc lập riêng; **safety pending tới C4**.
+Kế hoạch C2d-5d2 ban đầu đã được tách thành 5d2a extraction và 5d2b embedding/index/provider trong prompt mới ở trên; không coi kiểm tương thích PR #50 là đã chuyển worker/cleanup. C3/operator/delivery và C4/cutover/storage độc lập riêng; **safety pending tới C4**.
 
 ## C2d-5c2 đã merge PR #49
 

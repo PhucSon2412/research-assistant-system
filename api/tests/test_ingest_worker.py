@@ -13,6 +13,7 @@ from app.ingest.worker import _begin, claim_job, due_job_ids, process_job, utcno
 from app.models import IngestionJob, SourceFile
 from tests.helpers import WEB_ORIGIN
 from tests.test_uploads import intent, send, upload_api
+from tests.test_c2c1_bootstrap import installation  # noqa: F401
 
 
 def upload(browser, original: bytes) -> dict:
@@ -31,13 +32,13 @@ def test_private_markdown_pipeline_locators_metadata_and_acl(upload_api):
     a, b, admin = api.user_browser("a@example.org"), api.user_browser("b@example.org"), api.admin_browser()
     original = b"# Extracted title\n\n## Abstract\nA summary.\n\n## Methods\nA result.\n\n## References\n[1] A citation.\n"
     ids = upload(a, original)
-    assert a.patch(f"/library/items/{ids['item_id']}", json={"title": "User title"},
-        headers={"origin": WEB_ORIGIN}).status_code == 200
+    changed = a.patch(f"/library/items/{ids['item_id']}", json={"title": "User title"})
+    assert changed.status_code == 200, changed.text
     job_id = uuid.UUID(ids["job_id"])
     with Session(api.engine) as db:
         assert job_id in due_job_ids(db, get_settings())
     assert process_job(job_id, storage=storage) == "awaiting_index"
-    assert process_job(job_id, storage=storage) == "not_claimed"
+    assert process_job(job_id, storage=storage) == "index_pending"
     detail = a.get(f"/library/items/{ids['item_id']}").json()["item"]
     assert detail["title"] == "User title"
     assert detail["content_status"] == "metadata_only"
@@ -223,7 +224,8 @@ def test_storage_retry_and_epoch_cancel(upload_api):
         conn.execute(text("UPDATE library_items SET rights_epoch=rights_epoch+1 WHERE id=:i"),
                      {"i": uuid.UUID(other["item_id"])})
     assert process_job(uuid.UUID(other["job_id"]), storage=storage) == "cancelled"
-    assert api.scalar("SELECT finished_at FROM ingestion_jobs WHERE id=:i", i=uuid.UUID(other["job_id"])) is not None
+    # Revocation won before claim; extraction leaves cancellation to its writer/cleanup.
+    assert api.scalar("SELECT attempt_count FROM ingestion_jobs WHERE id=:i", i=uuid.UUID(other["job_id"])) == 0
     assert api.scalar("SELECT extraction_finished_at FROM ingestion_jobs WHERE id=:i",
                       i=uuid.UUID(other["job_id"])) is None
     assert api.scalar("SELECT count(*) FROM chunks WHERE item_id=:i", i=uuid.UUID(other["item_id"])) == 0
