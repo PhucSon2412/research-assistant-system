@@ -33,7 +33,7 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StrictBool
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_clock, get_db, get_now, require_admin, require_trusted_origin
+from app.api.deps import get_clock, get_db, require_admin, require_trusted_origin
 from app.api.errors import ApiError
 from app.api.review_publication_reads import review_publication_json
 from app.authz import Principal, pending_publication_clause, review_copy_admin_clause
@@ -44,7 +44,7 @@ from app.models import (AccessRights, CommonPublication, DeletionTombstone, Libr
                         RevocationMetadataRetention, SourceFile, User)
 from app.models.enums import PublicationState, RevocationReason, RevokedMetadataField
 from app.publication import live_duplicate
-from app.api import common_publish, common_revoke
+from app.api import common_index_request, common_publish, common_revoke
 from app.storage import OriginalStorage, get_storage
 
 router = APIRouter(prefix="/admin/pending-publications", tags=["review"])
@@ -63,16 +63,17 @@ NOTES = {PublicationState.PENDING.value: PENDING_NOTE, PublicationState.LISTED.v
          PublicationState.REVOKED.value: REVOKED_NOTE}
 
 
-class IndexInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    # The page says the copy's extracted text goes to OpenRouter for embedding; nothing is pre-ticked.
-    confirm_external_processing: Literal[True]
-
-
 def _confirmed(value: bool) -> bool:
     if not value:
         raise ValueError("explicit confirmation required")
     return value
+
+
+class IndexInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # The page says the copy's extracted text goes to OpenRouter for embedding; nothing is pre-ticked.
+    # StrictBool: Literal[True] alone also accepted 1 and 1.0 (C2d-5d1).
+    confirm_external_processing: Annotated[StrictBool, AfterValidator(_confirmed)]
 
 
 class PublishInput(BaseModel):
@@ -332,17 +333,16 @@ async def publish_copy(
 
 
 @copies_router.post("/{item_id}/index", dependencies=[Depends(require_trusted_origin)])
-def index_copy(
+async def index_copy(
+    request: Request,
     item_id: str,
     body: IndexInput,
     admin: Principal = Depends(require_admin),
-    db: Session = Depends(get_db),
-    now: datetime = Depends(get_now),
+    settings: Settings = Depends(get_settings),
+    clock=Depends(get_clock),
 ) -> dict:
-    """Queue (or return the running) index job; the worker does the rest under the same gate."""
-    started = common_index.start(db, admin, _parse_id(item_id), now)
-    return {"item": _copy_out(db, admin, started.job.item_id, now),
-            "job": {"id": str(started.job.id), "state": started.job.state}, "created": started.created}
+    """Queue (or return the live) durable index job; the worker re-checks the gate at its checkpoints."""
+    return await common_index_request.receive(request, admin, item_id, clock, settings)
 
 
 @copies_router.post("/{item_id}/revoke", dependencies=[Depends(require_trusted_origin)])
