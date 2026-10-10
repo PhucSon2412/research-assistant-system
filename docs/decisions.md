@@ -1,5 +1,19 @@
 # Nhật ký quyết định
 
+## Giao C2d-5e2 sau merge PR #53 (2026-10-10)
+
+Git fetch/GitHub CLI xác nhận PR #53 MERGED `b2e76edb028af2ff118d3936ed4cdf47cb88a99f`; `origin/main` tại merge, tree khớp head `bf9d81f`, code sửa P2 `9139c01`. Source `0044`, không query DB dev. Kết quả reviewer 20/agent 1.584 và các lượt trước giữ source riêng, chưa rerun merge; docs review chưa commit được giữ cho PR sau.
+
+Đã đọc CLI reconcile: giữ Session xuyên list/delete S3, không runtime/gate checkpoints hoặc fence orphan; `0044` chỉ authorize revoked common có tombstone thật. Hợp đồng upload/approval vẫn yêu cầu reconcile thủ công khi attempt/SDK/DB thread cũ đã settle; grace không bảo đảm điều đó.
+
+Orchestrator chọn **C2d-5e2 một PR CLI/direct orphan reconcile runtime, vẫn thủ công/quiescent**, chưa online GC hoặc lịch beat. Zero SourceFile reference toàn DB (kể cả revoked) mới là orphan; fence riêng hoặc schema typed tương đương cùng key serialization/INSERT trigger, không fake/nới common tombstone authority. S3 ngoài DB, prepare known commit + release rồi proof mới trước delete; uncertain dừng, invocation độc lập resume kể cả object vắng khỏi listing. Runbook quiescence là điều kiện vận hành, không cờ bypass/gate hoặc chứng nhận runtime tự nhìn thấy mọi process; pending/hold vẫn chặn task. Migration mới sau head thực tế, dự kiến `0045`; grants hẹp, giữ P2 operator fix và recovery compatibility.
+
+[Prompt đầy đủ](tasks/m6c2b2c2d5e2-orphan-original-reconcile-runtime.md). Lựa chọn scoped theo ủy quyền, không xác nhận trực tiếp mới của chủ dự án hay bất biến kiến trúc. **Chỉ giao tài liệu, chưa triển khai/kiểm**; discovery/citation → search/query/rerank → RAG/generation → tổng hồi quy C2d còn riêng, C3/C4 theo điều kiện cũ. Safety pending tới C4; không `.env`/dev/provider/pricing. Các trạng thái PR trước merge bên dưới giữ lịch sử.
+
+## Review lại PR #53 — P2 đã sửa (2026-10-10)
+
+Tại head `bf9d81f`, code `9139c01`, không phát hiện điểm chặn merge mới trong scope cleanup runtime. Reviewer thực chạy **20/20**, gồm hai ca P2 cũ và rollback lỗi; đối chiếu 61 artifact hash/311 source hash, agent **1.584 unique pass / 2.977 not-run** và 9 countercheck riêng. Capability operator phù hợp provisioning hiện tại, chưa chứng nhận danh tính/vận hành C3. PR OPEN/chưa merge, source `0044`, safety pending tới C4. [Report, drift tài nguyên và giới hạn](reviews/pr53-c2d5e1-revoked-common-cleanup-runtime.md). Các kết luận tại `3c4c165` dưới đây giữ lịch sử trước sửa.
+
 ## Sửa review PR #53 — operator identity (2026-10-10)
 
 Theo [prompt sửa](tasks/fix-pr53-operator-cleanup-identity-and-seal.md), agent chọn bằng chứng dương dựa trên provisioning hiện có (`app.db_roles`), không migration mới: owner/migrator (superuser hoặc owner `deletion_tombstones`) hoặc login recovery (EXECUTE `ras_auth_restrict` + INSERT `revocation_journal_records` + không EXECUTE `ras_auth_session_create`), trên chính login thực, không SET ROLE. Đây là kiểm năng lực, không phải chứng nhận danh tính operator C3; login bị cấp sai đúng bộ quyền recovery vẫn được nhận như recovery. Lỗi probe/release từ chối. `recover` đổi lỗi thành `RecoveryError` có mã. ID tham số UUID1 cố định; seal kiểm selection ⊆ collection chính xác. Fence/retention/ledger/lock graph runtime không đổi. **Safety pending tới C4.**

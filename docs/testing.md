@@ -1,5 +1,13 @@
 # Chiến lược kiểm thử
 
+## Kế hoạch C2d-5e2 sau merge PR #53
+
+[Task orphan reconcile runtime](tasks/m6c2b2c2d5e2-orphan-original-reconcile-runtime.md) yêu cầu kiểm PG/MinIO/journal/runtime thật cô lập: role/gate trước list, zero-reference toàn DB, biên grace/cursor, INSERT/fence hai thứ tự, DB/S3 không giữ connection, uncertain/release/late resume, storage errors, process smoke và hồi quy upload/approval/common cleanup/recovery. Task **chưa triển khai hoặc chạy API/web/migration/smoke**. Review PR #53 giữ 20 pass độc lập và artifact 1.584 pass tại source trước merge `b2e76edb`, không là pass mới. Debt cũ giữ riêng; safety pending tới C4.
+
+## Review lại độc lập PR #53 tại bf9d81f
+
+Reviewer thực chạy **20/20 pass**, 0 failure/error/skip: 17 ca repo operator/runtime/recover/full cleanup, hai regression P2 cũ và một ca rollback lỗi ngoài repo. 4.544 node repo chưa rerun lượt này; 311 source hash trước/sau khớp. Artifact agent kiểm riêng: 61 hash khớp, **1.584 unique pass / 4.561 collected / 2.977 not-run**, 9 countercheck assertion failure, UUID collect ổn định; không cộng smoke Linux lịch sử hoặc 101 pass review trước. [Report/evidence/giới hạn](reviews/pr53-c2d5e1-revoked-common-cleanup-runtime.md). P2 đã sửa, không thấy điểm chặn merge mới trong scope; PR chưa merge, safety pending tới C4.
+
 ## Sửa review PR #53 — operator identity và seal
 
 Tái hiện trước sửa trên `3c4c165`: 6 regression mới fail (`DID NOT RAISE`), 2 control owner/recovery đạt. Sau sửa tại `9139c01`: regression runtime cấp sai TEMP/protected write/thiếu grant/bắt chước recovery, lỗi probe/release, guard runtime lỗi, `_sweep_objects` với runtime đều từ chối trước mutation/S3; control owner/recovery dọn được khi gate pending thật. `sealed-fix-1`: **1584 unique pass**, exit 0, selection ⊆ collection chính xác, collect 4.561/2.977 not-run, 311 source hash trùng; bỏ smoke (đường worker không đổi; lịch sử `3b54a6f`). 9/9 countercheck. Debt 24 node giữ riêng. [Inventory](c2d5e1-test-inventory.json).

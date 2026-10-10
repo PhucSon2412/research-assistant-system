@@ -1,5 +1,7 @@
 # Môi trường phát triển và schema (M1a–C2d-5e1 trên nhánh review)
 
+**PR #53 đã merge `b2e76edb`, source `0044`; [C2d-5e2 reconcile orphan runtime](tasks/m6c2b2c2d5e2-orphan-original-reconcile-runtime.md) mới giao tài liệu, chưa triển khai/kiểm.** CLI reconcile hiện hành vẫn legacy; các lệnh M1c/M6b bên dưới là lịch sử, chưa chứng nhận runtime/cutover. Task mới phải cập nhật runbook: dừng writers, settle mọi attempt/SDK/DB thread cũ rồi mới dọn; grace không chứng minh quiescence. Pending/hold vẫn chặn runtime, không dùng owner/recovery fallback. Không thêm lệnh mới chưa chạy; không thao tác stack dev trong task. Safety pending tới C4.
+
 ## C2d-5e1 cleanup runtime cô lập
 
 [Handoff](c2d5e1-revoked-common-cleanup-runtime.md) · [Inventory](c2d5e1-test-inventory.json). Conda ras, context ngoài repo, project/cổng sinh riêng (`scripts/c2d5e1_test_host.py --context <ctx> setup`, rồi `test <pytest args>`), explicit env-file rỗng; không `.env`/dev/provider. Smoke worker+beat dùng tag thử `rasc2d5e1-worker:20261010` tạo từ image dependency có sẵn, source mount read-only. Migration 0044 cần provision lại login roles (`app.db_roles.provision`) hoặc khối DO trong migration cấp quyền cho role đã provision. `python -m app.cli.cleanup_revoked` nay chỉ chạy với login runtime + gate mở; Compose mặc định (owner) bị từ chối. Source `0044` không là revision DB dev. Safety pending tới C4.
