@@ -19,6 +19,8 @@ from threading import Barrier, Thread
 from types import SimpleNamespace
 
 import pytest
+
+from app.ingest import cleanup as runtime_cleanup  # normal (runtime) cleanup, not recovery
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError, OperationalError
@@ -642,7 +644,7 @@ def test_restore_from_before_a_revocation_serves_and_processes_nothing_until_rec
     b_key = api.scalar("SELECT storage_key FROM source_files WHERE id=:f", f=uuid.UUID(w.b_same["file_id"]))
     with backup(api, admin_engine) as snap:
         assert revoke(w.admin, w.ok).status_code == 200
-        assert publication.operator_cleanup_revoked(api.engine, storage, api.clock.now, 50) == {"deleted": 2}
+        assert runtime_cleanup.cleanup_revoked(api.engine, storage) == {"deleted": 2}
         assert not key_present(storage, ok_key)
 
         app_env(snap.url)
@@ -846,7 +848,7 @@ def test_objects_restored_from_an_older_object_backup_are_removed_by_recover(upl
     key = common_key(w.api, w.copy)
     older_objects = objects(w.storage)
     assert revoke(w.admin, w.copy).status_code == 200
-    assert publication.operator_cleanup_revoked(w.api.engine, w.storage, w.api.clock.now, 50) == {"deleted": 1}
+    assert runtime_cleanup.cleanup_revoked(w.api.engine, w.storage) == {"deleted": 1}
     put_back(w.storage, older_objects)
     assert key_present(w.storage, key)
     # The database says revoked and purged: nothing serves the object, and the gate cannot see it...
