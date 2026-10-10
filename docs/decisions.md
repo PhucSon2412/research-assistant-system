@@ -1,5 +1,21 @@
 # Nhật ký quyết định
 
+## Giao C2d-5d2b sau merge PR #51 (2026-10-10)
+
+**Nguồn:** chủ dự án báo đã merge PR #51 và yêu cầu prompt tiếp theo; orchestrator chọn phạm vi theo ủy quyền trước đó. GitHub/Git xác minh merge **`9fb8890568af85b7beea4503f93f12e2896e6c89`**, head `b569d0c` là ancestor và tree khớp merge; source `0042`. Không truy vấn revision DB dev hoặc chạy lại test tại merge.
+
+[Prompt document embedding/index runtime](tasks/m6c2b2c2d5d2b-document-index-runtime.md) đã viết, **chưa triển khai/kiểm**. Chuyển cả private/common từ index-state dispatch/claim tới reservation, heartbeat, provider admission/outcome và atomic publish. Không nối lại helper indexer legacy. Khảo sát nguồn thấy indexer còn import `worker._locked` đã gỡ, Session/commit và provider-capacity maintenance cũ; agent phải tái hiện trên settings thử rồi chuyển call graph, không dựng fallback owner.
+
+**Lựa chọn scoped của orchestrator, không phải xác nhận trực tiếp mới của chủ dự án:** giữ private active latest status/receipt và common exact rights như extraction; job không dựa cookie Admin. Tách quyền content khỏi late accounting: khi gate hợp lệ, kết quả provider đã gửi được đối soát một lần theo call/attempt/day gốc dù job mất quyền; không lưu vector hoặc resurrect content. Heartbeat/reaper cần binding và lock order riêng, không bỏ giữ trần chi phí uncertain. Giữ kế toán common owner NULL/app + embedding bucket (phương án orchestrator trước đây), budget/model/allowlist/pricing mặc định; fake transport qua adapter thật, không live key. Final hash luôn sau entry cuối, kể cả reuse completed; khe overwrite sau hash vẫn được ghi rõ.
+
+Query/rerank/RAG provider, background cleanup/discovery/reconcile khác, bốn lỗi baseline trước tổng hồi quy, C3/operator/delivery và C4/Compose/storage còn riêng. Không dev/`.env`/provider/cutover. **Safety pending tới C4**; số PR #51 là lịch sử trước merge, không pass mới.
+
+## Review PR #51 (2026-10-10)
+
+Tại head `b569d0c` (code/test `dfca84a`, production `5b505d3`, diff sau sealed chỉ docs), không phát hiện điểm chặn merge mới trong scope C2d-5d2a worker/beat runtime và extraction tới `awaiting_index`/`metadata_only`. Reviewer thực chạy **103/103 API**, gồm process worker/beat Linux và Redis stop/start; 293 source hashes khớp. Artifact agent **549 API/8 countercheck** và 218 file manifest được đối chiếu riêng. PR đã merge `9fb8890`, chưa rerun tại merge, source `0042`, safety pending tới C4. [Report](reviews/pr51-c2d5d2a-worker-runtime-extraction.md).
+
+Review không mở index/provider, các background writer còn legacy hoặc mặc định Compose/API cutover. Bốn lỗi baseline PR #50 giữ debt trước tổng hồi quy/C4. Chín container dev đã đổi ID trong thời gian gián đoạn, nguyên nhân chưa xác định; từ lúc tiếp tục tới cleanup ID/image giữ nguyên. Chỉ khởi động lại và dọn project thử thuộc reviewer, không thao tác dev/`.env`/provider. Không dùng kết luận review làm xác nhận pricing, storage journal hoặc safety ready.
+
 ## Giao C2d-5d2a sau merge PR #50 (2026-10-09)
 
 **Nguồn:** chủ dự án báo đã merge PR #50 và yêu cầu giao agent tiếp theo; orchestrator chọn phạm vi theo ủy quyền trước đó. GitHub/Git xác minh merge **`03b79855221f3d9279cbe5aa677d6a50db59b5ab`**, head PR `ff5fa82` là ancestor và tree khớp merge; source migration `0042`. Không truy vấn DB dev; số kiểm PR #50 giữ theo source review, không chạy lại tại merge.

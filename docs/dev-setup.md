@@ -1,4 +1,6 @@
-# Môi trường phát triển và schema (M1a–C2d-5d2a)
+# Môi trường phát triển và schema (M1a–C2d-5d2a; kế hoạch C2d-5d2b)
+
+**C2d-5d2b mới là kế hoạch:** [prompt document embedding/index runtime](tasks/m6c2b2c2d5d2b-document-index-runtime.md). Không có lệnh triển khai/kiểm mới được chứng nhận trong lượt giao. PR #51 đã merge `9fb8890`, source `0042`; không suy revision DB dev hoặc áp override vào dev. Safety pending tới C4.
 
 **C2d-5d2a:** [handoff worker runtime/extraction](c2d5d2a-worker-runtime-extraction.md), [selection/JUnit/hash](c2d5d2a-test-inventory.json). Code `dfca84a`, source `0042`, không migration/grants mới. Compose mặc định còn truyền `POSTGRES_USER` cho API/worker/beat; runtime check sẽ từ chối owner. Không áp override/restart dev hoặc tuyên bố mặc định đã cutover; safety pending tới C4.
 
@@ -10,7 +12,7 @@ Smoke `test_c2d5d2a_process_smoke.py` đã thực chạy Compose gốc + `script
 
 Tám đối chứng đã chạy tuần tự qua `scripts/c2d5d2a_counterchecks.py --context <context thử>` bằng Conda, XML/log riêng và khôi phục đúng bytes trước suite cuối. Raw preparation, manifest source/JUnit và lỗi/not-run ngoài repo; không commit paper/journal/secret. Bốn lỗi baseline PR #50 giữ debt riêng. Không web/proxy thay đổi, không Chrome/npm ở task này.
 
-**Mốc merge hiện hành:** PR #50 đã merge `03b7985`, head migration `0042`; không suy revision DB dev. [C2d-5d1 HTTP index request](c2d5d1-common-index-request.md) đã merge; lệnh/kết quả cô lập ở mục dưới. Extraction worker C2d-5d2a ở handoff trên, PR chưa merge; index/provider tiếp C2d-5d2b. **Safety pending tới C4**, readiness dev đóng không phải lý do tự mở cutover. Các lệnh/kết quả dưới đây giữ theo task/source đã ghi.
+**Mốc merge hiện hành:** PR #51 đã merge `9fb8890`, head migration `0042`; không suy revision DB dev. [C2d-5d1 HTTP index request](c2d5d1-common-index-request.md) đã merge; lệnh/kết quả cô lập ở mục dưới. Extraction worker C2d-5d2a ở handoff trên đã merge; index/provider tiếp C2d-5d2b. **Safety pending tới C4**, readiness dev đóng không phải lý do tự mở cutover. Các lệnh/kết quả dưới đây giữ theo task/source đã ghi.
 
 ## C2d-5d1 cô lập
 

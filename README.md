@@ -1,6 +1,10 @@
 # Research Assistant System
 
-**C2d-5d2a đã triển khai, PR chờ review:** [worker runtime/extraction](docs/c2d5d2a-worker-runtime-extraction.md) · [selection/JUnit/hash và giới hạn](docs/c2d5d2a-test-inventory.json). Code `dfca84a`, base PR #50 `03b7985`, source `0042`, không migration/grants. Runtime worker/beat trên override cô lập, dispatch UUID, proof/lease/clock mới mỗi checkpoint, S3/parser ngoài DB; dừng `awaiting_index`/`metadata_only`. Index/provider chờ C2d-5d2b, background task khác và mặc định Compose/API cutover còn riêng. **Safety pending tới C4.**
+**Đã giao C2d-5d2b, chưa triển khai/chưa có test mới:** [prompt document embedding/index runtime](docs/tasks/m6c2b2c2d5d2b-document-index-runtime.md). Dispatch/claim index, reservation/heartbeat, provider admission/outcome và công bố keyword/vector generation; fake provider trên project runtime cô lập. PR #51 đã merge `9fb8890`, source `0042`; giữ safety pending tới C4.
+
+**Review PR #51 tại `b569d0c`: không phát hiện điểm chặn merge mới trong phạm vi worker runtime/extraction.** Reviewer thực chạy **103/103 API**, gồm worker/beat thực và Redis stop/start; 293 source hashes khớp. Artifact **549 API/8 countercheck** của agent được đối chiếu riêng. PR **đã merge `9fb8890`**, chưa rerun tại merge, source `0042`, **safety pending tới C4**; index/provider C2d-5d2b và C3/C4 còn riêng. [Report, evidence và giới hạn](docs/reviews/pr51-c2d5d2a-worker-runtime-extraction.md).
+
+**C2d-5d2a đã merge PR #51 `9fb8890`:** [worker runtime/extraction](docs/c2d5d2a-worker-runtime-extraction.md) · [selection/JUnit/hash và giới hạn](docs/c2d5d2a-test-inventory.json). Code `dfca84a`, base PR #50 `03b7985`, source `0042`, không migration/grants. Runtime worker/beat trên override cô lập, dispatch UUID, proof/lease/clock mới mỗi checkpoint, S3/parser ngoài DB; dừng `awaiting_index`/`metadata_only`. Index/provider chờ C2d-5d2b, background task khác và mặc định Compose/API cutover còn riêng. **Safety pending tới C4.**
 
 Kiểm sealed tại `dfca84a`: **549 API unique pass**, 0 fail/error/skip; collect 4343, **3794 not-run**; 8 cơ chế đối chứng đạt (9 lượt raw, 1 yếu không tính). Bốn lỗi baseline PR #50 chưa sửa; kết quả và giới hạn trong inventory, không cộng pass lịch sử.
 
