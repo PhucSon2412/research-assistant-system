@@ -1,5 +1,34 @@
 # Nhật ký quyết định
 
+## Quyết định triển khai C2d-5f1 — citation reconcile runtime (2026-10-10)
+
+Nhánh `feat/m6c2b2c2d5f1-citation-reconcile-runtime` từ merge PR #54 `37edd5c9` (đã fetch/xác minh lại). Source giữ **`0045`**, không migration/grant. Các lựa chọn dưới đây do agent chốt trong phạm vi task scoped của orchestrator; **không** phải xác nhận trực tiếp mới của chủ dự án và không là luật kiến trúc vĩnh viễn. [Handoff](c2d5f1-citation-reconcile-runtime.md).
+
+- **Một boundary cho CLI/direct/Celery:** mỗi batch `entry` riêng (login runtime thực, grant citation kiểm *từng quyền* một, writer gate) rồi một transaction ngắn kết thúc bằng journal exclusive, binding scalar, clock mới và commit known. Wrapper Celery giữ `_gate` nhưng không còn là lớp duy nhất. Bỏ tham số `now` của `reconcile_pending`. CLI không có preview (metadata dẫn xuất, không xóa object); exit 0/1/2.
+- **Lock order toàn cục item → reference → citation advisory → journal.** Khảo sát xác nhận nguy cơ đảo chiều: discovery giữ citation exclusive rồi trigger 0024 chờ item `KEY SHARE`, trong khi extraction giữ item `FOR UPDATE` chờ citation shared. Sửa ở discovery hook: khóa item common của link ứng viên (chờ, UUID order) **trước** exclusive; item xuất hiện muộn chỉ `NOWAIT` → `RetargetBusy`, page rollback, cursor không advance. Backfill dùng `FOR KEY SHARE SKIP LOCKED`/`FOR SHARE SKIP LOCKED`, không bao giờ chờ hàng. Extraction hook giữ nguyên transaction/thứ tự.
+- **Không lease/queue/cursor bền:** keyset trong bộ nhớ một pass + `SKIP LOCKED` đủ để candidate bận/bị xóa không chặn phía sau và không lặp vô hạn. Lock timeout sau khi đã có hàng (citation lock, INSERT trùng) là `busy:citation_lock`, không phải halt.
+- **Common đóng = revoked hoặc có tombstone** (`not_revoked_reference_clause` mở rộng, alias riêng), loại ở hint và kiểm lại dưới khóa item; trigger 0024 vẫn là lớp chặn cuối.
+- **Counts:** chỉ từ commit known + release sạch; `links_written` là hàng thật sự INSERT/đổi (RETURNING), hàng giống hệt không tính. Commit exception luôn uncertain; release lỗi sau known commit báo `committed_unreleased`.
+- **Fan-out retarget theo page vẫn chưa bound** (atomic như cũ, không cắt rồi advance cursor); engine/gate/HTTP/pacing/lease/cursor/outcome của `run_sync` để C2d-5f2.
+
+Không đổi matcher, ACL, evidence/payload, pricing hoặc dev stack. **Safety pending tới C4.**
+
+## Giao C2d-5f1 sau merge PR #54 (2026-10-10)
+
+Đã fetch/xác minh PR #54 merge `37edd5c9c28e60ba43425f0b1bd9f42946585e28`; `origin/main` tại merge này, tree khớp `cf66f1c`. Source migration `0045`, không suy DB dev. Review 125 pass và agent 2.096 unique pass giữ theo source trước merge, chưa rerun merge. [Review và giới hạn](reviews/pr54-c2d5e2-orphan-original-reconcile-runtime.md).
+
+Khảo sát thấy `reconcile_pending`/CLI còn Session/commit legacy, Celery chỉ có entry gate; extraction và discovery đều gọi helper citation trong transaction riêng. Citation shared/exclusive advisory locks kết hợp derived trigger lấy item lock cần đối chiếu worker item → citation lock để tránh đảo chiều. Discovery còn connection/session lock xuyên HTTP và sleep trong request-clock transaction; chưa chuyển business boundary.
+
+Orchestrator chọn **C2d-5f1 citation runtime trước, C2d-5f2 discovery harvesting sau** trong nhóm roadmap discovery/citation. C2d-5f1 chuyển CLI/direct/Celery backfill, bounded batch/runtime/final binding/outcome/release, giữ atomic extraction/page hooks và sửa phần citation lock cần thiết; không chứng nhận toàn discovery hoặc đổi matcher/ACL/evidence. Fan-out retarget chưa bound phải bàn giao rõ cho C2d-5f2, không âm thầm cắt updates rồi advance cursor. Không thêm network/provider hoặc sự kiện journal cho bibliography. [Prompt đầy đủ](tasks/m6c2b2c2d5f1-citation-reconcile-runtime.md).
+
+Lựa chọn scoped theo ủy quyền, không là xác nhận trực tiếp mới của chủ dự án hoặc bất biến vĩnh viễn. **Chỉ giao tài liệu, chưa triển khai/kiểm; safety pending tới C4.** Search/query/rerank → RAG/generation → tổng hồi quy C2d và C3/C4 vẫn riêng; không `.env`/dev/pricing/provider thật. Giữ docs review/task chưa commit cho PR mới.
+
+## Review PR #54 — reconcile orphan thủ công (2026-10-10)
+
+Tại head `cf66f1c`, source `0045`, không phát hiện điểm chặn merge mới trong scope đã giao. Reviewer thực chạy **125/125**, đối chiếu riêng artifact agent **2.096 unique pass / 2.594 not-run**, 179 artifact hash/321 source hash và 9 countercheck. PR OPEN/chưa merge, **safety pending tới C4**. [Report, evidence và giới hạn](reviews/pr54-c2d5e2-orphan-original-reconcile-runtime.md).
+
+Giữ ba lựa chọn scoped của task: runtime login thay Compose owner cũ, mặc định preview/`--apply` khi xóa, chỉ key `originals/<32 hex thường>`. Quiescence vẫn do người vận hành bảo đảm; chưa online GC, không suy HEAD là conditional delete hoặc restore đã an toàn. Đây là kết luận orchestrator theo ủy quyền, không phải xác nhận trực tiếp mới của chủ dự án. Discovery/citation và các consumer/C3/C4 tiếp theo chưa giao trong lượt review.
+
 ## Quyết định triển khai C2d-5e2 (2026-10-10)
 
 Agent triển khai theo lựa chọn scoped của orchestrator (không phải xác nhận trực tiếp mới của chủ dự án, không là luật kiến trúc vĩnh viễn). Base `b2e76edb`, source `0044 → 0045`, chưa merge. [Handoff](c2d5e2-orphan-original-reconcile-runtime.md).

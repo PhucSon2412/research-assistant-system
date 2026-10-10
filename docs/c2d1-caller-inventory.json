@@ -1242,7 +1242,7 @@
   "c2d5d2_open_callers": [
     "app.ingest.indexer._gate/_reserve/_verified_unlocked/process_index/_provider_failure/_publish: legacy, disconnected from extraction worker; C2d-5d2b",
     "celery ras.discovery.sync -> discovery.run_sync: runtime login and entry gate only; business boundary legacy",
-    "celery ras.citations.reconcile -> citations.reconcile_pending: runtime login and entry gate only; business boundary legacy",
+    "celery ras.citations.reconcile -> citations.reconcile_pending: runtime login and entry gate only; business boundary legacy [C2d-5f1: converted to the runtime batch boundary, see c2d5f1_citation_reconcile]",
     "celery ras.revocation.cleanup -> publication.cleanup_revoked: runtime login and entry gate only; business boundary legacy",
     "recovery/operator/CLI and search/query/rerank/RAG providers: separate tasks, no cutover certification"
   ],
@@ -1287,8 +1287,30 @@
     "unchanged_separate": [
       "celery ras.revocation.cleanup / CLI cleanup_revoked -> app.ingest.cleanup (C2d-5e1)",
       "recovery recover -> publication.operator_cleanup_revoked and recovery._sweep_objects (operator path; never calls the orphan boundary)",
-      "celery ras.discovery.sync and ras.citations.reconcile: business boundary legacy (next task)"
+      "celery ras.discovery.sync and ras.citations.reconcile: business boundary legacy (next task) [C2d-5f1 converted ras.citations.reconcile; ras.discovery.sync remains C2d-5f2]"
     ],
     "superseded": "docker compose exec api python -m app.cli.reconcile_originals with the Compose owner login (now refused before any storage call)"
+  },
+  "c2d5f1_citation_reconcile": {
+    "status": "implemented on branch feat/m6c2b2c2d5f1-citation-reconcile-runtime; PR not merged; source 0045 (no migration/grants)",
+    "base": "37edd5c9c28e60ba43425f0b1bd9f42946585e28 (merge PR #54)",
+    "handoff": "docs/c2d5f1-citation-reconcile-runtime.md",
+    "inventory": "docs/c2d5f1-test-inventory.json",
+    "converted": [
+      "python -m app.cli.reconcile_citations -> app.citations.reconcile_pending (runtime login + per-privilege grants + writer gate per batch; exit 0/1/2)",
+      "celery ras.citations.reconcile -> _gate (kept) -> app.citations.reconcile_pending (same batch boundary; refuses owner/closed gate even if the wrapper is bypassed)",
+      "direct app.citations.reconcile_pending(engine, policy) (no now/force parameter)"
+    ],
+    "hooks_contract_changed": [
+      "extraction app.ingest.worker._extract/_extract_pdf -> checkpoints.finish save -> citations.reconcile_references: unchanged transaction (item FOR UPDATE -> shared citation lock -> link -> caller final journal)",
+      "discovery discovery._write_page -> citations.reconcile_arxiv_ids: common items KEY SHARE (waiting) BEFORE the exclusive citation lock; late items NOWAIT -> RetargetBusy; conditional Core UPDATE"
+    ],
+    "lock_order": "item row -> reference row -> citation advisory -> journal",
+    "unchanged_separate": [
+      "celery ras.discovery.sync -> discovery.run_sync: engine/gate/HTTP/pacing/lease/cursor/outcome legacy (C2d-5f2)",
+      "GET /library/items/{id}/references and /discovery/papers/{id}/citing-items: resource read boundary unchanged",
+      "search/query/rerank/RAG providers, C3/C4"
+    ],
+    "superseded": "docker compose exec worker python -m app.cli.reconcile_citations with the Compose owner login (now refused before any reference read)"
   }
 }

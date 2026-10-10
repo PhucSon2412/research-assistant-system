@@ -129,7 +129,7 @@ def test_0018_preserves_existing_license_provenance(empty_db_url: str) -> None:
     eng.dispose()
 
 
-def test_0019_keeps_existing_references_and_backfill_links_them(empty_db_url: str) -> None:
+def test_0019_keeps_existing_references_and_backfill_links_them(empty_db_url: str, journal_path, monkeypatch) -> None:
     from app.citations import reconcile_pending
     from app.config import CitationPolicy
     from app.identity.passwords import hash_password
@@ -153,7 +153,23 @@ def test_0019_keeps_existing_references_and_backfill_links_them(empty_db_url: st
     with eng.connect() as conn:
         assert conn.scalar(text("SELECT raw_citation FROM reference_entries")) == raw
         assert conn.scalar(text("SELECT count(*) FROM reference_citation_links")) == 0
-    assert reconcile_pending(eng, CitationPolicy()) == {"batches": 1, "references": 1}
+    # C2d-5f1: the backfill runs only through the runtime login; the owner is refused before any read.
+    assert reconcile_pending(eng, CitationPolicy()) == {"halted:worker_runtime_required": 1}
+    with eng.connect() as conn:
+        assert conn.scalar(text("SELECT count(*) FROM reference_citation_links")) == 0
+    from types import SimpleNamespace
+    from app import auth_safety
+    from datetime import UTC, datetime
+    from app import recovery
+    from app.config import get_settings
+    from tests.test_auth_safety_foundation import runtime_engine
+    recovery.register_existing(eng, get_settings(), datetime.now(UTC))  # labelled operator setup: live DB
+    monkeypatch.setattr(auth_safety, "cutover", lambda db: "ready")  # scoped business cutover only
+    runtime = runtime_engine(SimpleNamespace(engine=eng))
+    try:
+        assert reconcile_pending(runtime, CitationPolicy()) == {"batches": 1, "references": 1, "links_written": 1}
+    finally:
+        runtime.dispose()
     with eng.connect() as conn:
         row = conn.execute(text("SELECT match_status, arxiv_id, cited_version FROM reference_citation_links")).one()
         assert tuple(row) == ("linked", "2609.00041", "v2")

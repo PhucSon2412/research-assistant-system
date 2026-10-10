@@ -269,7 +269,10 @@ def test_cleanup_removes_every_derivative_of_the_revoked_copies_and_nothing_else
     with Session(api.setup_engine) as db:
         citations.reconcile_arxiv_ids(db, [ARXIV_ID])
         db.commit()
-    backfill = citations.reconcile_pending(api.setup_engine, settings_with_fake_key().citations)
+    # Through the runtime login (C2d-5f1); the owner engine is refused at entry.
+    assert citations.reconcile_pending(api.setup_engine, settings_with_fake_key().citations) == {
+        "halted:worker_runtime_required": 1}
+    backfill = citations.reconcile_pending(api.engine, settings_with_fake_key().citations)
     assert backfill["references"] == counts["md"]["reference_entries"]  # the other copy's only (same bytes)
     stale = """SELECT count(*) FROM reference_citation_links l JOIN reference_entries r ON r.id=l.reference_id
         WHERE r.item_id=:i AND l.matcher_version='old'"""

@@ -1,4 +1,20 @@
-# Môi trường phát triển và schema (M1a–C2d-5e2 trên nhánh review)
+# Môi trường phát triển và schema (M1a–C2d-5e2 đã merge)
+
+PR #54 đã merge `37edd5c9`, source `0045`; merge tree khớp `cf66f1c`, chưa rerun tại merge. C2d-5f1 citation runtime đã triển khai trên nhánh review (chưa merge): [handoff](c2d5f1-citation-reconcile-runtime.md); discovery harvesting là C2d-5f2. Lệnh đã chạy chỉ trong môi trường cô lập (mục dưới); không có lệnh vận hành dev mới, lệnh backfill owner cũ đã superseded. Safety pending tới C4; các hướng dẫn/lượt kiểm dưới đây giữ theo source lịch sử, không là chứng nhận dev/cutover.
+
+## C2d-5f1 citation reconcile cô lập
+
+Chỉ chạy với PG/MinIO/Redis/journal/role cô lập, context ngoài repo; không đọc `.env`, không chạm stack dev. Lệnh đã chạy (PowerShell, `$py` là Python Conda `ras`):
+
+```powershell
+& $py scripts/c2d5f1_test_host.py --context <ctx ngoài repo> setup
+& $py scripts/c2d5f1_test_host.py --context <ctx> test api/tests/test_c2d5f1_citation_runtime.py api/tests/test_c2d5f1_worker_hooks.py -q
+docker build -q -t rasc2d5f1-worker:20261010 api   # cho test_c2d5f1_process_smoke.py; gỡ tag sau
+& $py scripts/c2d5f1_counterchecks.py --context <ctx> --out <thư mục ngoài repo>
+& $py scripts/c2d5f1_seal.py --context <ctx> --name <tên lượt>
+```
+
+Backfill citation chỉ chạy bằng login runtime đã provision và gate mở: `python -m app.cli.reconcile_citations` (exit 0 hết/bound/busy, 1 halted, 2 thiếu cấu hình) hoặc task `ras.citations.reconcile`. Trước C4 gate production luôn `auth_safety_pending`, nên chỉ chạy được trong môi trường thử có cutover scoped. Kết quả và giới hạn: [handoff](c2d5f1-citation-reconcile-runtime.md).
 
 ## C2d-5e2 orphan reconcile cô lập
 
@@ -935,7 +951,7 @@ Kiểm chứng sau review PR #15: `& "$env:USERPROFILE\.conda\envs\ras\python.ex
 
 # M5b-1 liên kết citation arXiv chính xác (PR #16 đã merge)
 
-Migration `0019` thêm `reference_citation_links` (một hàng cho mỗi reference entry). `docker compose up -d --build --wait` nâng migration; worker tự tính link khi extract reference mới, mỗi trang discovery tính lại đích của link cùng arXiv ID, và beat chạy `ras.citations.reconcile` để backfill reference đã có hoặc hàng lệch hash/matcher version. Cấu hình ở `CitationPolicy` (`api/app/config.py`): `RAS_CITATIONS__ENABLED=true`, `RAS_CITATIONS__RECONCILE_POLL_SECONDS=300`, `RAS_CITATIONS__RECONCILE_BATCH_SIZE=500`, `RAS_CITATIONS__RECONCILE_MAX_BATCHES=20`. Backfill thủ công, chạy lại an toàn và chỉ in số đếm: `docker compose exec -T worker python -m app.cli.reconcile_citations`.
+Migration `0019` thêm `reference_citation_links` (một hàng cho mỗi reference entry). `docker compose up -d --build --wait` nâng migration; worker tự tính link khi extract reference mới, mỗi trang discovery tính lại đích của link cùng arXiv ID, và beat chạy `ras.citations.reconcile` để backfill reference đã có hoặc hàng lệch hash/matcher version. Cấu hình ở `CitationPolicy` (`api/app/config.py`): `RAS_CITATIONS__ENABLED=true`, `RAS_CITATIONS__RECONCILE_POLL_SECONDS=300`, `RAS_CITATIONS__RECONCILE_BATCH_SIZE=500`, `RAS_CITATIONS__RECONCILE_MAX_BATCHES=20`. Backfill thủ công, chạy lại an toàn và chỉ in số đếm: `docker compose exec -T worker python -m app.cli.reconcile_citations`. **Superseded từ C2d-5f1 (nhánh review):** lệnh này chạy bằng login owner của Compose dev nên nay bị từ chối `halted:worker_runtime_required` trước mọi đọc reference; backfill chỉ chạy bằng login runtime đã provision và gate mở (trước C4 chỉ trong môi trường thử có cutover scoped), xem [C2d-5f1](c2d5f1-citation-reconcile-runtime.md).
 
 API: `GET /library/items/{id}/references` (chỉ owner item private) thêm `id`, `ordinal`, `pipeline_version` và `citation_link` gồm `status`, `method`, `id_form`, `arxiv_id`, `cited_version`, `id_span` (code point trong raw citation), `relation=cites` và `target` khi `linked` (title, `original_url`, `cited_version_url`, `latest_metadata_version`, `label=metadata-only`). `GET /discovery/papers/{id}/citing-items?limit=20&offset=0` trả item private của chính caller có reference liên kết tới paper; paper không tồn tại hoặc có tombstone trả `404`. Web: mục “Tài liệu tham khảo được trích xuất” ở `/items/{id}` và nút “Paper của tôi trích dẫn bài này” ở `/discovery`.
 
