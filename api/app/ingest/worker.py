@@ -7,7 +7,7 @@ and rights epoch, so an expired worker cannot publish after a replacement.
 Two origins run: ``upload`` (a private item's own file, ``SourceFile.job_id``)
 and ``promotion`` (M6b-2b2b: a published reviewed common copy, the file pinned
 in ``IngestionJob.source_file_id``; the common file's ``job_id`` stays NULL).
-Extraction stops at awaiting_index; index dispatch belongs to C2d-5d2b.
+Extraction stops at awaiting_index; index has its own C2d-5d2b boundary.
 A promotion step re-checks the common rights gate (``app.common_index``) with
 the item locked, so a revoke either committed before (the attempt stops
 without further content I/O or writes) or waits for the checkpoint commit. Every step locks the **item
@@ -429,7 +429,14 @@ def process_job(job_id: uuid.UUID, settings: Settings | None = None,
             return current is not None and (current.state in ('awaiting_index', 'indexing')
                 or current.state == 'retryable_failed' and current.resume_state == 'indexing')
         if runtime.short(db, preflight):
-            return 'index_pending'
+            from app.ingest import document_index, document_accounting
+            document_index.configured(settings)
+            document_accounting.reap(db, settings)
+            token = document_index.claim(db, job_id, settings)
+            if token is None:
+                return 'not_claimed'
+            return document_index.process_index(db, job_id, token,
+                storage or OriginalStorage(settings), settings)
         token = claim_job(db, job_id, settings)
         if token is None:
             return 'not_claimed'
@@ -474,7 +481,7 @@ def process_job(job_id: uuid.UUID, settings: Settings | None = None,
             pass
 
 
-def due_job_ids(db: Session, settings: Settings, now: datetime | None = None) -> list[uuid.UUID]:
+def extraction_due_job_ids(db: Session, settings: Settings, now: datetime | None = None) -> list[uuid.UUID]:
     # Candidate lookup is not claim proof. Clock argument is legacy compatibility;
     # actual eligibility uses a fresh clock after SQL and final journal wait.
     checkpoints.entry(db)
@@ -509,6 +516,17 @@ def due_job_ids(db: Session, settings: Settings, now: datetime | None = None) ->
                 break
         return result
     return runtime.short(db, read)
+
+
+def due_job_ids(db: Session, settings: Settings, now: datetime | None = None) -> list[uuid.UUID]:
+    extracted = extraction_due_job_ids(db, settings, now)
+    from app.ingest import document_index, document_accounting
+    document_accounting.reap(db, settings)
+    try:
+        document_index.configured(settings)
+    except runtime.Halt:
+        return extracted
+    return (extracted + document_index.due(db, settings))[:settings.ingest.dispatch_batch]
 
 
 def dispatchable(job_id, settings=None):

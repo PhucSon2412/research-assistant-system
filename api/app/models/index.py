@@ -53,6 +53,9 @@ class EmbeddingCall(Base):
         # 0024: cleanup of a revoked common copy keeps the cost ledger and removes vector + chunk hash.
         CheckConstraint("chunk_hash IS NOT NULL OR content_removed_at IS NOT NULL", name="content_present"),
         CheckConstraint("content_removed_at IS NULL OR (vector IS NULL AND chunk_hash IS NULL)", name="content_removed"),
+        CheckConstraint('(reservation_token IS NULL AND reservation_job_id IS NULL AND reservation_job_token IS NULL) OR '
+                        '(reservation_token IS NOT NULL AND reservation_job_id IS NOT NULL AND reservation_job_token IS NOT NULL)',
+                        name='reservation_binding'),
         UniqueConstraint("source_file_id", "model_id", "pipeline_version", "chunk_hash", name="uq_embedding_call_content"),
         Index("ix_embedding_calls_status", "status"),
         Index("ix_embedding_calls_reserved_lease", "lease_until",
@@ -78,6 +81,9 @@ class EmbeddingCall(Base):
     cost_status: Mapped[str] = mapped_column(Text)
     reserved_day: Mapped[date] = mapped_column(Date)
     lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reservation_token: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    reservation_job_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey('ingestion_jobs.id', ondelete='RESTRICT'))
+    reservation_job_token: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     content_removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

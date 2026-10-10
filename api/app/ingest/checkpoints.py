@@ -30,6 +30,8 @@ def frozen(row):
             return MappingProxyType({k: freeze(v) for k, v in value.items()})
         if isinstance(value, list):
             return tuple(freeze(v) for v in value)
+        if type(value).__module__ == 'numpy' and hasattr(value, 'tolist'):
+            return freeze(value.tolist())
         return value
     return Record(MappingProxyType({c.key: freeze(getattr(row, c.key)) for c in row.__table__.columns}))
 

@@ -9,7 +9,7 @@ from app.ingest.embedding import EmbeddingError, embed
 
 
 def test_embedding_transport_sends_only_one_extracted_text(monkeypatch):
-    settings = Settings(database_url="postgresql+psycopg://test@localhost/test")
+    settings = Settings(db=None, database_url="postgresql+psycopg://test@localhost/test")
     settings.embedding.api_key = SecretStr("synthetic-key")
     seen = []
 
@@ -44,7 +44,7 @@ def test_embedding_transport_sends_only_one_extracted_text(monkeypatch):
     (None, "Azure"),
 ])
 def test_embedding_transport_rejects_unknown_identity(monkeypatch, response_model, response_provider):
-    settings = Settings(database_url="postgresql+psycopg://test@localhost/test")
+    settings = Settings(db=None, database_url="postgresql+psycopg://test@localhost/test")
     settings.embedding.api_key = SecretStr("synthetic-key")
     original_client = httpx.Client
     payload = {"data": [{"index": 0, "embedding": [0.1]}]}
