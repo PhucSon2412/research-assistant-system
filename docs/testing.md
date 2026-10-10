@@ -1,5 +1,27 @@
 # Chiến lược kiểm thử
 
+## Sửa review PR #53 — operator identity và seal
+
+Tái hiện trước sửa trên `3c4c165`: 6 regression mới fail (`DID NOT RAISE`), 2 control owner/recovery đạt. Sau sửa tại `9139c01`: regression runtime cấp sai TEMP/protected write/thiếu grant/bắt chước recovery, lỗi probe/release, guard runtime lỗi, `_sweep_objects` với runtime đều từ chối trước mutation/S3; control owner/recovery dọn được khi gate pending thật. `sealed-fix-1`: **1584 unique pass**, exit 0, selection ⊆ collection chính xác, collect 4.561/2.977 not-run, 311 source hash trùng; bỏ smoke (đường worker không đổi; lịch sử `3b54a6f`). 9/9 countercheck. Debt 24 node giữ riêng. [Inventory](c2d5e1-test-inventory.json).
+
+## Review độc lập PR #53 tại 3c4c165
+
+**101/101 pass**: 71 cleanup runtime, 2 migration 0044, 28 migration/ORM; **hai regression operator mới fail đúng P2**, 0 setup error/skip. Runtime profile sai và identity probe lỗi đi operator purge khi safety pending. Không sửa production/test; 311 source hash hiện hành khớp sealed agent, snapshot review đầu ghi khi suite đã bắt đầu. [Report/evidence/giới hạn](reviews/pr53-c2d5e1-revoked-common-cleanup-runtime.md) · [Prompt sửa](tasks/fix-pr53-operator-cleanup-identity-and-seal.md).
+
+112 artifact hash và JUnit agent 1.575 unique pass được đối chiếu riêng, không cộng reviewer rerun. Đúng hai UUID1 khiến schema selection lệch: not-run logic **2.976**; raw 2.978 và seal exit 1 phải giữ lịch sử, sửa ID cho lượt sau. Reviewer chưa rerun 4.450 node repo, process smoke/web/base debt. PR OPEN/chưa merge, source `0044`, safety pending tới C4.
+
+## C2d-5e1 — kiểm nhánh cleanup runtime
+
+Code `3b54a6f`: **1575 API unique pass**, 0 fail/error/skip; collect 4551, 2978 not-run. Selection theo call graph: cleanup runtime mới (fence SQL/raw insert/race hai thứ tự/hash collision/isolation tham chiếu/S3 403-5xx-timeout/uncertain/release/clock/gate trong finalize/late accounting/recover), migration 0044, cleanup/publication cũ, revoke, document/common index, upload/approval, HTTP index/publish, recovery/backup, ORM/migration và smoke worker+beat Linux (SIGKILL giữa fence và delete). 24 node fail/error y hệt ở base `ba20fda` được deselect tường minh, ghi riêng là debt, không tính pass. 8/8 countercheck (role, gate cuối, trigger insert, bảo vệ tham chiếu, giữ ledger, hậu điều kiện, uncertain, release) bắt assertion nghiệp vụ; lượt yếu đầu (gate cuối) giữ riêng. Không web/provider live/dev/cutover. [Inventory](c2d5e1-test-inventory.json).
+
+## Kế hoạch C2d-5e1 sau merge PR #52 (lịch sử)
+
+[Prompt cleanup common revoked runtime](tasks/m6c2b2c2d5e1-revoked-common-cleanup-runtime.md) yêu cầu role runtime thật, PG/MinIO/Redis/journal cô lập: fence/raw SQL/shared-key race cả hai thứ tự, I/O ngoài DB, full derived scrub/retention, uncertain/release, late financial settlement và operator recovery tương thích. Worker/beat Linux thực và restart theo durable phases; gate pending/hold thật, countercheck phục hồi source trước sealed suite. Hồi quy hữu hạn theo call graph, selection/JUnit/hash và not-run ghi riêng. **Lượt giao chưa chạy test ứng dụng**; số PR #52 là lịch sử trước merge. Safety pending tới C4, không provider live/dev/cutover.
+
+## Review độc lập PR #52 tại 97bc6e7
+
+Reviewer thực chạy **254/254 API unique**, 0 fail/error/skip: 161 document runtime/common/schema + toàn migration/ORM, 92 private/common index/search/shared capacity/adapter, một process smoke Linux worker/beat thực với Redis outage/retry/restart. 302 source hashes trước/sau khớp; **4.223 node không chạy lại** theo collect 4.477. Artifact agent **703 API/8 countercheck** và 403 file manifest đối chiếu riêng, không cộng lượt reviewer. PR đã merge `ba20fda`, chưa rerun tại merge, source `0043`, safety pending tới C4. Không web/provider live/cutover/benchmark. [Report, evidence và cleanup/drift](reviews/pr52-c2d5d2b-document-index-runtime.md).
+
 ## C2d-5d2b — kiểm nhánh document runtime
 
 [Handoff](c2d5d2b-document-index-runtime.md) · [Inventory](c2d5d2b-test-inventory.json). Selection finite theo call graph: document private/common mới, worker/beat fake transport, extraction, index/shared capacity/query accounting, upload, HTTP index/revoke, cleanup/recovery và ORM/migration. JUnit unique khớp collect/selection; source hash trước/sau; counterchecks chạy riêng, khôi phục bytes trước seal. Raw lỗi chuẩn bị/base debt giữ ngoài repo, không cộng vào lượt cuối. Business cutover chỉ scoped; pending/hold/journal/role thật không bypass. Không web/provider live/dev/C3/C4; safety pending. Mục kế hoạch bên dưới giữ lịch sử tại lúc giao.

@@ -255,3 +255,32 @@ class RevocationMetadataRetention(Base):
     confirmed_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),
                                                             ForeignKey("users.id", ondelete="RESTRICT"))
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class ObjectDeleteFence(Base):
+    """Permanent authority to delete ONE object key of a revoked common copy (C2d-5e1, 0044).
+
+    Written only by ``ras_auth_cleanup_fence`` under the per-key advisory
+    lock, when no row that is not a revoked copy names the key. From its
+    commit every ``source_files`` INSERT of the key is refused (same lock,
+    DB trigger), so a deleted object never gains a new reference. Never
+    updated or deleted, also not by cleanup or ``purged_at``: it is the
+    deletion decision, not content. Key, tombstone tuple and a DB time only;
+    no FK, like the tombstone it names (it may outlive the rows).
+    """
+
+    __tablename__ = "object_delete_fences"
+    __table_args__ = (
+        UniqueConstraint("storage_key", name="uq_object_delete_fences_storage_key"),
+        CheckConstraint("length(storage_key) > 0", name="storage_key_not_empty"),
+        CheckConstraint("rights_epoch > 0", name="epoch_positive"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True,
+                                          server_default=text("gen_random_uuid()"))
+    storage_key: Mapped[str] = mapped_column(Text)
+    tombstone_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    source_file_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    rights_epoch: Mapped[int] = mapped_column(BigInteger)
+    fenced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))

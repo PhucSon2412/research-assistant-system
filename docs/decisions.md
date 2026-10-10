@@ -1,10 +1,44 @@
 # Nhật ký quyết định
 
+## Sửa review PR #53 — operator identity (2026-10-10)
+
+Theo [prompt sửa](tasks/fix-pr53-operator-cleanup-identity-and-seal.md), agent chọn bằng chứng dương dựa trên provisioning hiện có (`app.db_roles`), không migration mới: owner/migrator (superuser hoặc owner `deletion_tombstones`) hoặc login recovery (EXECUTE `ras_auth_restrict` + INSERT `revocation_journal_records` + không EXECUTE `ras_auth_session_create`), trên chính login thực, không SET ROLE. Đây là kiểm năng lực, không phải chứng nhận danh tính operator C3; login bị cấp sai đúng bộ quyền recovery vẫn được nhận như recovery. Lỗi probe/release từ chối. `recover` đổi lỗi thành `RecoveryError` có mã. ID tham số UUID1 cố định; seal kiểm selection ⊆ collection chính xác. Fence/retention/ledger/lock graph runtime không đổi. **Safety pending tới C4.**
+
+## Review PR #53 — operator identity fail open (2026-10-10)
+
+Tại head `3c4c165`, code/test `3b54a6f`, có **P2 chặn merge**: `_require_operator` coi mọi `runtime.Halt` là cho phép operator. Reviewer tái hiện runtime được thêm TEMP trên DB thử, và identity probe lỗi: cả hai xóa original/commit purged khi safety pending. Không chấp nhận biến thể kiểm ngược này; yêu cầu operator proof dương, lỗi kiểm danh tính phải đóng quyền, giữ đường recovery khi gate đóng mà không mở toàn C3. [Report](reviews/pr53-c2d5e1-revoked-common-cleanup-runtime.md) · [Prompt sửa](tasks/fix-pr53-operator-cleanup-identity-and-seal.md).
+
+Reviewer 101/101 cleanup/migration/ORM pass, hai regression mới fail đúng P2. 112 artifact hash/311 source hash và agent 1.575 pass kiểm riêng; not-run logic **2.976**, raw **2.978** lệch hai UUID1 đổi ID. Yêu cầu param ID ổn định, exact inventory và giữ lịch sử seal exit 1. PR vẫn OPEN/chưa merge, source `0044`, safety pending tới C4; không pricing/dev/provider hoặc task tiếp theo. Biến thể/ghi nhận của agent bên dưới giữ lịch sử, không là kết luận review chấp thuận.
+
+## Triển khai C2d-5e1 (2026-10-10)
+
+**Nguồn:** task C2d-5e1 (lựa chọn scoped của orchestrator, không phải xác nhận trực tiếp mới của chủ dự án). Code `3b54a6f` trên nhánh review, chưa merge. [Handoff](c2d5e1-revoked-common-cleanup-runtime.md).
+
+Theo đúng phương án giao: fence bền vững theo key (`0044`), prepare chỉ key lock + scalar, trigger SourceFile INSERT cùng key lock, S3 ngoài DB, finalize tombstone → item → journal, recovery giữ đường operator. **Biến thể/bổ sung do agent chọn, ghi rõ:** (1) trigger và routine từ chối transaction không READ COMMITTED vì snapshot cũ có thể không thấy fence vừa commit; (2) `derived_rows_shared` kiểm cả ở prepare để không fence/xóa object khi cleanup chắc chắn dừng; (3) helper cũ đổi tên `operator_cleanup_revoked`, từ chối login thỏa `require_runtime` (kiểm ngược, không phải chứng nhận danh tính operator); test cũ gọi cleanup thường bằng engine runtime chuyển sang boundary runtime; (4) lock timeout ở tombstone/item/key → `skipped:cleanup_busy` không tăng attempt (chưa có test riêng); (5) clock sau journal là sàn (`recorded_at`, không lùi) vì cleanup không có lease. Thay đổi hợp đồng: fence (metadata vận hành) còn lại sau lỗi DB/S3 sau prepare; nội dung DB vẫn rollback. CLI cleanup với Compose mặc định (owner) nay bị từ chối; drill/demo lịch sử không chạy lại. 24 node debt base được tái hiện ở `ba20fda` và giữ riêng. **Safety pending tới C4.**
+
+## Giao C2d-5e1 sau merge PR #52 (2026-10-10)
+
+**Nguồn:** chủ dự án báo merge và yêu cầu prompt tiếp theo; orchestrator chọn phạm vi theo ủy quyền. GitHub/Git xác minh merge **`ba20fda402840243f13bd4bb27e98c4c0cb17562`**, head `97bc6e7` là ancestor và tree khớp merge; source migration **0043**, không suy revision DB dev. Kết quả PR #52 giữ theo code/review trước merge, không rerun tại merge.
+
+[Prompt C2d-5e1](tasks/m6c2b2c2d5e1-revoked-common-cleanup-runtime.md) chuyển normal Celery/CLI/direct cleanup của bản chung đã thu hồi sang runtime. Hiện cleanup giữ transaction/locks khi xóa S3, còn recovery dùng chung helper; task tách DB prepare/pre-delete/finalization khỏi I/O và giữ operator recovery thành điểm vào riêng. Không dùng runtime gate cần ready cho recover hoặc cho runtime chọn bypass/operator engine.
+
+**Lựa chọn scoped của orchestrator:** fence bền vững theo object key và serialize với mọi SourceFile INSERT bằng cơ chế DB; prepare chỉ key lock + scalar reads, finalization tombstone → item, không giữ DB/key/journal lock qua S3. `storage_key` không unique, nên hai SELECT hoặc key ngẫu nhiên không chứng minh an toàn trước liên kết mới. Key được authorize delete không nhận tham chiếu mới; tham chiếu private/live common/item vắng hiện có phải được bảo vệ. Fence là metadata vận hành tối thiểu, không bị xóa cùng dẫn xuất. Đây không phải xác nhận trực tiếp mới của chủ dự án hoặc luật kiến trúc vĩnh viễn; biến thể phải chứng minh cả hai thứ tự race và lock graph không cycle.
+
+Prepare uncertain/release lỗi không S3; final commit exception dừng batch, không SELECT suy landed/error writer/retry trong attempt. Delete đã admit có thể xong sau hold; không final commit khi gate đóng. S3 không rollback cùng DB. Giữ metadata retention, isolation item/key, financial nonce/day/ceiling và late settlement không resurrect vector. Orphan reconcile → discovery/citation → query/rerank/search → RAG/generation → tổng hồi quy C2d còn riêng; C3/C4 theo điều kiện đã ghi. **Safety pending tới C4**, không mở pricing/provider thật.
+
+Lượt giao chỉ khảo sát source/Git và sửa/kiểm docs; chưa triển khai cleanup hoặc chạy test ứng dụng, không `.env`/dev/provider.
+
+## Review PR #52 (2026-10-10)
+
+Tại head `97bc6e7` (code/test `43a6564`, diff sau sealed chỉ docs), không phát hiện điểm chặn merge mới trong scope private/common document index runtime. Reviewer thực chạy **254/254 API**, gồm process worker/beat Linux, Redis outage/restart và shared index/search; 302 source hashes khớp. Artifact agent **703 API/8 countercheck**, 403 file được kiểm riêng. PR đã merge `ba20fda`, chưa rerun tại merge; source `0043`, **safety pending tới C4**. [Report](reviews/pr52-c2d5d2b-document-index-runtime.md).
+
+Kết luận giữ ranh giới content/financial settlement, nonce fencing và hai giới hạn hash→provider/commit, settlement→vector. Không mở pricing/default Compose/API cutover hoặc chứng nhận query/rerank/RAG/background còn lại; bốn baseline debt giữ riêng trước tổng hồi quy/C4. Đính chính nhận định sai của orchestrator về alias `_locked` ở mục giao bên dưới và task. Chín container có sẵn giữ ID/image; StartedAt worker/beat drift, không thao tác dev. Review chỉ sửa docs, không commit/push/merge/comment PR.
+
 ## Giao C2d-5d2b sau merge PR #51 (2026-10-10)
 
 **Nguồn:** chủ dự án báo đã merge PR #51 và yêu cầu prompt tiếp theo; orchestrator chọn phạm vi theo ủy quyền trước đó. GitHub/Git xác minh merge **`9fb8890568af85b7beea4503f93f12e2896e6c89`**, head `b569d0c` là ancestor và tree khớp merge; source `0042`. Không truy vấn revision DB dev hoặc chạy lại test tại merge.
 
-[Prompt document embedding/index runtime](tasks/m6c2b2c2d5d2b-document-index-runtime.md) đã viết, **chưa triển khai/kiểm**. Chuyển cả private/common từ index-state dispatch/claim tới reservation, heartbeat, provider admission/outcome và atomic publish. Không nối lại helper indexer legacy. Khảo sát nguồn thấy indexer còn import `worker._locked` đã gỡ, Session/commit và provider-capacity maintenance cũ; agent phải tái hiện trên settings thử rồi chuyển call graph, không dựng fallback owner.
+[Prompt document embedding/index runtime](tasks/m6c2b2c2d5d2b-document-index-runtime.md) đã viết; **tại lúc giao chưa triển khai/kiểm**, sau đó triển khai trong PR #52. Chuyển cả private/common từ index-state dispatch/claim tới reservation, heartbeat, provider admission/outcome và atomic publish. Không nối lại helper indexer legacy. **Đính chính sau khảo sát/review:** tại base `9fb8890`, `worker._locked` vẫn là alias `checkpoints.leased`, không bị gỡ; import thành công nhưng predicate extraction từ chối index. Nhận định import lỗi trước đây của orchestrator là sai. Session/commit và provider-capacity maintenance cũ vẫn phải chuyển call graph, không dựng fallback owner. [Đối chiếu](reviews/pr52-c2d5d2b-document-index-runtime.md#sửa-nhận-định-trong-prompt-của-orchestrator).
 
 **Lựa chọn scoped của orchestrator, không phải xác nhận trực tiếp mới của chủ dự án:** giữ private active latest status/receipt và common exact rights như extraction; job không dựa cookie Admin. Tách quyền content khỏi late accounting: khi gate hợp lệ, kết quả provider đã gửi được đối soát một lần theo call/attempt/day gốc dù job mất quyền; không lưu vector hoặc resurrect content. Heartbeat/reaper cần binding và lock order riêng, không bỏ giữ trần chi phí uncertain. Giữ kế toán common owner NULL/app + embedding bucket (phương án orchestrator trước đây), budget/model/allowlist/pricing mặc định; fake transport qua adapter thật, không live key. Final hash luôn sau entry cuối, kể cả reuse completed; khe overwrite sau hash vẫn được ghi rõ.
 

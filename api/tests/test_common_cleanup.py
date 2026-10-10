@@ -277,7 +277,7 @@ def test_cleanup_removes_every_derivative_of_the_revoked_copies_and_nothing_else
     assert api.scalar(stale, i=uuid.UUID(other)) == 0
     kept["other"] = rows_of(api, other)
 
-    assert publication.cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 2}
+    assert publication.operator_cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 2}
     for name in ("md", "pdf"):
         copy = copies[name]
         assert derived_counts(api, copy) == dict.fromkeys(DERIVED, 0), name
@@ -324,7 +324,7 @@ def test_cleanup_removes_every_derivative_of_the_revoked_copies_and_nothing_else
 
     # Rerunning changes nothing.
     before = {name: rows_of(api, copies[name]) for name in copies}
-    assert publication.cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {}
+    assert publication.operator_cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {}
     assert {name: rows_of(api, copies[name]) for name in copies} == before
 
     # A scrubbed call still reserved keeps its slot and ceiling until its lease expires; the reaper then
@@ -414,7 +414,7 @@ def test_late_writes_after_purge_are_refused_and_cost_stays_reconcilable(world):
         conn.execute(text("""UPDATE embedding_calls SET vector=NULL, chunk_hash=NULL, content_removed_at=now()
             WHERE source_file_id=:f"""), {"f": uuid.UUID(ids["a_md"]["file_id"])})
 
-    assert publication.cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 1}
+    assert publication.operator_cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 1}
     for statement, message in late_writes(api, md, ids["a_md"]):
         with pytest.raises(IntegrityError, match=message), api.setup_engine.begin() as conn:
             conn.execute(text(statement), {"i": uuid.UUID(md)})
@@ -477,7 +477,7 @@ def test_writer_before_revoke_commits_first_and_cleanup_removes_its_rows(world, 
     revoker.join(10)
     assert outcome == {"ok": True}
     assert derived_counts(api, md)["sections"] == before["sections"] + 1
-    assert publication.cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 1}
+    assert publication.operator_cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 1}
     assert derived_counts(api, md) == dict.fromkeys(DERIVED, 0)
     assert "RACECANARY" not in api.dump_all_text()
 
@@ -522,7 +522,7 @@ def test_writer_waiting_on_a_revoke_is_refused_after_t_rev(world, monkeypatch):
     assert outcome.get("revoked") is True and "written" not in outcome
     assert CLOSED in outcome["refused"]
     assert derived_counts(api, pdf) == before
-    assert publication.cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 1}
+    assert publication.operator_cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 1}
     assert derived_counts(api, pdf) == dict.fromkeys(DERIVED, 0)
 
 
@@ -542,7 +542,7 @@ def test_failure_mid_cleanup_rolls_back_everything_and_is_retried(world, monkeyp
     # 1. A DB error after the derived rows were deleted: everything rolls back.
     real_finish = publication._finish_jobs
     monkeypatch.setattr(publication, "_finish_jobs", lambda db, item_id, at: db.execute(text("SELECT 1/0")))
-    assert publication.cleanup_revoked(api.setup_engine, storage, now, 50) == {"error:cleanup_failed": 1}
+    assert publication.operator_cleanup_revoked(api.setup_engine, storage, now, 50) == {"error:cleanup_failed": 1}
     assert rows_of(api, md) == rows and tuple(tomb()) == (None, 1, "cleanup_failed")
     monkeypatch.setattr(publication, "_finish_jobs", real_finish)
 
@@ -551,7 +551,7 @@ def test_failure_mid_cleanup_rolls_back_everything_and_is_retried(world, monkeyp
         def size(self, key):
             raise ConnectionError("synthetic S3 outage")
 
-    assert publication.cleanup_revoked(api.setup_engine, Down(), now, 50) == {"error:storage_unavailable": 1}
+    assert publication.operator_cleanup_revoked(api.setup_engine, Down(), now, 50) == {"error:storage_unavailable": 1}
     assert rows_of(api, md) == rows and tuple(tomb()) == (None, 2, "storage_unavailable")
 
     # 3. The object is deleted, then the transaction fails: rows come back, the object stays gone.
@@ -562,7 +562,7 @@ def test_failure_mid_cleanup_rolls_back_everything_and_is_retried(world, monkeyp
         raise RuntimeError("synthetic failure after the object delete")
 
     monkeypatch.setattr(publication, "_remove_metadata", fail_after_object)
-    assert publication.cleanup_revoked(api.setup_engine, storage, now, 50) == {"error:cleanup_failed": 1}
+    assert publication.operator_cleanup_revoked(api.setup_engine, storage, now, 50) == {"error:cleanup_failed": 1}
     assert rows_of(api, md) == rows and tuple(tomb()) == (None, 3, "cleanup_failed")
     assert key not in {k for k, _ in storage.orphan_keys("")}
     detail = browsers["admin"].get(f"/admin/common-copies/{md}").json()["item"]["tombstone"]
@@ -571,7 +571,7 @@ def test_failure_mid_cleanup_rolls_back_everything_and_is_retried(world, monkeyp
     monkeypatch.setattr(publication, "_remove_metadata", real)
 
     # The retry finishes the job.
-    assert publication.cleanup_revoked(api.setup_engine, storage, now, 50) == {"already_absent": 1}
+    assert publication.operator_cleanup_revoked(api.setup_engine, storage, now, 50) == {"already_absent": 1}
     assert derived_counts(api, md) == dict.fromkeys(DERIVED, 0)
     purged_at, attempts, error = tomb()
     assert (purged_at, attempts, error) == (now, 4, None)

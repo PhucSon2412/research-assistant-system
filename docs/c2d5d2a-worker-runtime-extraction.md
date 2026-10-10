@@ -19,7 +19,8 @@ Worker/beat dùng engine ứng dụng từ `RAS_DB__*`, kiểm login thực trư
 | Validate, Markdown/PDF extract/chunk, reconcile trong extraction | Đã chuyển theo proof bất biến, I/O ngoài DB, DML trước journal |
 | `awaiting_index`, `indexing`, retry `resume_state=indexing` | Giữ nguyên, mã `index_pending`; không claim/attempt/ledger/provider |
 | `indexer.process_index` và các helper provider | Legacy còn trong module, không còn được worker gọi; C2d-5d2b |
-| `ras.discovery.sync`, `ras.citations.reconcile`, `ras.revocation.cleanup` | Chỉ kiểm runtime/gate đầu; business boundary còn legacy |
+| `ras.discovery.sync`, `ras.citations.reconcile` | Chỉ kiểm runtime/gate đầu; business boundary còn legacy |
+| `ras.revocation.cleanup` | Tại PR này chỉ kiểm runtime/gate đầu; **sau C2d-5e1** dùng boundary runtime [cleanup](c2d5e1-revoked-common-cleanup-runtime.md) |
 | Recovery/operator/CLI reconcile/cleanup/backup | Không chuyển trong PR; engine/setup theo hợp đồng riêng |
 | Search/query embedding/rerank, RAG/generation | Task riêng; không kiểm provider/cutover ở PR này |
 

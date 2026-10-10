@@ -96,7 +96,7 @@ def test_python_and_sql_independently_reject_field_shapes(engine,kind,shape,fiel
 
 
 @pytest.mark.parametrize("kind",journal.AUTH_KINDS)
-@pytest.mark.parametrize("field,value",[("operation_id","not-uuid"),("generation",str(uuid.uuid1())),("user_id","A"*36),
+@pytest.mark.parametrize("field,value",[("operation_id","not-uuid"),pytest.param("generation","00000000-0000-1000-8000-000000000001",id="generation-uuid1"),("user_id","A"*36),
     ("reason_code","caller_rehash"),("recorded_at","2026-10-03T09:00:00"),("recorded_at","2026-10-03T24:00:00+00:00"),
     ("recorded_at","infinity"),("recorded_at","2026-02-30T09:00:00Z")])
 def test_bad_values_no_sql_unknown(engine,kind,field,value):
@@ -745,9 +745,9 @@ def test_common_publish_download_revoke_cleanup_direct(engine, app_env, journal_
                 return len(copy.storage.objects[key])
             def delete(self, key):
                 copy.storage.delete(key)
-        counts = publication.cleanup_revoked(engine, Storage(), NOW+timedelta(seconds=2), 100)
+        counts = publication.operator_cleanup_revoked(engine, Storage(), NOW+timedelta(seconds=2), 100)
         assert not any(k.startswith('error:') for k in counts), counts
-        assert publication.cleanup_revoked(engine, Storage(), NOW+timedelta(seconds=2), 100) == {}
+        assert publication.operator_cleanup_revoked(engine, Storage(), NOW+timedelta(seconds=2), 100) == {}
         assert copy.key not in copy.storage.objects and list(copy.storage.objects.values()) == [BODY]
         with Session(engine) as db:
             assert db.get(LibraryItem, copy.item).title is None

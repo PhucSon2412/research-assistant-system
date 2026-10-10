@@ -2,7 +2,8 @@
 
 Every task first checks the recovery gate (M6c-1) and does nothing while it is
 closed: no ingest, discovery, citation reconcile or cleanup runs against a
-database that may be a restored, stale copy. ``recover`` runs cleanup itself.
+database that may be a restored, stale copy. ``recover`` runs its own operator
+cleanup; ``ras.revocation.cleanup`` uses the runtime boundary ``app.ingest.cleanup``.
 """
 
 from __future__ import annotations
@@ -19,9 +20,8 @@ from app.ingest.worker import due_job_ids, process_job, dispatchable
 from app.ingest import runtime
 from app.discovery import run_sync
 from app.citations import reconcile_pending
-from app.clock import utcnow
 from app.db import get_engine
-from app.publication import cleanup_revoked
+from app.ingest.cleanup import cleanup_revoked
 from app.storage import get_storage
 
 try:
@@ -118,4 +118,5 @@ def cleanup_revoked_copies() -> dict:
     # Tombstones in PostgreSQL are the durable queue; a missed run is retried next time.
     if not _gate("ras.revocation.cleanup"):
         return {"skipped": "recovery_gate_closed"}
-    return cleanup_revoked(get_engine(), get_storage(settings), utcnow(), settings.retention.cleanup_batch_size)
+    # Runtime boundary: each checkpoint rechecks login/gate; S3 runs outside DB transactions.
+    return cleanup_revoked(get_engine(), get_storage(settings), settings)

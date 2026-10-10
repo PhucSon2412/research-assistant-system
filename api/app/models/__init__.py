@@ -12,7 +12,8 @@ from app.models.ingest import Chunk, IngestionJob, IngestStepAttempt, MetadataCa
 from app.models.library import LibraryItem, PaperVersion, SourceFile
 from app.models.recovery import RecoveryRegistration, RevocationJournalRecord
 from app.models.review import ReviewRequest
-from app.models.rights import AccessRights, CommonPublication, DeletionTombstone, RevocationMetadataRetention
+from app.models.rights import (AccessRights, CommonPublication, DeletionTombstone, ObjectDeleteFence,
+                               RevocationMetadataRetention)
 from app.models.search import RagRequestDay, SearchRequestDay, SearchUsage
 from app.models.upload import ProcessingAcknowledgement, UploadIntent
 
@@ -28,6 +29,7 @@ __all__ = [
     "IngestionJob",
     "IngestStepAttempt",
     "MetadataCandidate",
+    "ObjectDeleteFence",
     "Section",
     "Chunk",
     "PdfPage",

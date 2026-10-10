@@ -521,7 +521,7 @@ def test_response_reflects_current_job_after_known_commit(indexes, monkeypatch, 
         else:
             runtime_revoke(b.w, b.copy.item, clock=b.clock)
             if case == 'cleanup':
-                done = publication.cleanup_revoked(b.w.engine, b.raw_storage, NOW + timedelta(days=2), 10)
+                done = publication.operator_cleanup_revoked(b.w.engine, b.raw_storage, NOW + timedelta(days=2), 10)
                 assert sum(done.values()) == 1
         return real(principal, item_id, csrf, clock, settings, outcome)
     monkeypatch.setattr(boundary, 'respond', respond)

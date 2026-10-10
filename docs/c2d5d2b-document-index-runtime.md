@@ -1,5 +1,9 @@
 # C2d-5d2b — document embedding/index qua runtime
 
+**Bàn giao sau merge PR #52 `ba20fda`:** [task C2d-5e1 cleanup common revoked runtime](tasks/m6c2b2c2d5e1-revoked-common-cleanup-runtime.md). Normal cleanup tách DB/S3 và thêm fence shared key; operator recovery giữ đường riêng. Kết quả dưới đây giữ source trước merge, không rerun tại merge; safety pending tới C4.
+
+**Review độc lập PR #52 tại `97bc6e7` (2026-10-10):** không phát hiện điểm chặn merge mới trong scope document index runtime. Reviewer **254/254 API**, gồm shared index/search và worker/beat Linux thực; 302 source hashes khớp. Artifact agent 703 API/8 countercheck kiểm riêng. PR đã merge `ba20fda`, chưa rerun tại merge; source `0043`, safety pending tới C4. [Report, cleanup và giới hạn](reviews/pr52-c2d5d2b-document-index-runtime.md).
+
 [Task](tasks/m6c2b2c2d5d2b-document-index-runtime.md) · [Inventory](c2d5d2b-test-inventory.json) · [Extraction](c2d5d2a-worker-runtime-extraction.md)
 
 Base đã fetch: `origin/main = 9fb8890568af85b7beea4503f93f12e2896e6c89`, merge PR #51. Nhánh `feat/m6c2b2c2d5d2b-document-index-runtime` tạo từ base đó. Commit `d80961c` giữ riêng toàn bộ tài liệu orchestrator/review có sẵn. Source migration `0042 → 0043`; không suy revision DB dev. **Safety pending tới C4**, không mở pricing/cutover hay provider thật.
@@ -14,7 +18,7 @@ Base đã fetch: `origin/main = 9fb8890568af85b7beea4503f93f12e2896e6c89`, merge
 | Content | `document_index.{claim,proof,step,pre_send,store_result,fail}` | Owner User nếu private → item UPDATE → job UPDATE → rights/publication/version/file/consent/sections/pages/chunks → capacity → generation/entries → budget/call cần thiết → flush + constraints → journal exclusive trực tiếp → exact predicates/state/clock → commit |
 | Financial maintenance | `document_accounting.{renew,reap,settle}` | Runtime/gate entry → capacity → call UUID → original-day budgets → flush/constraints → journal exclusive → exact tuple/status/clock → commit; không khóa item/User/job, không ghi content |
 | Shared query admission | `provider_capacity.reap_expired` compatibility bridge | Legacy query expiry giữ API; nonce-bound document expiry chuyển sang reaper runtime sau khi nhả capacity transaction cũ. Query/rerank/RAG provider boundary vẫn task riêng |
-| Discovery/citation/cleanup/recovery/operator | Giữ hợp đồng trước | Không coi đã chuyển business boundary; cleanup dùng làm đối thủ/system fixture có nhãn |
+| Discovery/citation/cleanup/recovery/operator | Giữ hợp đồng trước | Không coi đã chuyển business boundary; cleanup dùng làm đối thủ/system fixture có nhãn. **Sau C2d-5e1:** normal cleanup chuyển [runtime](c2d5e1-revoked-common-cleanup-runtime.md), helper cũ thành `operator_cleanup_revoked` cho recovery/fixture có nhãn |
 
 Worker/beat dùng engine runtime từ `RAS_DB__*`; guard kiểm actual login/membership/ownership/protected auth writes/DDL/TEMP và các grant index/capacity. Không provision hoặc mở connection recovery/owner trong runtime. Mọi content checkpoint có Session ngắn, rollback và close đều được thử; release lỗi invalidate và dừng. `Outcome` độc lập teardown; commit exception luôn uncertain, không SELECT suy commit, failure checkpoint, retry, giải tiền hay xóa original trong attempt đó.
 

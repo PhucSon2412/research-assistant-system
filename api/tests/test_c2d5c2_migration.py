@@ -55,7 +55,7 @@ def test_0041_populated_upgrade_acl_reprovision_preserves_journal_retention(empt
         before=journal_path.read_bytes()
         with eng.connect() as c:
             rows={t:c.execute(text(f'SELECT * FROM {t} ORDER BY 1')).all() for t in ('deletion_tombstones','revocation_metadata_retentions','revocation_journal_records')}
-        upgrade(empty_db_url)
+        upgrade(empty_db_url,'0042')  # this revision's own contract; 0044 has its own upgrade test
         for repeat in (False,True):
             if repeat: provision(eng,runtime='c1_runtime',recovery='c1_recovery',definer='c1_definer')
             with eng.connect() as c:

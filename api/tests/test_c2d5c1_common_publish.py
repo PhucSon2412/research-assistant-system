@@ -734,7 +734,7 @@ def test_response_after_revoke_cleanup_uses_new_history_proof_no_stale_dto(publi
     def respond(*a, **kw):
         revoke(b)
         if cleanup:
-            publication.cleanup_revoked(b.w.engine, b.raw_storage, NOW + timedelta(days=2), 10)
+            publication.operator_cleanup_revoked(b.w.engine, b.raw_storage, NOW + timedelta(days=2), 10)
         return real(*a, **kw)
     monkeypatch.setattr(boundary, 'respond', respond)
     r = publish(b)

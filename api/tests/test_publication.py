@@ -659,12 +659,12 @@ def test_cleanup_removes_only_the_common_object_and_is_safe_to_repeat(upload_api
         def size(self, key):
             raise ConnectionError("synthetic S3 outage")
 
-    counts = publication.cleanup_revoked(api.setup_engine, Down(), now, 50)
+    counts = publication.operator_cleanup_revoked(api.setup_engine, Down(), now, 50)
     assert counts == {"error:storage_unavailable": 2, "shared_kept": 1}
     assert api.scalar("SELECT count(*) FROM deletion_tombstones WHERE purged_at IS NULL AND cleanup_attempts=1"
                       " AND last_cleanup_error='storage_unavailable'") == 2
 
-    counts = publication.cleanup_revoked(api.setup_engine, storage, now + timedelta(minutes=15), 50)
+    counts = publication.operator_cleanup_revoked(api.setup_engine, storage, now + timedelta(minutes=15), 50)
     assert counts == {"deleted": 1, "already_absent": 1}
     remaining = object_keys(storage)
     assert keys[copies[0]] not in remaining and keys[copies[1]] not in remaining
@@ -684,7 +684,7 @@ def test_cleanup_removes_only_the_common_object_and_is_safe_to_repeat(upload_api
     assert b.get(f"/files/{shared_file}/original").status_code == 404
 
     # Rerunning is a no-op.
-    assert publication.cleanup_revoked(api.setup_engine, storage, now + timedelta(hours=1), 50) == {}
+    assert publication.operator_cleanup_revoked(api.setup_engine, storage, now + timedelta(hours=1), 50) == {}
     assert state(api, copies[3]) == "pending"
 
     # A derived full-text row is removed with the copy (M6b-2b2a; full coverage in test_common_cleanup);
@@ -696,7 +696,7 @@ def test_cleanup_removes_only_the_common_object_and_is_safe_to_repeat(upload_api
             WHERE item_id=:i"""),
             {"i": uuid.UUID(copies[3])})
     assert revoke(admin, copies[3]).status_code == 200
-    assert publication.cleanup_revoked(api.setup_engine, Down(), now + timedelta(hours=2), 50) == {
+    assert publication.operator_cleanup_revoked(api.setup_engine, Down(), now + timedelta(hours=2), 50) == {
         "error:storage_unavailable": 1}
     assert api.scalar("SELECT count(*) FROM metadata_candidates WHERE item_id=:i", i=uuid.UUID(copies[3])) == 1
     assert key_present(storage, keys[copies[3]])
@@ -705,7 +705,7 @@ def test_cleanup_removes_only_the_common_object_and_is_safe_to_repeat(upload_api
     api.clock.advance(hours=25)
     admin = api.admin_browser()  # the old session went idle
     assert admin.get(f"/admin/common-copies/{copies[3]}").json()["item"]["tombstone"]["overdue"] is True
-    assert publication.cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 1}
+    assert publication.operator_cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 1}
     assert api.scalar("SELECT count(*) FROM metadata_candidates WHERE item_id=:i", i=uuid.UUID(copies[3])) == 0
     assert not key_present(storage, keys[copies[3]])
     no_secrets_in(api, caplog)
@@ -748,7 +748,7 @@ def test_restored_backup_is_gated_until_recover_replays_the_journal(upload_api, 
     snapshot = app_db.make_engine(snapshot_url)
     try:
         assert revoke(admin, copy, "rights_withdrawn").status_code == 200
-        assert publication.cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 1}
+        assert publication.operator_cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 1}
         journal = journal_revocations()
         assert [e["item_id"] for e in journal] == [copy]
         for secret in FORBIDDEN_IN_LOGS:
@@ -912,7 +912,7 @@ def test_cleanup_removes_revoked_metadata_by_default(upload_api, monkeypatch):
         assert_hidden(browser, copy, common_file(api, copy), who)
     assert b.get(f"/collections/{box['id']}/items").json()["total"] == 0
 
-    assert publication.cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 1}
+    assert publication.operator_cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 1}
     meta = copy_metadata(api, copy)
     assert meta.pop("scrubbed") is True and set(meta.values()) == {None}
     with api.setup_engine.connect() as conn:
@@ -944,7 +944,7 @@ def test_cleanup_removes_revoked_metadata_by_default(upload_api, monkeypatch):
             ("UPDATE access_rights SET evidence_note='again' WHERE item_id=:i", "final")):
         with pytest.raises(IntegrityError, match=message), api.setup_engine.begin() as conn:
             conn.execute(text(statement), {"i": uuid.UUID(copy)})
-    assert publication.cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {}  # rerun is a no-op
+    assert publication.operator_cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {}  # rerun is a no-op
 
 
 def test_revocation_keeps_only_fields_with_a_recorded_basis(upload_api, monkeypatch):
@@ -969,7 +969,7 @@ def test_revocation_keeps_only_fields_with_a_recorded_basis(upload_api, monkeypa
     assert response.status_code == 200, response.text
     for who, browser in (("a", a), ("b", b), ("admin", admin)):  # a kept title opens nothing
         assert_hidden(browser, copy, common_file(api, copy), who)
-    assert publication.cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 1}
+    assert publication.operator_cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 1}
     meta = copy_metadata(api, copy)
     assert (meta["title"], meta["evidence_note"]) == ("Bản chung đã kiểm", ADMIN_EVIDENCE)
     assert {k for k, v in meta.items() if k != "scrubbed" and v is not None} == {"title", "evidence_note"}
