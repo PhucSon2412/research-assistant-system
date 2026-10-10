@@ -52,6 +52,10 @@ EXPECTED_TABLES = {
     "recovery_registrations", "revocation_journal_records",
     # C2d-5e1 (0044)
     "object_delete_fences",
+    # C2d-5e2 (0045)
+    "orphan_object_completions",
+    "orphan_object_fences",
+    "orphan_reconcile_cursors",
 }
 
 

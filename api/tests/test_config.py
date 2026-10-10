@@ -47,6 +47,8 @@ def test_defaults_match_documented_mvp_values() -> None:
     assert (s.files.pdf_max_bytes, s.files.pdf_max_pages, s.files.markdown_max_bytes) == (30 * MIB, 100, 2 * MIB)
     assert s.files.upload_intent_lifetime == timedelta(minutes=10)
     assert s.files.orphan_grace == timedelta(hours=24)
+    # C2d-5e2: bounded manual orphan reconcile pass.
+    assert (s.files.orphan_list_page_size, s.files.orphan_max_pages, s.files.orphan_max_deletes) == (500, 20, 100)
     assert s.files.pdf_probe_timeout_seconds == 10
     assert s.files.pdf_probe_memory_bytes == 256 * MIB
     # M6b-2b1: verified common downloads spooled at once per API process.
@@ -115,6 +117,12 @@ def test_redis_broker_password_is_url_escaped() -> None:
         lambda: FileLimits(pdf_max_bytes=0),
         lambda: FileLimits(upload_intent_lifetime=timedelta(0)),
         lambda: FileLimits(orphan_grace=timedelta(minutes=10)),
+        lambda: FileLimits(orphan_list_page_size=0),
+        lambda: FileLimits(orphan_list_page_size=1001),
+        lambda: FileLimits(orphan_max_pages=0),
+        lambda: FileLimits(orphan_max_pages=1001),
+        lambda: FileLimits(orphan_max_deletes=0),
+        lambda: FileLimits(orphan_max_deletes=10001),
         lambda: FileLimits(pdf_probe_timeout_seconds=0),
         lambda: FileLimits(verified_download_max_concurrent=0),
         lambda: FileLimits(verified_download_max_concurrent=65),

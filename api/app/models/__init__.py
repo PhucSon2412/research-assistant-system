@@ -10,6 +10,7 @@ from app.models.identity import BootstrapState, Invitation, PasswordResetToken, 
 from app.models.index import EmbeddingBudgetDay, EmbeddingCall, EmbeddingUserBudgetDay, IndexEntry, IndexGeneration
 from app.models.ingest import Chunk, IngestionJob, IngestStepAttempt, MetadataCandidate, PdfPage, ReferenceEntry, Section
 from app.models.library import LibraryItem, PaperVersion, SourceFile
+from app.models.orphans import OrphanObjectCompletion, OrphanObjectFence, OrphanReconcileCursor
 from app.models.recovery import RecoveryRegistration, RevocationJournalRecord
 from app.models.review import ReviewRequest
 from app.models.rights import (AccessRights, CommonPublication, DeletionTombstone, ObjectDeleteFence,
@@ -30,6 +31,7 @@ __all__ = [
     "IngestStepAttempt",
     "MetadataCandidate",
     "ObjectDeleteFence",
+    "OrphanObjectCompletion", "OrphanObjectFence", "OrphanReconcileCursor",
     "Section",
     "Chunk",
     "PdfPage",

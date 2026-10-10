@@ -19,6 +19,7 @@ from app.main import app
 from app.storage import get_storage
 from app.clock import utcnow
 from app.cli import reconcile_originals
+from app.ingest import orphans
 from app.models import SourceFile
 from tests.helpers import WEB_ORIGIN, Harness, Browser, FakeClock, DEV_ENV, ADMIN_EMAIL, ADMIN_PASSWORD, USER_PASSWORD
 from tests.test_c2c1_bootstrap import installation
@@ -281,12 +282,13 @@ def test_reconcile_removes_crash_orphan_but_keeps_referenced_file(upload_api, mo
     a = api.user_browser("a@example.org")
     data = b"# keep\n"
     assert send(a, intent(a, data).json()["intent_token"], data).status_code == 201
-    storage.put("originals/crash-orphan", io.BytesIO(b"orphan"), "text/markdown")
+    # A crash orphan has the key shape upload/approval mint (C2d-5e2 never touches other names).
+    storage.put("originals/" + uuid.uuid4().hex, io.BytesIO(b"orphan"), "text/markdown")
     assert len(list(storage.orphan_keys())) == 2
     monkeypatch.setattr(reconcile_originals, "get_settings", app_config.get_settings)
-    monkeypatch.setattr(reconcile_originals, "get_engine", lambda: api.engine)
-    monkeypatch.setattr(reconcile_originals, "utcnow", lambda: utcnow() + timedelta(days=2))
-    reconcile_originals.main()
+    monkeypatch.setattr(reconcile_originals, "get_engine", lambda: api.engine)  # the runtime login
+    monkeypatch.setattr(orphans, "utcnow", lambda: utcnow() + timedelta(days=2))
+    assert reconcile_originals.main(["--apply"]) == 0
     assert len(list(storage.orphan_keys())) == 1
 
 

@@ -34,7 +34,8 @@ def require_runtime(db):
               OR has_table_privilege('revocation_journal_records','INSERT')
               OR EXISTS (SELECT 1 FROM unnest(ARRAY['users','invitations','bootstrap_state','sessions',
                  'password_reset_tokens','auth_change_receipts','auth_safety_heads','auth_safety_state',
-                 'auth_hash_policies','revocation_journal_records','object_delete_fences']) AS t(name)
+                 'auth_hash_policies','revocation_journal_records','object_delete_fences',
+                 'orphan_object_fences','orphan_object_completions']) AS t(name)
                  WHERE has_table_privilege(t.name,'INSERT,UPDATE,DELETE,TRUNCATE,TRIGGER')
                    OR has_any_column_privilege(t.name,'INSERT,UPDATE,REFERENCES'))
               OR NOT has_function_privilege('ras_auth_lock_users(uuid[])','EXECUTE')

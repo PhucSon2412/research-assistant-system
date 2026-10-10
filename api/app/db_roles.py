@@ -12,13 +12,13 @@ RUNTIME_ROUTINES = {"ras_auth_review_closure_mirror", "ras_auth_review_closure_c
                     "ras_auth_reset_token_live", "ras_auth_token_lock", "ras_auth_token_close", "ras_auth_bootstrap_prepare",
                     "ras_auth_invitation_lock", "ras_auth_invitation_create", "ras_auth_invitation_revoke",
                     "ras_auth_invitation_prepare", "ras_auth_invitation_compensate", "ras_auth_invitation_recover",
-                    "ras_auth_cleanup_fence"}
+                    "ras_auth_cleanup_fence", "ras_auth_orphan_fence", "ras_auth_orphan_complete"}
 RECOVERY_ROUTINES = {"ras_auth_mirror", "ras_auth_confirm", "ras_auth_project", "ras_auth_restrict", "ras_auth_progress", "ras_auth_lock_users",
                      "ras_auth_account_live", "ras_auth_session_live", "ras_auth_session_lock",
                      "ras_auth_session_close", "ras_auth_closure_mirror", "ras_auth_status_live", "ras_auth_reset_eligible",
                      "ras_auth_reset_token_live", "ras_auth_token_lock", "ras_auth_token_close",
                      "ras_auth_invitation_lock", "ras_auth_invitation_recover"}
-PROTECTED = {"users", "invitations", "bootstrap_state", "sessions", "password_reset_tokens", "auth_change_receipts", "auth_safety_heads", "auth_safety_state", "auth_hash_policies", "revocation_journal_records", "object_delete_fences"}
+PROTECTED = {"users", "invitations", "bootstrap_state", "sessions", "password_reset_tokens", "auth_change_receipts", "auth_safety_heads", "auth_safety_state", "auth_hash_policies", "revocation_journal_records", "object_delete_fences", "orphan_object_fences", "orphan_object_completions"}
 
 
 def _identifier(name):
@@ -91,6 +91,9 @@ def provision(engine, *, runtime: str, recovery: str, definer: str):
         if conn.scalar(text("SELECT to_regclass('object_delete_fences') IS NOT NULL")):
             # Only the definer routine writes fences; logins read them (SourceFile INSERT trigger runs as invoker).
             conn.execute(text(f"GRANT SELECT,INSERT ON object_delete_fences TO {df}"))
+        if conn.scalar(text("SELECT to_regclass('orphan_object_fences') IS NOT NULL")):
+            # Only the definer routines write orphan fences/completions (C2d-5e2, 0045).
+            conn.execute(text(f"GRANT SELECT,INSERT ON orphan_object_fences,orphan_object_completions TO {df}"))
         if conn.scalar(text("SELECT to_regprocedure('ras_auth_invitation_before_journal()') IS NOT NULL")):
             conn.execute(text(f"GRANT EXECUTE ON FUNCTION ras_auth_invitation_before_journal(),ras_auth_invitation_actor(uuid,uuid,text,timestamptz,interval) TO {df}"))
         # Triggers execute under the caller; SELECT is already granted. Trigger functions don't expose mutation.
