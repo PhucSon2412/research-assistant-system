@@ -240,6 +240,8 @@ def _reserve(db, rows, chunk, settings):
         if call.status == 'completed':
             if call.vector is None or call.content_removed_at is not None:
                 raise w.StepError('embedding_content_unavailable')
+            if call.provider != settings.embedding.provider:
+                raise w.StepError('index_vector_mismatch')
             return call, False
         if call.status != 'rejected':
             raise w.StepError('embedding_outcome_uncertain')
@@ -308,6 +310,7 @@ def step(db, job_id, token, settings, source_proof, verified, *, publish=False):
             db.add(generation)
             db.flush()
         elif (generation.state != 'building' or generation.expected_chunks != len(chunks)
+                or generation.provider != settings.embedding.provider
                 or generation.pipeline_version != pipeline or generation.rights_epoch != item.rights_epoch
                 or generation.item_id != item.id or generation.version_id != version.id or generation.source_file_id != source.id):
             raise w.StepError('index_generation_changed')

@@ -91,6 +91,30 @@ def test_import_direct_entry_and_atomic_publish(indexed):
             ix.process_index(db,b.job,uuid.uuid4(),b.storage,b.settings)
 
 
+@pytest.mark.parametrize('change', ['keyword_text', 'keyword_hash', 'call_provider', 'generation_provider'])
+def test_publish_rechecks_keyword_and_provider_binding(indexed, monkeypatch, change):
+    b = indexed
+    original = ix._publish
+    def corrupt(db, job, item, generation, chunks, settings):
+        # Labelled adversarial mutation inside the transaction, before the pure
+        # publication validator. A failed publish must roll this mutation back.
+        statements = {
+            'keyword_text': "UPDATE index_entries SET text=text||' forged' WHERE generation_id=:i",
+            'keyword_hash': "UPDATE index_entries SET chunk_hash=repeat('0',64) WHERE generation_id=:i",
+            'call_provider': "UPDATE embedding_calls SET provider='wrong' WHERE id IN (SELECT embedding_call_id FROM index_entries WHERE generation_id=:i)",
+            'generation_provider': "UPDATE index_generations SET provider='wrong' WHERE id=:i"}
+        db.execute(text(statements[change]), {'i': generation.id})
+        db.expire_all()
+        return original(db, job, item, generation, chunks, settings)
+    monkeypatch.setattr(ix, '_publish', corrupt)
+    assert run(b) == ('index_keyword_mismatch' if change.startswith('keyword')
+        else 'index_generation_changed' if change == 'generation_provider' else 'index_vector_mismatch')
+    assert sql(b, 'SELECT count(*) FROM index_generations WHERE state=\'active\'') == 0
+    assert sql(b, 'SELECT active_index_generation_id IS NULL FROM library_items WHERE id=:i', i=b.item)
+    assert len(b.calls) == b.expected
+    assert sql(b, 'SELECT reserved_usd FROM embedding_budget_days') == 0
+
+
 @pytest.mark.parametrize('state,resume',[('awaiting_index',None),('indexing',None),('retryable_failed','indexing')])
 @pytest.mark.parametrize('missing',['key','price'])
 def test_config_pause_does_not_claim_or_reserve(indexed,state,resume,missing):

@@ -179,6 +179,7 @@ def _insert_entry(db: Session, generation: IndexGeneration, chunk: Chunk, call: 
         raise StepError("embedding_dimensions_mismatch")
     if (call.vector is None or call.content_removed_at is not None
             or call.source_file_id != generation.source_file_id or call.model_id != generation.model_id
+            or call.provider != generation.provider
             or call.pipeline_version != chunk.pipeline_version or call.chunk_hash != chunk.chunk_hash):
         raise StepError('index_vector_mismatch')
     generation.dimensions = call.dimensions
@@ -188,15 +189,21 @@ def _insert_entry(db: Session, generation: IndexGeneration, chunk: Chunk, call: 
 
 def _publish(db: Session, job: IngestionJob, item: LibraryItem, generation: IndexGeneration,
              chunks: list[Chunk], settings: Settings) -> None:
+    if generation.provider != settings.embedding.provider or generation.model_id != settings.embedding.model_id:
+        raise StepError('index_generation_changed')
     entries = db.scalars(select(IndexEntry).where(IndexEntry.generation_id == generation.id)).all()
     if (generation.dimensions is None or len(entries) != generation.expected_chunks
             or {e.chunk_id for e in entries} != {c.id for c in chunks}):
         raise StepError("index_incomplete")
     for entry in entries:
+        chunk = next(c for c in chunks if c.id == entry.chunk_id)
+        if entry.text != chunk.text or entry.chunk_hash != chunk.chunk_hash:
+            raise StepError('index_keyword_mismatch')
         call = db.get(EmbeddingCall, entry.embedding_call_id)
         if (call.status != "completed" or call.vector is None or call.dimensions != generation.dimensions
                 or call.model_id != generation.model_id or entry.chunk_hash != call.chunk_hash
                 or call.source_file_id != generation.source_file_id or call.pipeline_version != generation.pipeline_version
+                or call.provider != generation.provider
                 or call.content_removed_at is not None or len(call.vector) != generation.dimensions
                 or not all(math.isfinite(float(v)) for v in call.vector)):
             raise StepError("index_vector_mismatch")
