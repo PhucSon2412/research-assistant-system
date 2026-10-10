@@ -443,6 +443,25 @@ def test_heartbeat_clock_after_final_wait_cannot_resurrect(indexed,monkeypatch):
     assert sql(b,'SELECT reserved_usd FROM embedding_budget_days')==a.call.reserved_usd
 
 
+@pytest.mark.parametrize('deadline', ['expired', 'absent'])
+def test_historic_reservation_expires_without_adoption(indexed, deadline):
+    b=indexed; db,token,a,v=prepare(b)
+    # Labelled historical ledger fixture: migration intentionally retains NULL
+    # attempt bindings. Expiry must free the slot without inventing an attempt.
+    sql(b, '''UPDATE embedding_calls SET reservation_token=NULL,reservation_job_id=NULL,
+        reservation_job_token=NULL,lease_until=:t WHERE id=:i''',
+        t=NOW-timedelta(seconds=1) if deadline=='expired' else None, i=a.call.id)
+    assert money.reap(db,b.settings)==1
+    assert sql(b,"SELECT status FROM embedding_calls WHERE id=:i",i=a.call.id)=='uncertain'
+    assert sql(b,'SELECT reserved_usd FROM embedding_budget_days')==a.call.reserved_usd
+    assert sql(b,'SELECT committed_usd FROM embedding_budget_days')==0
+    assert sql(b,'SELECT reservation_token IS NULL FROM embedding_calls WHERE id=:i',i=a.call.id)
+    with pytest.raises(runtime.Halt,match='reservation_lost'):
+        money.settle(db,a.call,b.settings,result=result(b))
+    assert money.renew(b.api.engine,a.call,b.settings) is False
+    assert not b.calls and sql(b,'SELECT count(*) FROM index_entries')==0
+
+
 @pytest.mark.parametrize('phase',['heartbeat','settlement','reaper'])
 @pytest.mark.parametrize('landed',[False,True])
 def test_financial_commit_uncertain_keeps_attempt_fact(indexed,monkeypatch,phase,landed):

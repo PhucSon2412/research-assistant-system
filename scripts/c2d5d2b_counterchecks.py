@@ -39,6 +39,7 @@ def main():
             prefix+'test_commit_uncertain_never_continues_or_fails[True-reservation]'),
     ]
     results=[]
+    code_sha=subprocess.check_output(['git','rev-parse','HEAD'],cwd=REPO,text=True).strip()
     for name,file,replacements,node in specs:
         path=REPO/file
         original=path.read_bytes()
@@ -61,6 +62,7 @@ def main():
             passed=(completed.returncode==1 and len(cases)==1 and len(failures)==1 and not errors
                 and 'AssertionError' in ''.join(failures[0].itertext()))
             results.append(dict(name=name,node=node,valid_countercheck=passed,exit=completed.returncode,
+                code_sha=code_sha,
                 original_sha256=before,mutant_sha256=hashlib.sha256(path.read_bytes()).hexdigest()))
         finally:
             path.write_bytes(original)

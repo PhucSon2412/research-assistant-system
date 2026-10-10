@@ -9,7 +9,7 @@ import threading
 from contextlib import contextmanager
 from datetime import timedelta
 
-from sqlalchemy import select, text
+from sqlalchemy import or_, select, text
 from sqlalchemy.orm import Session
 
 from app import auth_safety
@@ -25,6 +25,12 @@ FIELDS = ('id', 'source_file_id', 'owner_user_id', 'model_id', 'provider', 'pipe
 def matches(call, proof):
     return (call is not None and proof.reservation_token is not None
         and all(getattr(call, k) == getattr(proof, k) for k in FIELDS))
+
+
+def expiry_matches(call, proof):
+    # Historic rows have no attempt nonce. They may ONLY lose an expired slot,
+    # retaining the ceiling; never adopt them for renewal, settlement or resend.
+    return call is not None and all(getattr(call, k) == getattr(proof, k) for k in FIELDS)
 
 
 def locked(db):
@@ -136,7 +142,7 @@ def reap(db, settings):
         db.info['document_checkpoint'] = 'reaper'
         locked(db)
         calls = list(db.scalars(select(EmbeddingCall).where(EmbeddingCall.status == 'reserved',
-            EmbeddingCall.reservation_token.is_not(None), EmbeddingCall.lease_until <= w.utcnow())
+            or_(EmbeddingCall.lease_until <= w.utcnow(), EmbeddingCall.lease_until.is_(None)))
             .order_by(EmbeddingCall.id).limit(settings.ingest.dispatch_batch).with_for_update(skip_locked=True)))
         snapshots = [(c, cp.frozen(c), c.lease_until) for c in calls]
         for call, _, _ in snapshots:
@@ -150,10 +156,10 @@ def reap(db, settings):
             raise runtime.Halt('recovery_gate_closed') from None
         for call, proof, _ in snapshots:
             db.refresh(call)
-            if not matches(call, proof) or call.status != 'uncertain' or call.lease_until is not None:
+            if not expiry_matches(call, proof) or call.status != 'uncertain' or call.lease_until is not None:
                 raise runtime.Halt('reservation_lost')
         at = w.utcnow()
-        if any(deadline > at for _, _, deadline in snapshots):
+        if any(deadline is not None and deadline > at for _, _, deadline in snapshots):
             raise runtime.Halt('reservation_lost')
         runtime.commit(db, outcome)
         return len(calls)

@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 REPO=Path(__file__).resolve().parents[1]
 
@@ -46,12 +47,12 @@ def main():
     old=json.loads((REPO/'docs/c2d5d2a-test-inventory.json').read_text(encoding='utf-8'))
     # Historical inventory supplies names only. Every selected node is run anew.
     groups={
+        'cleanup':['api/tests/test_common_cleanup.py'],
         'runtime':[f'api/tests/test_c2d5d2b_{s}.py' for s in ('document_runtime','common_runtime','process_smoke','schema')],
         'extraction':[f'api/tests/test_{s}.py' for s in ('c2d5d2a_worker_runtime','c2d5d2a_common_extraction','c2d5d2a_process_smoke','ingest_worker','pdf_ingest')],
         'index-shared':[f'api/tests/test_{s}.py' for s in ('private_index','common_index','search','embedding_transport')],
         'request':['api/tests/test_c2d5d1_common_index_request.py'],
         'revoke':['api/tests/test_c2d5c2_common_revoke.py'],
-        'cleanup':['api/tests/test_common_cleanup.py'],
         'schema':['api/tests/test_migrations.py::test_orm_models_match_migrated_schema',
             'api/tests/test_migrations.py::test_empty_database_upgrades_to_head',
             'api/tests/test_migrations.py::test_0024_removes_derived_rows_of_copies_purged_under_0023_and_fences_writes'],
@@ -71,11 +72,15 @@ def main():
         groups['upload']=['api/tests/test_uploads.py']
     summary={'code_sha':subprocess.check_output(['git','rev-parse','HEAD'],cwd=REPO,text=True).strip(),
         'all_collected':all_nodes,'groups':{},'unique':[]}
+    selections={}
     for name,args in groups.items():
         code,log=run(name+'-collection',args+['--collect-only','-q'])
         if code: raise SystemExit('selection failed: '+name)
         expected=collected(log)
+        selections[name]=expected
         (root/(name+'-selection.json')).write_text(json.dumps(expected,indent=2),encoding='utf-8')
+    def execute(name):
+        args,expected=groups[name],selections[name]
         xml=root/(name+'.xml')
         command=args+['-q','--tb=short','-o','faulthandler_timeout=60','--junitxml='+str(xml)]
         code,log=run(name,command)
@@ -87,11 +92,22 @@ def main():
             not any(v.find(k) is not None for k in ('failure','error','skipped')) for v in cases),
             failures=len(tree.findall('.//failure')),errors=len(tree.findall('.//error')),skips=len(tree.findall('.//skipped')))
         result['selection_matches']=sorted(actual)==expected and len(actual)==len(set(actual))
-        summary['groups'][name]=result
-        summary['unique']=sorted(set(summary['unique'])|set(actual))
-        (root/'summary.json').write_text(json.dumps(summary,indent=2),encoding='utf-8')
-        print(name+': '+str(result['pass_count'])+' passed; '+str(result['failures'])+' failures; '+str(result['errors'])+' errors',flush=True)
-        if code or not result['selection_matches']: break
+        return name,result
+    # Each pytest process owns disposable DBs, buckets, journal/tmp paths and
+    # settings. No role-attribute mutations occur in this selection. Bound host
+    # concurrency to three; Linux worker/beat smoke groups NEVER overlap.
+    waves=[['cleanup'],['runtime','request','revoke'],['extraction','index-shared','schema','recovery','upload']]
+    summary['execution_waves']=waves
+    for wave in waves:
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            futures=[pool.submit(execute,name) for name in wave]
+            for future in as_completed(futures):
+                name,result=future.result()
+                summary['groups'][name]=result
+                summary['unique']=sorted(set(summary['unique'])|set(result['executed']))
+                (root/'summary.json').write_text(json.dumps(summary,indent=2),encoding='utf-8')
+                print(name+': '+str(result['pass_count'])+' passed; '+str(result['failures'])+' failures; '+str(result['errors'])+' errors',flush=True)
+        if any(g['exit'] or not g['selection_matches'] for g in summary['groups'].values()): break
     after=sources()
     (root/'source-after.json').write_text(json.dumps(after,indent=2),encoding='utf-8')
     summary['source_equal']=before==after
