@@ -567,10 +567,10 @@ def test_existing_references_backfill_retry_and_stale_source_changes(upload_api,
         conn.execute(text("DELETE FROM reference_citation_links"))
     assert {r["citation_link"]["status"] for r in refs_of(a, ids["item_id"])} == {"not_reconciled"}
     policy = CitationPolicy(reconcile_batch_size=4)
-    assert reconcile_pending(api.engine, policy) == {"batches": 4, "references": 15}
+    assert reconcile_pending(api.engine, policy) == {"batches": 4, "references": 15, "links_written": 15}
     assert tally(refs_of(a, ids["item_id"]), MD_REFS)["linked_correct"] == 4
     stamp = api.scalar("SELECT max(reconciled_at) FROM reference_citation_links")
-    assert reconcile_pending(api.engine, policy) == {"batches": 0, "references": 0}
+    assert reconcile_pending(api.engine, policy) == {}  # nothing pending: no batch, no write
     with Session(api.engine) as db:  # an explicit rerun changes nothing
         assert reconcile_references(db, source_file_id=uuid.UUID(ids["file_id"])) == 15
         db.commit()
@@ -703,7 +703,10 @@ def test_concurrent_backfills_write_one_row_per_reference(upload_api):
 
     with ThreadPoolExecutor(4) as pool:
         results = list(pool.map(backfill, range(4)))
-    assert sum(r["references"] for r in results) >= 30
+    assert sum(r.get("references", 0) for r in results) >= 30
+    # Identical rows written by a concurrent pass are not counted again: one counted write per reference.
+    assert sum(r.get("links_written", 0) for r in results) == 30
+    assert not any(k.startswith("halted:") for r in results for k in r), results
     with api.engine.connect() as conn:
         assert conn.scalar(text("SELECT count(*) FROM reference_citation_links")) == 30
         assert conn.scalar(text("SELECT count(*) FROM reference_citation_links WHERE match_status='linked'")) == 8

@@ -3,7 +3,8 @@
 Every task first checks the recovery gate (M6c-1) and does nothing while it is
 closed: no ingest, discovery, citation reconcile or cleanup runs against a
 database that may be a restored, stale copy. ``recover`` runs its own operator
-cleanup; ``ras.revocation.cleanup`` uses the runtime boundary ``app.ingest.cleanup``.
+cleanup; ``ras.revocation.cleanup`` uses the runtime boundary ``app.ingest.cleanup`` and
+``ras.citations.reconcile`` the batch boundary ``app.citations.reconcile_pending``.
 """
 
 from __future__ import annotations
@@ -110,6 +111,7 @@ def sync_arxiv() -> dict:
 def reconcile_citation_links() -> dict:
     if not _gate("ras.citations.reconcile"):
         return {"skipped": "recovery_gate_closed"}
+    # Runtime boundary: every batch rechecks login/grants/gate and ends in the journal lock.
     return reconcile_pending(get_engine(), settings.citations)
 
 
