@@ -945,8 +945,15 @@ def test_reference_conflict_on_a_fence_halts(orphan, monkeypatch):
 def test_two_concurrent_passes_one_completion(orphan):
     b = orphan
     key = put(b)
-    listed, deleting = threading.Barrier(2, timeout=30), threading.Barrier(2, timeout=30)
-    b.watch.hooks['list'] = lambda k: listed.wait()  # both passes read pending fences before either prepares
+    headed, deleting = threading.Barrier(2, timeout=30), threading.Barrier(2, timeout=30)
+    first_heads, guard = [], threading.Lock()
+    def head(_):  # each pass's FIRST HEAD comes after its pending/hint reads: neither has fenced yet
+        with guard:
+            first = len(first_heads) < 2
+            first_heads.append(1)
+        if first:
+            headed.wait()
+    b.watch.hooks['head'] = head
     b.watch.hooks['delete'] = lambda k: deleting.wait()  # both passes delete (at least once)
     with ThreadPoolExecutor(2) as pool:
         results = [f.result(60) for f in [pool.submit(run, b) for _ in range(2)]]
