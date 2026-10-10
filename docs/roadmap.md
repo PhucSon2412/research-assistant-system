@@ -1,5 +1,17 @@
 # Roadmap đề xuất
 
+## C2d-5e2 đã triển khai trên nhánh review, chờ chủ dự án review
+
+[Handoff](c2d5e2-orphan-original-reconcile-runtime.md) · [Inventory](c2d5e2-test-inventory.json). Base `b2e76edb`, source `0045`, code `ebbc27a`: CLI/direct orphan reconcile qua runtime, fence orphan riêng + completion, zero-reference toàn DB, S3 ngoài DB, resume/bound/cursor. Vẫn thủ công khi quiescent; chưa online GC/beat. Seal `sealed-2` tại `9faf0d1` (production code `ebbc27a`, chỉ khác barrier một test): **2.096 API unique pass**, 0 fail/error/skip, exit 0, collect 4.690, **2.594 not-run** (gồm 25 debt base deselect); 321 source hash trước/sau trùng; smoke CLI Linux SIGKILL thật 1 pass; countercheck 9/9. PR chưa merge. **Bước tiếp theo đề xuất: discovery/citation** → search/query/rerank → RAG/generation → tổng hồi quy C2d; C3/C4 riêng, **safety pending tới C4**.
+
+## Mốc giao C2d-5e2 (lịch sử)
+
+[Prompt C2d-5e2](tasks/m6c2b2c2d5e2-orphan-original-reconcile-runtime.md) đã giao sau merge PR #53 `b2e76edb` (source `0044`): CLI/direct runtime, zero-reference orphan fence, DB/S3 checkpoints và resume; **thủ công khi quiescent, chưa online GC hoặc beat schedule**. Mới giao tài liệu, chưa triển khai/kiểm. Kế tiếp discovery/citation → search/query/rerank → RAG/generation → tổng hồi quy C2d; C3/C4 riêng, **safety pending tới C4**. Các mốc PR #53 đang review/chưa giao bên dưới giữ lịch sử trước merge; không cộng pass tại merge.
+
+## PR #53 đã review lại, chờ chủ dự án merge
+
+Head `bf9d81f`, code `9139c01`: P2 đã sửa; không thấy điểm chặn merge mới trong scope cleanup runtime. Reviewer **20/20**; artifact agent **1.584 unique pass / 2.977 not-run** kiểm riêng. [Report và giới hạn](reviews/pr53-c2d5e1-revoked-common-cleanup-runtime.md). PR OPEN/chưa merge, source `0044`, **safety pending tới C4**. Orphan reconcile và các task sau chưa giao; các mục review P2 bên dưới giữ lịch sử trước sửa.
+
 ## PR #53 đã sửa P2, chờ review lại
 
 cleanup operator/sweep chỉ nhận login có bằng chứng dương — owner/migrator (superuser hoặc owner `deletion_tombstones`) hoặc recovery đã provision (EXECUTE `ras_auth_restrict` + INSERT journal mirror, **không** EXECUTE `ras_auth_session_create`); probe/release lỗi → `operator_identity_unavailable`, không chứng minh → `operator_cleanup_requires_operator`, đều trước mutation/S3. P2 tái hiện trên `3c4c165` (6 fail) trước sửa. Seal `sealed-fix-1`: **1584 API unique pass**, exit 0, collect 4.561, **2.977 not-run** theo identity chính xác (ID UUID1 đã ổn định; smoke Linux giữ kết quả lịch sử `3b54a6f`); 9/9 countercheck gồm catch-all cũ. Lượt `sealed-3` cũ giữ exit 1, not-run raw 2.978/logic 2.976. Safety pending tới C4.

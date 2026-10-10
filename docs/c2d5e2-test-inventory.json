@@ -1,0 +1,614 @@
+{
+  "task": "C2d-5e2 orphan original reconcile runtime",
+  "base": {
+    "origin_main": "b2e76edb028af2ff118d3936ed4cdf47cb88a99f",
+    "pr53_head": "bf9d81f",
+    "tree_matches_merge": true
+  },
+  "branch": "feat/m6c2b2c2d5e2-orphan-original-reconcile-runtime",
+  "docs_commit_preexisting": "35bdf34",
+  "production_code_sha": "ebbc27ac88cac804fcc50a42cf3c5d28117451f4",
+  "seal_code_sha": "9faf0d17e341b107129d2cc8e4d6d394c103fbf4",
+  "code_note": "seal_code_sha only changes test_two_concurrent_passes_one_completion (barrier at first HEAD); api/app, migrations and scripts identical to production_code_sha",
+  "source_migration": "0045 (from 0044)",
+  "safety": "pending until C4; scoped business cutover only in fixtures; real pending gate tested separately; no provider/arXiv/dev/.env",
+  "environment": {
+    "python": "C:\\Users\\ADMIN\\.conda\\envs\\ras\\python.exe",
+    "host_script": "scripts/c2d5e2_test_host.py",
+    "isolated_project": "rasc2d5e282556039",
+    "images": [
+      "pgvector/pgvector:pg16",
+      "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z",
+      "redis:7-alpine",
+      "rasc2d5e2-cli:20261010 (tag of rasc2d5d2a-worker:20261009, sha256:2ebafdf6...)"
+    ],
+    "artifact_root": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-c2d5e2-20261010"
+  },
+  "final": {
+    "name": "sealed-2",
+    "unique_pass": 2096,
+    "unique_executed": 2096,
+    "collected": 4690,
+    "not_run": 2594,
+    "source_equal_before_after": true,
+    "source_files_hashed": 321,
+    "execution_waves": [
+      [
+        "smoke"
+      ],
+      [
+        "orphan-runtime",
+        "cleanup-runtime",
+        "cleanup-legacy"
+      ],
+      [
+        "upload-approval",
+        "revoke",
+        "schema"
+      ],
+      [
+        "index",
+        "request-publish",
+        "recovery"
+      ]
+    ],
+    "groups": {
+      "smoke": {
+        "args": [
+          "api/tests/test_c2d5e2_process_smoke.py"
+        ],
+        "selected": 1,
+        "executed": 1,
+        "passed": 1,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "exit": 0,
+        "selection_matches": true,
+        "selection_in_collection": true,
+        "junit": "ctx/sealed-2/smoke.xml"
+      },
+      "cleanup-legacy": {
+        "args": [
+          "api/tests/test_common_cleanup.py",
+          "api/tests/test_publication.py"
+        ],
+        "selected": 23,
+        "executed": 23,
+        "passed": 23,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "exit": 0,
+        "selection_matches": true,
+        "selection_in_collection": true,
+        "junit": "ctx/sealed-2/cleanup-legacy.xml"
+      },
+      "orphan-runtime": {
+        "args": [
+          "api/tests/test_c2d5e2_orphan_reconcile.py"
+        ],
+        "selected": 120,
+        "executed": 120,
+        "passed": 120,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "exit": 0,
+        "selection_matches": true,
+        "selection_in_collection": true,
+        "junit": "ctx/sealed-2/orphan-runtime.xml"
+      },
+      "cleanup-runtime": {
+        "args": [
+          "api/tests/test_c2d5e1_cleanup_runtime.py"
+        ],
+        "selected": 81,
+        "executed": 81,
+        "passed": 81,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "exit": 0,
+        "selection_matches": true,
+        "selection_in_collection": true,
+        "junit": "ctx/sealed-2/cleanup-runtime.xml"
+      },
+      "schema": {
+        "args": [
+          "api/tests/test_migrations.py",
+          "api/tests/test_c2d5e2_migration.py",
+          "api/tests/test_c2d5e1_migration.py",
+          "api/tests/test_c2d5a_migration.py",
+          "api/tests/test_c2c2_migration.py",
+          "api/tests/test_auth_safety_foundation.py",
+          "api/tests/test_config.py"
+        ],
+        "selected": 248,
+        "executed": 248,
+        "passed": 248,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "exit": 0,
+        "selection_matches": true,
+        "selection_in_collection": true,
+        "junit": "ctx/sealed-2/schema.xml"
+      },
+      "revoke": {
+        "args": [
+          "api/tests/test_c2d5c2_common_revoke.py",
+          "api/tests/test_c2d5c2_migration.py"
+        ],
+        "selected": 172,
+        "executed": 172,
+        "passed": 172,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "exit": 0,
+        "selection_matches": true,
+        "selection_in_collection": true,
+        "junit": "ctx/sealed-2/revoke.xml"
+      },
+      "upload-approval": {
+        "args": [
+          "api/tests/test_uploads.py",
+          "api/tests/test_c2d4b_upload_original.py",
+          "api/tests/test_c2d5b_review_approval.py",
+          "api/tests/test_c2d5b_migration.py",
+          "api/tests/test_review_approval.py",
+          "api/tests/test_c2d4c_original_downloads.py"
+        ],
+        "selected": 841,
+        "executed": 841,
+        "passed": 841,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "exit": 0,
+        "selection_matches": true,
+        "selection_in_collection": true,
+        "junit": "ctx/sealed-2/upload-approval.xml"
+      },
+      "recovery": {
+        "args": [
+          "api/tests/test_recovery.py",
+          "api/tests/test_backup.py"
+        ],
+        "selected": 15,
+        "executed": 15,
+        "passed": 15,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "exit": 0,
+        "selection_matches": true,
+        "selection_in_collection": true,
+        "junit": "ctx/sealed-2/recovery.xml"
+      },
+      "index": {
+        "args": [
+          "api/tests/test_c2d5d2b_document_runtime.py",
+          "api/tests/test_c2d5d2b_common_runtime.py",
+          "api/tests/test_c2d5d2b_schema.py",
+          "api/tests/test_c2d5d2a_common_extraction.py",
+          "api/tests/test_c2d5d2a_worker_runtime.py",
+          "api/tests/test_common_index.py"
+        ],
+        "selected": 233,
+        "executed": 233,
+        "passed": 233,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "exit": 0,
+        "selection_matches": true,
+        "selection_in_collection": true,
+        "junit": "ctx/sealed-2/index.xml"
+      },
+      "request-publish": {
+        "args": [
+          "api/tests/test_c2d5d1_common_index_request.py",
+          "api/tests/test_c2d5c1_common_publish.py"
+        ],
+        "selected": 362,
+        "executed": 362,
+        "passed": 362,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "exit": 0,
+        "selection_matches": true,
+        "selection_in_collection": true,
+        "junit": "ctx/sealed-2/request-publish.xml"
+      }
+    },
+    "skipped_groups": {}
+  },
+  "baseline_debt_deselected": {
+    "count": 25,
+    "nodes": [
+      "api/tests/test_auth_safety_foundation.py::test_legacy_writers_empty_batch_and_bootstrap_blocked",
+      "api/tests/test_auth_safety_foundation.py::test_runtime_valid_routines_and_rehash_cas",
+      "api/tests/test_backup.py::test_a_failed_or_interrupted_backup_never_leaves_an_artifact_that_verifies",
+      "api/tests/test_backup.py::test_complete_artifact_verifies_and_every_damage_is_refused",
+      "api/tests/test_backup.py::test_hold_refuses_a_journal_behind_the_database_rather_than_diverging_it",
+      "api/tests/test_backup.py::test_hold_shuts_the_gate_after_a_restore_even_with_nothing_revoked_since_the_backup",
+      "api/tests/test_backup.py::test_restore_and_recover_run_again_safely",
+      "api/tests/test_backup.py::test_restore_leaves_a_project_without_the_marker_completely_untouched[db_running]",
+      "api/tests/test_backup.py::test_restore_leaves_a_project_without_the_marker_completely_untouched[db_stopped]",
+      "api/tests/test_backup.py::test_restore_refuses_an_object_read_back_with_other_bytes_of_the_same_size_and_the_gate_stays_shut",
+      "api/tests/test_backup.py::test_restore_with_a_missing_or_foreign_journal_serves_nothing_and_recover_refuses",
+      "api/tests/test_c2d4b_upload_original.py::test_worker_advance_and_intent_expiry_before_response_keep_receipt",
+      "api/tests/test_c2d4c_original_downloads.py::test_audit_resource_locks_queue_writer_response_proof_sees_winner[common]",
+      "api/tests/test_recovery.py::test_adopts_a_database_older_than_its_registration",
+      "api/tests/test_recovery.py::test_cleanup_failure_during_recovery_keeps_the_gate_shut_until_a_rerun_succeeds",
+      "api/tests/test_recovery.py::test_db_refuses_tombstones_without_journal_record_and_edits_to_the_mirror",
+      "api/tests/test_recovery.py::test_gate_check_waits_briefly_for_the_journal_lock_then_counts_as_closed",
+      "api/tests/test_recovery.py::test_indexer_checks_the_gate_right_before_each_embedding_call",
+      "api/tests/test_recovery.py::test_lost_older_or_corrupt_journal_closes_the_gate_and_is_rebuilt_only_on_confirmation",
+      "api/tests/test_recovery.py::test_only_confirmation_may_change_a_journal_record",
+      "api/tests/test_recovery.py::test_only_one_recovery_runs_at_a_time",
+      "api/tests/test_recovery.py::test_restore_from_before_a_revocation_serves_and_processes_nothing_until_recover",
+      "api/tests/test_recovery.py::test_restore_replays_revocations_of_copies_the_snapshot_never_had",
+      "api/tests/test_recovery.py::test_revocation_while_the_journal_is_ahead_writes_nothing",
+      "api/tests/test_recovery.py::test_torn_journal_line_is_moved_aside_and_the_record_restored_from_the_database"
+    ],
+    "note": "24 carried from PR #53 (reproduced at ba20fda then); 1 new in this selection (test_c2d4c_original_downloads [common]) failed identically at base b2e76ed in an isolated worktree rerun (prep/base-c2d4c.log). Four PR #50 debts are outside this selection. None fixed or counted."
+  },
+  "counterchecks": [
+    {
+      "name": "runtime",
+      "node": "api/tests/test_c2d5e2_orphan_reconcile.py::test_entry_requires_actual_runtime_login_before_any_storage[direct-owner]",
+      "valid_countercheck": true,
+      "exit": 1,
+      "code_sha": "ebbc27ac88cac804fcc50a42cf3c5d28117451f4",
+      "original_sha256": "1bbbc3b8e9487317508187c6c71a7e66ff6106b25dd72c15fb6a9c40839907f8",
+      "mutant_sha256": "e8a80ca8f53114b3a2c2eeeda3c5675ac3e07c3333a55ef612b789c174e0e776"
+    },
+    {
+      "name": "entry-gate",
+      "node": "api/tests/test_c2d5e2_orphan_reconcile.py::test_closed_gate_no_storage_no_mutation_cli_and_direct[hold]",
+      "valid_countercheck": true,
+      "exit": 1,
+      "code_sha": "ebbc27ac88cac804fcc50a42cf3c5d28117451f4",
+      "original_sha256": "1bbbc3b8e9487317508187c6c71a7e66ff6106b25dd72c15fb6a9c40839907f8",
+      "mutant_sha256": "de17a6345f996c82782b0c431e939c4a04621244c3ef4ffbf3c81a9066ff5f04"
+    },
+    {
+      "name": "zero-reference",
+      "node": "api/tests/test_c2d5e2_orphan_reconcile.py::test_reference_hints_are_not_the_authority",
+      "valid_countercheck": true,
+      "exit": 1,
+      "code_sha": "ebbc27ac88cac804fcc50a42cf3c5d28117451f4",
+      "original_sha256": "2e70cb3261dbc6b3739b83a6b46877f87c101cca7e32ac8698ba2cbde96039cf",
+      "mutant_sha256": "fe7d7ab6e0a40841afc2584abba22a2dbd4c8d934b773695fbd0996b107cef5f"
+    },
+    {
+      "name": "insert-fence",
+      "node": "api/tests/test_c2d5e2_orphan_reconcile.py::test_prepare_first_refuses_waiting_insert_without_cycle[False]",
+      "valid_countercheck": true,
+      "exit": 1,
+      "code_sha": "ebbc27ac88cac804fcc50a42cf3c5d28117451f4",
+      "original_sha256": "2e70cb3261dbc6b3739b83a6b46877f87c101cca7e32ac8698ba2cbde96039cf",
+      "mutant_sha256": "9338a29d17b011d891263ad1d4aa7ed497cfd3634125133d1449c8f9358d06cd"
+    },
+    {
+      "name": "key-lock",
+      "node": "api/tests/test_c2d5e2_orphan_reconcile.py::test_insert_first_holds_key_then_prepare_keeps_object",
+      "valid_countercheck": true,
+      "exit": 1,
+      "code_sha": "ebbc27ac88cac804fcc50a42cf3c5d28117451f4",
+      "original_sha256": "2e70cb3261dbc6b3739b83a6b46877f87c101cca7e32ac8698ba2cbde96039cf",
+      "mutant_sha256": "6194e4f0f3b42fdf4260f9edbad5b9170763afe9bd44418dda698f79d3612882"
+    },
+    {
+      "name": "uncertain",
+      "node": "api/tests/test_c2d5e2_orphan_reconcile.py::test_prepare_commit_uncertain_no_storage_then_independent_resume[True]",
+      "valid_countercheck": true,
+      "exit": 1,
+      "code_sha": "ebbc27ac88cac804fcc50a42cf3c5d28117451f4",
+      "original_sha256": "c96701cf45ce3c44d482997b9cd8cf699acfe35ce69d489ba597f37d9f5e5755",
+      "mutant_sha256": "3ee3d42069977a0bc32e003f4fbe169aa61a0ea5a1f4464eb1bd0c5bf510259f"
+    },
+    {
+      "name": "release",
+      "node": "api/tests/test_c2d5e2_orphan_reconcile.py::test_release_fault_after_known_commit_keeps_mutation_and_stops[prepare]",
+      "valid_countercheck": true,
+      "exit": 1,
+      "code_sha": "ebbc27ac88cac804fcc50a42cf3c5d28117451f4",
+      "original_sha256": "c96701cf45ce3c44d482997b9cd8cf699acfe35ce69d489ba597f37d9f5e5755",
+      "mutant_sha256": "9b606a3e1d1dbfc5e2c67f731a239cb8696144f583d02547a759bf5dabfe24b3"
+    },
+    {
+      "name": "403-as-missing",
+      "node": "api/tests/test_c2d5e2_orphan_reconcile.py::test_storage_errors_halt_never_count_as_absent[pre_delete_head-403]",
+      "valid_countercheck": true,
+      "exit": 1,
+      "code_sha": "ebbc27ac88cac804fcc50a42cf3c5d28117451f4",
+      "original_sha256": "1bbbc3b8e9487317508187c6c71a7e66ff6106b25dd72c15fb6a9c40839907f8",
+      "mutant_sha256": "b66dc61f589c378ebac28a035511662270ef6452de6e984a1d361d2b6366aad8"
+    },
+    {
+      "name": "final-gate",
+      "node": "api/tests/test_c2d5e2_orphan_reconcile.py::test_gate_closing_inside_finalize_refuses_commit[pending]",
+      "valid_countercheck": true,
+      "exit": 1,
+      "code_sha": "ebbc27ac88cac804fcc50a42cf3c5d28117451f4",
+      "original_sha256": "1bbbc3b8e9487317508187c6c71a7e66ff6106b25dd72c15fb6a9c40839907f8",
+      "mutant_sha256": "cbf22fbd7bb9e3f29337367e9850b54139d1b929fe13b7893052b342ee1f7183"
+    }
+  ],
+  "counterchecks_note": "run at production_code_sha before the seal; source restored byte/hash after each mutant",
+  "not_run": [
+    "web/Chrome/npm (no web/proxy change)",
+    "test_c2d5e1_process_smoke.py (needs removed rasc2d5e1-worker tag; worker cleanup path unchanged)",
+    "test_c2d5d2b_process_smoke.py and other process smokes outside the selection",
+    "scripts/drill_backup_restore.py and demo scripts",
+    "full suite beyond selection",
+    "provider/arXiv live, charge, pricing, benchmark/SLO, C3/C4",
+    "lock-timeout skipped:busy branch of prepare (no dedicated test)",
+    "SET ROLE through membership (cluster-wide role change avoided; require_runtime refuses current_user<>session_user)",
+    "restore drill with orphan fences",
+    "dev stack: no reconcile command run there"
+  ],
+  "artifact_manifest_sha256": {
+    "after-containers.txt": "d0c7c030f6bbd0f2923f819a3513c1e77313d5fb4ef4f826a5f2a1c10e54bb10",
+    "after-images.txt": "0ef423a32daf0468759c215563badda94d446f2acf3363ce85102a1fda28d81e",
+    "after-networks.txt": "8faa83f96cb9b24dd247ce7d0d2f6a5df59cbb586092ee281e357c7669c8d8c3",
+    "after-started.txt": "c2ee637d127924eb4bf0070b2c5f1f2ad44c87d81b69c97b1d971ef6707685e3",
+    "after-volumes.txt": "01162f021c0f55aef1ea4d057d96bf840c14df68a4ffd8e9bae3dddf0111615f",
+    "baseline-containers.txt": "ec7d3a0cf72e9c0af04ba020eb112457456fed82261bf2f951254222b256a0c2",
+    "baseline-images.txt": "7dd3de06a2982e0064540ea92f0b5e842666305f634b65f7981aed28c350697e",
+    "baseline-networks.txt": "8faa83f96cb9b24dd247ce7d0d2f6a5df59cbb586092ee281e357c7669c8d8c3",
+    "baseline-started.txt": "12c4e348670e97a307305b5ee561e6ccb2d8179fcd7a720e59ae027ad8884261",
+    "baseline-volumes.txt": "01162f021c0f55aef1ea4d057d96bf840c14df68a4ffd8e9bae3dddf0111615f",
+    "counterchecks-1/counterchecks.json": "e311d6eb51137f8cad2eaeaeb14186ab9ee52632fe2072439145fde1ef55065f",
+    "counterchecks-1/mutant-403-as-missing.log": "80e8df7316d7146456b4d201114441f15f6556754a263814cb3556006912d496",
+    "counterchecks-1/mutant-403-as-missing.xml": "bb1bdbb916ee87dc74250c4b079d8e89946ebe1a2ccb12b8e186019fe54f3328",
+    "counterchecks-1/mutant-entry-gate.log": "b5f3c8bbe3d539cf60a30662f8eb55f476d17a2e70b0d6ab3b78869a3a06e220",
+    "counterchecks-1/mutant-entry-gate.xml": "8ca402c82d8aa7c261f6f4f9000d54210a9bb18cf2ef98b2fb490ea89fce230c",
+    "counterchecks-1/mutant-final-gate.log": "be177c90fad4014f903dc8d9a1460138fa6d7686186c6b87b2838a5c297a6fbf",
+    "counterchecks-1/mutant-final-gate.xml": "ae03a3f69ab1b0078bd985eda7f2859bc2a1474837feea72da76c8fa355f19df",
+    "counterchecks-1/mutant-insert-fence.log": "df95fc51f59c0492b308e7331338f17d4893642b7dc3f4f768a2df132d95d013",
+    "counterchecks-1/mutant-insert-fence.xml": "d6944d93a25590a661f414c41134a0f6aed25a3486cfaa11e8f9390c592867f0",
+    "counterchecks-1/mutant-key-lock.log": "a4601e8de587d304a8bf8be945c32effef497a3cd16083e121b2fc5e421755bf",
+    "counterchecks-1/mutant-key-lock.xml": "15e7ff5f85af67e1e9e6465bef6c97c065f0f0a255d982124e5d1b698213bdef",
+    "counterchecks-1/mutant-release.log": "b89dae09369dad55c52941d7501a6834b49711a90b27f2bd57d00b0e24bdedf6",
+    "counterchecks-1/mutant-release.xml": "16dd8c535157af86200a82afbc30afd6884cd0110f7d8d5577649e2bd081d7a4",
+    "counterchecks-1/mutant-runtime.log": "13ee4e0f2147a2630919bcec10dc66e1b31337a8fd0401728c7c0cbc0877a2d7",
+    "counterchecks-1/mutant-runtime.xml": "e03242f37f08c7ec26bc5aa60066a9ccb9f2de500f5de18eb88f3916e2de1502",
+    "counterchecks-1/mutant-uncertain.log": "f687e82e1d37356eb60486aaacd66e3c132a9b3d4e6085c5d023de3439505283",
+    "counterchecks-1/mutant-uncertain.xml": "809f0cf13737d3b2d6492aa4c5a89c12d9a692edb5103501c1f176406949a909",
+    "counterchecks-1/mutant-zero-reference.log": "6ef706725f80b8f162bda5563462c40c100f03eb407a09652d72e6c4e22f28aa",
+    "counterchecks-1/mutant-zero-reference.xml": "a50b16f90f1f9ce893cc72d0f10854e6af26645cc461bdccda0b5d22c9da4e3b",
+    "ctx/isolated-containers.json": "335dc9a600450ac0654278c650aba2fd6e66b9dd298c156fcef35c1b494c8783",
+    "ctx/process-435bcfc95a3748fabae5fcdf838b4e3d/again.log": "e85c27c16263ef614798e58c0f056672d069e2b14c7eaf3f1585e67b21e3cea2",
+    "ctx/process-435bcfc95a3748fabae5fcdf838b4e3d/harness/sitecustomize.py": "d3c6e5b04a5c15ce74848c169cc65008a74b084b6d417a2e8dc65e54aac2d364",
+    "ctx/process-435bcfc95a3748fabae5fcdf838b4e3d/identity-1-1.json": "2592cb10616063c84fbe2de34d96f0b8c6d83622b9394185472180b2ee7c35b6",
+    "ctx/process-435bcfc95a3748fabae5fcdf838b4e3d/identity-1-2.json": "2592cb10616063c84fbe2de34d96f0b8c6d83622b9394185472180b2ee7c35b6",
+    "ctx/process-435bcfc95a3748fabae5fcdf838b4e3d/identity-1-3.json": "2592cb10616063c84fbe2de34d96f0b8c6d83622b9394185472180b2ee7c35b6",
+    "ctx/process-435bcfc95a3748fabae5fcdf838b4e3d/in-delete": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "ctx/process-435bcfc95a3748fabae5fcdf838b4e3d/inspect.log": "6f914e41d5ba1bdec2118ae27189c81921de176e9137cb17721ab5e9b8a9af73",
+    "ctx/process-435bcfc95a3748fabae5fcdf838b4e3d/kill.log": "3f8a4fb91285c15003a543f1c160cb628cb753a665843c0eaad0a419dd0f8044",
+    "ctx/process-435bcfc95a3748fabae5fcdf838b4e3d/parked-logs.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ctx/process-435bcfc95a3748fabae5fcdf838b4e3d/remove.log": "3f8a4fb91285c15003a543f1c160cb628cb753a665843c0eaad0a419dd0f8044",
+    "ctx/process-435bcfc95a3748fabae5fcdf838b4e3d/result.json": "801ec77956de4d15b98e47c33aea5f5c513100580c96f7451bddfb3db647bc95",
+    "ctx/process-435bcfc95a3748fabae5fcdf838b4e3d/resume.log": "a398ad371c169d134bb14809c6d1e2f4a7d2078a03c047702816618f14f4426f",
+    "ctx/process-435bcfc95a3748fabae5fcdf838b4e3d/start-parked.log": "91b876b38dc68a3de5e11b482a9aa75317f216f3de4288153886481f806a8823",
+    "ctx/process-813a5320309c435eb9cf38274f1331e0/again.log": "e85c27c16263ef614798e58c0f056672d069e2b14c7eaf3f1585e67b21e3cea2",
+    "ctx/process-813a5320309c435eb9cf38274f1331e0/harness/sitecustomize.py": "d3c6e5b04a5c15ce74848c169cc65008a74b084b6d417a2e8dc65e54aac2d364",
+    "ctx/process-813a5320309c435eb9cf38274f1331e0/identity-1-1.json": "2592cb10616063c84fbe2de34d96f0b8c6d83622b9394185472180b2ee7c35b6",
+    "ctx/process-813a5320309c435eb9cf38274f1331e0/identity-1-2.json": "2592cb10616063c84fbe2de34d96f0b8c6d83622b9394185472180b2ee7c35b6",
+    "ctx/process-813a5320309c435eb9cf38274f1331e0/identity-1-3.json": "2592cb10616063c84fbe2de34d96f0b8c6d83622b9394185472180b2ee7c35b6",
+    "ctx/process-813a5320309c435eb9cf38274f1331e0/in-delete": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "ctx/process-813a5320309c435eb9cf38274f1331e0/inspect.log": "6f914e41d5ba1bdec2118ae27189c81921de176e9137cb17721ab5e9b8a9af73",
+    "ctx/process-813a5320309c435eb9cf38274f1331e0/kill.log": "34c883d3e1ea2fba84cc422f1823b7dc23f6916e95ca3e3508ecd3649c2909ab",
+    "ctx/process-813a5320309c435eb9cf38274f1331e0/parked-logs.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ctx/process-813a5320309c435eb9cf38274f1331e0/remove.log": "34c883d3e1ea2fba84cc422f1823b7dc23f6916e95ca3e3508ecd3649c2909ab",
+    "ctx/process-813a5320309c435eb9cf38274f1331e0/result.json": "801ec77956de4d15b98e47c33aea5f5c513100580c96f7451bddfb3db647bc95",
+    "ctx/process-813a5320309c435eb9cf38274f1331e0/resume.log": "a398ad371c169d134bb14809c6d1e2f4a7d2078a03c047702816618f14f4426f",
+    "ctx/process-813a5320309c435eb9cf38274f1331e0/start-parked.log": "9af2486ca01362b2595511639229a7f09500224fffbf87756808dc3d5981dbae",
+    "ctx/process-fba41880ef0d47e5814816092c2aca51/again.log": "e85c27c16263ef614798e58c0f056672d069e2b14c7eaf3f1585e67b21e3cea2",
+    "ctx/process-fba41880ef0d47e5814816092c2aca51/harness/sitecustomize.py": "d3c6e5b04a5c15ce74848c169cc65008a74b084b6d417a2e8dc65e54aac2d364",
+    "ctx/process-fba41880ef0d47e5814816092c2aca51/identity-1-1.json": "2592cb10616063c84fbe2de34d96f0b8c6d83622b9394185472180b2ee7c35b6",
+    "ctx/process-fba41880ef0d47e5814816092c2aca51/identity-1-2.json": "2592cb10616063c84fbe2de34d96f0b8c6d83622b9394185472180b2ee7c35b6",
+    "ctx/process-fba41880ef0d47e5814816092c2aca51/identity-1-3.json": "2592cb10616063c84fbe2de34d96f0b8c6d83622b9394185472180b2ee7c35b6",
+    "ctx/process-fba41880ef0d47e5814816092c2aca51/in-delete": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "ctx/process-fba41880ef0d47e5814816092c2aca51/inspect.log": "6f914e41d5ba1bdec2118ae27189c81921de176e9137cb17721ab5e9b8a9af73",
+    "ctx/process-fba41880ef0d47e5814816092c2aca51/kill.log": "421e74c7dd758818a91b7e6e09db45950bc0cfe1f103c4729c6628259e09bfa2",
+    "ctx/process-fba41880ef0d47e5814816092c2aca51/parked-logs.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ctx/process-fba41880ef0d47e5814816092c2aca51/remove.log": "421e74c7dd758818a91b7e6e09db45950bc0cfe1f103c4729c6628259e09bfa2",
+    "ctx/process-fba41880ef0d47e5814816092c2aca51/result.json": "801ec77956de4d15b98e47c33aea5f5c513100580c96f7451bddfb3db647bc95",
+    "ctx/process-fba41880ef0d47e5814816092c2aca51/resume.log": "a398ad371c169d134bb14809c6d1e2f4a7d2078a03c047702816618f14f4426f",
+    "ctx/process-fba41880ef0d47e5814816092c2aca51/start-parked.log": "2107282d1a47157c5d7e7c514f9edf9671eaa3a467be80862807bb64e8a04367",
+    "ctx/sealed-1/all-collection.log": "ad04b11b8af157656ab1533e8e6763261981a07226cd946ecbc673cdc6655362",
+    "ctx/sealed-1/cleanup-legacy-collection.log": "1fe66739079a44a2ee1f617a9084f0684a2729573ff75a82e00be01a9e5152f0",
+    "ctx/sealed-1/cleanup-legacy-selection.json": "9c452078be3acc239e6cc1996d6a314c7381ce48ca5892cf57c1fc7c873a1c89",
+    "ctx/sealed-1/cleanup-legacy.log": "b86fced9f51e4f9716d265152c5581a401f8dd1215680bc4b8074f0a45307227",
+    "ctx/sealed-1/cleanup-legacy.xml": "2a3fb1b087d591f08ca1736e7e1b0a9e91508e0b565674b0f4b92460b12a7eb3",
+    "ctx/sealed-1/cleanup-runtime-collection.log": "432c563c423750b6b24c3bb0c3d56bb55db17847773d1d4e5674fe2903dae0ec",
+    "ctx/sealed-1/cleanup-runtime-selection.json": "e26c1034003e64839eccc1d61335218264c43c32799de0a86fc7b839e6fc088d",
+    "ctx/sealed-1/cleanup-runtime.log": "05985adff6076006fa28eb684dfd05aabc05387985825400a77f1f1aa7d94416",
+    "ctx/sealed-1/cleanup-runtime.xml": "d4b467ef7387fde1b73d024938d5d3f65557c53a0e3969be41789f4fa8488430",
+    "ctx/sealed-1/index-collection.log": "091f3d7ec56d0ec4f51b19d52f8ab498550ec1a4edef70d90bb981dd42eaed26",
+    "ctx/sealed-1/index-selection.json": "57ecb7056e765c1b438042a3238eab2fac93ed6573f987b53621364e6325c75a",
+    "ctx/sealed-1/orphan-runtime-collection.log": "3b57121063d71725b38a30870499146e66826f98b441f19bb144875e982db0de",
+    "ctx/sealed-1/orphan-runtime-selection.json": "53c62247b12d9fa8e2c03dfd04bcefe6f90616eaa02fe83752c3b45357368286",
+    "ctx/sealed-1/orphan-runtime.log": "e12dfb098e4366ead14b6d5461cad10b1f185c9b113e97db56bbfc020baf59af",
+    "ctx/sealed-1/orphan-runtime.xml": "669d666a714c9f691902117247bb86af30fb68e73ff4345b6a602e98ebd1306d",
+    "ctx/sealed-1/recovery-collection.log": "d656c2214e0647100e1a19fdf95253980296d1434ba9cfbb2bd8a2d2259e01b7",
+    "ctx/sealed-1/recovery-selection.json": "3d7edc0a2ff58ed1400829c5e7335a2aa05dfe3fea3ea2f72d70f16944488b83",
+    "ctx/sealed-1/request-publish-collection.log": "8ec578e53fc1d5fe81c4ca11b2e2ac83441a0b29580374265ffe832abd3385a4",
+    "ctx/sealed-1/request-publish-selection.json": "4f826240c5928ff4c11cee35460403356777144d34a9f802a5de2856076c6319",
+    "ctx/sealed-1/revoke-collection.log": "bc124a1ac149a79e1a3eb47b1f845bfef6a82afb60f5f41223ec585dc6f8ffd6",
+    "ctx/sealed-1/revoke-selection.json": "23664bd4e3161f703b74802444d6cc976548aea0ed806ae2d7725c0ecd14cf97",
+    "ctx/sealed-1/schema-collection.log": "83a6454227369284eb6dc61b5d0e2a7dc83a2b066d37b4d02f4356442adcb28d",
+    "ctx/sealed-1/schema-selection.json": "1edfcaf9a49d5fe9d75f6f02a7123fa1d924faa1bcdf10d6cf8be9af6cc99fc4",
+    "ctx/sealed-1/smoke-collection.log": "32ad05dd68d8bb4f4dddb753732edd091624717191fb94b5c56d0873fd437508",
+    "ctx/sealed-1/smoke-selection.json": "b0adac4230eb08aaec329a10eddb10c8b3f6d643df6cbc908f3ec49ffe2620a5",
+    "ctx/sealed-1/smoke.log": "dfcd1899016ee0e2a3ecd73b9bd29c8d71bce7a15ca020cb7ff851b5400785e9",
+    "ctx/sealed-1/smoke.xml": "be3d5b992c0914b4fead3f8a8f27462c900bcfdd61e41fb83bfc9cee47e0f9f9",
+    "ctx/sealed-1/source-after.json": "e10616f80e83808cf4847536fccd9cdf4ff576c04084ed3edf9df961e53d8767",
+    "ctx/sealed-1/source-before.json": "e10616f80e83808cf4847536fccd9cdf4ff576c04084ed3edf9df961e53d8767",
+    "ctx/sealed-1/summary.json": "35cdd679f8ecaec8a0272dbf6cda258444001499fcb35d5afbf4e7f4194a5b23",
+    "ctx/sealed-1/upload-approval-collection.log": "ff893ca9efd428f59dad6ecc2df36796259e0f104dedcbf0e2649b52c2d24b8b",
+    "ctx/sealed-1/upload-approval-selection.json": "54b2056838ef9040d28bf24b5222f50dbda7d7d262a53bf23eaabfcb0e05e0b5",
+    "ctx/sealed-2/all-collection.log": "4d04a141fe6a9bf5247b3f704a6316132099fab77d76c1e55911a6c85db4bc24",
+    "ctx/sealed-2/cleanup-legacy-collection.log": "4eba043dfe9ff3b35ebd0c65285ebf33b4cd471e543dec5f2abdef3508419898",
+    "ctx/sealed-2/cleanup-legacy-selection.json": "9c452078be3acc239e6cc1996d6a314c7381ce48ca5892cf57c1fc7c873a1c89",
+    "ctx/sealed-2/cleanup-legacy.log": "c1d97636d07dee4e01015352b3a2388f711481ad7900a6083018420f811aca8c",
+    "ctx/sealed-2/cleanup-legacy.xml": "f96dfdd26d423ba7b7cc194d4f91b5df11d159bf9ef36832247c17d9243c8c94",
+    "ctx/sealed-2/cleanup-runtime-collection.log": "a3e316f3db55cde85c755d0335ee10067cbbb1998c649a5591f5533b9effd955",
+    "ctx/sealed-2/cleanup-runtime-selection.json": "e26c1034003e64839eccc1d61335218264c43c32799de0a86fc7b839e6fc088d",
+    "ctx/sealed-2/cleanup-runtime.log": "3e6c2a752bc50412c4401447d93284f1165b43d903c703e946769c64584e7ca2",
+    "ctx/sealed-2/cleanup-runtime.xml": "007e214989a43df2ee39dfc5052ff42986bd0636f43e7a134fed6540f850e970",
+    "ctx/sealed-2/index-collection.log": "da5901345396fae8118a60b151b812bbda1b4317bd95fbdd7c65dbfb01d736e8",
+    "ctx/sealed-2/index-selection.json": "57ecb7056e765c1b438042a3238eab2fac93ed6573f987b53621364e6325c75a",
+    "ctx/sealed-2/index.log": "1f5bfe01398886a4de41f55c71c3a1c029b1ce3afbaeb9fc166278044896a186",
+    "ctx/sealed-2/index.xml": "eaf98cc45e4b1d97c0a438d2458759d31405aba79f0c4530b97adaf688446881",
+    "ctx/sealed-2/orphan-runtime-collection.log": "5e265157769fc1c170c5cbd4b36d9a7d0074bb17f1ec42b746dcccd7a8c84f6d",
+    "ctx/sealed-2/orphan-runtime-selection.json": "53c62247b12d9fa8e2c03dfd04bcefe6f90616eaa02fe83752c3b45357368286",
+    "ctx/sealed-2/orphan-runtime.log": "90468558d169c9226da780b3e54bfd185432fa1a10e08c60d6594d5902d3b293",
+    "ctx/sealed-2/orphan-runtime.xml": "5f5ebaf0c13edb8a7af1bab05cd54a174d8b4f59a5eadde4f44c3146c11e14c1",
+    "ctx/sealed-2/recovery-collection.log": "51a6ccdad94277925495cd7a2976fbdae04016207abbd2a3049ced7560d40c34",
+    "ctx/sealed-2/recovery-selection.json": "3d7edc0a2ff58ed1400829c5e7335a2aa05dfe3fea3ea2f72d70f16944488b83",
+    "ctx/sealed-2/recovery.log": "096fd16d1a79dbb7521664341ad794634627e18776e4b25b12049a750d68676b",
+    "ctx/sealed-2/recovery.xml": "e48ebb6a183d59e875ad5c11122b741986b2a292368bb0047dc3fafe643ad0a4",
+    "ctx/sealed-2/request-publish-collection.log": "7b86773e9de403eca5b9285faee61597036d689feea5b0e98928d4abd1436513",
+    "ctx/sealed-2/request-publish-selection.json": "4f826240c5928ff4c11cee35460403356777144d34a9f802a5de2856076c6319",
+    "ctx/sealed-2/request-publish.log": "46c0b9de0df9b54cdf1cb85e06ea7b63b2ad76d34c05ae45b53064ab14f9e678",
+    "ctx/sealed-2/request-publish.xml": "53925c71d97bfb081a31209e31821c3f30fe69d7d3bfa2f798b0492d3d5bd323",
+    "ctx/sealed-2/revoke-collection.log": "f0c28100f81a07f59526b0ae79b889851402634860b034d6ebf38f9cdb2ecf2f",
+    "ctx/sealed-2/revoke-selection.json": "23664bd4e3161f703b74802444d6cc976548aea0ed806ae2d7725c0ecd14cf97",
+    "ctx/sealed-2/revoke.log": "5c928c5f7f6e92377945362d4b87d3a39cecb6b38763bf22423be9c1b465bbd9",
+    "ctx/sealed-2/revoke.xml": "1be51d36c0c93350e11816c7c12641fcac940e99a288842c1fe6e90b550c9d37",
+    "ctx/sealed-2/schema-collection.log": "83a6454227369284eb6dc61b5d0e2a7dc83a2b066d37b4d02f4356442adcb28d",
+    "ctx/sealed-2/schema-selection.json": "1edfcaf9a49d5fe9d75f6f02a7123fa1d924faa1bcdf10d6cf8be9af6cc99fc4",
+    "ctx/sealed-2/schema.log": "0075899c4d27251b7f0191aeabf60240bf2e3735ad98cc78e1d9fe3f966d4a71",
+    "ctx/sealed-2/schema.xml": "45958f65a49fa73743d9ad71bcc503e5858f304fdbc1d8b8a3c8fde4c0dd194a",
+    "ctx/sealed-2/smoke-collection.log": "32ad05dd68d8bb4f4dddb753732edd091624717191fb94b5c56d0873fd437508",
+    "ctx/sealed-2/smoke-selection.json": "b0adac4230eb08aaec329a10eddb10c8b3f6d643df6cbc908f3ec49ffe2620a5",
+    "ctx/sealed-2/smoke.log": "f4440bf9f787ea8a1567afce7953e7a35701d8dd68d473c1f0e2d1ca641384ad",
+    "ctx/sealed-2/smoke.xml": "27639187490b8317bd461bf3f6a881ed480ac25b8b4c96b9e90f0a75413ca5ee",
+    "ctx/sealed-2/source-after.json": "624d3ee664437b10f39904dcca4313fe0dcaa7043b93344efd25fbdadd57d45e",
+    "ctx/sealed-2/source-before.json": "624d3ee664437b10f39904dcca4313fe0dcaa7043b93344efd25fbdadd57d45e",
+    "ctx/sealed-2/summary.json": "d4b91c39debcb70ca56920bee0588c6f25167e7c6649c1562b44308df9df4250",
+    "ctx/sealed-2/upload-approval-collection.log": "8966785dd07d3415134c5e9fe0575cee141bd6a5d32cc095e2e0634abd8ac9b8",
+    "ctx/sealed-2/upload-approval-selection.json": "54b2056838ef9040d28bf24b5222f50dbda7d7d262a53bf23eaabfcb0e05e0b5",
+    "ctx/sealed-2/upload-approval.log": "5dccc735c8a006dde239cf5270e7f1dff894abb9789614bcfc6e750f70e15caa",
+    "ctx/sealed-2/upload-approval.xml": "6bdb23a690647ce523a26bc34e552b4da1f33e07f012a017c819e84cf62ffba3",
+    "prep/base-c2d4c.log": "c3b97bc214efb086fef04b3e505b07353518459ed40589b1799d220d3673d9d2",
+    "prep/p1-schema.log": "4de1780085b7f8b1270479db4f41d8b57ed70ee2c13668944830499ad6eb980a",
+    "prep/p10-c2d4c-rerun-1.log": "e3d01728d6b685a867fcf4c9756d637b8b504fabd5312755ea86b00d17ee46fd",
+    "prep/p10-c2d4c-rerun-2.log": "30b143b24e7b659131debcf786f0378b90c2f536b5cb8ac32753ffd42cefb8ae",
+    "prep/p10-c2d4c-rerun-3.log": "2ee4216bb7cf4c56a956cfbf5582a094229ce4ddc3f7d0b0843c120dd66460b7",
+    "prep/p10-c2d4c-rerun.log": "7ec9de53847f289546db7a638ee1be0985a007cbd873147801aac9f14207e94d",
+    "prep/p11-concurrent-1.log": "7ce1d8e0d3a5c9f1998e45d671a60d653846383640756c189b3dbd938bc433ea",
+    "prep/p11-concurrent-10.log": "052d7ae2d41864f3da31325780f30e08342f6d7d47289a4f2c2b2ea6f1ae45db",
+    "prep/p11-concurrent-2.log": "2d0e63ab5194b353a35c6c189fd358cf29309fcddd710eab30e15cfe24af9082",
+    "prep/p11-concurrent-3.log": "c9bdc84e5231c94040da3367b41050703bd42ab95a723a34ac33c38a8bed79a8",
+    "prep/p11-concurrent-4.log": "35e38491622997605ead1a46bbf1cb13e64a4969b71af01adfb8ef4ced4c33a4",
+    "prep/p11-concurrent-5.log": "0b2649a38701869679403c7fa3b646577cfc3f75c0a5a381bc0e7203ccbd51d2",
+    "prep/p11-concurrent-6.log": "3a3f4fca3cb1ae66020a3b578265dec5cad2202620cf735669af1ff874273589",
+    "prep/p11-concurrent-7.log": "0ef1b87873217a8b1b051ebd70a1d8e9441378e82f23138ca91f60d044de12e5",
+    "prep/p11-concurrent-8.log": "b4fda3b543b5efbf225c15e3786990814d9ab2ed5710b03ea1197574e030162d",
+    "prep/p11-concurrent-9.log": "f8c7138779f0718ee9836d0c83226dd605fb00173cce51f1614a602d2f2f3332",
+    "prep/p2-new.log": "e5e115bea7676b88d2e25f6b09e83b5d5169336103006e3bde0fe7bc1ee8b736",
+    "prep/p3-new.log": "353d505fcba95c34e694be18ecabbcab199d43f8ab059c9329eed46190693ac1",
+    "prep/p4-new.log": "5cc1103b8c796cfb948baf4cd81166f7885bcf9501bcb71a15fec36ed996bb84",
+    "prep/p5-compat.log": "48100deaee283f9cdfaf6bd45a1a0a96a50b689c11e43671695e724758737f23",
+    "prep/p6-mig-legacy.log": "6d6c632c856a3ad04728e88872aa4050094c6ffec7d9befb30ce37ebcf508c09",
+    "prep/p7-legacy.log": "613e0068e469df4a9c0200a3f73bfc00456dbf2233229d102d0885d85301dfa4",
+    "prep/p8-smoke.log": "66e4a075a234d72bf169ef7d7eb22a6c9a15c6eb7320884430280bc65316da3f",
+    "prep/p9-cleanup.log": "c5ad34fa9a9af79876a31af12bf7c802ef2e7d92617e2c64447a2769b3611fcf",
+    "prep/p9-index.log": "41630db6851e22071dbe6e2e12cbeca200e617e4cff70562f82ef91b32e0bc85",
+    "prep/p9-publish.log": "24293f03af46ea7e0fd92f5c96ce59b2d2597c00ec9bf9ce308826afb49562c0",
+    "prep/p9-recovery.log": "b5491fd9226c36110d9f9f1969d683afe2859e728aaaa4bb8fb296fd845afa94",
+    "prep/p9-revoke.log": "74e2756cb570f24dca7595dab17ff9bd7803329876c3bcdd7ff1b60aab2145c2",
+    "prep/p9-schema.log": "2fc6686bc1f70bee314ee1d1923acf6204e97627cab2689ed2caf4de79d8dbe6",
+    "prep/p9-upload.log": "10f69d87836dcee594fc14fe3d10726e39710e522d6b08f0c180e4dda981c234",
+    "prep-run.sh": "36b6571cf4754b5ec5095fc8b4af5591baa6855467fdf31d3e9715b6f529997b",
+    "prep_run.py": "0fb0c57759bfe1e3210e6215ffcbfef6af390777606e078053e9c5b0b1ed573f",
+    "secret-scan-after.json": "e286435ede26011b38b5f71bcc96c2b8931375f6c3c32f98064d9a03bcf41b72",
+    "secret-scan-before.json": "d7686f71dad6b35381a724e250ac03a1d44b606a929027e91e134d2837dcff27"
+  },
+  "preparation_runs_not_counted": [
+    {
+      "log": "prep/p1-schema.log",
+      "result": "90 passed (migrations/config/0044 migration after EXPECTED_TABLES update)"
+    },
+    {
+      "log": "prep/p2-new.log",
+      "result": "-x stop: 1 failed (grace boundary used sub-second listing time), 28 passed"
+    },
+    {
+      "log": "prep/p3-new.log",
+      "result": "113 passed, 3 failed (same grace bug; invalid clock read only after the first list call) - a heredoc edit had not been applied"
+    },
+    {
+      "log": "prep/p4-new.log",
+      "result": "10 passed after fixes (clock read right after entry; whole-second age)"
+    },
+    {
+      "log": "prep/p5-compat.log",
+      "result": "4 passed (upload/approval/recover compatibility)"
+    },
+    {
+      "log": "prep/p6-mig-legacy.log",
+      "result": "3 passed, 1 failed: test_review_approval local variable 'orphans' shadowed the module import"
+    },
+    {
+      "log": "prep/p7-legacy.log",
+      "result": "1 passed after renaming the import"
+    },
+    {
+      "log": "prep/p8-smoke.log",
+      "result": "1 passed (Linux CLI process, SIGKILL 137 between fence and delete)"
+    },
+    {
+      "log": "prep/p9-*.log",
+      "result": "cleanup 104, schema 248, revoke 172, index 233, recovery 15, publish 362 passed; upload 841 passed + 1 failed (test_c2d4c_original_downloads [common])"
+    },
+    {
+      "log": "prep/p10-c2d4c-rerun-1..3.log and prep/base-c2d4c.log",
+      "result": "the c2d4c [common] node fails identically (revocation_unavailable at common_revoke.py:238) at head and at base b2e76ed in an isolated worktree: base debt, deselected"
+    },
+    {
+      "log": "ctx/sealed-1/",
+      "result": "exit 1, stopped after wave 2: orphan-runtime 119 passed + 1 failed (test_two_concurrent_passes_one_completion: barrier at listing let one pass commit its fence before the other read hints; product behaviour correct, test barrier timed out); smoke 1, cleanup-legacy 23, cleanup-runtime 81 passed. Not counted"
+    },
+    {
+      "log": "prep/p11-concurrent-1..10.log",
+      "result": "10/10 passed after moving the barrier to each pass's first HEAD (commit 9faf0d1)"
+    }
+  ],
+  "secret_scan": {
+    "scope": "every file under the artifact root and the repo working tree (git cached+untracked, not ignored); the five generated test secrets in UTF-8/UTF-16LE/UTF-16BE",
+    "before_cleanup_hits": [
+      "ctx/compose.json",
+      "ctx/credentials.json"
+    ],
+    "after_cleanup": {
+      "files_scanned": 685,
+      "hits": []
+    },
+    "note": "smoke runtime.env files are deleted in the test finally; credentials.json, compose.json, empty.env deleted after teardown"
+  },
+  "cleanup": {
+    "project": "rasc2d5e282556039",
+    "removed_containers": 3,
+    "removed_anonymous_volumes": 3,
+    "removed_network": "rasc2d5e282556039_default",
+    "verification": "label ras.task and sole volume consumer checked before compose down -v",
+    "image_tag_removed": "rasc2d5e2-cli:20261010 (underlying image kept, still tagged rasc2d5d2a-worker:20261009)",
+    "worktree_removed": "base worktree at b2e76ed used for the c2d4c debt rerun",
+    "baseline": "9 pre-existing containers same ID/name/image; volume, network and image sets identical to baseline; ras-worker-1/ras-beat-1 were already Restarting at baseline and their StartedAt/RestartCount changed (736 -> 901) without being touched by this task; cause not attributed; no dev stop/start/migrate/query"
+  },
+  "smoke": {
+    "node": "api/tests/test_c2d5e2_process_smoke.py",
+    "evidence": "ctx/process-*/ (result.json, kill/inspect/resume/again logs, identity facts)",
+    "facts": "docker kill --signal KILL -> exit 137 while parked after the fence commit; resume deleted=2 kept:referenced=1 listed=2; third run listed=1 kept:referenced=1; identity c1_runtime, no raw users/fence write, no TEMP, fence routine EXECUTE"
+  }
+}

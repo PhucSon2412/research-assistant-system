@@ -656,9 +656,10 @@ def test_cleanup_db_unavailable_keeps_orphan_and_reconcile_after_settled_grace(u
     assert send(b,token).status_code==201 and len(keys(b))==2
     from app.cli import reconcile_originals
     from app.clock import utcnow
+    from app.ingest import orphans
     monkeypatch.setattr(reconcile_originals,'get_storage',lambda settings:b.storage)
-    monkeypatch.setattr(reconcile_originals,'utcnow',lambda:utcnow()+timedelta(days=2))
-    reconcile_originals.main()
+    monkeypatch.setattr(orphans,'utcnow',lambda:utcnow()+timedelta(days=2))
+    assert reconcile_originals.main(['--apply'])==0
     assert len(keys(b))==1 and rows(b)==dict.fromkeys(rows(b),1)
 
 

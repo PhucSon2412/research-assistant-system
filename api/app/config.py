@@ -95,6 +95,12 @@ class FileLimits(BaseModel):
     pdf_probe_timeout_seconds: int = Field(default=10, gt=0)
     pdf_probe_memory_bytes: int = Field(default=256 * MIB, gt=0)
     orphan_grace: timedelta = timedelta(hours=24)
+    # C2d-5e2 manual orphan reconcile, bounded per pass (starting values, not
+    # measured): objects per listing page (S3 caps at 1000), listing pages
+    # per pass, and fenced keys taken to storage per pass (resumed + new).
+    orphan_list_page_size: int = Field(default=500, gt=0, le=1000)
+    orphan_max_pages: int = Field(default=20, gt=0, le=1000)
+    orphan_max_deletes: int = Field(default=100, gt=0, le=10000)
     # M6b-2b1: a common original is read into a temp file and verified before
     # its first byte is sent. Per API process, at most this many such spools
     # exist at once (disk <= slots x the largest file limit); beyond it -> 503.

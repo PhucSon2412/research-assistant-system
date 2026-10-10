@@ -20,6 +20,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from app.api import review_approval
 from app.api.routes import reviews
 from app.cli import reconcile_originals
+from app.ingest import orphans as orphan_boundary
 from app.main import app
 from app.models.enums import AuditOutcome
 from tests.test_review_requests import (A_BODY, DECLARED_RIGHTS, DECLARED_SOURCE, _fixture_rows, close_journaled,
@@ -510,11 +511,11 @@ def test_uncertain_commit_keeps_referenced_copy_and_reconcile_removes_only_orpha
     assert api.scalar("SELECT count(*) FROM source_files WHERE storage_key=:k", k=orphan) == 0
 
     # Within the grace period nothing is swept; after it only the unreferenced copy goes.
-    reconcile_originals.main()
+    assert reconcile_originals.main(["--apply"]) == 0
     assert orphan in object_keys(storage)
-    later = reconcile_originals.utcnow() + timedelta(hours=25)
-    monkeypatch.setattr(reconcile_originals, "utcnow", lambda: later)
-    reconcile_originals.main()
+    later = orphan_boundary.utcnow() + timedelta(hours=25)
+    monkeypatch.setattr(orphan_boundary, "utcnow", lambda: later)
+    assert reconcile_originals.main(["--apply"]) == 0
     assert object_keys(storage) == keys | {kept}
     assert admin.get(original_url(rid2, ids_a["file_id"])).status_code == 200  # rid2 is still open
     assert approve(admin, api, rid2).status_code == 200

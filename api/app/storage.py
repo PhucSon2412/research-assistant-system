@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import BinaryIO
 
 import boto3
@@ -10,6 +11,19 @@ from botocore.client import Config
 from botocore.exceptions import ClientError
 
 from app.config import Settings
+
+# Every original key the application mints lives under this prefix (upload and approval).
+ORIGINALS_PREFIX = "originals/"
+
+
+@dataclass(frozen=True)
+class ListedObject:
+    """One raw listing entry; values are unchecked hints exactly as S3 returned them."""
+
+    key: object
+    last_modified: object
+    size: object
+    etag: object
 
 
 class OriginalStorage:
@@ -65,6 +79,26 @@ class OriginalStorage:
         """
         head = self.client.head_object(Bucket=self.bucket, Key=key)
         return int(head["ContentLength"]), str(head.get("ETag")), str(head.get("LastModified"))
+
+    def head(self, key: str) -> tuple[object, object, object]:
+        """Raw HEAD (size, ETag, Last-Modified); a missing key raises (see ``is_missing_object``)."""
+        head = self.client.head_object(Bucket=self.bucket, Key=key)
+        return head.get("ContentLength"), head.get("ETag"), head.get("LastModified")
+
+    def list_originals(self, *, start_after: str | None, max_keys: int) -> tuple[list[ListedObject], object]:
+        """ONE listing page of the original prefix of the configured bucket, after ``start_after``.
+
+        Never creates the bucket. Every error propagates: a missing bucket,
+        403, timeout or 5xx is never an empty listing. Returns the raw entries
+        and the raw ``IsTruncated`` flag for the caller to validate.
+        """
+        kwargs = {"Bucket": self.bucket, "Prefix": ORIGINALS_PREFIX, "MaxKeys": max_keys}
+        if start_after is not None:
+            kwargs["StartAfter"] = start_after
+        page = self.client.list_objects_v2(**kwargs)
+        entries = [ListedObject(o.get("Key"), o.get("LastModified"), o.get("Size"), o.get("ETag"))
+                   for o in page.get("Contents", [])]
+        return entries, page.get("IsTruncated")
 
     def orphan_keys(self, prefix: str = "originals/") -> Iterator[tuple[str, object]]:
         paginator = self.client.get_paginator("list_objects_v2")
