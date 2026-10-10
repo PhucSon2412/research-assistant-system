@@ -1,6 +1,12 @@
 # Roadmap đề xuất
 
-## C2d-5e2 đã triển khai trên nhánh review, chờ chủ dự án review
+## Giao C2d-5f1 sau merge PR #54
+
+[Prompt citation reconcile runtime](tasks/m6c2b2c2d5f1-citation-reconcile-runtime.md) — **đã giao tài liệu, chưa triển khai/kiểm**. Base merge PR #54 `37edd5c9`, source `0045`; merge tree khớp head `cf66f1c`, chưa rerun tại merge. Chuyển CLI/direct/Celery citation backfill, batch final proof/outcome và giữ transaction/lock của extraction/discovery hooks. Không đổi matcher/ACL hoặc mở bibliography làm evidence.
+
+Orchestrator chọn citation trước để chốt hợp đồng hook; **C2d-5f2 discovery harvesting** xử lý engine/gate, network ngoài DB, pacing/lease/cursor/backoff và outcome riêng. Tiếp theo search/query/rerank → RAG/generation → tổng hồi quy C2d → C3/C4 theo điều kiện cũ. Debt và giới hạn restore/operator/charge chưa được chứng nhận. **Safety pending tới C4**; các trạng thái PR #54 chưa merge bên dưới giữ lịch sử.
+
+## C2d-5e2 đã triển khai trên nhánh review (lịch sử trước merge)
 
 [Handoff](c2d5e2-orphan-original-reconcile-runtime.md) · [Inventory](c2d5e2-test-inventory.json). Base `b2e76edb`, source `0045`, code `ebbc27a`: CLI/direct orphan reconcile qua runtime, fence orphan riêng + completion, zero-reference toàn DB, S3 ngoài DB, resume/bound/cursor. Vẫn thủ công khi quiescent; chưa online GC/beat. Seal `sealed-2` tại `9faf0d1` (production code `ebbc27a`, chỉ khác barrier một test): **2.096 API unique pass**, 0 fail/error/skip, exit 0, collect 4.690, **2.594 not-run** (gồm 25 debt base deselect); 321 source hash trước/sau trùng; smoke CLI Linux SIGKILL thật 1 pass; countercheck 9/9. PR chưa merge. **Bước tiếp theo đề xuất: discovery/citation** → search/query/rerank → RAG/generation → tổng hồi quy C2d; C3/C4 riêng, **safety pending tới C4**.
 

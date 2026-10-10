@@ -1,4 +1,6 @@
-# Môi trường phát triển và schema (M1a–C2d-5e2 trên nhánh review)
+# Môi trường phát triển và schema (M1a–C2d-5e2 đã merge)
+
+PR #54 đã merge `37edd5c9`, source `0045`; merge tree khớp `cf66f1c`, chưa rerun tại merge. [C2d-5f1 citation runtime](tasks/m6c2b2c2d5f1-citation-reconcile-runtime.md) mới giao tài liệu, chưa triển khai/kiểm; discovery harvesting là C2d-5f2. Không có lệnh vận hành mới đã kiểm cho C2d-5f1. Safety pending tới C4; các hướng dẫn/lượt kiểm dưới đây giữ theo source lịch sử, không là chứng nhận dev/cutover.
 
 ## C2d-5e2 orphan reconcile cô lập
 

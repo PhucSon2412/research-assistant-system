@@ -1,6 +1,6 @@
 # C2d-5e2 — reconcile original mồ côi qua runtime
 
-**Trạng thái: nhánh `feat/m6c2b2c2d5e2-orphan-original-reconcile-runtime`, chờ review, chưa merge.** Base `origin/main = b2e76edb028af2ff118d3936ed4cdf47cb88a99f` (merge PR #53, tree khớp head `bf9d81f`). Source migration `0044 → 0045`; không suy revision DB dev. **Safety pending tới C4.** Reconcile vẫn **thủ công trong môi trường quiescent**; không có Celery/beat, HTTP hoặc UI mới, không online GC.
+**Trạng thái: PR #54 đã merge `37edd5c9c28e60ba43425f0b1bd9f42946585e28`, tree khớp head review `cf66f1c`; chưa rerun tại merge.** Nhánh `feat/m6c2b2c2d5e2-orphan-original-reconcile-runtime` tạo từ base `b2e76edb028af2ff118d3936ed4cdf47cb88a99f` (merge PR #53, tree khớp head `bf9d81f`). Source migration `0044 → 0045`; không suy revision DB dev. **Safety pending tới C4.** Reconcile vẫn **thủ công trong môi trường quiescent**; không có Celery/beat, HTTP hoặc UI mới, không online GC. Đã giao [C2d-5f1 citation runtime](tasks/m6c2b2c2d5f1-citation-reconcile-runtime.md), chưa triển khai/kiểm; discovery harvesting tách C2d-5f2.
 
 [Task](tasks/m6c2b2c2d5e2-orphan-original-reconcile-runtime.md) · [Inventory](c2d5e2-test-inventory.json) · [Cleanup runtime C2d-5e1](c2d5e1-revoked-common-cleanup-runtime.md) · [Upload original](c2d4b-upload-original.md) · [Approval/copy](c2d5b-review-approval-original-copy.md)
 

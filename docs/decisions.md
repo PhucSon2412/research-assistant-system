@@ -1,5 +1,21 @@
 # Nhật ký quyết định
 
+## Giao C2d-5f1 sau merge PR #54 (2026-10-10)
+
+Đã fetch/xác minh PR #54 merge `37edd5c9c28e60ba43425f0b1bd9f42946585e28`; `origin/main` tại merge này, tree khớp `cf66f1c`. Source migration `0045`, không suy DB dev. Review 125 pass và agent 2.096 unique pass giữ theo source trước merge, chưa rerun merge. [Review và giới hạn](reviews/pr54-c2d5e2-orphan-original-reconcile-runtime.md).
+
+Khảo sát thấy `reconcile_pending`/CLI còn Session/commit legacy, Celery chỉ có entry gate; extraction và discovery đều gọi helper citation trong transaction riêng. Citation shared/exclusive advisory locks kết hợp derived trigger lấy item lock cần đối chiếu worker item → citation lock để tránh đảo chiều. Discovery còn connection/session lock xuyên HTTP và sleep trong request-clock transaction; chưa chuyển business boundary.
+
+Orchestrator chọn **C2d-5f1 citation runtime trước, C2d-5f2 discovery harvesting sau** trong nhóm roadmap discovery/citation. C2d-5f1 chuyển CLI/direct/Celery backfill, bounded batch/runtime/final binding/outcome/release, giữ atomic extraction/page hooks và sửa phần citation lock cần thiết; không chứng nhận toàn discovery hoặc đổi matcher/ACL/evidence. Fan-out retarget chưa bound phải bàn giao rõ cho C2d-5f2, không âm thầm cắt updates rồi advance cursor. Không thêm network/provider hoặc sự kiện journal cho bibliography. [Prompt đầy đủ](tasks/m6c2b2c2d5f1-citation-reconcile-runtime.md).
+
+Lựa chọn scoped theo ủy quyền, không là xác nhận trực tiếp mới của chủ dự án hoặc bất biến vĩnh viễn. **Chỉ giao tài liệu, chưa triển khai/kiểm; safety pending tới C4.** Search/query/rerank → RAG/generation → tổng hồi quy C2d và C3/C4 vẫn riêng; không `.env`/dev/pricing/provider thật. Giữ docs review/task chưa commit cho PR mới.
+
+## Review PR #54 — reconcile orphan thủ công (2026-10-10)
+
+Tại head `cf66f1c`, source `0045`, không phát hiện điểm chặn merge mới trong scope đã giao. Reviewer thực chạy **125/125**, đối chiếu riêng artifact agent **2.096 unique pass / 2.594 not-run**, 179 artifact hash/321 source hash và 9 countercheck. PR OPEN/chưa merge, **safety pending tới C4**. [Report, evidence và giới hạn](reviews/pr54-c2d5e2-orphan-original-reconcile-runtime.md).
+
+Giữ ba lựa chọn scoped của task: runtime login thay Compose owner cũ, mặc định preview/`--apply` khi xóa, chỉ key `originals/<32 hex thường>`. Quiescence vẫn do người vận hành bảo đảm; chưa online GC, không suy HEAD là conditional delete hoặc restore đã an toàn. Đây là kết luận orchestrator theo ủy quyền, không phải xác nhận trực tiếp mới của chủ dự án. Discovery/citation và các consumer/C3/C4 tiếp theo chưa giao trong lượt review.
+
 ## Quyết định triển khai C2d-5e2 (2026-10-10)
 
 Agent triển khai theo lựa chọn scoped của orchestrator (không phải xác nhận trực tiếp mới của chủ dự án, không là luật kiến trúc vĩnh viễn). Base `b2e76edb`, source `0044 → 0045`, chưa merge. [Handoff](c2d5e2-orphan-original-reconcile-runtime.md).
