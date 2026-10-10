@@ -1,5 +1,7 @@
 # Research Assistant System
 
+**Review PR #53 tại `3c4c165`: cần sửa P2 trước merge.** Đường operator nhận runtime khi guard lỗi/profile không hợp lệ; reviewer tái hiện object bị xóa dù safety pending. 101 test cleanup/migration/ORM đạt; hai regression mới fail đúng lỗi. [Report và giới hạn](docs/reviews/pr53-c2d5e1-revoked-common-cleanup-runtime.md) · [Prompt sửa PR #53](docs/tasks/fix-pr53-operator-cleanup-identity-and-seal.md). Agent 1.575 pass được kiểm artifact riêng; not-run logic 2.976, không phải raw 2.978. Safety pending tới C4; số nhánh review dưới đây giữ source/luợt agent.
+
 **Task tiếp theo:** C2d-5e1 đã triển khai trên nhánh review, chờ chủ dự án review/merge; mục kế tiếp theo roadmap (orphan reconcile → discovery/citation → search/query/rerank → RAG/generation → tổng hồi quy C2d) chưa giao.
 
 **C2d-5e1 trên nhánh review (chưa merge):** [handoff cleanup runtime](docs/c2d5e1-revoked-common-cleanup-runtime.md) · [inventory](docs/c2d5e1-test-inventory.json). Base merge PR #52 `ba20fda`, source `0043 → 0044`; code kiểm `3b54a6f`. Normal Celery/CLI/direct cleanup qua runtime: fence xóa bền vững theo key (`object_delete_fences`, routine `ras_auth_cleanup_fence`, trigger SourceFile INSERT cùng key lock), S3 ngoài mọi transaction, finalize tombstone → item → journal. Recovery giữ đường operator `operator_cleanup_revoked`. Seal: **1575 API unique pass**, 0 fail/error/skip (collect 4551, 2978 not-run gồm 24 node debt base tái hiện ở `ba20fda`); 8/8 countercheck. Orphan reconcile/discovery/citation/query/RAG/C3/C4 riêng; **safety pending tới C4**.

@@ -1,5 +1,11 @@
 # Nhật ký quyết định
 
+## Review PR #53 — operator identity fail open (2026-10-10)
+
+Tại head `3c4c165`, code/test `3b54a6f`, có **P2 chặn merge**: `_require_operator` coi mọi `runtime.Halt` là cho phép operator. Reviewer tái hiện runtime được thêm TEMP trên DB thử, và identity probe lỗi: cả hai xóa original/commit purged khi safety pending. Không chấp nhận biến thể kiểm ngược này; yêu cầu operator proof dương, lỗi kiểm danh tính phải đóng quyền, giữ đường recovery khi gate đóng mà không mở toàn C3. [Report](reviews/pr53-c2d5e1-revoked-common-cleanup-runtime.md) · [Prompt sửa](tasks/fix-pr53-operator-cleanup-identity-and-seal.md).
+
+Reviewer 101/101 cleanup/migration/ORM pass, hai regression mới fail đúng P2. 112 artifact hash/311 source hash và agent 1.575 pass kiểm riêng; not-run logic **2.976**, raw **2.978** lệch hai UUID1 đổi ID. Yêu cầu param ID ổn định, exact inventory và giữ lịch sử seal exit 1. PR vẫn OPEN/chưa merge, source `0044`, safety pending tới C4; không pricing/dev/provider hoặc task tiếp theo. Biến thể/ghi nhận của agent bên dưới giữ lịch sử, không là kết luận review chấp thuận.
+
 ## Triển khai C2d-5e1 (2026-10-10)
 
 **Nguồn:** task C2d-5e1 (lựa chọn scoped của orchestrator, không phải xác nhận trực tiếp mới của chủ dự án). Code `3b54a6f` trên nhánh review, chưa merge. [Handoff](c2d5e1-revoked-common-cleanup-runtime.md).

@@ -1,5 +1,7 @@
 # C2d-5e1 — cleanup bản chung đã thu hồi qua runtime
 
+**Review PR #53 tại `3c4c165` (2026-10-10): có P2 chặn merge.** [Report](reviews/pr53-c2d5e1-revoked-common-cleanup-runtime.md) · [prompt sửa](tasks/fix-pr53-operator-cleanup-identity-and-seal.md). Runtime guard lỗi/profile sai được helper operator cho qua; reviewer tái hiện object bị xóa và purge khi safety pending. Mô tả từ chối runtime bên dưới chỉ đúng khi runtime guard thành công, chưa bảo đảm fail closed. Reviewer 101 API pass; hai regression mới fail đúng P2. Artifact 1.575 pass kiểm riêng; not-run logic 2.976 thay cho raw 2.978 vì hai UUID1 đổi ID; giữ seal exit 1/source lịch sử, chưa sửa inventory agent. PR OPEN/chưa merge; safety pending tới C4.
+
 [Task](tasks/m6c2b2c2d5e1-revoked-common-cleanup-runtime.md) · [Inventory](c2d5e1-test-inventory.json) · [Document runtime](c2d5d2b-document-index-runtime.md) · [Revoke runtime](c2d5c2-common-revoke.md)
 
 Base đã fetch: `origin/main = ba20fda402840243f13bd4bb27e98c4c0cb17562` (merge PR #52; head `97bc6e7` là ancestor, tree khớp). Nhánh `feat/m6c2b2c2d5e1-revoked-common-cleanup-runtime`; commit `6254a8a` giữ riêng toàn bộ docs orchestrator/review có sẵn. Source migration `0043 → 0044`; không suy revision DB dev. **Safety pending tới C4**, không mở pricing/cutover/provider thật.

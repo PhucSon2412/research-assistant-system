@@ -1,5 +1,11 @@
 # Chiến lược kiểm thử
 
+## Review độc lập PR #53 tại 3c4c165
+
+**101/101 pass**: 71 cleanup runtime, 2 migration 0044, 28 migration/ORM; **hai regression operator mới fail đúng P2**, 0 setup error/skip. Runtime profile sai và identity probe lỗi đi operator purge khi safety pending. Không sửa production/test; 311 source hash hiện hành khớp sealed agent, snapshot review đầu ghi khi suite đã bắt đầu. [Report/evidence/giới hạn](reviews/pr53-c2d5e1-revoked-common-cleanup-runtime.md) · [Prompt sửa](tasks/fix-pr53-operator-cleanup-identity-and-seal.md).
+
+112 artifact hash và JUnit agent 1.575 unique pass được đối chiếu riêng, không cộng reviewer rerun. Đúng hai UUID1 khiến schema selection lệch: not-run logic **2.976**; raw 2.978 và seal exit 1 phải giữ lịch sử, sửa ID cho lượt sau. Reviewer chưa rerun 4.450 node repo, process smoke/web/base debt. PR OPEN/chưa merge, source `0044`, safety pending tới C4.
+
 ## C2d-5e1 — kiểm nhánh cleanup runtime
 
 Code `3b54a6f`: **1575 API unique pass**, 0 fail/error/skip; collect 4551, 2978 not-run. Selection theo call graph: cleanup runtime mới (fence SQL/raw insert/race hai thứ tự/hash collision/isolation tham chiếu/S3 403-5xx-timeout/uncertain/release/clock/gate trong finalize/late accounting/recover), migration 0044, cleanup/publication cũ, revoke, document/common index, upload/approval, HTTP index/publish, recovery/backup, ORM/migration và smoke worker+beat Linux (SIGKILL giữa fence và delete). 24 node fail/error y hệt ở base `ba20fda` được deselect tường minh, ghi riêng là debt, không tính pass. 8/8 countercheck (role, gate cuối, trigger insert, bảo vệ tham chiếu, giữ ledger, hậu điều kiện, uncertain, release) bắt assertion nghiệp vụ; lượt yếu đầu (gate cuối) giữ riêng. Không web/provider live/dev/cutover. [Inventory](c2d5e1-test-inventory.json).
