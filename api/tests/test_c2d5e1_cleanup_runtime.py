@@ -344,6 +344,21 @@ def test_gate_closing_between_checkpoints(gone, monkeypatch, moment):
     assert tomb(b).purged_at == NOW and len(fences(b)) == 1
 
 
+@pytest.mark.parametrize('gate', ['pending', 'hold'])
+def test_gate_closing_inside_finalize_refuses_commit(gone, monkeypatch, gate):
+    """The final gate after locks/DML/flush decides, not only the entry check."""
+    b = gone
+    rows = snapshot(b)
+    real = publication._finish_jobs
+    def closing(db, item_id, at):
+        corrupt(b, gate, monkeypatch)  # after entry, tombstone/item locks and derived DML
+        return real(db, item_id, at)
+    monkeypatch.setattr(publication, '_finish_jobs', closing)
+    assert clean(b) == {'halted:recovery_gate_closed': 1}
+    assert snapshot(b) == rows and tomb(b).purged_at is None and tomb(b).cleanup_attempts == 0
+    assert not present(b, b.copy.key) and len(fences(b)) == 1  # the admitted delete is not undone
+
+
 # --- fence SQL --------------------------------------------------------------------------------
 
 def call_routine(engine, **over):

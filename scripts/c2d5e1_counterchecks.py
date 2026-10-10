@@ -32,7 +32,7 @@ def main():
          t + 'test_entry_requires_actual_runtime_login[owner]'),
         ('final-gate', cleanup, [("        _final_gate(db, writer=True)\n        with db.no_autoflush:",
                                   "        with db.no_autoflush:")],
-         t + 'test_gate_closing_between_checkpoints[during_head]'),
+         t + 'test_gate_closing_inside_finalize_refuses_commit[pending]'),
         ('insert-fence', sql, [("  RAISE EXCEPTION 'object key is fenced for deletion' USING ERRCODE='check_violation'; END IF;",
                                 "  NULL; END IF;")],
          t + 'test_prepare_first_refuses_waiting_insert_without_cycle[False]'),
