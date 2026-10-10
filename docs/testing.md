@@ -1,6 +1,18 @@
 # Chiến lược kiểm thử
 
-**Kế hoạch mới, chưa có kết quả chạy:** [C2d-5d2a worker runtime/extraction](tasks/m6c2b2c2d5d2a-worker-runtime-extraction.md). Runtime/dispatch/claim/lease/checkpoint, S3/parser ngoài DB locks, pending gate thật, commit uncertain và extraction tới `awaiting_index`; Redis/Celery/PG/MinIO/journal cô lập, không provider. Kiểm theo rủi ro và call graph; không cộng số PR #50 thành pass mới. Bốn lỗi baseline giữ debt tổng hồi quy trước C4.
+## C2d-5d2b — kiểm nhánh document runtime
+
+[Handoff](c2d5d2b-document-index-runtime.md) · [Inventory](c2d5d2b-test-inventory.json). Selection finite theo call graph: document private/common mới, worker/beat fake transport, extraction, index/shared capacity/query accounting, upload, HTTP index/revoke, cleanup/recovery và ORM/migration. JUnit unique khớp collect/selection; source hash trước/sau; counterchecks chạy riêng, khôi phục bytes trước seal. Raw lỗi chuẩn bị/base debt giữ ngoài repo, không cộng vào lượt cuối. Business cutover chỉ scoped; pending/hold/journal/role thật không bypass. Không web/provider live/dev/C3/C4; safety pending. Mục kế hoạch bên dưới giữ lịch sử tại lúc giao.
+
+## Kế hoạch C2d-5d2b sau merge PR #51
+
+[Prompt document embedding/index runtime](tasks/m6c2b2c2d5d2b-document-index-runtime.md) yêu cầu runtime PG/MinIO/journal/Redis, provider adapter với fake transport, gate thật pending riêng, clock/lease, budget/concurrency, hash trước mỗi call và publish kể cả reuse, outcome uncertain, late accounting sau thu hồi và cleanup. Worker/beat thật chứng minh luồng private/common tới indexed; không provider live/cutover. **Lượt giao chỉ khảo sát source/Git và kiểm docs, chưa chạy test mới.** Số PR #51 giữ source lịch sử, bốn baseline debt trước tổng hồi quy/C4; safety pending tới C4.
+
+## Review độc lập PR #51 tại b569d0c
+
+Reviewer thực chạy **103/103 API unique**, 0 fail/error/skip: 74 worker/common-extraction mới, 28 migration/ORM và một process smoke worker/beat Linux thực với Redis stop/start, ba job private Markdown/PDF/common. 293 source hashes trước/sau khớp. Artifact agent **549 pass/8 countercheck**, 218 file manifest và selection/JUnit được kiểm riêng, không cộng vào lượt reviewer. Theo collect 4.343, reviewer chưa chạy lại **4.240 node**; không web/provider/cutover/benchmark. PR đã merge `9fb8890`, chưa rerun tại merge, source `0042`, safety pending tới C4. [Report, evidence, gián đoạn và cleanup](reviews/pr51-c2d5d2a-worker-runtime-extraction.md).
+
+**Kế hoạch giao C2d-5d2a (lịch sử, chưa có kết quả tại lúc giao):** [task worker runtime/extraction](tasks/m6c2b2c2d5d2a-worker-runtime-extraction.md). Runtime/dispatch/claim/lease/checkpoint, S3/parser ngoài DB locks, pending gate thật, commit uncertain và extraction tới `awaiting_index`; Redis/Celery/PG/MinIO/journal cô lập, không provider. Kết quả thực hiện/review hiện hành ở mục trên và handoff; bốn lỗi baseline vẫn là debt tổng hồi quy trước C4.
 
 ## Review độc lập PR #50 tại ff5fa82
 

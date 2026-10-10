@@ -41,6 +41,10 @@ def require_runtime(db):
               OR NOT has_function_privilege('ras_auth_status_live(uuid)','EXECUTE')
               OR NOT has_function_privilege('ras_auth_session_create(uuid,uuid,uuid,text,text,timestamp with time zone,timestamp with time zone)','EXECUTE')
               OR NOT has_table_privilege('ingestion_jobs','UPDATE')
+              OR EXISTS (SELECT 1 FROM unnest(ARRAY['embedding_calls','embedding_budget_days',
+                 'embedding_user_budget_days','index_generations','index_entries']) AS t(name)
+                 CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) AS p(name)
+                 WHERE NOT has_table_privilege(t.name,p.name))
             FROM pg_roles r WHERE rolname=current_user
         """))
         if forbidden is not False:

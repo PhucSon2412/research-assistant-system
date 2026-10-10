@@ -1,6 +1,8 @@
 # C2d-5d2a — worker runtime và extraction
 
-Source kiểm: `dfca84ac04a68bbce29abe0e9d1b87ac51da28ac` (production code `5b505d3`, commit sau chỉ sửa fixture/đối chứng). Base đã fetch và xác minh `origin/main` bằng merge PR #50 `03b79855221f3d9279cbe5aa677d6a50db59b5ab`; không suy revision DB dev. Source migration vẫn `0042`, không migration/grants mới. [Task](tasks/m6c2b2c2d5d2a-worker-runtime-extraction.md) · [Inventory selection/JUnit/hash](c2d5d2a-test-inventory.json). Docs orchestrator/reviewer có sẵn được giữ trong commit riêng `397803c` trước code. PR chưa merge; **safety pending tới C4**.
+**Review độc lập PR #51 (2026-10-10) tại head `b569d0c`:** không phát hiện điểm chặn merge mới trong scope extraction; **103/103 API** reviewer đạt, gồm process worker/beat thực và Redis stop/start. 293 source hashes khớp; artifact agent **549/8 countercheck** kiểm riêng. PR đã merge `9fb8890`, chưa rerun tại merge, safety pending tới C4; [report, evidence và giới hạn](reviews/pr51-c2d5d2a-worker-runtime-extraction.md). Kết quả sealed agent bên dưới giữ nguyên nguồn, không tính là reviewer chạy lại toàn bộ.
+
+Source kiểm: `dfca84ac04a68bbce29abe0e9d1b87ac51da28ac` (production code `5b505d3`, commit sau chỉ sửa fixture/đối chứng). Base đã fetch và xác minh `origin/main` bằng merge PR #50 `03b79855221f3d9279cbe5aa677d6a50db59b5ab`; không suy revision DB dev. Source migration vẫn `0042`, không migration/grants mới. [Task](tasks/m6c2b2c2d5d2a-worker-runtime-extraction.md) · [Inventory selection/JUnit/hash](c2d5d2a-test-inventory.json). Docs orchestrator/reviewer có sẵn được giữ trong commit riêng `397803c` trước code. PR đã merge `9fb8890`; **safety pending tới C4**. [Prompt C2d-5d2b](tasks/m6c2b2c2d5d2b-document-index-runtime.md) đã giao, chưa triển khai/kiểm.
 
 ## Phạm vi và cấu hình
 

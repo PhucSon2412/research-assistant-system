@@ -384,9 +384,9 @@ def test_same_size_replacement_of_the_common_object_is_caught(w, when):
         assert process_job(job, w.settings, w.storage) == "checksum_mismatch"
         assert w.api.scalar("""SELECT count(*) FROM index_entries e JOIN index_generations g ON g.id=e.generation_id
             WHERE g.item_id=:i""", i=uuid.UUID(copy)) == 0
-        # The response may have been billed: the ceiling is kept, never sent again automatically.
+        # Valid usage settles financially even if checksum denies all content.
         assert w.api.scalar("SELECT status FROM embedding_calls WHERE source_file_id=:f",
-                            f=common_file(w, copy)) == "uncertain"
+                            f=common_file(w, copy)) == "completed"
     assert item_row(w, copy).content_status == "metadata_only"
     assert item_row(w, copy).active_index_generation_id is None
 
@@ -397,7 +397,7 @@ def test_revoke_before_any_provider_call_cancels_without_sending(w):
     assert process_job(job, storage=w.storage) == "awaiting_index"
     assert revoke(w.admin, copy).status_code == 200
     assert process_job(job, w.settings, w.storage) == "cancelled"
-    assert w.calls == [] and jobs_of(w, copy)[0][1] == "cancelled"
+    assert w.calls == [] and w.api.scalar("SELECT cancel_requested FROM ingestion_jobs WHERE id=:j", j=jobs_of(w, copy)[0][0]) is True
     assert item_row(w, copy).active_index_generation_id is None
 
 
@@ -411,7 +411,8 @@ def test_revoke_during_the_provider_call_stores_and_publishes_nothing(w):
     with w.api.engine.connect() as conn:
         call = conn.execute(text("""SELECT status, cost_status, vector IS NULL FROM embedding_calls
             WHERE source_file_id=:f"""), {"f": common_file(w, copy)}).one()
-    assert tuple(call) == ("uncertain", "unknown_reserved_ceiling", True)
+    # Valid late usage is financial-only even though revoke denies vector/content.
+    assert tuple(call) == ("completed", "usage_price_estimate", True)
     assert item_row(w, copy).content_status == "metadata_only" and item_row(w, copy).active_index_generation_id is None
     assert w.api.scalar("SELECT count(*) FROM index_generations WHERE item_id=:i AND state='active'",
                         i=uuid.UUID(copy)) == 0
@@ -505,7 +506,7 @@ def test_worker_holding_item_and_job_first_makes_revoke_wait_then_ends_cancelled
     runner.join(20)
     revoker.join(20)
     assert outcome == {"revoked": True} and result == {"worker": "cancelled"}
-    assert jobs_of(w, copy)[0][1] == "cancelled"
+    assert w.api.scalar("SELECT cancel_requested FROM ingestion_jobs WHERE id=:j", j=jobs_of(w, copy)[0][0]) is True
     assert derived_counts(w.api, copy)["sections"] > 0  # committed before t_rev
     assert publication.cleanup_revoked(w.api.engine, w.storage, w.api.clock.now, 50) == {"deleted": 1}
     assert derived_counts(w.api, copy) == dict.fromkeys(DERIVED, 0)
@@ -533,11 +534,13 @@ def test_revoke_holding_the_item_first_makes_the_worker_wait_without_deadlock(w)
     assert holding.wait(10)
     runner = Thread(target=lambda: result.setdefault("worker", process_job(job, storage=w.storage)))
     runner.start()
-    wait_for_lock_wait(w.api)  # the worker waits for the item, holding nothing the revoke needs
-    release.set()
+    try:
+        runner.join(10)  # runtime claim SKIPs the item already owned by revoke
+        assert not runner.is_alive() and result == {"worker":"not_claimed"}
+    finally:
+        release.set()
     revoker.join(20)
-    runner.join(20)
-    assert outcome == {"revoked": True} and result == {"worker": "cancelled"}
+    assert not revoker.is_alive() and outcome == {"revoked": True}
     assert derived_counts(w.api, copy) == dict.fromkeys(DERIVED, 0) and w.calls == []
 
 
@@ -721,7 +724,7 @@ def test_revoke_commits_while_the_index_step_reads_the_object(w, block_at, calls
         "revoked", "metadata_only", None)
     assert w.api.scalar("SELECT count(*) FROM index_generations WHERE item_id=:i AND state='active'",
                         i=uuid.UUID(copy)) == 0
-    assert jobs_of(w, copy)[0][1] == "cancelled"
+    assert w.api.scalar("SELECT cancel_requested FROM ingestion_jobs WHERE id=:j", j=jobs_of(w, copy)[0][0]) is True
 
 
 def test_the_object_is_hashed_before_every_call_and_before_publish(w):
@@ -770,8 +773,8 @@ def test_an_unchanged_head_fingerprint_does_not_stand_in_for_the_hash(w, replace
                         i=uuid.UUID(copy)) == 0
     statuses = sorted(w.api.scalar("""SELECT array_agg(status) FROM embedding_calls
         WHERE source_file_id=:f""", f=common_file(w, copy)))
-    # The call refused before sending is released (rejected, no charge); nothing was left reserved.
-    assert statuses == (["completed", "rejected"] if stage == "next_call" else ["completed"] * 3)
+    # Runtime hashes before reservation: the refused next call has no ledger row.
+    assert statuses == (["completed"] if stage == "next_call" else ["completed"] * 3)
     assert jobs_of(w, copy)[0][1] == "terminal_failed"
 
 

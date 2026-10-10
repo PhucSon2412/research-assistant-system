@@ -23,6 +23,7 @@ from tests.test_ingest_worker import upload
 from tests.test_pdf_ingest import partial_pdf, upload_pdf
 from tests.test_private_index import fake_provider, settings_with_fake_key
 from tests.test_uploads import upload_api
+from tests.test_c2c1_bootstrap import installation  # noqa: F401
 
 
 def configured(settings):
@@ -224,16 +225,20 @@ def test_query_embedding_429_and_timeout_accounting(upload_api, monkeypatch):
     configured(settings)
     for error, status in ((EmbeddingError("provider_rate_limited", True), "rejected"),
                           (EmbeddingError("provider_outcome_uncertain"), "uncertain")):
+        with api.engine.connect() as conn:
+            before=set(conn.scalars(text('SELECT id FROM search_usage')))
         def fail(*args, **kwargs):
             raise error
         monkeypatch.setattr("app.search.embed", fail)
         response = browser.post("/search", {"query": "keyword", "mode": "hybrid", "rerank": False})
         assert response.status_code == 503 and response.json()["error"] == error.code
-        assert api.scalar("SELECT status FROM search_usage ORDER BY created_at DESC,id DESC LIMIT 1") == status
+        with api.engine.connect() as conn:
+            added=[r for r in conn.execute(text('SELECT id,status FROM search_usage')) if r.id not in before]
+        assert len(added)==1 and added[0].status==status
 
 
 def test_rerank_transport_contract_and_bad_response(monkeypatch):
-    settings = Settings(database_url="postgresql+psycopg://test@localhost/test")
+    settings = Settings(db=None, database_url="postgresql+psycopg://test@localhost/test")
     settings.embedding.api_key = SecretStr("synthetic-test-key")
     captured = []
     original_client = httpx.Client
@@ -269,7 +274,7 @@ def test_rerank_transport_contract_and_bad_response(monkeypatch):
     (None, "Fireworks"),
 ])
 def test_rerank_transport_rejects_unknown_identity(monkeypatch, response_model, response_provider):
-    settings = Settings(database_url="postgresql+psycopg://test@localhost/test")
+    settings = Settings(db=None, database_url="postgresql+psycopg://test@localhost/test")
     settings.embedding.api_key = SecretStr("synthetic-test-key")
     payload = {"results": [{"index": 0, "relevance_score": .8}]}
     if response_model is not None:
@@ -287,7 +292,7 @@ def test_rerank_transport_rejects_unknown_identity(monkeypatch, response_model, 
 
 
 def test_rerank_transport_429_and_timeout(monkeypatch):
-    settings = Settings(database_url="postgresql+psycopg://test@localhost/test")
+    settings = Settings(db=None, database_url="postgresql+psycopg://test@localhost/test")
     settings.embedding.api_key = SecretStr("synthetic-test-key")
     original_client = httpx.Client
     monkeypatch.setattr("app.search.httpx.Client", lambda timeout: original_client(

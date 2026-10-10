@@ -100,8 +100,11 @@ def test_index_states_untouched_even_with_key_and_price(work, state, resume):
     settings.embedding.api_key = SecretStr('test-never-dispatch')
     settings.embedding.pricing_verified = True  # local copy only, not environment/production config
     with Session(b.api.engine) as db:
-        assert b.job not in worker.due_job_ids(db, settings)
-    assert worker.process_job(b.job, settings, b.storage) == 'index_pending'
+        assert b.job not in worker.extraction_due_job_ids(db, settings)
+    # The extraction boundary still rejects index states; document dispatch is
+    # now separate. Missing price keeps the durable state/attempt untouched.
+    settings.embedding.pricing_verified = False
+    assert worker.process_job(b.job, settings, b.storage) == 'embedding_pricing_unverified'
     assert not b.opened
     assert sql(b, 'SELECT state FROM ingestion_jobs WHERE id=:i', i=b.job) == state
     assert sql(b, 'SELECT attempt_count FROM ingestion_jobs WHERE id=:i', i=b.job) == 0

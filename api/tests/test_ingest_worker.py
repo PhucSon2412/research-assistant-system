@@ -38,7 +38,7 @@ def test_private_markdown_pipeline_locators_metadata_and_acl(upload_api):
     with Session(api.engine) as db:
         assert job_id in due_job_ids(db, get_settings())
     assert process_job(job_id, storage=storage) == "awaiting_index"
-    assert process_job(job_id, storage=storage) == "index_pending"
+    assert process_job(job_id, storage=storage) == "embedding_key_missing"
     detail = a.get(f"/library/items/{ids['item_id']}").json()["item"]
     assert detail["title"] == "User title"
     assert detail["content_status"] == "metadata_only"

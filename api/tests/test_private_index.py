@@ -18,6 +18,7 @@ from app.ingest.worker import due_job_ids, process_job
 from tests.test_ingest_worker import upload
 from tests.test_pdf_ingest import full_pdf, image_only_pdf, partial_pdf, upload_pdf
 from tests.test_uploads import upload_api
+from tests.test_c2c1_bootstrap import installation  # noqa: F401
 
 
 def settings_with_fake_key():
@@ -253,7 +254,7 @@ def test_wrong_dimensions_and_unknown_provider_outcome_are_not_retried(upload_ap
     assert process_job(uuid.UUID(ids["job_id"]), settings, storage) == "embedding_dimensions_mismatch"
     assert api.scalar("SELECT count(*) FROM index_entries") == 1
     assert api.scalar("SELECT count(*) FROM index_generations WHERE state='active'") == 0
-    assert api.scalar("SELECT count(*) FROM embedding_calls WHERE status='uncertain'") == 1
+    assert api.scalar("SELECT count(*) FROM embedding_calls WHERE status='completed' AND vector IS NULL") == 1
     assert process_job(uuid.UUID(ids["job_id"]), settings, storage) == "not_claimed"
     assert len(counter) == 2
 
@@ -282,7 +283,7 @@ def test_unverified_price_blocks_private_provider_payload(upload_api, monkeypatc
     settings.embedding.pricing_verified = False
     with get_sessionmaker()() as db:
         assert uuid.UUID(ids["job_id"]) not in due_job_ids(db, settings)
-    assert process_job(uuid.UUID(ids["job_id"]), settings, storage) == "not_claimed"
+    assert process_job(uuid.UUID(ids["job_id"]), settings, storage) == "embedding_pricing_unverified"
     assert not calls
     assert api.scalar("SELECT count(*) FROM embedding_calls") == 0
 
@@ -356,8 +357,7 @@ def test_worker_death_after_request_reservation_does_not_reissue(upload_api, mon
         raise SystemExit("synthetic worker crash")
     monkeypatch.setattr("app.ingest.indexer.embed", die)
     settings = settings_with_fake_key()
-    with pytest.raises(SystemExit):
-        process_job(uuid.UUID(ids["job_id"]), settings, storage)
+    assert process_job(uuid.UUID(ids["job_id"]), settings, storage) == 'provider_outcome_uncertain'
     assert api.scalar("SELECT count(*) FROM embedding_calls WHERE status='reserved'") == 1
     with api.engine.begin() as conn:
         conn.execute(text("UPDATE ingestion_jobs SET lease_until=now()-interval '1 second' WHERE id=:j"),
@@ -485,11 +485,14 @@ def test_dead_document_reservation_reaped_and_late_response_reconciles_once(uplo
     assert api.scalar("SELECT count(*) FROM embedding_calls WHERE status='completed'") == 1
     assert api.scalar("SELECT reserved_usd FROM embedding_budget_days") == 0
     committed = api.scalar("SELECT committed_usd FROM embedding_budget_days")
-    from app.ingest.indexer import _provider_failure
-    from app.ingest.embedding import EmbeddingError
+    from app.ingest.document_accounting import settle
+    from app.ingest.checkpoints import frozen
+    from app.models import EmbeddingCall
     call_id = api.scalar("SELECT id FROM embedding_calls")
     with Session(api.engine) as db:
-        _provider_failure(db, call_id, EmbeddingError("late_duplicate"))
+        proof = frozen(db.get(EmbeddingCall, call_id))
+        db.rollback()
+        settle(db, proof, settings, error=EmbeddingError("late_duplicate"))
     assert api.scalar("SELECT committed_usd FROM embedding_budget_days") == committed
 
 

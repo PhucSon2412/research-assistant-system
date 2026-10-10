@@ -1,8 +1,18 @@
 # Roadmap đề xuất
 
+## C2d-5d2b trên nhánh review
+
+[Document runtime](c2d5d2b-document-index-runtime.md) · [Inventory](c2d5d2b-test-inventory.json): dispatch/claim index, reservation/heartbeat/reaper và accounting riêng, publish keyword/vector private/common; source `0043`, base `9fb8890`. Fake adapter, PostgreSQL/MinIO/Redis/journal/runtime thật; kết quả theo inventory. Query/rerank/RAG, background writer khác, operator C3 và cutover C4 còn riêng. Safety pending; không pricing thật hoặc SLO/charge certification. Mục giao sau đây giữ lịch sử tại lúc giao.
+
+## Giao C2d-5d2b sau merge PR #51
+
+[Prompt document embedding/index runtime](tasks/m6c2b2c2d5d2b-document-index-runtime.md) **đã giao, chưa triển khai/chưa kiểm**. Base merge PR #51 `9fb8890`, source `0042`. Phạm vi private/common: index dispatch/claim → reservation/pre-provider proof → heartbeat/outcome/late accounting → keyword/vector generation active. Kiểm bằng runtime/PG/MinIO/Redis/journal cô lập và fake adapter; missing pricing/key vẫn chờ. Không mở cutover/provider thật, query/rerank/RAG hoặc background writer khác. [Quyết định scoped](decisions.md#giao-c2d-5d2b-sau-merge-pr-51-2026-10-10).
+
+**Safety pending tới C4**; bốn baseline PR #50 giữ debt trước tổng hồi quy. Tiếp theo background writer còn thiếu boundary → search/query/rerank provider → RAG/generation → tổng hồi quy C2d; C3/C4 theo điều kiện riêng.
+
 ## Giao C2d-5d2a sau merge PR #50
 
-[Worker runtime/extraction](c2d5d2a-worker-runtime-extraction.md) đã triển khai tại `dfca84a`, PR chưa merge; [inventory](c2d5d2a-test-inventory.json) ghi selection/JUnit/hash và giới hạn. Base merge PR #50 **`03b7985`**, source `0042`. Runtime worker/beat trên override cô lập, dispatch ID, claim/lease, validate/extract/chunk có gate/binding/clock/checkpoint mới, tới **`awaiting_index` + `metadata_only`**. Không nối indexer legacy; index states giữ chờ C2d-5d2b. [Quyết định phạm vi và maintenance](decisions.md#giao-c2d-5d2a-sau-merge-pr-50-2026-10-09).
+[Worker runtime/extraction](c2d5d2a-worker-runtime-extraction.md) đã merge PR #51 `9fb8890`, code kiểm `dfca84a`; [inventory](c2d5d2a-test-inventory.json) ghi selection/JUnit/hash và giới hạn. Base merge PR #50 **`03b7985`**, source `0042`. Runtime worker/beat trên override cô lập, dispatch ID, claim/lease, validate/extract/chunk có gate/binding/clock/checkpoint mới, tới **`awaiting_index` + `metadata_only`**. Không nối indexer legacy; index states giữ chờ C2d-5d2b. [Quyết định phạm vi và maintenance](decisions.md#giao-c2d-5d2a-sau-merge-pr-50-2026-10-09).
 
 Thứ tự: **C2d-5d2a extraction → C2d-5d2b document embedding/index/provider → background cleanup/reconcile/discovery còn thiếu boundary → search/query/rerank provider → RAG/generation → tổng hồi quy C2d → C3/C4 theo điều kiện riêng**. Bốn lỗi baseline PR #50 phải được xử lý trước hoàn tất tổng hồi quy/C4; kiểm tương thích không chứng nhận task đã chuyển. Mặc định Compose/API, operator/delivery, storage/journal production, charge thật và cutover chưa mở; **safety pending tới C4**.
 
