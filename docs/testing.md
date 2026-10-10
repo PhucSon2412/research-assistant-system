@@ -1,5 +1,9 @@
 # Chiến lược kiểm thử
 
+## C2d-5d2b — kiểm nhánh document runtime
+
+[Handoff](c2d5d2b-document-index-runtime.md) · [Inventory](c2d5d2b-test-inventory.json). Selection finite theo call graph: document private/common mới, worker/beat fake transport, extraction, index/shared capacity/query accounting, upload, HTTP index/revoke, cleanup/recovery và ORM/migration. JUnit unique khớp collect/selection; source hash trước/sau; counterchecks chạy riêng, khôi phục bytes trước seal. Raw lỗi chuẩn bị/base debt giữ ngoài repo, không cộng vào lượt cuối. Business cutover chỉ scoped; pending/hold/journal/role thật không bypass. Không web/provider live/dev/C3/C4; safety pending. Mục kế hoạch bên dưới giữ lịch sử tại lúc giao.
+
 ## Kế hoạch C2d-5d2b sau merge PR #51
 
 [Prompt document embedding/index runtime](tasks/m6c2b2c2d5d2b-document-index-runtime.md) yêu cầu runtime PG/MinIO/journal/Redis, provider adapter với fake transport, gate thật pending riêng, clock/lease, budget/concurrency, hash trước mỗi call và publish kể cả reuse, outcome uncertain, late accounting sau thu hồi và cleanup. Worker/beat thật chứng minh luồng private/common tới indexed; không provider live/cutover. **Lượt giao chỉ khảo sát source/Git và kiểm docs, chưa chạy test mới.** Số PR #51 giữ source lịch sử, bốn baseline debt trước tổng hồi quy/C4; safety pending tới C4.

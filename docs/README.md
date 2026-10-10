@@ -1,5 +1,7 @@
 # Tài liệu dự án
 
+**C2d-5d2b trên nhánh review:** [Handoff](c2d5d2b-document-index-runtime.md) · [Inventory](c2d5d2b-test-inventory.json). Private/common document index qua runtime, nonce reservation, heartbeat/reaper, late financial settlement và publish nguyên tử. Base `9fb8890`, source `0043`; **safety pending tới C4**, không mở pricing. Các mốc giao/review bên dưới giữ lịch sử.
+
 **Đã giao C2d-5d2b, chưa triển khai/chưa có test mới:** [prompt document embedding/index runtime](tasks/m6c2b2c2d5d2b-document-index-runtime.md). Dispatch/claim index, reservation/heartbeat, provider admission/outcome và công bố keyword/vector generation; fake provider trên project runtime cô lập. PR #51 đã merge `9fb8890`, source `0042`; giữ safety pending tới C4.
 
 **Review PR #51 tại `b569d0c`: không phát hiện điểm chặn merge mới trong phạm vi worker runtime/extraction.** Reviewer thực chạy **103/103 API**, gồm worker/beat thực và Redis stop/start; 293 source hashes khớp. Artifact **549 API/8 countercheck** của agent được đối chiếu riêng. PR **đã merge `9fb8890`**, chưa rerun tại merge, source `0042`, **safety pending tới C4**. [Report, evidence và giới hạn](reviews/pr51-c2d5d2a-worker-runtime-extraction.md).

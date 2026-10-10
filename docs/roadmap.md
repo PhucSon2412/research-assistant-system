@@ -1,5 +1,9 @@
 # Roadmap đề xuất
 
+## C2d-5d2b trên nhánh review
+
+[Document runtime](c2d5d2b-document-index-runtime.md) · [Inventory](c2d5d2b-test-inventory.json): dispatch/claim index, reservation/heartbeat/reaper và accounting riêng, publish keyword/vector private/common; source `0043`, base `9fb8890`. Fake adapter, PostgreSQL/MinIO/Redis/journal/runtime thật; kết quả theo inventory. Query/rerank/RAG, background writer khác, operator C3 và cutover C4 còn riêng. Safety pending; không pricing thật hoặc SLO/charge certification. Mục giao sau đây giữ lịch sử tại lúc giao.
+
 ## Giao C2d-5d2b sau merge PR #51
 
 [Prompt document embedding/index runtime](tasks/m6c2b2c2d5d2b-document-index-runtime.md) **đã giao, chưa triển khai/chưa kiểm**. Base merge PR #51 `9fb8890`, source `0042`. Phạm vi private/common: index dispatch/claim → reservation/pre-provider proof → heartbeat/outcome/late accounting → keyword/vector generation active. Kiểm bằng runtime/PG/MinIO/Redis/journal cô lập và fake adapter; missing pricing/key vẫn chờ. Không mở cutover/provider thật, query/rerank/RAG hoặc background writer khác. [Quyết định scoped](decisions.md#giao-c2d-5d2b-sau-merge-pr-51-2026-10-10).

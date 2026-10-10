@@ -1,6 +1,10 @@
-# Môi trường phát triển và schema (M1a–C2d-5d2a; kế hoạch C2d-5d2b)
+# Môi trường phát triển và schema (M1a–C2d-5d2b trên nhánh review)
 
-**C2d-5d2b mới là kế hoạch:** [prompt document embedding/index runtime](tasks/m6c2b2c2d5d2b-document-index-runtime.md). Không có lệnh triển khai/kiểm mới được chứng nhận trong lượt giao. PR #51 đã merge `9fb8890`, source `0042`; không suy revision DB dev hoặc áp override vào dev. Safety pending tới C4.
+## C2d-5d2b document runtime cô lập
+
+[Handoff](c2d5d2b-document-index-runtime.md) · [Inventory](c2d5d2b-test-inventory.json). Chỉ Conda ras, context ngoài repo, project/cổng sinh riêng và explicit env-file rỗng; không đọc `.env`, dev hoặc provider thật. Setup/migrate/provision chạy trên host; worker/beat chỉ nhận runtime credentials. `scripts/compose.worker-runtime.yml` vẫn tắt pricing/key; fake transport và bản Settings bật pricing nằm trong test harness, không switch production. Source `0043` không là revision DB dev. Các lệnh/kết quả đã thực chạy và cleanup nằm trong inventory; không dùng chúng để mở cutover. Safety pending tới C4.
+
+**Lịch sử tại lúc giao C2d-5d2b:** [prompt document embedding/index runtime](tasks/m6c2b2c2d5d2b-document-index-runtime.md). Không có lệnh triển khai/kiểm mới được chứng nhận trong lượt giao. PR #51 đã merge `9fb8890`, source `0042`; không suy revision DB dev hoặc áp override vào dev. Safety pending tới C4.
 
 **C2d-5d2a:** [handoff worker runtime/extraction](c2d5d2a-worker-runtime-extraction.md), [selection/JUnit/hash](c2d5d2a-test-inventory.json). Code `dfca84a`, source `0042`, không migration/grants mới. Compose mặc định còn truyền `POSTGRES_USER` cho API/worker/beat; runtime check sẽ từ chối owner. Không áp override/restart dev hoặc tuyên bố mặc định đã cutover; safety pending tới C4.
 
