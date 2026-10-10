@@ -1,5 +1,9 @@
 # Roadmap đề xuất
 
+## PR #53 đã sửa P2, chờ review lại
+
+cleanup operator/sweep chỉ nhận login có bằng chứng dương — owner/migrator (superuser hoặc owner `deletion_tombstones`) hoặc recovery đã provision (EXECUTE `ras_auth_restrict` + INSERT journal mirror, **không** EXECUTE `ras_auth_session_create`); probe/release lỗi → `operator_identity_unavailable`, không chứng minh → `operator_cleanup_requires_operator`, đều trước mutation/S3. P2 tái hiện trên `3c4c165` (6 fail) trước sửa. Seal `sealed-fix-1`: **1584 API unique pass**, exit 0, collect 4.561, **2.977 not-run** theo identity chính xác (ID UUID1 đã ổn định; smoke Linux giữ kết quả lịch sử `3b54a6f`); 9/9 countercheck gồm catch-all cũ. Lượt `sealed-3` cũ giữ exit 1, not-run raw 2.978/logic 2.976. Safety pending tới C4.
+
 ## PR #53 cần sửa review trước merge
 
 [Review P2 operator identity](reviews/pr53-c2d5e1-revoked-common-cleanup-runtime.md) · [Prompt sửa cùng PR #53](tasks/fix-pr53-operator-cleanup-identity-and-seal.md). Runtime guard fail không chứng minh operator; hai ca tái hiện đã xóa object/purge khi safety pending. Thêm proof dương và regression, ổn định node ID/sửa not-run logic. Reviewer 101 pass, hai regression fail đúng P2; PR OPEN, source `0044`. Orphan reconcile và các task sau chưa giao; safety pending tới C4.

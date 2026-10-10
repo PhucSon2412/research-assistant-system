@@ -1,5 +1,7 @@
 # C2d-5e1 — cleanup bản chung đã thu hồi qua runtime
 
+**Sửa review PR #53 tại `9139c01` (chờ review lại, chưa merge):** cleanup operator/sweep chỉ nhận login có bằng chứng dương — owner/migrator (superuser hoặc owner `deletion_tombstones`) hoặc recovery đã provision (EXECUTE `ras_auth_restrict` + INSERT journal mirror, **không** EXECUTE `ras_auth_session_create`); probe/release lỗi → `operator_identity_unavailable`, không chứng minh → `operator_cleanup_requires_operator`, đều trước mutation/S3. P2 tái hiện trên `3c4c165` (6 fail) trước sửa. Seal `sealed-fix-1`: **1584 API unique pass**, exit 0, collect 4.561, **2.977 not-run** theo identity chính xác (ID UUID1 đã ổn định; smoke Linux giữ kết quả lịch sử `3b54a6f`); 9/9 countercheck gồm catch-all cũ. Lượt `sealed-3` cũ giữ exit 1, not-run raw 2.978/logic 2.976. Safety pending tới C4.
+
 **Review PR #53 tại `3c4c165` (2026-10-10): có P2 chặn merge.** [Report](reviews/pr53-c2d5e1-revoked-common-cleanup-runtime.md) · [prompt sửa](tasks/fix-pr53-operator-cleanup-identity-and-seal.md). Runtime guard lỗi/profile sai được helper operator cho qua; reviewer tái hiện object bị xóa và purge khi safety pending. Mô tả từ chối runtime bên dưới chỉ đúng khi runtime guard thành công, chưa bảo đảm fail closed. Reviewer 101 API pass; hai regression mới fail đúng P2. Artifact 1.575 pass kiểm riêng; not-run logic 2.976 thay cho raw 2.978 vì hai UUID1 đổi ID; giữ seal exit 1/source lịch sử, chưa sửa inventory agent. PR OPEN/chưa merge; safety pending tới C4.
 
 [Task](tasks/m6c2b2c2d5e1-revoked-common-cleanup-runtime.md) · [Inventory](c2d5e1-test-inventory.json) · [Document runtime](c2d5d2b-document-index-runtime.md) · [Revoke runtime](c2d5c2-common-revoke.md)
@@ -13,7 +15,7 @@ Base đã fetch: `origin/main = ba20fda402840243f13bd4bb27e98c4c0cb17562` (merge
 | Beat/Celery `ras.revocation.cleanup` | `_gate` đầu task → `app.ingest.cleanup.cleanup_revoked(get_engine(), storage, settings)` | Engine runtime từ `RAS_DB__*`; mỗi checkpoint tự kiểm lại login/gate |
 | CLI `python -m app.cli.cleanup_revoked` | Cùng `cleanup_revoked` runtime | Exit 0 hết batch, 1 khi checkpoint halt, 2 thiếu cấu hình; chỉ in mã/số đếm |
 | Direct runtime | `app.ingest.cleanup.cleanup_revoked` | Không nhận ID/key từ caller; quyền là tombstone common đã journal xác nhận |
-| Recovery `recover` | `recovery._cleanup` → `publication.operator_cleanup_revoked`; `_sweep_objects` giữ nguyên | Đường operator riêng, chạy khi gate đóng và traffic/writer dừng; từ chối login runtime |
+| Recovery `recover` | `recovery._cleanup` → `publication.operator_cleanup_revoked`; `_sweep_objects` giữ nguyên | Đường operator riêng, chạy khi gate đóng và traffic/writer dừng; chỉ nhận login có **bằng chứng dương** owner/recovery (sửa review PR #53) |
 | Test system/adversary cũ | `publication.operator_cleanup_revoked` với engine owner, đã gắn nhãn | Không tính là runtime pass |
 
 Checkpoint runtime (mỗi cái một Session ngắn, rollback + close luôn được thử, release lỗi → invalidate + `worker_release_unavailable`):
@@ -74,7 +76,7 @@ Cleanup giữ nonce/job token/day/ceiling/token/model/provider/cost của `embed
 
 ## Recovery
 
-`recover` vẫn gọi đường operator (`operator_cleanup_revoked`, S3 trong transaction như cũ, chỉ an toàn khi API/worker/beat dừng) và `_sweep_objects` (xóa object của mọi tombstone trong journal, kể cả đã `purged_at`, nếu không còn tham chiếu không-revoked). Runtime cleanup không import/gọi nhánh này; nhánh operator từ chối login thỏa `require_runtime` (`operator_cleanup_requires_operator`). Kiểm: hold → runtime halt; recover bằng login recovery purge tombstone, object restore quay lại bị sweep, recover lặp lại không xóa thêm; gate cuối `auth_safety_pending`, không ready. Kiểm tra operator này **không** phải phép đo danh tính operator đầy đủ (C3).
+`recover` vẫn gọi đường operator (`operator_cleanup_revoked`, S3 trong transaction như cũ, chỉ an toàn khi API/worker/beat dừng) và `_sweep_objects` (xóa object của mọi tombstone trong journal, kể cả đã `purged_at`, nếu không còn tham chiếu không-revoked). Runtime cleanup không import/gọi nhánh này. **Sau sửa review PR #53:** `operator_cleanup_revoked` và `_sweep_objects` chỉ chạy khi chính connection/login thực (`current_user = session_user`, không SET ROLE) chứng minh dương một trong hai: (a) owner/migrator — superuser hoặc owner bảng `deletion_tombstones`; (b) login recovery đã provision — EXECUTE `ras_auth_restrict` **và** INSERT `revocation_journal_records` **và không** EXECUTE `ras_auth_session_create` (năng lực chỉ runtime có, theo `app.db_roles`). Routine/bảng thiếu được coi là không chứng minh. Probe lỗi hoặc rollback/close lỗi → `operator_identity_unavailable`; không chứng minh → `operator_cleanup_requires_operator`; cả hai dừng trước khóa hàng/mutation/S3 (`recover` đổi thành `RecoveryError` có mã). Không suy operator từ runtime guard thất bại, tên role khai báo, GUC hay cờ bypass. Bản trước dùng `except runtime.Halt: return` nên runtime bị cấp sai TEMP/protected write/thiếu grant hoặc probe lỗi vẫn xóa object và purge — đã tái hiện trên code `3c4c165` (6 ca fail) trước khi sửa. Kiểm: hold → runtime halt; recover bằng login recovery purge tombstone, object restore quay lại bị sweep, recover lặp lại không xóa thêm; gate cuối `auth_safety_pending`, không ready. Đây là kiểm năng lực theo provisioning hiện có, **không** phải chứng nhận danh tính operator đầy đủ (C3): login được cấp sai đúng bộ quyền recovery mà thiếu EXECUTE session_create sẽ được nhận như recovery.
 
 Phân loại restore: fence nằm trong DB nên đi cùng backup/restore DB. Restore về trước khi có fence → recover/operator dọn lại theo journal; pg_dump tạo trigger ở post-data nên pg_restore không bị trigger fence chặn (lập luận từ thứ tự pg_dump, **chưa** chạy drill restore trong PR này). Journal không thêm trường mới. Giới hạn journal/DB cùng rollback và lưu trữ journal production giữ nguyên như M6c.
 
@@ -95,7 +97,7 @@ Không exactly-once S3, không rollback object cùng DB, không bằng chứng p
 
 ## Kiểm chứng
 
-Seal cuối `sealed-3` tại `3b54a6f` (production code từ `6b1adc5`, test cuối `2afe1b8`; `3b54a6f` chỉ sửa đường dẫn deselect của seal): **1575 API unique pass**, 0 fail/error/skip; collect 4.551, **2.978 not-run**. 311 source hashes (`api/`, `scripts/`) trước/sau trùng.
+Seal cuối `sealed-3` tại `3b54a6f` (production code từ `6b1adc5`, test cuối `2afe1b8`; `3b54a6f` chỉ sửa đường dẫn deselect của seal): **1575 API unique pass**, 0 fail/error/skip; collect 4.551, raw **2.978 not-run**; theo identity logic là **2.976** vì hai node `test_bad_values_no_sql_unknown[generation-<uuid1>-…]` đổi ID giữa collect và chạy (số raw giữ lịch sử, đã sửa ID ổn định ở lượt sau). 311 source hashes (`api/`, `scripts/`) trước/sau trùng.
 
 | Nhóm | Pass |
 | --- | ---: |
@@ -116,3 +118,16 @@ Seal script trả exit 1 chỉ vì nhóm schema có 2 node tham số hóa mang u
 **Countercheck:** 8/8 cơ chế bắt assertion nghiệp vụ tại `2afe1b8` (role guard, gate cuối finalize, trigger INSERT fence, bảo vệ tham chiếu, giữ ledger/nonce, hậu điều kiện tham chiếu, commit uncertain, release lỗi); source khôi phục byte/hash sau mỗi mutant, chạy tuần tự trước seal. Lượt đầu, mutant gate cuối **không bị bắt** (test cũ đóng gate trước entry của finalize) — giữ là lượt yếu, đã thêm test đóng gate bên trong finalize.
 
 **Lượt không tính:** chuẩn bị p1–p11 (lỗi fixture, beat nhận thiếu storage env, danh sách bảng mong đợi), `sealed-1` (4 test `test_common_index` gọi helper operator bằng engine runtime — đúng là đường vòng guard mới chặn, đã chuyển sang boundary runtime — cùng 1 debt upload), `sealed-2` (deselect dùng tiền tố `api/tests/` không khớp nodeid). Chi tiết, log và SHA-256 artifact trong [inventory](c2d5e1-test-inventory.json); artifact ngoài repo ở `C:\Users\ADMIN\AppData\Local\Temp\ras-c2d5e1-20261010`.
+
+## Sửa review PR #53
+
+Code `9139c01` (sau commit docs reviewer `4fa774f`): `publication._require_operator` thay `except runtime.Halt: return` bằng truy vấn bằng chứng dương (mục Recovery ở trên); Session riêng luôn rollback + close, lỗi → invalidate + `operator_identity_unavailable`. `_sweep_objects` dùng cùng guard. ID tham số `test_bad_values_no_sql_unknown[generation-uuid1-…]` cố định; seal thêm `selection_in_collection` và tùy chọn `--skip` có ghi lý do.
+
+| Kiểm | Kết quả |
+| --- | --- |
+| Tái hiện trên `3c4c165` | 6 regression fail (`DID NOT RAISE`): runtime +TEMP, +protected write, thiếu grant, bắt chước recovery, guard runtime lỗi, sweep; 2 control đạt |
+| Sau sửa, chuẩn bị | 12/12 operator/sweep, 97/97 file cleanup runtime + test UUID1; hai lượt collect-only cho ID giống hệt |
+| Countercheck | 9/9 bắt assertion, gồm `operator-catchall` (tái lập catch-all → snapshot/S3 assertion fail) |
+| `sealed-fix-1` | **1584 unique pass**, exit 0; collect 4.561, 2.977 not-run; 311 source hash trùng; nhóm: cleanup-legacy 23, cleanup-runtime 81, revoke 172, index 233, request-publish 362, upload-approval 512, recovery 15, schema 186 |
+
+Smoke worker+beat Linux không chạy lại (đường worker/runtime cleanup không đổi; tag image thử đã gỡ) — kết quả 1 pass tại `3b54a6f` giữ là lịch sử. 24 debt base không rerun ở base trong lượt này. Artifact: `C:\Users\ADMIN\AppData\Local\Temp\ras-pr53fix`.

@@ -1,5 +1,9 @@
 # Nhật ký quyết định
 
+## Sửa review PR #53 — operator identity (2026-10-10)
+
+Theo [prompt sửa](tasks/fix-pr53-operator-cleanup-identity-and-seal.md), agent chọn bằng chứng dương dựa trên provisioning hiện có (`app.db_roles`), không migration mới: owner/migrator (superuser hoặc owner `deletion_tombstones`) hoặc login recovery (EXECUTE `ras_auth_restrict` + INSERT `revocation_journal_records` + không EXECUTE `ras_auth_session_create`), trên chính login thực, không SET ROLE. Đây là kiểm năng lực, không phải chứng nhận danh tính operator C3; login bị cấp sai đúng bộ quyền recovery vẫn được nhận như recovery. Lỗi probe/release từ chối. `recover` đổi lỗi thành `RecoveryError` có mã. ID tham số UUID1 cố định; seal kiểm selection ⊆ collection chính xác. Fence/retention/ledger/lock graph runtime không đổi. **Safety pending tới C4.**
+
 ## Review PR #53 — operator identity fail open (2026-10-10)
 
 Tại head `3c4c165`, code/test `3b54a6f`, có **P2 chặn merge**: `_require_operator` coi mọi `runtime.Halt` là cho phép operator. Reviewer tái hiện runtime được thêm TEMP trên DB thử, và identity probe lỗi: cả hai xóa original/commit purged khi safety pending. Không chấp nhận biến thể kiểm ngược này; yêu cầu operator proof dương, lỗi kiểm danh tính phải đóng quyền, giữ đường recovery khi gate đóng mà không mở toàn C3. [Report](reviews/pr53-c2d5e1-revoked-common-cleanup-runtime.md) · [Prompt sửa](tasks/fix-pr53-operator-cleanup-identity-and-seal.md).

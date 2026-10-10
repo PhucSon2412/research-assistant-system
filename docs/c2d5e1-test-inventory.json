@@ -357,7 +357,9 @@
         "selection_file": "schema-selection.json",
         "junit": "schema.xml"
       }
-    }
+    },
+    "not_run_logical": 2976,
+    "not_run_note": "raw 2978 kept as recorded; logical 2976 after mapping only the two uuid1 parameter IDs (review PR #53)"
   },
   "baseline_debt_deselected": {
     "count": 24,
@@ -750,5 +752,262 @@
     "image_tag_removed": "rasc2d5e1-worker:20261010 (underlying image kept, still tagged rasc2d5d2a-worker:20261009)",
     "verification": "label ras.task + sole volume consumer checked before removal; base worktree removed",
     "baseline": "9 pre-existing containers same ID/name/image; volume and image lists identical to baseline; ras-worker-1/ras-beat-1 were already Restarting at baseline and were not touched (StartedAt drift not attributed to this task); no dev stop/start/migrate/query"
+  },
+  "review_fix": {
+    "review": "docs/reviews/pr53-c2d5e1-revoked-common-cleanup-runtime.md",
+    "prompt": "docs/tasks/fix-pr53-operator-cleanup-identity-and-seal.md",
+    "reviewed_head": "3c4c165",
+    "reviewer_docs_commit": "4fa774f",
+    "code_sha": "9139c0140cdd8794a91fd0eb00039910a3a25b27",
+    "operator_contract": "actual login (current_user=session_user) proves owner/migrator (superuser or owner of deletion_tombstones) or provisioned recovery (EXECUTE ras_auth_restrict AND INSERT revocation_journal_records AND NOT EXECUTE ras_auth_session_create); missing routine/table = not proven; probe/rollback/close fault -> operator_identity_unavailable; otherwise operator_cleanup_requires_operator; also guards recovery._sweep_objects",
+    "reproduced_before_fix": {
+      "code": "3c4c165",
+      "log": "prep/f0-before-fix.log",
+      "result": "6 failed (misprovisioned temp/protected_write/missing_grant/recovery_mimic, runtime_guard_error, sweep) - DID NOT RAISE; 2 owner/recovery controls passed"
+    },
+    "uuid_param_fix": "test_bad_values_no_sql_unknown generation case uses fixed uuid1 literal with id generation-uuid1; two collect-only runs identical (prep/collect-1.txt, collect-2.txt)",
+    "seal": {
+      "name": "sealed-fix-1",
+      "exit": 0,
+      "unique_pass": 1584,
+      "collected": 4561,
+      "not_run": 2977,
+      "skipped_groups": {
+        "smoke": "worker runtime path unchanged by the fix; historical sealed-3 result at 3b54a6f kept, test image tag removed"
+      },
+      "source_files_hashed": 311,
+      "source_equal_before_after": true,
+      "groups": {
+        "cleanup-legacy": {
+          "passed": 23,
+          "failures": 0,
+          "errors": 0,
+          "skips": 0,
+          "selection_matches": true,
+          "selection_in_collection": true
+        },
+        "cleanup-runtime": {
+          "passed": 81,
+          "failures": 0,
+          "errors": 0,
+          "skips": 0,
+          "selection_matches": true,
+          "selection_in_collection": true
+        },
+        "revoke": {
+          "passed": 172,
+          "failures": 0,
+          "errors": 0,
+          "skips": 0,
+          "selection_matches": true,
+          "selection_in_collection": true
+        },
+        "index": {
+          "passed": 233,
+          "failures": 0,
+          "errors": 0,
+          "skips": 0,
+          "selection_matches": true,
+          "selection_in_collection": true
+        },
+        "request-publish": {
+          "passed": 362,
+          "failures": 0,
+          "errors": 0,
+          "skips": 0,
+          "selection_matches": true,
+          "selection_in_collection": true
+        },
+        "upload-approval": {
+          "passed": 512,
+          "failures": 0,
+          "errors": 0,
+          "skips": 0,
+          "selection_matches": true,
+          "selection_in_collection": true
+        },
+        "recovery": {
+          "passed": 15,
+          "failures": 0,
+          "errors": 0,
+          "skips": 0,
+          "selection_matches": true,
+          "selection_in_collection": true
+        },
+        "schema": {
+          "passed": 186,
+          "failures": 0,
+          "errors": 0,
+          "skips": 0,
+          "selection_matches": true,
+          "selection_in_collection": true
+        }
+      }
+    },
+    "counterchecks": [
+      {
+        "name": "role",
+        "node": "api/tests/test_c2d5e1_cleanup_runtime.py::test_entry_requires_actual_runtime_login[owner]",
+        "valid_countercheck": true,
+        "exit": 1,
+        "code_sha": "9139c0140cdd8794a91fd0eb00039910a3a25b27",
+        "original_sha256": "276766ca5e11c344d936f161a983cd2c392d1f6f657a943e06f73d332fd5c3a5",
+        "mutant_sha256": "ea520e83355fe92b08c093d10b01f2ac50a351f65778adc5c9dbc20c0ed40d88"
+      },
+      {
+        "name": "final-gate",
+        "node": "api/tests/test_c2d5e1_cleanup_runtime.py::test_gate_closing_inside_finalize_refuses_commit[pending]",
+        "valid_countercheck": true,
+        "exit": 1,
+        "code_sha": "9139c0140cdd8794a91fd0eb00039910a3a25b27",
+        "original_sha256": "276766ca5e11c344d936f161a983cd2c392d1f6f657a943e06f73d332fd5c3a5",
+        "mutant_sha256": "0c42f290e8710b334e59853cacb051360dcb4bdbbdb8aa61665409885b5e609a"
+      },
+      {
+        "name": "insert-fence",
+        "node": "api/tests/test_c2d5e1_cleanup_runtime.py::test_prepare_first_refuses_waiting_insert_without_cycle[False]",
+        "valid_countercheck": true,
+        "exit": 1,
+        "code_sha": "9139c0140cdd8794a91fd0eb00039910a3a25b27",
+        "original_sha256": "dbce5fcd06ba6d47a44e9beadad62a6d38ab2912d22e9e2b43fbe6b2c6777cce",
+        "mutant_sha256": "ebe0660ceff42a31f69b35c73aeea3b7084ccc531c06509f172d48edea83dc70"
+      },
+      {
+        "name": "ref-protection",
+        "node": "api/tests/test_c2d5e1_cleanup_runtime.py::test_protected_reference_keeps_object_without_fence[private]",
+        "valid_countercheck": true,
+        "exit": 1,
+        "code_sha": "9139c0140cdd8794a91fd0eb00039910a3a25b27",
+        "original_sha256": "dbce5fcd06ba6d47a44e9beadad62a6d38ab2912d22e9e2b43fbe6b2c6777cce",
+        "mutant_sha256": "6a91c8f0120f8aa18bdb5c822861f5e4ed733ec0c590a73e25ff23c4efb6a2dd"
+      },
+      {
+        "name": "nonce-accounting",
+        "node": "api/tests/test_c2d5e1_cleanup_runtime.py::test_late_reap_and_settle_after_cleanup_keep_ceiling_once[settle]",
+        "valid_countercheck": true,
+        "exit": 1,
+        "code_sha": "9139c0140cdd8794a91fd0eb00039910a3a25b27",
+        "original_sha256": "771016c13431be011302f5e2308b1bb3b5c2849c63a463600d2b1f721996fbaa",
+        "mutant_sha256": "c47ec7f33d0f48507a5118b77e6d0c3e54f62a4b26ba763a54385032533d4fd0"
+      },
+      {
+        "name": "final-postcondition",
+        "node": "api/tests/test_c2d5e1_cleanup_runtime.py::test_final_reference_conflict_after_delete_is_not_purged",
+        "valid_countercheck": true,
+        "exit": 1,
+        "code_sha": "9139c0140cdd8794a91fd0eb00039910a3a25b27",
+        "original_sha256": "276766ca5e11c344d936f161a983cd2c392d1f6f657a943e06f73d332fd5c3a5",
+        "mutant_sha256": "d91e005688a9462d71df9f92e3d059c39c1b557c5afc6173a04fde2533678f1e"
+      },
+      {
+        "name": "uncertain",
+        "node": "api/tests/test_c2d5e1_cleanup_runtime.py::test_final_commit_uncertain_stops_batch_without_inference[False]",
+        "valid_countercheck": true,
+        "exit": 1,
+        "code_sha": "9139c0140cdd8794a91fd0eb00039910a3a25b27",
+        "original_sha256": "6958453d257fc4824d383bbc97434ccd4bbea3ab9fe3997c131886a2a71baf7a",
+        "mutant_sha256": "9a823d1a04b1128fba5f756081104e651b8f3b72667ae7380706cbdceceafd76"
+      },
+      {
+        "name": "release",
+        "node": "api/tests/test_c2d5e1_cleanup_runtime.py::test_release_fault_after_known_commit_keeps_mutation_and_stops[prepare]",
+        "valid_countercheck": true,
+        "exit": 1,
+        "code_sha": "9139c0140cdd8794a91fd0eb00039910a3a25b27",
+        "original_sha256": "6958453d257fc4824d383bbc97434ccd4bbea3ab9fe3997c131886a2a71baf7a",
+        "mutant_sha256": "834a855ed8df8658b521cfc8983f89ff5b2578635fc59cf101fba1a621d19c96"
+      },
+      {
+        "name": "operator-catchall",
+        "node": "api/tests/test_c2d5e1_cleanup_runtime.py::test_operator_refuses_misprovisioned_runtime_with_real_pending_gate[temp]",
+        "valid_countercheck": true,
+        "exit": 1,
+        "code_sha": "9139c0140cdd8794a91fd0eb00039910a3a25b27",
+        "original_sha256": "771016c13431be011302f5e2308b1bb3b5c2849c63a463600d2b1f721996fbaa",
+        "mutant_sha256": "3daeb38e17d805d483d9f6b20fec9e47206720573e684c1a8ba8841ba865efe6"
+      }
+    ],
+    "preparation_runs_not_counted": [
+      {
+        "log": "prep/f1.log",
+        "result": "12 passed (operator/sweep subset)"
+      },
+      {
+        "log": "prep/f2.log",
+        "result": "97 passed (cleanup runtime file + uuid1 test)"
+      }
+    ],
+    "baseline_debt": "same 24 deselected nodes, not rerun at base in this round; four PR #50 debts separate",
+    "artifact_root": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-pr53fix",
+    "artifact_manifest_sha256": {
+      "ctx/sealed-fix-1/all-collection.log": "9b941aa40416fdd339e077b121aef0da72972f41ec20e7a188b110db7db7da84",
+      "ctx/sealed-fix-1/cleanup-legacy-collection.log": "d8ac56ded3080e0296bd6ce20aed01cede3c1d4ea559eb2e2291c2e6daa9fb55",
+      "ctx/sealed-fix-1/cleanup-legacy-selection.json": "9c452078be3acc239e6cc1996d6a314c7381ce48ca5892cf57c1fc7c873a1c89",
+      "ctx/sealed-fix-1/cleanup-legacy.log": "4f34cf55a8c84318e54925543dbcef12f7469ada879bd754df06b71f4ee467d0",
+      "ctx/sealed-fix-1/cleanup-legacy.xml": "aaacfbe9ae6f8f93c594cf69ecb91d15d6d2f0723c2095f5e2cf07149b7156a3",
+      "ctx/sealed-fix-1/cleanup-runtime-collection.log": "c98e467025bfdd575d8f4b07d478b2076e46ffa3d220fc30b03c5d70ccc00b76",
+      "ctx/sealed-fix-1/cleanup-runtime-selection.json": "e26c1034003e64839eccc1d61335218264c43c32799de0a86fc7b839e6fc088d",
+      "ctx/sealed-fix-1/cleanup-runtime.log": "33b0226cd264c5fe36709ae177a612b81453c236638cd5ba52a9848aa172324b",
+      "ctx/sealed-fix-1/cleanup-runtime.xml": "06694ca67dccfc3c9e52c31856b774609e3c09a0a65f6c04bbdb70e28d7984f8",
+      "ctx/sealed-fix-1/index-collection.log": "48ebdedc658925e4e80b40983c01a2c3557a3452a3aaf22c6f141633e8067628",
+      "ctx/sealed-fix-1/index-selection.json": "57ecb7056e765c1b438042a3238eab2fac93ed6573f987b53621364e6325c75a",
+      "ctx/sealed-fix-1/index.log": "68d354d10307250151b50ef0de0796ac21b4953587ca35ad97b026560824b73f",
+      "ctx/sealed-fix-1/index.xml": "d289ffeb561582a3bb8baefabc77ef67f926a7c26f8c1f32754ba498a9bb8a9c",
+      "ctx/sealed-fix-1/recovery-collection.log": "706a3a7e9fbf635c39d445de0de52864d644523ffddf7b9541126ccadc51b5e4",
+      "ctx/sealed-fix-1/recovery-selection.json": "3d7edc0a2ff58ed1400829c5e7335a2aa05dfe3fea3ea2f72d70f16944488b83",
+      "ctx/sealed-fix-1/recovery.log": "9f69c425b2681892403e5468ec69d0a9056a4ad985e5361098c0087460288d76",
+      "ctx/sealed-fix-1/recovery.xml": "fe4bfbeb022eeae4867491fc15d12cb4cd2620d2d54c0b65104aba0351ca2913",
+      "ctx/sealed-fix-1/request-publish-collection.log": "8ec578e53fc1d5fe81c4ca11b2e2ac83441a0b29580374265ffe832abd3385a4",
+      "ctx/sealed-fix-1/request-publish-selection.json": "4f826240c5928ff4c11cee35460403356777144d34a9f802a5de2856076c6319",
+      "ctx/sealed-fix-1/request-publish.log": "03b5c42244b8899dd7e543ea83d14da32c08bd9ef83f0b62f50bc5f932122173",
+      "ctx/sealed-fix-1/request-publish.xml": "10b023d8cd18a3013e66621fe9e500aecd0a54a1bdf8e67c0ad28e7751a7c5fc",
+      "ctx/sealed-fix-1/revoke-collection.log": "524528938be6e0325573e73c81d341009c78c0d2cf8f7ba8fc7c190623fc4485",
+      "ctx/sealed-fix-1/revoke-selection.json": "23664bd4e3161f703b74802444d6cc976548aea0ed806ae2d7725c0ecd14cf97",
+      "ctx/sealed-fix-1/revoke.log": "4dcb27677ca177cd47cf71aea035c4d7a08ef7b4ebca14c661f4ebb2d3b57c15",
+      "ctx/sealed-fix-1/revoke.xml": "5cba335324e08a895b9921211ea297b3f04bfb534643bb2b6f8a5c4f9263e8b7",
+      "ctx/sealed-fix-1/schema-collection.log": "17eef4704926a5eb4610005922ed86bfa03e52b410fdbc92f2a5c84150cd7985",
+      "ctx/sealed-fix-1/schema-selection.json": "c3570307e5d7372161560bd3a5067031b420b8a9942e9e7af4c66165b8f76b25",
+      "ctx/sealed-fix-1/schema.log": "9259a2becfd8fe20d8cc13f5245d503cf7ee75ad325a48e4654b7f5760d48a4b",
+      "ctx/sealed-fix-1/schema.xml": "46e50cd14d8c6a37956aa7bacf19464a2465c4d4d0f8d30404a7a0889a2ff0fa",
+      "ctx/sealed-fix-1/source-after.json": "ea7500cb45b3841d09d792305efbfbd4a2cb0d4913a144c46a947d4436b96cee",
+      "ctx/sealed-fix-1/source-before.json": "ea7500cb45b3841d09d792305efbfbd4a2cb0d4913a144c46a947d4436b96cee",
+      "ctx/sealed-fix-1/summary.json": "a4a774e607aa4d22c2dae57f9b1372bf717a758f7eea4914ca64351b9f2f4ed9",
+      "ctx/sealed-fix-1/upload-approval-collection.log": "b677fc48a3aefa957e74a2712434c638718fcf373ea5f8dbd340759adf1a5464",
+      "ctx/sealed-fix-1/upload-approval-selection.json": "daac9848072c00558479d19d148d259fcd8ad2cbc0e3a0e27a4f417452291167",
+      "ctx/sealed-fix-1/upload-approval.log": "4b54cba52d6e9b269cb844d47ebd991d22ceb8d82a9134aa5e111f231e1e9fec",
+      "ctx/sealed-fix-1/upload-approval.xml": "3070b1162e969e9aca7540cb2dc129f69b822796108faae4c44efa7099160d9a",
+      "sealed-fix-1.out": "410fa4f6511e07bc1e7be13897e581710bbc1d80eb17f07eaddfc620fac87f14",
+      "prep/collect-1.txt": "76480c75125d06e7ce6e3345674c247acb37ef698d157d62e931eb6b523c0452",
+      "prep/collect-2.txt": "76480c75125d06e7ce6e3345674c247acb37ef698d157d62e931eb6b523c0452",
+      "prep/f0-before-fix.log": "bf070edf00450d22372e0d0b257aee2ab9a3d6e52e6692f5d1e84a8833b6f74d",
+      "prep/f1.log": "2bb5f4c86cfd2cf3a9c2547a6d925e51da35ceb0707ed6a162d36bf61eea4151",
+      "prep/f2.log": "e3d8a8c028a766590bb4c8b6f763a5592cb89574a7a8e9fe410b9f65f000d382",
+      "counterchecks-1/counterchecks.json": "a578612898cb2ec6eae3dfd438d6358df4245ef9826520a721ca76ddfdd392f1",
+      "counterchecks-1/mutant-final-gate.log": "8d94d9919d2eb41c303963f65a254d6c49b590c07a1f31e4a2a877750bb9b429",
+      "counterchecks-1/mutant-final-gate.xml": "af5711edc465ffb8a6791b0310fc764cf51e14cd5de759ee5fbd5d60c3c22c33",
+      "counterchecks-1/mutant-final-postcondition.log": "eaf0d9c8020be1464d84321f480c656b4cd8fd2ad85b4327bfdac2a5620438e1",
+      "counterchecks-1/mutant-final-postcondition.xml": "e9e1e26b3cbcc3f8bf3b35f7e02d372b90a424ffa8e9d5ef9306777f718f83ff",
+      "counterchecks-1/mutant-insert-fence.log": "2d1ef2018c4b02c7f6135d70014c2c61cea546353ed3154e2138180d57b516fb",
+      "counterchecks-1/mutant-insert-fence.xml": "da4aba99dfd4da8e357799eb9429ef86146a7a65c8d7d2cc501a00815d27032f",
+      "counterchecks-1/mutant-nonce-accounting.log": "65da79937ec2c8725e7f25ca5e88b80e949d547acbf4d322270addc49afa17c3",
+      "counterchecks-1/mutant-nonce-accounting.xml": "ed61c78ffd2203b77cffaf0bf3be0825f1f92fb1ba44ab05d21e12d608a4a7b3",
+      "counterchecks-1/mutant-operator-catchall.log": "bcb623e2bd8109fa43ad05c34715b4cc379134c6008bf7405d4f266d088f728f",
+      "counterchecks-1/mutant-operator-catchall.xml": "8dcabbce2c9ed039762831ae2328818b5f108937d983d2738b5174adb9ffe4b1",
+      "counterchecks-1/mutant-ref-protection.log": "1ce05358e97ec67a8369cb5caab1f8a86e8fbad504167f09201dd8af8207ad0d",
+      "counterchecks-1/mutant-ref-protection.xml": "58c010bf271fb52e28514d1bdb699dab361ba581aa130a205a366c45b4fac3c5",
+      "counterchecks-1/mutant-release.log": "40b3b915e37f355d6681c9857f9d8ad3502e7c2bbc4fdac96cb5b2d3c596a4a8",
+      "counterchecks-1/mutant-release.xml": "36c6ca8ea53fe8e4dd5c90e377e1a5627527fa6810305b7cf0cb3bf774aed280",
+      "counterchecks-1/mutant-role.log": "06b03c936181b3a6f5e03e6990ede0aeea1c5abb9d78d625bd2b12a36365f827",
+      "counterchecks-1/mutant-role.xml": "a52da2b5978a7cbaa5073ef042ba7fe8f78bf7e90d908b7b0d9bd2922a7ca53a",
+      "counterchecks-1/mutant-uncertain.log": "52c23ac2210668ae1b220bce0667b3a50646f1032063d1598ee2bc90658d9884",
+      "counterchecks-1/mutant-uncertain.xml": "ff31d2f8519de5e1eed4fc4e5c519e2a993992e04520e0676bea8c8c153fcf3e"
+    },
+    "cleanup": {
+      "project": "rasc2d5e10660e9d4",
+      "removed": "3 containers, 3 anonymous volumes (sole consumers verified), 1 network; no image tag created",
+      "baseline": "pre-existing containers same ID/name/image; volume diff only the 3 removed test anonymous volumes (baseline taken after setup); images identical",
+      "secret_scan": "2195 files UTF-8/UTF-16LE/BE; only ctx/compose.json hit, deleted with credentials.json/empty.env after teardown",
+      "worktree": "temporary pre-fix worktree at 3c4c165 removed"
+    }
   }
 }

@@ -1,5 +1,9 @@
 # Chiến lược kiểm thử
 
+## Sửa review PR #53 — operator identity và seal
+
+Tái hiện trước sửa trên `3c4c165`: 6 regression mới fail (`DID NOT RAISE`), 2 control owner/recovery đạt. Sau sửa tại `9139c01`: regression runtime cấp sai TEMP/protected write/thiếu grant/bắt chước recovery, lỗi probe/release, guard runtime lỗi, `_sweep_objects` với runtime đều từ chối trước mutation/S3; control owner/recovery dọn được khi gate pending thật. `sealed-fix-1`: **1584 unique pass**, exit 0, selection ⊆ collection chính xác, collect 4.561/2.977 not-run, 311 source hash trùng; bỏ smoke (đường worker không đổi; lịch sử `3b54a6f`). 9/9 countercheck. Debt 24 node giữ riêng. [Inventory](c2d5e1-test-inventory.json).
+
 ## Review độc lập PR #53 tại 3c4c165
 
 **101/101 pass**: 71 cleanup runtime, 2 migration 0044, 28 migration/ORM; **hai regression operator mới fail đúng P2**, 0 setup error/skip. Runtime profile sai và identity probe lỗi đi operator purge khi safety pending. Không sửa production/test; 311 source hash hiện hành khớp sealed agent, snapshot review đầu ghi khi suite đã bắt đầu. [Report/evidence/giới hạn](reviews/pr53-c2d5e1-revoked-common-cleanup-runtime.md) · [Prompt sửa](tasks/fix-pr53-operator-cleanup-identity-and-seal.md).
