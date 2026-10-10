@@ -1,6 +1,10 @@
 # Roadmap đề xuất
 
-## Giao C2d-5f1 sau merge PR #54
+## C2d-5f1 đã triển khai trên nhánh review (chưa merge)
+
+[Handoff](c2d5f1-citation-reconcile-runtime.md) · [Inventory](c2d5f1-test-inventory.json). Base `37edd5c9`, source giữ `0045`, code `8fb9671`: CLI/direct/Celery citation backfill qua batch runtime, outcome uncertain/release/busy/bound, common revoked/tombstone kiểm dưới khóa item, discovery hook khóa item trước citation exclusive (deadlock thứ tự cũ tái hiện ở base). Seal `sealed-1` tại `8e2a500`: **1.203 API unique pass**, 0 fail/error/skip, collect 4.737, **3.534 not-run** (27 debt deselect); 327 source hash trùng; smoke Linux CLI + Celery/Redis 2 pass; countercheck 10/10. **Bước tiếp theo đề xuất: C2d-5f2 discovery harvesting** (engine/gate, HTTP ngoài DB, pacing/lease/cursor/backoff, fan-out retarget, outcome) → search/query/rerank → RAG/generation → tổng hồi quy C2d; C3/C4 riêng, **safety pending tới C4**.
+
+## Giao C2d-5f1 sau merge PR #54 (lịch sử)
 
 [Prompt citation reconcile runtime](tasks/m6c2b2c2d5f1-citation-reconcile-runtime.md) — **đã giao tài liệu, chưa triển khai/kiểm**. Base merge PR #54 `37edd5c9`, source `0045`; merge tree khớp head `cf66f1c`, chưa rerun tại merge. Chuyển CLI/direct/Celery citation backfill, batch final proof/outcome và giữ transaction/lock của extraction/discovery hooks. Không đổi matcher/ACL hoặc mở bibliography làm evidence.
 

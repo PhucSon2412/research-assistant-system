@@ -1,5 +1,18 @@
 # Nhật ký quyết định
 
+## Quyết định triển khai C2d-5f1 — citation reconcile runtime (2026-10-10)
+
+Nhánh `feat/m6c2b2c2d5f1-citation-reconcile-runtime` từ merge PR #54 `37edd5c9` (đã fetch/xác minh lại). Source giữ **`0045`**, không migration/grant. Các lựa chọn dưới đây do agent chốt trong phạm vi task scoped của orchestrator; **không** phải xác nhận trực tiếp mới của chủ dự án và không là luật kiến trúc vĩnh viễn. [Handoff](c2d5f1-citation-reconcile-runtime.md).
+
+- **Một boundary cho CLI/direct/Celery:** mỗi batch `entry` riêng (login runtime thực, grant citation kiểm *từng quyền* một, writer gate) rồi một transaction ngắn kết thúc bằng journal exclusive, binding scalar, clock mới và commit known. Wrapper Celery giữ `_gate` nhưng không còn là lớp duy nhất. Bỏ tham số `now` của `reconcile_pending`. CLI không có preview (metadata dẫn xuất, không xóa object); exit 0/1/2.
+- **Lock order toàn cục item → reference → citation advisory → journal.** Khảo sát xác nhận nguy cơ đảo chiều: discovery giữ citation exclusive rồi trigger 0024 chờ item `KEY SHARE`, trong khi extraction giữ item `FOR UPDATE` chờ citation shared. Sửa ở discovery hook: khóa item common của link ứng viên (chờ, UUID order) **trước** exclusive; item xuất hiện muộn chỉ `NOWAIT` → `RetargetBusy`, page rollback, cursor không advance. Backfill dùng `FOR KEY SHARE SKIP LOCKED`/`FOR SHARE SKIP LOCKED`, không bao giờ chờ hàng. Extraction hook giữ nguyên transaction/thứ tự.
+- **Không lease/queue/cursor bền:** keyset trong bộ nhớ một pass + `SKIP LOCKED` đủ để candidate bận/bị xóa không chặn phía sau và không lặp vô hạn. Lock timeout sau khi đã có hàng (citation lock, INSERT trùng) là `busy:citation_lock`, không phải halt.
+- **Common đóng = revoked hoặc có tombstone** (`not_revoked_reference_clause` mở rộng, alias riêng), loại ở hint và kiểm lại dưới khóa item; trigger 0024 vẫn là lớp chặn cuối.
+- **Counts:** chỉ từ commit known + release sạch; `links_written` là hàng thật sự INSERT/đổi (RETURNING), hàng giống hệt không tính. Commit exception luôn uncertain; release lỗi sau known commit báo `committed_unreleased`.
+- **Fan-out retarget theo page vẫn chưa bound** (atomic như cũ, không cắt rồi advance cursor); engine/gate/HTTP/pacing/lease/cursor/outcome của `run_sync` để C2d-5f2.
+
+Không đổi matcher, ACL, evidence/payload, pricing hoặc dev stack. **Safety pending tới C4.**
+
 ## Giao C2d-5f1 sau merge PR #54 (2026-10-10)
 
 Đã fetch/xác minh PR #54 merge `37edd5c9c28e60ba43425f0b1bd9f42946585e28`; `origin/main` tại merge này, tree khớp `cf66f1c`. Source migration `0045`, không suy DB dev. Review 125 pass và agent 2.096 unique pass giữ theo source trước merge, chưa rerun merge. [Review và giới hạn](reviews/pr54-c2d5e2-orphan-original-reconcile-runtime.md).

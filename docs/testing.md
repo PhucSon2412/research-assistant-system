@@ -1,6 +1,10 @@
 # Chiến lược kiểm thử
 
-## Kế hoạch C2d-5f1 sau merge PR #54
+## C2d-5f1 citation reconcile runtime (nhánh review)
+
+Runtime login/PG/journal/Redis cô lập (`scripts/c2d5f1_test_host.py`), chỉ cutover scoped trong fixture, pending thật kiểm riêng. File mới: `test_c2d5f1_citation_runtime.py` (entry CLI/direct/Celery, grant từng quyền, gate trước entry/giữa batch/trước final, matcher/version/file/provenance, common allowed/revoked/tombstone, uncertain landed/not landed, release, binding, clock, busy, bound, hai pass đồng thời, race revoke ↔ backfill/retarget hai thứ tự với lock wait thật), `test_c2d5f1_worker_hooks.py` (worker extraction thật ↔ discovery hai thứ tự arrival, extraction ↔ backfill, common extraction ↔ retarget không deadlock, batch trước revoke rồi cleanup runtime), `test_c2d5f1_process_smoke.py` (CLI container và Celery worker/beat, SIGKILL giữa batch). Seal `sealed-1` tại `8e2a500`: **1.203 API unique pass**, 0 fail/error/skip, collect 4.737, **3.534 not-run** (27 debt deselect); 327 source hash trùng; smoke Linux CLI + Celery/Redis 2 pass; countercheck 10/10. Không chạy web, provider/arXiv, drill restore hoặc toàn suite ngoài selection. [Handoff](c2d5f1-citation-reconcile-runtime.md) · [Inventory](c2d5f1-test-inventory.json).
+
+## Kế hoạch C2d-5f1 sau merge PR #54 (lịch sử)
 
 [Task citation reconcile runtime](tasks/m6c2b2c2d5f1-citation-reconcile-runtime.md) yêu cầu runtime/PG/journal cô lập, entry CLI/direct/Celery, batch gate/binding/clock/outcome, exact matcher/hash/target, race extraction/discovery arrival và common revoke/cleanup, bounds/lock-timeout, process smoke, hồi quy hữu hạn và exact inventory/JUnit/source hashes. **Chưa triển khai hoặc chạy API/web/migration/smoke C2d-5f1.** Review PR #54 giữ 125 pass tại `cf66f1c`, không là pass mới tại merge `37edd5c9`. Debt cũ giữ riêng; safety pending tới C4.
 
