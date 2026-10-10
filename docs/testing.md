@@ -1,5 +1,13 @@
 # Chiến lược kiểm thử
 
+## Kế hoạch C2d-5e1 sau merge PR #52
+
+[Prompt cleanup common revoked runtime](tasks/m6c2b2c2d5e1-revoked-common-cleanup-runtime.md) yêu cầu role runtime thật, PG/MinIO/Redis/journal cô lập: fence/raw SQL/shared-key race cả hai thứ tự, I/O ngoài DB, full derived scrub/retention, uncertain/release, late financial settlement và operator recovery tương thích. Worker/beat Linux thực và restart theo durable phases; gate pending/hold thật, countercheck phục hồi source trước sealed suite. Hồi quy hữu hạn theo call graph, selection/JUnit/hash và not-run ghi riêng. **Lượt giao chưa chạy test ứng dụng**; số PR #52 là lịch sử trước merge. Safety pending tới C4, không provider live/dev/cutover.
+
+## Review độc lập PR #52 tại 97bc6e7
+
+Reviewer thực chạy **254/254 API unique**, 0 fail/error/skip: 161 document runtime/common/schema + toàn migration/ORM, 92 private/common index/search/shared capacity/adapter, một process smoke Linux worker/beat thực với Redis outage/retry/restart. 302 source hashes trước/sau khớp; **4.223 node không chạy lại** theo collect 4.477. Artifact agent **703 API/8 countercheck** và 403 file manifest đối chiếu riêng, không cộng lượt reviewer. PR đã merge `ba20fda`, chưa rerun tại merge, source `0043`, safety pending tới C4. Không web/provider live/cutover/benchmark. [Report, evidence và cleanup/drift](reviews/pr52-c2d5d2b-document-index-runtime.md).
+
 ## C2d-5d2b — kiểm nhánh document runtime
 
 [Handoff](c2d5d2b-document-index-runtime.md) · [Inventory](c2d5d2b-test-inventory.json). Selection finite theo call graph: document private/common mới, worker/beat fake transport, extraction, index/shared capacity/query accounting, upload, HTTP index/revoke, cleanup/recovery và ORM/migration. JUnit unique khớp collect/selection; source hash trước/sau; counterchecks chạy riêng, khôi phục bytes trước seal. Raw lỗi chuẩn bị/base debt giữ ngoài repo, không cộng vào lượt cuối. Business cutover chỉ scoped; pending/hold/journal/role thật không bypass. Không web/provider live/dev/C3/C4; safety pending. Mục kế hoạch bên dưới giữ lịch sử tại lúc giao.

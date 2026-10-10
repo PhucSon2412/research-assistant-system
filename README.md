@@ -1,8 +1,12 @@
 # Research Assistant System
 
-**C2d-5d2b trên nhánh review:** [Handoff](docs/c2d5d2b-document-index-runtime.md) · [Inventory](docs/c2d5d2b-test-inventory.json). Private/common document index qua runtime, nonce reservation, heartbeat/reaper, late financial settlement và publish nguyên tử. Base `9fb8890`, source `0043`; **safety pending tới C4**, không mở pricing. Các mốc giao/review bên dưới giữ lịch sử.
+**Task tiếp theo:** [Prompt C2d-5e1 — cleanup bản chung đã thu hồi qua runtime](docs/tasks/m6c2b2c2d5e1-revoked-common-cleanup-runtime.md). Tách DB checkpoint khỏi S3, bảo vệ shared object bằng deletion fence và giữ recovery operator riêng. Base merge PR #52 `ba20fda`, source `0043`; mới giao tài liệu, chưa triển khai/kiểm. **Safety pending tới C4.**
 
-**Đã giao C2d-5d2b, chưa triển khai/chưa có test mới:** [prompt document embedding/index runtime](docs/tasks/m6c2b2c2d5d2b-document-index-runtime.md). Dispatch/claim index, reservation/heartbeat, provider admission/outcome và công bố keyword/vector generation; fake provider trên project runtime cô lập. PR #51 đã merge `9fb8890`, source `0042`; giữ safety pending tới C4.
+**Review PR #52 tại `97bc6e7`: không phát hiện điểm chặn merge mới trong phạm vi document index runtime.** Reviewer thực chạy **254/254 API**, gồm worker/beat Linux và Redis outage/restart; 302 source hashes khớp. Artifact agent **703 API/8 countercheck**, 403 file được đối chiếu riêng. PR **đã merge `ba20fda`**, chưa rerun tại merge, source `0043`, **safety pending tới C4**. [Report và giới hạn](docs/reviews/pr52-c2d5d2b-document-index-runtime.md).
+
+**C2d-5d2b đã merge PR #52 `ba20fda`:** [Handoff](docs/c2d5d2b-document-index-runtime.md) · [Inventory](docs/c2d5d2b-test-inventory.json). Private/common document index qua runtime, nonce reservation, heartbeat/reaper, late financial settlement và publish nguyên tử. Base `9fb8890`, source `0043`; **safety pending tới C4**, không mở pricing. Các mốc giao/review bên dưới giữ lịch sử.
+
+**Mốc giao C2d-5d2b (lịch sử, tại lúc giao chưa triển khai/kiểm):** [prompt document embedding/index runtime](docs/tasks/m6c2b2c2d5d2b-document-index-runtime.md). Dispatch/claim index, reservation/heartbeat, provider admission/outcome và công bố keyword/vector generation; fake provider trên project runtime cô lập. Base PR #51 merge `9fb8890`, source `0042`; hiện triển khai và review PR #52 như trên, safety pending tới C4.
 
 **Review PR #51 tại `b569d0c`: không phát hiện điểm chặn merge mới trong phạm vi worker runtime/extraction.** Reviewer thực chạy **103/103 API**, gồm worker/beat thực và Redis stop/start; 293 source hashes khớp. Artifact **549 API/8 countercheck** của agent được đối chiếu riêng. PR **đã merge `9fb8890`**, chưa rerun tại merge, source `0042`, **safety pending tới C4**; index/provider C2d-5d2b và C3/C4 còn riêng. [Report, evidence và giới hạn](docs/reviews/pr51-c2d5d2a-worker-runtime-extraction.md).
 

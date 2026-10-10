@@ -1,5 +1,9 @@
 # C2d-5d2b — document embedding/index qua runtime
 
+**Bàn giao sau merge PR #52 `ba20fda`:** [task C2d-5e1 cleanup common revoked runtime](tasks/m6c2b2c2d5e1-revoked-common-cleanup-runtime.md). Normal cleanup tách DB/S3 và thêm fence shared key; operator recovery giữ đường riêng. Kết quả dưới đây giữ source trước merge, không rerun tại merge; safety pending tới C4.
+
+**Review độc lập PR #52 tại `97bc6e7` (2026-10-10):** không phát hiện điểm chặn merge mới trong scope document index runtime. Reviewer **254/254 API**, gồm shared index/search và worker/beat Linux thực; 302 source hashes khớp. Artifact agent 703 API/8 countercheck kiểm riêng. PR đã merge `ba20fda`, chưa rerun tại merge; source `0043`, safety pending tới C4. [Report, cleanup và giới hạn](reviews/pr52-c2d5d2b-document-index-runtime.md).
+
 [Task](tasks/m6c2b2c2d5d2b-document-index-runtime.md) · [Inventory](c2d5d2b-test-inventory.json) · [Extraction](c2d5d2a-worker-runtime-extraction.md)
 
 Base đã fetch: `origin/main = 9fb8890568af85b7beea4503f93f12e2896e6c89`, merge PR #51. Nhánh `feat/m6c2b2c2d5d2b-document-index-runtime` tạo từ base đó. Commit `d80961c` giữ riêng toàn bộ tài liệu orchestrator/review có sẵn. Source migration `0042 → 0043`; không suy revision DB dev. **Safety pending tới C4**, không mở pricing/cutover hay provider thật.

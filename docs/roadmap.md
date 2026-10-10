@@ -1,12 +1,22 @@
 # Roadmap đề xuất
 
-## C2d-5d2b trên nhánh review
+## Giao C2d-5e1 sau merge PR #52
+
+[Prompt cleanup common revoked qua runtime](tasks/m6c2b2c2d5e1-revoked-common-cleanup-runtime.md) — **đã giao, chưa triển khai/kiểm**. Base merge `ba20fda`, source `0043`; normal Celery/CLI/direct cleanup, durable deletion fence bảo vệ shared key, DB checkpoint ngoài S3, outcome và late accounting; operator recovery giữ đường riêng. [Quyết định scoped](decisions.md#giao-c2d-5e1-sau-merge-pr-52-2026-10-10).
+
+Sau đó: orphan reconcile → discovery/citation background → search/query/rerank provider → RAG/generation → tổng hồi quy C2d. Các scope sẽ được khảo sát/chia PR khi giao, không coi compatibility là đã chuyển runtime. Bốn baseline debt và operator C3/cutover C4 còn riêng; **safety pending tới C4**. Không dùng kết quả PR #52 trước merge làm pass mới.
+
+## Review PR #52 — document index runtime
+
+Tại `97bc6e7`, không phát hiện điểm chặn merge mới trong phạm vi C2d-5d2b; reviewer **254/254 API**, agent **703 API/8 countercheck** được đối chiếu riêng. PR đã merge `ba20fda`, chưa rerun tại merge, source `0043`, safety pending tới C4. [Report và phần chưa được chứng nhận](reviews/pr52-c2d5d2b-document-index-runtime.md). Background writer còn lại → search/query/rerank provider → RAG/generation → tổng hồi quy C2d vẫn là các task tiếp; C3/C4 theo điều kiện riêng.
+
+## C2d-5d2b đã merge PR #52 ba20fda
 
 [Document runtime](c2d5d2b-document-index-runtime.md) · [Inventory](c2d5d2b-test-inventory.json): dispatch/claim index, reservation/heartbeat/reaper và accounting riêng, publish keyword/vector private/common; source `0043`, base `9fb8890`. Fake adapter, PostgreSQL/MinIO/Redis/journal/runtime thật; kết quả theo inventory. Query/rerank/RAG, background writer khác, operator C3 và cutover C4 còn riêng. Safety pending; không pricing thật hoặc SLO/charge certification. Mục giao sau đây giữ lịch sử tại lúc giao.
 
 ## Giao C2d-5d2b sau merge PR #51
 
-[Prompt document embedding/index runtime](tasks/m6c2b2c2d5d2b-document-index-runtime.md) **đã giao, chưa triển khai/chưa kiểm**. Base merge PR #51 `9fb8890`, source `0042`. Phạm vi private/common: index dispatch/claim → reservation/pre-provider proof → heartbeat/outcome/late accounting → keyword/vector generation active. Kiểm bằng runtime/PG/MinIO/Redis/journal cô lập và fake adapter; missing pricing/key vẫn chờ. Không mở cutover/provider thật, query/rerank/RAG hoặc background writer khác. [Quyết định scoped](decisions.md#giao-c2d-5d2b-sau-merge-pr-51-2026-10-10).
+[Prompt document embedding/index runtime](tasks/m6c2b2c2d5d2b-document-index-runtime.md) **tại lúc giao chưa triển khai/chưa kiểm**; hiện PR #52 đã triển khai/review như trên. Base merge PR #51 `9fb8890`, source `0042`. Phạm vi private/common: index dispatch/claim → reservation/pre-provider proof → heartbeat/outcome/late accounting → keyword/vector generation active. Kiểm bằng runtime/PG/MinIO/Redis/journal cô lập và fake adapter; missing pricing/key vẫn chờ. Không mở cutover/provider thật, query/rerank/RAG hoặc background writer khác. [Quyết định scoped](decisions.md#giao-c2d-5d2b-sau-merge-pr-51-2026-10-10).
 
 **Safety pending tới C4**; bốn baseline PR #50 giữ debt trước tổng hồi quy. Tiếp theo background writer còn thiếu boundary → search/query/rerank provider → RAG/generation → tổng hồi quy C2d; C3/C4 theo điều kiện riêng.
 
