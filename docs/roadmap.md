@@ -1,6 +1,10 @@
 # Roadmap đề xuất
 
-## Task hiện hành: C2d-5e2 orphan reconcile runtime
+## C2d-5e2 đã triển khai trên nhánh review, chờ chủ dự án review
+
+[Handoff](c2d5e2-orphan-original-reconcile-runtime.md) · [Inventory](c2d5e2-test-inventory.json). Base `b2e76edb`, source `0045`, code `ebbc27a`: CLI/direct orphan reconcile qua runtime, fence orphan riêng + completion, zero-reference toàn DB, S3 ngoài DB, resume/bound/cursor. Vẫn thủ công khi quiescent; chưa online GC/beat. Seal `sealed-2` tại `9faf0d1` (production code `ebbc27a`, chỉ khác barrier một test): **2.096 API unique pass**, 0 fail/error/skip, exit 0, collect 4.690, **2.594 not-run** (gồm 25 debt base deselect); 321 source hash trước/sau trùng; smoke CLI Linux SIGKILL thật 1 pass; countercheck 9/9. PR chưa merge. **Bước tiếp theo đề xuất: discovery/citation** → search/query/rerank → RAG/generation → tổng hồi quy C2d; C3/C4 riêng, **safety pending tới C4**.
+
+## Mốc giao C2d-5e2 (lịch sử)
 
 [Prompt C2d-5e2](tasks/m6c2b2c2d5e2-orphan-original-reconcile-runtime.md) đã giao sau merge PR #53 `b2e76edb` (source `0044`): CLI/direct runtime, zero-reference orphan fence, DB/S3 checkpoints và resume; **thủ công khi quiescent, chưa online GC hoặc beat schedule**. Mới giao tài liệu, chưa triển khai/kiểm. Kế tiếp discovery/citation → search/query/rerank → RAG/generation → tổng hồi quy C2d; C3/C4 riêng, **safety pending tới C4**. Các mốc PR #53 đang review/chưa giao bên dưới giữ lịch sử trước merge; không cộng pass tại merge.
 

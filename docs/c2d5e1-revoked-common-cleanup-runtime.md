@@ -1,6 +1,6 @@
 # C2d-5e1 — cleanup bản chung đã thu hồi qua runtime
 
-**PR #53 đã merge `b2e76edb`**, tree khớp head `bf9d81f`; kết quả dưới đây theo source/lượt trước merge, chưa rerun merge. Source `0044`, safety pending tới C4. Bước kế tiếp đã giao [C2d-5e2 orphan reconcile runtime](tasks/m6c2b2c2d5e2-orphan-original-reconcile-runtime.md): thủ công/quiescent, orphan fence riêng, không nới common tombstone authority hoặc đổi operator recovery. Task kế tiếp chưa triển khai/kiểm.
+**PR #53 đã merge `b2e76edb`**, tree khớp head `bf9d81f`; kết quả dưới đây theo source/lượt trước merge, chưa rerun merge. Source `0044`, safety pending tới C4. Bước kế tiếp đã giao [C2d-5e2 orphan reconcile runtime](tasks/m6c2b2c2d5e2-orphan-original-reconcile-runtime.md): thủ công/quiescent, orphan fence riêng, không nới common tombstone authority hoặc đổi operator recovery. C2d-5e2 nay đã triển khai trên nhánh review, chưa merge: [handoff](c2d5e2-orphan-original-reconcile-runtime.md) (fence orphan bảng riêng, trigger INSERT 0044 được thay thân hàm trong 0045 để kiểm cả hai loại fence).
 
 **Review lại tại `bf9d81f`, code `9139c01`: P2 đã sửa, không thấy điểm chặn merge mới trong phạm vi PR #53.** Reviewer thực chạy **20/20**; artifact agent **1.584 unique pass / 2.977 not-run**, 61 artifact hash và 311 source hash khớp, 9 countercheck đối chiếu riêng. [Report/evidence/giới hạn](reviews/pr53-c2d5e1-revoked-common-cleanup-runtime.md). PR OPEN/chưa merge, source `0044`, **safety pending tới C4**. Các mốc review trước sửa bên dưới giữ lịch sử; operator C3, baseline debt và consumer còn lại chưa chứng nhận.
 
@@ -91,7 +91,7 @@ Phân loại restore: fence nằm trong DB nên đi cùng backup/restore DB. Res
 ## Caller còn legacy / chưa làm
 
 - `publication.operator_cleanup_revoked`, `_purge_one`, `recovery._sweep_objects`: đường operator; chuyển identity/operator riêng là C3.
-- `app.cli.reconcile_originals`, discovery/OAI, citation reconcile, private deletion/membership journal: task riêng.
+- `app.cli.reconcile_originals` (C2d-5e2 trên nhánh review), discovery/OAI, citation reconcile, private deletion/membership journal: task riêng.
 - `scripts/drill_backup_restore.py` gọi CLI cleanup với Compose mặc định (owner) — nay CLI từ chối owner (exit 1). Drill và hai script demo/smoke lịch sử (`demo_m6b2b2b_common_index.py`, `smoke_m6b2a_publish_browser.py`, đổi import sang operator) **không chạy lại**.
 - Query/rerank/search/RAG runtime, mặc định Compose/API cutover, C3/C4: riêng. Bốn baseline debt PR #50 không thuộc selection và không được gọi đã sửa.
 

@@ -1,5 +1,20 @@
 # Nhật ký quyết định
 
+## Quyết định triển khai C2d-5e2 (2026-10-10)
+
+Agent triển khai theo lựa chọn scoped của orchestrator (không phải xác nhận trực tiếp mới của chủ dự án, không là luật kiến trúc vĩnh viễn). Base `b2e76edb`, source `0044 → 0045`, chưa merge. [Handoff](c2d5e2-orphan-original-reconcile-runtime.md).
+
+- **Fence orphan là bảng riêng** `orphan_object_fences` + completion append-only `orphan_object_completions`, không mở rộng `object_delete_fences`: binding revoked-common (tombstone/item/epoch NOT NULL, journal-confirmed) giữ nguyên, không tombstone giả. Trigger INSERT `source_files` của 0044 được thay thân hàm (trong 0045) để kiểm cả hai, cùng key lock `1918989163/hashtext`.
+- **Zero reference toàn DB** là authority duy nhất (routine definer), không lọc theo quyền caller hay trạng thái item; hint đọc trước chỉ để bỏ sớm.
+- **Chỉ key đúng dạng mint** `originals/` + 32 hex; key khác dưới tiền tố được giữ (`kept:foreign_key`). Đổi so với CLI cũ (xóa mọi key không tham chiếu dưới `originals/`): test M1c cũ dùng `originals/crash-orphan` được sửa sang key đúng dạng.
+- **CLI mặc định preview**, xóa cần `--apply`; không tham số bucket/key. Đổi so với CLI cũ (xóa ngay khi chạy). Không Celery/beat/HTTP.
+- **Mốc tuổi** = Last-Modified theo giây UTC, đủ điều kiện khi `last_modified < now − grace`; list phải khớp HEAD (size/giây/ETag), HEAD sau fence phải khớp quan sát lưu trong fence, khác → giữ object và ghi completion `kept_identity_changed` (fence vẫn chặn INSERT).
+- **Lỗi storage, clock, cursor, uncertain commit, release, gate** đều halt cả pass (exit 1), không tiến tới candidate kế; cursor chỉ ghi khi pass không halt. Bound mặc định 500/20/100 (page/pages/deletes), có validation, **chưa đo**.
+- Cursor listing lưu trong DB (`orphan_reconcile_cursors`) để chống starvation giữa các lần chạy độc lập; chỉ là hint, ghi qua writer gate.
+- `require_runtime`/`PROTECTED` thêm hai bảng mới: runtime bị cấp ghi thô vào đó bị từ chối ở mọi đường worker, không chỉ reconcile.
+
+Mục quyết định cũ nói `reconcile_originals` chạy tay không kiểm gate hoặc chạy bằng `docker compose exec api` (M1c, M6b-1, M6c-1) là **lịch sử**, bị thay bởi mục này.
+
 ## Giao C2d-5e2 sau merge PR #53 (2026-10-10)
 
 Git fetch/GitHub CLI xác nhận PR #53 MERGED `b2e76edb028af2ff118d3936ed4cdf47cb88a99f`; `origin/main` tại merge, tree khớp head `bf9d81f`, code sửa P2 `9139c01`. Source `0044`, không query DB dev. Kết quả reviewer 20/agent 1.584 và các lượt trước giữ source riêng, chưa rerun merge; docs review chưa commit được giữ cho PR sau.

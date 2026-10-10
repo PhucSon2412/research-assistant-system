@@ -1273,5 +1273,22 @@
     "io": "detached frozen proof; S3 actual size/SHA256 and parser without DB checkout; fresh gate/binding/lease proof before IO, after read and result checkpoint",
     "index": "awaiting_index/indexing/retry resume indexing preserved with index_pending; no provider/indexer call or reservation mutation",
     "other_tasks": "five task entry gates checked; only two ingest tasks converted; discovery/reconcile/cleanup business still legacy"
+  },
+  "c2d5e2_orphan_reconcile": {
+    "status": "implemented on branch feat/m6c2b2c2d5e2-orphan-original-reconcile-runtime; PR not merged; source 0045",
+    "base": "b2e76edb028af2ff118d3936ed4cdf47cb88a99f (merge PR #53)",
+    "handoff": "docs/c2d5e2-orphan-original-reconcile-runtime.md",
+    "inventory": "docs/c2d5e2-test-inventory.json",
+    "converted": [
+      "python -m app.cli.reconcile_originals [--apply] -> app.ingest.orphans.reconcile_originals (runtime login, gate at every checkpoint, preview by default)",
+      "direct app.ingest.orphans.reconcile_originals(engine, storage, settings, apply=...)"
+    ],
+    "not_added": "no Celery task, beat schedule, HTTP route or UI (manual quiescent operation only)",
+    "unchanged_separate": [
+      "celery ras.revocation.cleanup / CLI cleanup_revoked -> app.ingest.cleanup (C2d-5e1)",
+      "recovery recover -> publication.operator_cleanup_revoked and recovery._sweep_objects (operator path; never calls the orphan boundary)",
+      "celery ras.discovery.sync and ras.citations.reconcile: business boundary legacy (next task)"
+    ],
+    "superseded": "docker compose exec api python -m app.cli.reconcile_originals with the Compose owner login (now refused before any storage call)"
   }
 }
