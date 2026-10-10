@@ -1165,11 +1165,14 @@ def _closures(path: Path) -> list[Record]:
 
 def _cleanup(engine: Engine, storage, settings: Settings, now: datetime, report: RecoveryReport) -> None:
     # Operator path, not the runtime boundary: recover runs while its gate is closed.
-    from app.publication import operator_cleanup_revoked
+    from app.publication import CleanupError, operator_cleanup_revoked
 
     for _ in range(settings.recovery.cleanup_passes):
-        for outcome, count in operator_cleanup_revoked(engine, storage, now,
-                                                       settings.retention.cleanup_batch_size).items():
+        try:
+            counts = operator_cleanup_revoked(engine, storage, now, settings.retention.cleanup_batch_size)
+        except CleanupError as exc:  # no positive owner/recovery proof: nothing was touched
+            raise RecoveryError(exc.code) from None
+        for outcome, count in counts.items():
             report.cleanup[outcome] = report.cleanup.get(outcome, 0) + count
         with Session(engine) as db:
             if not db.scalar(select(func.count()).select_from(DeletionTombstone)
@@ -1180,9 +1183,13 @@ def _cleanup(engine: Engine, storage, settings: Settings, now: datetime, report:
 
 def _sweep_objects(engine: Engine, storage, path: Path, report: RecoveryReport) -> None:
     """The object store may be restored apart from the database: every revoked copy's object must be gone."""
-    from app.publication import CleanupError, _object_in_use, _remove_object
+    from app.publication import CleanupError, _object_in_use, _remove_object, _require_operator
     from app.models.enums import CleanupObjectOutcome
 
+    try:
+        _require_operator(engine)  # positive owner/recovery proof before any S3 delete
+    except CleanupError as exc:
+        raise RecoveryError(exc.code) from None
     with Session(engine) as db:
         for record in _revocations(path):
             key = record.body["storage_key"]

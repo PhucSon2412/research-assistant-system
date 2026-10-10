@@ -855,3 +855,87 @@ def test_recover_uses_operator_path_and_sweeps_restored_object(gone, monkeypatch
     third = recovery.recover(b.w.recovery, b.raw_storage, get_settings(), NOW)
     assert third.objects_removed == 0 and third.gate == 'auth_safety_pending'
     assert present(b, b.own.key)
+
+
+# --- operator identity (review PR #53) -----------------------------------------------------------
+
+def attempt_operator(engine, b):
+    try:
+        return publication.operator_cleanup_revoked(engine, b.watch, NOW, 10), None
+    except publication.CleanupError as exc:
+        return None, exc.code
+
+
+def assert_operator_untouched(b, rows):
+    assert_untouched(b, rows)
+    assert not b.watch.calls and fences(b) == [] and tomb(b).cleanup_attempts == 0
+    assert q(b, "SELECT count(*) FROM audit_events WHERE action='common_copy.cleanup'") == 0
+
+
+@pytest.mark.parametrize('profile', ['temp', 'protected_write', 'missing_grant', 'recovery_mimic'])
+def test_operator_refuses_misprovisioned_runtime_with_real_pending_gate(gone, monkeypatch, profile):
+    b = gone
+    monkeypatch.setattr(auth_safety, 'cutover', REAL_CUTOVER)  # production pending gate, not scoped ready
+    rows = snapshot(b)
+    database = q(b, 'SELECT current_database()')
+    grant = {  # labelled owner corruption of THIS test DB's runtime grants
+        'temp': f'GRANT TEMPORARY ON DATABASE "{database}" TO c1_runtime',
+        'protected_write': 'GRANT UPDATE ON users TO c1_runtime',
+        'missing_grant': 'REVOKE EXECUTE ON FUNCTION ras_auth_lock_users(uuid[]) FROM c1_runtime',
+        'recovery_mimic': 'GRANT EXECUTE ON FUNCTION ras_auth_restrict(uuid) TO c1_runtime',
+    }[profile]
+    q(b, grant)
+    if profile == 'recovery_mimic':
+        q(b, 'GRANT INSERT ON revocation_journal_records TO c1_runtime')
+    assert clean(b) == {'halted:worker_runtime_required': 1}  # the runtime boundary refuses this profile
+    outcome = attempt_operator(get_engine(), b)
+    assert_operator_untouched(b, rows)  # no S3/mutation first, then the refusal code
+    assert outcome == (None, 'operator_cleanup_requires_operator')
+
+
+@pytest.mark.parametrize('fault', ['probe_error', 'release_error', 'runtime_guard_error'])
+def test_operator_identity_faults_refuse_before_any_mutation(gone, monkeypatch, fault):
+    b = gone
+    monkeypatch.setattr(auth_safety, 'cutover', REAL_CUTOVER)
+    rows = snapshot(b)
+    engine, code = b.w.engine, 'operator_identity_unavailable'  # the owner WOULD be proven without the fault
+    if fault == 'probe_error':
+        monkeypatch.setattr(publication, 'OPERATOR_PROOF', text('SELECT 1/0'))
+    elif fault == 'release_error':
+        real = Session.close
+        def close(self):
+            if not getattr(self, '_fault_done', False):
+                self._fault_done = True
+                raise RuntimeError('synthetic close fault')
+            return real(self)
+        monkeypatch.setattr(Session, 'close', close)
+    else:  # the reviewer's case: a failing runtime check is not operator evidence
+        def broken(db):
+            raise runtime.Halt('worker_runtime_unavailable')
+        monkeypatch.setattr(runtime, 'require_runtime', broken)
+        engine, code = get_engine(), 'operator_cleanup_requires_operator'
+    outcome = attempt_operator(engine, b)
+    if fault == 'release_error':
+        monkeypatch.setattr(Session, 'close', real)
+    assert_operator_untouched(b, rows)
+    assert outcome == (None, code)
+
+
+@pytest.mark.parametrize('login', ['owner', 'recovery'])
+def test_operator_control_owner_and_recovery_clean_with_pending_gate(gone, monkeypatch, login):
+    b = gone
+    monkeypatch.setattr(auth_safety, 'cutover', REAL_CUTOVER)
+    assert clean(b) == {'halted:recovery_gate_closed': 1}
+    engine = b.w.engine if login == 'owner' else b.w.recovery
+    assert publication.operator_cleanup_revoked(engine, b.watch, NOW, 10) == {'deleted': 1}
+    assert tomb(b).object_outcome == 'deleted' and not present(b, b.copy.key)
+    assert present(b, b.own.key) and snapshot(b, b.own.item) == b.private_before
+    assert REAL_CUTOVER(Session(b.w.engine)) == 'auth_safety_pending'
+
+
+def test_sweep_refuses_runtime_before_object_calls(gone, monkeypatch):
+    b = gone
+    from app.recovery import RecoveryReport, RecoveryError, _sweep_objects
+    with pytest.raises(RecoveryError, match='operator_cleanup_requires_operator'):
+        _sweep_objects(get_engine(), b.watch, b.w.path, RecoveryReport())
+    assert not b.watch.calls and present(b, b.copy.key)

@@ -386,18 +386,47 @@ def _purge_one(db: Session, storage: OriginalStorage, tombstone_id: uuid.UUID, n
     return outcome.value
 
 
-def _require_operator(engine: Engine) -> None:
-    """Refuse the actual runtime login: runtime cleanup must use ``app.ingest.cleanup``."""
-    from app.ingest import runtime
+# Positive operator capability of the ACTUAL login (no SET ROLE): either the schema owner/migrator
+# (superuser or owner of deletion_tombstones), or the provisioned recovery login (app.db_roles: only it
+# executes ras_auth_restrict and inserts journal mirrors, and it never executes the runtime-only
+# ras_auth_session_create). A failing runtime guard is NOT such evidence.
+OPERATOR_PROOF = text("""SELECT current_user = session_user AND (
+      r.rolsuper
+      OR EXISTS (SELECT 1 FROM pg_class c WHERE c.oid = to_regclass('public.deletion_tombstones') AND c.relowner = r.oid)
+      OR (COALESCE(has_function_privilege(to_regprocedure('ras_auth_restrict(uuid)'), 'EXECUTE'), false)
+          AND COALESCE(has_table_privilege(to_regclass('public.revocation_journal_records'), 'INSERT'), false)
+          AND NOT COALESCE(has_function_privilege(to_regprocedure(
+              'ras_auth_session_create(uuid,uuid,uuid,text,text,timestamp with time zone,timestamp with time zone)'),
+              'EXECUTE'), true)))
+    FROM pg_roles r WHERE r.rolname = current_user""")
 
-    with Session(engine) as db:
+
+def _require_operator(engine: Engine) -> None:
+    """Admit only a positively proven owner/recovery login; any probe or release fault refuses.
+
+    Runtime cleanup must use ``app.ingest.cleanup``. Raises before any row lock, mutation or S3.
+    """
+    db = Session(engine)
+    try:
+        proven = db.scalar(OPERATOR_PROOF)
+    except Exception:
+        proven = None
+    released = True
+    for action in (db.rollback, db.close):
         try:
-            runtime.require_runtime(db)
-        except runtime.Halt:
-            return  # owner/recovery/operator connection (or no database at all: fails below)
-        finally:
-            db.rollback()
-    raise CleanupError("operator_cleanup_requires_operator")
+            action()
+        except Exception:
+            released = False
+    if not released:
+        try:
+            db.invalidate()
+        except Exception:
+            pass
+        raise CleanupError("operator_identity_unavailable")
+    if proven is None:
+        raise CleanupError("operator_identity_unavailable")
+    if proven is not True:
+        raise CleanupError("operator_cleanup_requires_operator")
 
 
 def operator_cleanup_revoked(engine: Engine, storage: OriginalStorage, now: datetime,

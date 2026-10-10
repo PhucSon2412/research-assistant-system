@@ -30,6 +30,7 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument('--context',type=Path,required=True)
     p.add_argument('--name',required=True)
+    p.add_argument('--skip',action='append',default=[],help='group=reason; kept as historical, listed in summary')
     a=p.parse_args()
     root=a.context.resolve()/a.name
     root.mkdir()  # never overwrite an earlier attempt
@@ -86,8 +87,10 @@ def main():
         'schema':[T+s+'.py' for s in ('migrations','c2d5e1_migration','c2d5a_migration','c2c2_migration','auth_safety_foundation')]+DEBT,
         'smoke':[T+'c2d5e1_process_smoke.py'],
     }
+    skipped=dict(v.split('=',1) for v in a.skip)
+    for name in skipped: groups.pop(name)
     summary={'code_sha':subprocess.check_output(['git','rev-parse','HEAD'],cwd=REPO,text=True).strip(),
-        'all_collected':all_nodes,'groups':{},'unique':[]}
+        'all_collected':all_nodes,'groups':{},'unique':[],'skipped_groups':skipped}
     selections={}
     for name,args in groups.items():
         code,log=run(name+'-collection',args+['--collect-only','-q'])
@@ -107,12 +110,15 @@ def main():
         result=dict(args=args,selection=expected,executed=actual,exit=code,pass_count=sum(
             not any(v.find(k) is not None for k in ('failure','error','skipped')) for v in cases),
             failures=len(tree.findall('.//failure')),errors=len(tree.findall('.//error')),skips=len(tree.findall('.//skipped')))
+        # Exact identity: executed == selected == a subset of the full collection (no rename/duplicate/missing).
         result['selection_matches']=sorted(actual)==expected and len(actual)==len(set(actual))
+        result['selection_in_collection']=set(expected)<=set(all_nodes)
         return name,result
     # Each pytest process owns disposable DBs, buckets, journal/tmp paths and
     # settings. No role-attribute mutations occur in this selection. Bound host
     # concurrency to three; Linux worker/beat smoke groups NEVER overlap.
-    waves=[['smoke'],['cleanup-runtime','cleanup-legacy','revoke'],['index','upload-approval','request-publish'],['schema','recovery']]
+    waves=[[n for n in w if n in groups] for w in [['smoke'],['cleanup-runtime','cleanup-legacy','revoke'],['index','upload-approval','request-publish'],['schema','recovery']]]
+    waves=[w for w in waves if w]
     summary['execution_waves']=waves
     for wave in waves:
         with ThreadPoolExecutor(max_workers=3) as pool:
@@ -123,14 +129,15 @@ def main():
                 summary['unique']=sorted(set(summary['unique'])|set(result['executed']))
                 (root/'summary.json').write_text(json.dumps(summary,indent=2),encoding='utf-8')
                 print(name+': '+str(result['pass_count'])+' passed; '+str(result['failures'])+' failures; '+str(result['errors'])+' errors',flush=True)
-        if any(g['exit'] or not g['selection_matches'] for g in summary['groups'].values()): break
+        if any(g['exit'] or not g['selection_matches'] or not g['selection_in_collection'] for g in summary['groups'].values()): break
     after=sources()
     (root/'source-after.json').write_text(json.dumps(after,indent=2),encoding='utf-8')
     summary['source_equal']=before==after
     summary['not_run']=sorted(set(all_nodes)-set(summary['unique']))
     (root/'summary.json').write_text(json.dumps(summary,indent=2),encoding='utf-8')
     if before!=after: raise SystemExit('source changed during seal')
-    return int(any(g['exit'] or not g['selection_matches'] for g in summary['groups'].values()))
+    return int(any(g['exit'] or not g['selection_matches'] or not g['selection_in_collection'] for g in summary['groups'].values())
+               or set(summary['groups'])!=set(groups))
 
 
 if __name__=='__main__': raise SystemExit(main())

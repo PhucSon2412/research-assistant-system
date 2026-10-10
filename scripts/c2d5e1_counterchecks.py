@@ -54,6 +54,10 @@ def main():
         ('release', 'api/app/ingest/runtime.py', [("        raise Halt('worker_release_unavailable') from None",
                                                    "        pass  # negative control")],
          t + 'test_release_fault_after_known_commit_keeps_mutation_and_stops[prepare]'),
+        ('operator-catchall', 'api/app/publication.py',
+         [('        proven = None\n    released = True', '        proven = False  # negative control\n    released = True'),
+          ('    if proven is not True:\n        raise CleanupError("operator_cleanup_requires_operator")\n', '')],
+         t + 'test_operator_refuses_misprovisioned_runtime_with_real_pending_gate[temp]'),
     ]
     results = []
     code_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=REPO, text=True).strip()

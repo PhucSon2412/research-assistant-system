@@ -96,7 +96,7 @@ def test_python_and_sql_independently_reject_field_shapes(engine,kind,shape,fiel
 
 
 @pytest.mark.parametrize("kind",journal.AUTH_KINDS)
-@pytest.mark.parametrize("field,value",[("operation_id","not-uuid"),("generation",str(uuid.uuid1())),("user_id","A"*36),
+@pytest.mark.parametrize("field,value",[("operation_id","not-uuid"),pytest.param("generation","00000000-0000-1000-8000-000000000001",id="generation-uuid1"),("user_id","A"*36),
     ("reason_code","caller_rehash"),("recorded_at","2026-10-03T09:00:00"),("recorded_at","2026-10-03T24:00:00+00:00"),
     ("recorded_at","infinity"),("recorded_at","2026-02-30T09:00:00Z")])
 def test_bad_values_no_sql_unknown(engine,kind,field,value):
