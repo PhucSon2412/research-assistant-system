@@ -5,6 +5,7 @@ worker is ``process_job`` (C2d-5d2a) with its own item -> job locks; the hook
 is paused at a named point so the test can observe real lock waits. Discovery
 pages are synthetic OAI XML through ``_write_page`` (no network).
 """
+import functools
 import threading
 import uuid
 from datetime import timedelta
@@ -29,9 +30,21 @@ from tests.test_c2d5a_review_writes import writers  # noqa: F401
 from tests.test_c2d5d1_common_index_request import indexes  # noqa: F401
 from tests.test_c2d5d2a_common_extraction import common  # noqa: F401
 from tests.test_c2d5d2a_worker_runtime import work  # noqa: F401
-from tests.test_c2d5f1_citation_runtime import Pause, advisory, eventually, lock_waiters, thread
+from tests.test_c2d5f1_citation_runtime import Pause, advisory, eventually, lock_waiters, settle, thread
 from tests.test_citations import SEED, oai_page
 from tests.test_uploads import upload_api  # noqa: F401
+
+
+def settling(test):
+    """Release pauses/join threads right after the test body, even when it fails, so the world
+    fixtures tear down without a paused thread still holding a connection."""
+    @functools.wraps(test)
+    def body(*args, **kwargs):
+        try:
+            return test(*args, **kwargs)
+        finally:
+            settle()
+    return body
 
 
 def topic(engine):
@@ -65,6 +78,7 @@ def run_pending():
 
 
 @pytest.mark.parametrize('first', ['extraction', 'discovery'])
+@settling
 def test_real_extraction_and_discovery_both_arrival_orders_converge(work, monkeypatch, first):
     b = work
     topic(b.api.engine)
@@ -100,6 +114,7 @@ def test_real_extraction_and_discovery_both_arrival_orders_converge(work, monkey
     assert run_pending() == {}  # nothing left for the backfill
 
 
+@settling
 def test_real_extraction_holds_item_and_shared_lock_backfill_continues(work, monkeypatch):
     b = work
     topic(b.api.engine)
@@ -128,6 +143,7 @@ def test_real_extraction_holds_item_and_shared_lock_backfill_continues(work, mon
     assert run_pending() == {}
 
 
+@settling
 def test_real_common_extraction_holding_item_and_discovery_retarget_never_deadlock(common, monkeypatch):
     """The C2d-5f1 lock order: a discovery page waits for the common item BEFORE the exclusive lock."""
     b = common

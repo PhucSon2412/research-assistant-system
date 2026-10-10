@@ -52,6 +52,7 @@ def cit(resource_api):
         db.commit()
     assert get_engine().url.username == 'c1_runtime'
     yield h
+    settle()  # a failed assertion must not leave a paused thread holding a connection
     assert get_engine().pool.checkedout() == 0
 
 
@@ -165,11 +166,25 @@ def eventually(predicate, label, seconds=10):
     raise AssertionError(label)
 
 
+_PAUSES, _THREADS = [], []
+
+
+def settle():
+    """Release every pause and join every helper thread (also after a failed assertion)."""
+    for pause in _PAUSES:
+        pause.go.set()
+    for t in _THREADS:
+        t.join(60)
+    _PAUSES.clear()
+    _THREADS.clear()
+
+
 class Pause:
     """Park one named thread at a hook; the test observes locks, then releases it."""
 
     def __init__(self):
         self.reached, self.go = threading.Event(), threading.Event()
+        _PAUSES.append(self)
 
     def __call__(self):
         self.reached.set()
@@ -185,6 +200,7 @@ def thread(target, name):
         except BaseException as exc:  # noqa: BLE001
             box['error'] = exc
     t = threading.Thread(target=body, name=name, daemon=True)
+    _THREADS.append(t)
     t.start()
     return t, box
 
