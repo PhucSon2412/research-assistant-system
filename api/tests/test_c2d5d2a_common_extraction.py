@@ -177,7 +177,7 @@ def test_runtime_extraction_rows_keep_fence_and_system_cleanup(common):
             field_name='title',value='late',locator_kind='markdown',start_offset=0,end_offset=4,pipeline_version='synthetic'))
         db.flush()
     # Labelled legacy/system cleanup regression; this does NOT convert cleanup.
-    assert publication.cleanup_revoked(b.w.engine,b.raw_storage,NOW+timedelta(days=30),10)=={'deleted':1}
+    assert publication.operator_cleanup_revoked(b.w.engine,b.raw_storage,NOW+timedelta(days=30),10)=={'deleted':1}
     with b.w.engine.connect() as c:
         assert c.scalar(text('SELECT ras_common_copy_derived_left(:i)'),{'i':b.copy.item})==[]
         assert c.scalar(text('SELECT count(*) FROM source_files WHERE item_id=:i'),{'i':b.own.item})==1

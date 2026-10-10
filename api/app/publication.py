@@ -22,8 +22,14 @@ route (library list/count/detail, collections) drops the item in SQL; file,
 chunk, search and RAG recheck their own rights gates. Private items and other common copies
 are untouched.
 
-**Cleanup** works from unpurged tombstones, each in its own transaction, and
-is safe to repeat: it locks the tombstone, then the item; deletes the copy's
+**Cleanup** has two entry points (C2d-5e1). Normal Celery/CLI/direct cleanup is
+``app.ingest.cleanup``: actual runtime login and gate, a durable per-key
+deletion fence, S3 outside every DB transaction and separate finalisation.
+``operator_cleanup_revoked`` below is the operator/recovery path that
+``app.recovery`` calls while traffic and writers are stopped; it refuses a
+runtime login so runtime cannot use it to skip its gate. Both remove the same
+rows. The operator path works from unpurged tombstones, each in its own
+transaction, and is safe to repeat: it locks the tombstone, then the item; deletes the copy's
 derived full-text rows in foreign-key order (active pointer, citation links,
 references, index entries, generations, chunks, sections, PDF pages, metadata
 candidates) and nulls the vector and chunk hash of its embedding calls while
@@ -232,6 +238,21 @@ def _gone(db: Session, stmt) -> int:
     return db.execute(stmt.execution_options(synchronize_session=False)).rowcount
 
 
+def _derived_shared(db: Session, item_id: uuid.UUID) -> bool:
+    """An entry of another item's generation names this copy's chunk or embedding call.
+
+    That cannot come from the pipeline; removing it would break that other
+    index, so cleanup stops (``derived_rows_shared``) and leaves it to an operator.
+    """
+    files = select(SourceFile.id).where(SourceFile.item_id == item_id)
+    generations = select(IndexGeneration.id).where(IndexGeneration.item_id == item_id)
+    calls = select(EmbeddingCall.id).where(EmbeddingCall.source_file_id.in_(files))
+    return bool(db.scalar(select(func.count()).select_from(IndexEntry).where(
+        IndexEntry.generation_id.not_in(generations),
+        or_(IndexEntry.chunk_id.in_(select(Chunk.id).where(Chunk.item_id == item_id)),
+            IndexEntry.embedding_call_id.in_(calls)))))
+
+
 def _remove_derived(db: Session, item_id: uuid.UUID, now: datetime) -> tuple[dict[str, int], int]:
     """Delete the copy's full-text derivatives in foreign-key order and scrub its embedding ledger.
 
@@ -243,13 +264,7 @@ def _remove_derived(db: Session, item_id: uuid.UUID, now: datetime) -> tuple[dic
     """
     files = select(SourceFile.id).where(SourceFile.item_id == item_id)
     generations = select(IndexGeneration.id).where(IndexGeneration.item_id == item_id)
-    calls = select(EmbeddingCall.id).where(EmbeddingCall.source_file_id.in_(files))
-    # An entry of another item's generation naming this copy's chunk or vector cannot come from
-    # the pipeline; removing it would break that other index, so stop and leave it to an operator.
-    if db.scalar(select(func.count()).select_from(IndexEntry).where(
-            IndexEntry.generation_id.not_in(generations),
-            or_(IndexEntry.chunk_id.in_(select(Chunk.id).where(Chunk.item_id == item_id)),
-                IndexEntry.embedding_call_id.in_(calls)))):
+    if _derived_shared(db, item_id):
         raise CleanupError("derived_rows_shared")
     db.execute(update(LibraryItem).where(
         LibraryItem.id == item_id, or_(LibraryItem.active_index_generation_id.is_not(None),
@@ -371,8 +386,29 @@ def _purge_one(db: Session, storage: OriginalStorage, tombstone_id: uuid.UUID, n
     return outcome.value
 
 
-def cleanup_revoked(engine: Engine, storage: OriginalStorage, now: datetime, batch_size: int) -> dict[str, int]:
-    """Purge unpurged tombstones, oldest deadline first. Idempotent; failures are retried next run."""
+def _require_operator(engine: Engine) -> None:
+    """Refuse the actual runtime login: runtime cleanup must use ``app.ingest.cleanup``."""
+    from app.ingest import runtime
+
+    with Session(engine) as db:
+        try:
+            runtime.require_runtime(db)
+        except runtime.Halt:
+            return  # owner/recovery/operator connection (or no database at all: fails below)
+        finally:
+            db.rollback()
+    raise CleanupError("operator_cleanup_requires_operator")
+
+
+def operator_cleanup_revoked(engine: Engine, storage: OriginalStorage, now: datetime,
+                             batch_size: int) -> dict[str, int]:
+    """Operator/recovery purge of unpurged tombstones, oldest deadline first; not a runtime entry.
+
+    Legacy semantics kept for ``app.recovery``: the object is deleted while the
+    tombstone/item transaction is open, so it is only safe while API, worker and
+    beat are stopped. Idempotent; failures are retried next run.
+    """
+    _require_operator(engine)
     counts: dict[str, int] = {}
     with Session(engine) as db:
         ids = db.scalars(select(DeletionTombstone.id).where(DeletionTombstone.purged_at.is_(None))

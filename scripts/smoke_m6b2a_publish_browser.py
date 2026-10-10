@@ -191,7 +191,7 @@ def main() -> None:
                 STAGE = "cleanup"
                 from app.clock import utcnow
                 from app.config import get_settings
-                from app.publication import cleanup_revoked
+                from app.publication import operator_cleanup_revoked as cleanup_revoked  # operator path (historical smoke)
                 from app.storage import OriginalStorage
                 get_settings.cache_clear()
                 storage = OriginalStorage(get_settings())

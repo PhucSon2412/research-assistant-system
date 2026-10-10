@@ -135,7 +135,7 @@ def test_revoke_commits_during_unlocked_io_and_late_result_financial_only(doc,mo
             revoked=pool.submit(runtime_revoke,b.w,b.copy.item,clock=b.clock)
             assert revoked.result(15)['item']['publication_state']=='revoked'
             if cleanup:
-                assert publication.cleanup_revoked(b.w.engine,b.raw_storage,NOW+timedelta(days=30),10)=={'deleted':1}
+                assert publication.operator_cleanup_revoked(b.w.engine,b.raw_storage,NOW+timedelta(days=30),10)=={'deleted':1}
         finally: release.set()
         assert running.result(20) in ('cancelled','checksum_mismatch','lease_lost')
     assert sql(b,'SELECT count(*) FROM index_entries')==0

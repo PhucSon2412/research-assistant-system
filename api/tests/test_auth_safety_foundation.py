@@ -745,9 +745,9 @@ def test_common_publish_download_revoke_cleanup_direct(engine, app_env, journal_
                 return len(copy.storage.objects[key])
             def delete(self, key):
                 copy.storage.delete(key)
-        counts = publication.cleanup_revoked(engine, Storage(), NOW+timedelta(seconds=2), 100)
+        counts = publication.operator_cleanup_revoked(engine, Storage(), NOW+timedelta(seconds=2), 100)
         assert not any(k.startswith('error:') for k in counts), counts
-        assert publication.cleanup_revoked(engine, Storage(), NOW+timedelta(seconds=2), 100) == {}
+        assert publication.operator_cleanup_revoked(engine, Storage(), NOW+timedelta(seconds=2), 100) == {}
         assert copy.key not in copy.storage.objects and list(copy.storage.objects.values()) == [BODY]
         with Session(engine) as db:
             assert db.get(LibraryItem, copy.item).title is None

@@ -454,7 +454,7 @@ def test_revoke_queued_just_before_publish_wins_and_nothing_is_published(w):
                                                                                           None)
     assert w.api.scalar("SELECT count(*) FROM index_generations WHERE item_id=:i AND state='active'",
                         i=uuid.UUID(copy)) == 0
-    assert publication.cleanup_revoked(w.api.engine, w.storage, w.api.clock.now, 50) == {"deleted": 1}
+    assert publication.operator_cleanup_revoked(w.api.engine, w.storage, w.api.clock.now, 50) == {"deleted": 1}
     assert derived_counts(w.api, copy) == dict.fromkeys(DERIVED, 0)
 
 
@@ -478,7 +478,7 @@ def test_publish_holding_the_lock_wins_then_revoke_leaves_the_index_at_t_rev(w):
     row = item_row(w, copy)
     assert (row.publication_state, row.content_status, row.active_index_generation_id) == ("revoked", "metadata_only",
                                                                                           None)
-    assert publication.cleanup_revoked(w.api.engine, w.storage, w.api.clock.now, 50) == {"deleted": 1}
+    assert publication.operator_cleanup_revoked(w.api.engine, w.storage, w.api.clock.now, 50) == {"deleted": 1}
     assert derived_counts(w.api, copy) == dict.fromkeys(DERIVED, 0)
 
 
@@ -508,7 +508,7 @@ def test_worker_holding_item_and_job_first_makes_revoke_wait_then_ends_cancelled
     assert outcome == {"revoked": True} and result == {"worker": "cancelled"}
     assert w.api.scalar("SELECT cancel_requested FROM ingestion_jobs WHERE id=:j", j=jobs_of(w, copy)[0][0]) is True
     assert derived_counts(w.api, copy)["sections"] > 0  # committed before t_rev
-    assert publication.cleanup_revoked(w.api.engine, w.storage, w.api.clock.now, 50) == {"deleted": 1}
+    assert publication.operator_cleanup_revoked(w.api.engine, w.storage, w.api.clock.now, 50) == {"deleted": 1}
     assert derived_counts(w.api, copy) == dict.fromkeys(DERIVED, 0)
 
 
@@ -557,7 +557,7 @@ def test_cleanup_removes_rows_of_the_real_common_pipeline_and_nothing_private(w)
                    if t not in ("pdf_pages", "reference_citation_links", "metadata_candidates")), kind
         assert revoke(w.admin, copy).status_code == 200
         assert_not_served_after_revoke(w, copy)
-    assert publication.cleanup_revoked(w.api.engine, w.storage, w.api.clock.now, 50) == {"deleted": 2}
+    assert publication.operator_cleanup_revoked(w.api.engine, w.storage, w.api.clock.now, 50) == {"deleted": 2}
     for kind, copy in copies.items():
         assert derived_counts(w.api, copy) == dict.fromkeys(DERIVED, 0) and derived_left(w.api, copy) == []
         assert ledger(w.api, copy) == ledgers[kind] and all(row[-1] is None for row in ledgers[kind])

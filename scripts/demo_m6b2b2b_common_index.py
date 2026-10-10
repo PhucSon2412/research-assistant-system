@@ -70,7 +70,7 @@ from app.identity.passwords import hash_password  # noqa: E402
 from app.ingest import indexer  # noqa: E402
 from app.ingest.embedding import EmbeddingResult  # noqa: E402
 from app.ingest.worker import process_job  # noqa: E402
-from app.publication import cleanup_revoked  # noqa: E402
+from app.publication import operator_cleanup_revoked as cleanup_revoked  # noqa: E402  (operator path, historical demo)
 from app.storage import OriginalStorage  # noqa: E402
 
 get_settings.cache_clear()

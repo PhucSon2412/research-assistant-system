@@ -246,7 +246,7 @@ def test_restore_with_a_missing_or_foreign_journal_serves_nothing_and_recover_re
     path = journal_file()
     with backup(w.api, admin_engine) as snap:
         assert revoke(w.admin, w.copy).status_code == 200
-        assert publication.cleanup_revoked(w.api.engine, w.storage, w.api.clock.now, 50) == {"deleted": 1}
+        assert publication.operator_cleanup_revoked(w.api.engine, w.storage, w.api.clock.now, 50) == {"deleted": 1}
         current = path.read_bytes()
         app_env(snap.url)
         bk.restore_objects(w.storage, artifact, manifest)
@@ -353,7 +353,7 @@ def test_restore_and_recover_run_again_safely(upload_api, monkeypatch, admin_eng
     total = len(saved)
     with backup(w.api, admin_engine) as snap:
         assert revoke(w.admin, w.copy).status_code == 200
-        assert publication.cleanup_revoked(w.api.engine, w.storage, w.api.clock.now, 50) == {"deleted": 1}
+        assert publication.operator_cleanup_revoked(w.api.engine, w.storage, w.api.clock.now, 50) == {"deleted": 1}
         put_back(w.storage, {f"originals/{uuid.uuid4().hex}": b"written after the backup"})  # live system moves on
 
         for attempt in range(2):  # restore the same artifact twice, each followed by recover
@@ -465,7 +465,7 @@ def test_restore_refuses_an_object_read_back_with_other_bytes_of_the_same_size_a
     key = common_key(w.api, w.copy)
     with backup(w.api, admin_engine) as snap:
         assert revoke(w.admin, w.copy).status_code == 200
-        assert publication.cleanup_revoked(w.api.engine, w.storage, w.api.clock.now, 50) == {"deleted": 1}
+        assert publication.operator_cleanup_revoked(w.api.engine, w.storage, w.api.clock.now, 50) == {"deleted": 1}
         app_env(snap.url)
         recovery.hold(snap.engine, settings, w.api.clock.now)  # the tool holds before restoring objects
         real_put = w.storage.put

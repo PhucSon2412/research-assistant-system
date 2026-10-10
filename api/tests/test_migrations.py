@@ -50,6 +50,8 @@ EXPECTED_TABLES = {
     "access_rights",
     "common_publications", "deletion_tombstones", "revocation_metadata_retentions",
     "recovery_registrations", "revocation_journal_records",
+    # C2d-5e1 (0044)
+    "object_delete_fences",
 }
 
 

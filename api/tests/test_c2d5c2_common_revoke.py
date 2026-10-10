@@ -426,7 +426,7 @@ def test_cleanup_wins_before_new_response_scrubbed_and_count_from_attempt(publis
             dict(i=b.copy.item,v=b.copy.version,f=b.copy.file,k='00000000-0000-0000-0000-000000000001'))
     real = boundary.respond
     def respond(*a):
-        result = publication.cleanup_revoked(b.w.engine, b.raw_storage, NOW+timedelta(days=2), 10)
+        result = publication.operator_cleanup_revoked(b.w.engine, b.raw_storage, NOW+timedelta(days=2), 10)
         assert sum(result.values()) == 1
         return real(*a)
     monkeypatch.setattr(boundary, 'respond', respond)
@@ -626,7 +626,7 @@ def test_cleanup_tombstone_item_vs_response_share_real_wait_no_upgrade(publishes
         def held(*a):
             result=real(*a);entered.set();assert release.wait(15);return result
         monkeypatch.setattr(common_publish,'_lock_item',held)
-    def cleanup():return publication.cleanup_revoked(b.w.engine,b.raw_storage,NOW+timedelta(days=2),10)
+    def cleanup():return publication.operator_cleanup_revoked(b.w.engine,b.raw_storage,NOW+timedelta(days=2),10)
     def response():return boundary.respond(b.admin,b.copy.item,b.w.actor.csrf_token,b.clock,settings,outcome)
     with ThreadPoolExecutor(2) as pool:
         a=pool.submit(cleanup if first=='cleanup' else response)

@@ -1164,10 +1164,12 @@ def _closures(path: Path) -> list[Record]:
 
 
 def _cleanup(engine: Engine, storage, settings: Settings, now: datetime, report: RecoveryReport) -> None:
-    from app.publication import cleanup_revoked
+    # Operator path, not the runtime boundary: recover runs while its gate is closed.
+    from app.publication import operator_cleanup_revoked
 
     for _ in range(settings.recovery.cleanup_passes):
-        for outcome, count in cleanup_revoked(engine, storage, now, settings.retention.cleanup_batch_size).items():
+        for outcome, count in operator_cleanup_revoked(engine, storage, now,
+                                                       settings.retention.cleanup_batch_size).items():
             report.cleanup[outcome] = report.cleanup.get(outcome, 0) + count
         with Session(engine) as db:
             if not db.scalar(select(func.count()).select_from(DeletionTombstone)
