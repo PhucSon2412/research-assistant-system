@@ -129,6 +129,36 @@ def test_config_pause_does_not_claim_or_reserve(indexed,state,resume,missing):
     assert not b.opened and not b.calls and sql(b,'SELECT count(*) FROM embedding_calls')==0
 
 
+@pytest.mark.parametrize('deadline', ['expired', 'absent', 'live'])
+def test_document_capacity_counts_only_live_query_leases(indexed, deadline):
+    b=indexed; b.settings.embedding.max_concurrent_requests=1
+    at=w.utcnow()
+    until=at+timedelta(minutes=5) if deadline=='live' else at-timedelta(seconds=1) if deadline=='expired' else None
+    query=sql(b, '''INSERT INTO search_usage(user_id,day,task_type,model_id,provider,status,
+        reserved_usd,cost_status,lease_until) VALUES (:u,:d,'embed_query',:m,:p,'reserved',0.01,'unknown',:t) RETURNING id''',
+        u=b.uid,d=at.date(),m=b.settings.embedding.model_id,p=b.settings.embedding.provider,t=until)
+    assert run(b)==('embedding_concurrency_limit' if deadline=='live' else 'ready')
+    assert len(b.calls)==(0 if deadline=='live' else b.expected)
+    # Query accounting belongs to its existing boundary. A dead slot does not
+    # erase its financial ceiling or change its status in document admission.
+    assert sql(b,'SELECT reserved_usd FROM search_usage WHERE id=:i',i=query)==Decimal('0.01')
+    assert sql(b,"SELECT status FROM search_usage WHERE id=:i",i=query)=='reserved'
+    assert sql(b,'SELECT cost_usd IS NULL FROM search_usage WHERE id=:i',i=query)
+
+
+def test_expired_query_still_counts_towards_document_budget(indexed):
+    b=indexed; b.settings.embedding.max_concurrent_requests=1
+    b.settings.budget.embedding_daily_usd=0.01
+    b.settings.budget.user_embedding_daily_usd=0.01
+    at=w.utcnow()
+    sql(b, '''INSERT INTO search_usage(user_id,day,task_type,model_id,provider,status,
+        reserved_usd,cost_status,lease_until) VALUES (:u,:d,'embed_query',:m,:p,'reserved',0.01,'unknown',:t)''',
+        u=b.uid,d=at.date(),m=b.settings.embedding.model_id,p=b.settings.embedding.provider,t=at-timedelta(seconds=1))
+    assert run(b)=='embedding_budget_exhausted'
+    assert not b.calls and sql(b,'SELECT count(*) FROM embedding_calls')==0
+    assert sql(b,'SELECT sum(reserved_usd) FROM search_usage')==Decimal('0.01')
+
+
 @pytest.mark.parametrize('state,resume',[('awaiting_index',None),('indexing',None),('retryable_failed','indexing')])
 def test_duplicate_claim_and_index_dispatch(indexed,state,resume):
     b=indexed

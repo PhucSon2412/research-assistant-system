@@ -245,8 +245,11 @@ def _reserve(db, rows, chunk, settings):
             return call, False
         if call.status != 'rejected':
             raise w.StepError('embedding_outcome_uncertain')
-    active = db.scalar(select(func.count()).select_from(EmbeddingCall).where(EmbeddingCall.status == 'reserved'))
-    queries = db.scalar(select(func.count()).select_from(SearchUsage).where(SearchUsage.task_type == 'embed_query', SearchUsage.status == 'reserved'))
+    capacity_at = w.utcnow()
+    active = db.scalar(select(func.count()).select_from(EmbeddingCall).where(
+        EmbeddingCall.status == 'reserved', EmbeddingCall.lease_until > capacity_at))
+    queries = db.scalar(select(func.count()).select_from(SearchUsage).where(SearchUsage.task_type == 'embed_query',
+        SearchUsage.status == 'reserved', SearchUsage.lease_until > capacity_at))
     if active + queries >= settings.embedding.max_concurrent_requests:
         raise w.StepError('embedding_concurrency_limit', retryable=True)
     amount = ix._amount(settings.embedding.max_request_bytes, settings)

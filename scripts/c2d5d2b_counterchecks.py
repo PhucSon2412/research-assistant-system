@@ -37,6 +37,8 @@ def main():
             prefix+'test_clock_after_final_sql[equal-publish]'),
         ('commit','api/app/ingest/runtime.py',[("        raise Halt('worker_commit_uncertain') from None","        return  # negative control")],
             prefix+'test_commit_uncertain_never_continues_or_fails[True-reservation]'),
+        ('query-lease','api/app/ingest/document_index.py',[("SearchUsage.status == 'reserved', SearchUsage.lease_until > capacity_at", "SearchUsage.status == 'reserved'")],
+            prefix+'test_document_capacity_counts_only_live_query_leases[expired]'),
     ]
     results=[]
     code_sha=subprocess.check_output(['git','rev-parse','HEAD'],cwd=REPO,text=True).strip()
