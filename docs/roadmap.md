@@ -1,6 +1,10 @@
 # Roadmap đề xuất
 
-## Giao C2d-5e1 sau merge PR #52
+## C2d-5e1 trên nhánh review
+
+**C2d-5e1 trên nhánh review (chưa merge):** [handoff cleanup runtime](c2d5e1-revoked-common-cleanup-runtime.md) · [inventory](c2d5e1-test-inventory.json). Base merge PR #52 `ba20fda`, source `0043 → 0044`; code kiểm `3b54a6f`. Normal Celery/CLI/direct cleanup qua runtime: fence xóa bền vững theo key (`object_delete_fences`, routine `ras_auth_cleanup_fence`, trigger SourceFile INSERT cùng key lock), S3 ngoài mọi transaction, finalize tombstone → item → journal. Recovery giữ đường operator `operator_cleanup_revoked`. Seal: **1575 API unique pass**, 0 fail/error/skip (collect 4551, 2978 not-run gồm 24 node debt base tái hiện ở `ba20fda`); 8/8 countercheck. Orphan reconcile/discovery/citation/query/RAG/C3/C4 riêng; **safety pending tới C4**.
+
+## Giao C2d-5e1 sau merge PR #52 (lịch sử)
 
 [Prompt cleanup common revoked qua runtime](tasks/m6c2b2c2d5e1-revoked-common-cleanup-runtime.md) — **đã giao, chưa triển khai/kiểm**. Base merge `ba20fda`, source `0043`; normal Celery/CLI/direct cleanup, durable deletion fence bảo vệ shared key, DB checkpoint ngoài S3, outcome và late accounting; operator recovery giữ đường riêng. [Quyết định scoped](decisions.md#giao-c2d-5e1-sau-merge-pr-52-2026-10-10).
 

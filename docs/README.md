@@ -1,6 +1,10 @@
 # Tài liệu dự án
 
-**Task tiếp theo:** [Prompt C2d-5e1 — cleanup bản chung đã thu hồi qua runtime](tasks/m6c2b2c2d5e1-revoked-common-cleanup-runtime.md). Tách DB checkpoint khỏi S3, bảo vệ shared object bằng deletion fence và giữ recovery operator riêng. Base merge PR #52 `ba20fda`, source `0043`; mới giao tài liệu, chưa triển khai/kiểm. **Safety pending tới C4.**
+**Task tiếp theo:** C2d-5e1 đã triển khai trên nhánh review, chờ chủ dự án review/merge; mục kế tiếp theo roadmap (orphan reconcile → discovery/citation → search/query/rerank → RAG/generation → tổng hồi quy C2d) chưa giao.
+
+**C2d-5e1 trên nhánh review (chưa merge):** [handoff cleanup runtime](c2d5e1-revoked-common-cleanup-runtime.md) · [inventory](c2d5e1-test-inventory.json). Base merge PR #52 `ba20fda`, source `0043 → 0044`; code kiểm `3b54a6f`. Normal Celery/CLI/direct cleanup qua runtime: fence xóa bền vững theo key (`object_delete_fences`, routine `ras_auth_cleanup_fence`, trigger SourceFile INSERT cùng key lock), S3 ngoài mọi transaction, finalize tombstone → item → journal. Recovery giữ đường operator `operator_cleanup_revoked`. Seal: **1575 API unique pass**, 0 fail/error/skip (collect 4551, 2978 not-run gồm 24 node debt base tái hiện ở `ba20fda`); 8/8 countercheck. Orphan reconcile/discovery/citation/query/RAG/C3/C4 riêng; **safety pending tới C4**.
+
+**Mốc giao C2d-5e1 (lịch sử):** [Prompt C2d-5e1 — cleanup bản chung đã thu hồi qua runtime](tasks/m6c2b2c2d5e1-revoked-common-cleanup-runtime.md). Tách DB checkpoint khỏi S3, bảo vệ shared object bằng deletion fence và giữ recovery operator riêng. Base merge PR #52 `ba20fda`, source `0043`; mới giao tài liệu, chưa triển khai/kiểm. **Safety pending tới C4.**
 
 **Review PR #52 tại `97bc6e7`: không phát hiện điểm chặn merge mới trong phạm vi document index runtime.** Reviewer thực chạy **254/254 API**, gồm worker/beat Linux và Redis outage/restart; 302 source hashes khớp. Artifact agent **703 API/8 countercheck**, 403 file được đối chiếu riêng. PR **đã merge `ba20fda`**, chưa rerun tại merge, source `0043`, **safety pending tới C4**. [Report và giới hạn](reviews/pr52-c2d5d2b-document-index-runtime.md).
 

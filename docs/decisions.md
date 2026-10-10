@@ -1,5 +1,11 @@
 # Nhật ký quyết định
 
+## Triển khai C2d-5e1 (2026-10-10)
+
+**Nguồn:** task C2d-5e1 (lựa chọn scoped của orchestrator, không phải xác nhận trực tiếp mới của chủ dự án). Code `3b54a6f` trên nhánh review, chưa merge. [Handoff](c2d5e1-revoked-common-cleanup-runtime.md).
+
+Theo đúng phương án giao: fence bền vững theo key (`0044`), prepare chỉ key lock + scalar, trigger SourceFile INSERT cùng key lock, S3 ngoài DB, finalize tombstone → item → journal, recovery giữ đường operator. **Biến thể/bổ sung do agent chọn, ghi rõ:** (1) trigger và routine từ chối transaction không READ COMMITTED vì snapshot cũ có thể không thấy fence vừa commit; (2) `derived_rows_shared` kiểm cả ở prepare để không fence/xóa object khi cleanup chắc chắn dừng; (3) helper cũ đổi tên `operator_cleanup_revoked`, từ chối login thỏa `require_runtime` (kiểm ngược, không phải chứng nhận danh tính operator); test cũ gọi cleanup thường bằng engine runtime chuyển sang boundary runtime; (4) lock timeout ở tombstone/item/key → `skipped:cleanup_busy` không tăng attempt (chưa có test riêng); (5) clock sau journal là sàn (`recorded_at`, không lùi) vì cleanup không có lease. Thay đổi hợp đồng: fence (metadata vận hành) còn lại sau lỗi DB/S3 sau prepare; nội dung DB vẫn rollback. CLI cleanup với Compose mặc định (owner) nay bị từ chối; drill/demo lịch sử không chạy lại. 24 node debt base được tái hiện ở `ba20fda` và giữ riêng. **Safety pending tới C4.**
+
 ## Giao C2d-5e1 sau merge PR #52 (2026-10-10)
 
 **Nguồn:** chủ dự án báo merge và yêu cầu prompt tiếp theo; orchestrator chọn phạm vi theo ủy quyền. GitHub/Git xác minh merge **`ba20fda402840243f13bd4bb27e98c4c0cb17562`**, head `97bc6e7` là ancestor và tree khớp merge; source migration **0043**, không suy revision DB dev. Kết quả PR #52 giữ theo code/review trước merge, không rerun tại merge.

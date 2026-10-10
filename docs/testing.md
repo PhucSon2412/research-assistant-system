@@ -1,6 +1,10 @@
 # Chiến lược kiểm thử
 
-## Kế hoạch C2d-5e1 sau merge PR #52
+## C2d-5e1 — kiểm nhánh cleanup runtime
+
+Code `3b54a6f`: **1575 API unique pass**, 0 fail/error/skip; collect 4551, 2978 not-run. Selection theo call graph: cleanup runtime mới (fence SQL/raw insert/race hai thứ tự/hash collision/isolation tham chiếu/S3 403-5xx-timeout/uncertain/release/clock/gate trong finalize/late accounting/recover), migration 0044, cleanup/publication cũ, revoke, document/common index, upload/approval, HTTP index/publish, recovery/backup, ORM/migration và smoke worker+beat Linux (SIGKILL giữa fence và delete). 24 node fail/error y hệt ở base `ba20fda` được deselect tường minh, ghi riêng là debt, không tính pass. 8/8 countercheck (role, gate cuối, trigger insert, bảo vệ tham chiếu, giữ ledger, hậu điều kiện, uncertain, release) bắt assertion nghiệp vụ; lượt yếu đầu (gate cuối) giữ riêng. Không web/provider live/dev/cutover. [Inventory](c2d5e1-test-inventory.json).
+
+## Kế hoạch C2d-5e1 sau merge PR #52 (lịch sử)
 
 [Prompt cleanup common revoked runtime](tasks/m6c2b2c2d5e1-revoked-common-cleanup-runtime.md) yêu cầu role runtime thật, PG/MinIO/Redis/journal cô lập: fence/raw SQL/shared-key race cả hai thứ tự, I/O ngoài DB, full derived scrub/retention, uncertain/release, late financial settlement và operator recovery tương thích. Worker/beat Linux thực và restart theo durable phases; gate pending/hold thật, countercheck phục hồi source trước sealed suite. Hồi quy hữu hạn theo call graph, selection/JUnit/hash và not-run ghi riêng. **Lượt giao chưa chạy test ứng dụng**; số PR #52 là lịch sử trước merge. Safety pending tới C4, không provider live/dev/cutover.
 
