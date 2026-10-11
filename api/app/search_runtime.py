@@ -36,8 +36,9 @@ def caller(db, principal, settings, clock, csrf=None):
 def snapshot(db, principal, item, collection):
     models = s._scope(db, principal, item, collection, include_common=True)
     # Detect exact tuple/rights changes even if both scopes use the same model/dimension.
-    rows = db.execute(text('''SELECT i.id,i.rights_epoch,g.id,g.version_id,g.source_file_id,
-        f.checksum_sha256,f.byte_size,g.model_id,g.dimensions,
+    rows = db.execute(text('''SELECT i.id,i.rights_epoch,i.visibility,i.owner_user_id,
+        g.id,g.version_id,g.source_file_id,g.provider,g.pipeline_version,g.index_version,
+        f.checksum_sha256,f.byte_size,g.model_id,g.dimensions,v.coverage,
         (i.visibility='private' OR (i.id,g.version_id,f.id,g.id) IN ('''
         + s.common_fulltext_sql(external_processing=True) + ''')) provider_ok
         FROM library_items i JOIN index_generations g ON g.id=i.active_index_generation_id
