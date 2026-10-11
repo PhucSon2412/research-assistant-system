@@ -1,4 +1,10 @@
-# Môi trường phát triển và schema (M1a–C2d-5e2 đã merge)
+# Môi trường phát triển và schema (M1a–C2d-5f1 đã merge)
+
+**Discovery runtime C2d-5f2, source `0046`, chờ review:** [handoff/inventory](c2d5f2-discovery-runtime.md) giữ lệnh thực chạy và kết quả. Entrypoint `python -m app.cli.sync_arxiv` dùng runtime từ `RAS_DB__*`, không endpoint tùy ý. `--force` chỉ bỏ lịch poll thành công, không bỏ lease/pacing/backoff/Retry-After/gate. Exit 0 completed/bound/disabled, 1 error/halted, 2 config thiếu, 3 busy. Direct và `ras.discovery.sync` cùng boundary; demo owner M5a đã retired. Migration/provision chỉ trên môi trường được giao, không tự nâng dev. Safety pending tới C4; CLI production pending vẫn đóng.
+
+**Hiện hành 2026-10-11:** PR #55 đã merge `e6b5991`, source `0045`, không suy revision DB dev; safety pending tới C4. [Kế hoạch MVP](mvp-delivery-plan.md) và [task C2d-5f2](tasks/m6c2b2c2d5f2-discovery-runtime.md) mới giao tài liệu, chưa có lệnh hay kết quả kiểm vận hành mới. Các trạng thái OPEN và lệnh kiểm phía dưới giữ lịch sử theo source; không khắc phục stack dev bằng tắt gate pending.
+
+**Review PR #55 tại `bca5d90`: không phát hiện điểm chặn merge mới trong phạm vi citation reconcile runtime.** Reviewer thực chạy **121/121 pass** (119 ca repo + hai smoke Linux CLI/Celery SIGKILL); đối chiếu riêng **313 artifact hash**, agent **1.203 unique pass / 3.534 not-run**, 327 source hash và 10 countercheck. PR **OPEN, chưa merge**, source `0045`, **safety pending tới C4**. [Môi trường thử và cleanup](reviews/pr55-c2d5f1-citation-reconcile-runtime.md). Không có lệnh vận hành dev mới. Chín container có sẵn giữ ID/image; worker/beat RestartCount 1107 → 1111 và StartedAt đổi trong lúc review, chưa xác định nguyên nhân.
 
 PR #54 đã merge `37edd5c9`, source `0045`; merge tree khớp `cf66f1c`, chưa rerun tại merge. C2d-5f1 citation runtime đã triển khai trên nhánh review (chưa merge): [handoff](c2d5f1-citation-reconcile-runtime.md); discovery harvesting là C2d-5f2. Lệnh đã chạy chỉ trong môi trường cô lập (mục dưới); không có lệnh vận hành dev mới, lệnh backfill owner cũ đã superseded. Safety pending tới C4; các hướng dẫn/lượt kiểm dưới đây giữ theo source lịch sử, không là chứng nhận dev/cutover.
 

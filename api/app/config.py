@@ -180,6 +180,13 @@ class DiscoveryPolicy(BaseModel):
     max_pages_per_topic: int = Field(default=2, ge=1, le=100)
     max_response_bytes: int = Field(default=4 * MIB, ge=1024, le=32 * MIB)
     timeout_seconds: int = Field(default=20, ge=1, le=120)
+    http_deadline_seconds: int = Field(default=30, ge=1, le=180)
+    lease_seconds: int = Field(default=90, ge=5, le=600)
+    lease_margin_seconds: int = Field(default=10, ge=1, le=60)
+    max_pass_seconds: int = Field(default=300, ge=1, le=3600)
+    max_records_per_page: int = Field(default=5000, ge=1, le=50000)
+    retarget_limit: int = Field(default=2000, ge=1, le=50000)
+    retry_after_max_seconds: int = Field(default=86400, ge=1, le=604800)
     min_request_interval_seconds: int = Field(default=3, ge=3)
     retry_base_seconds: int = Field(default=60, ge=1)
     retry_max_seconds: int = Field(default=3600, ge=1)
@@ -194,6 +201,8 @@ class DiscoveryPolicy(BaseModel):
             raise ValueError("invalid arXiv category")
         if self.retry_max_seconds < self.retry_base_seconds:
             raise ValueError("discovery retry max must exceed base")
+        if self.http_deadline_seconds + self.lease_margin_seconds >= self.lease_seconds:
+            raise ValueError("discovery HTTP deadline must leave the lease margin")
         return self
 
 

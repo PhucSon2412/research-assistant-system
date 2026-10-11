@@ -84,5 +84,10 @@ class DiscoveryDeletedRecord(Base):
 
 class DiscoveryRequestClock(Base):
     __tablename__ = "discovery_request_clock"
+    __table_args__ = (
+        CheckConstraint("(lease_token IS NULL) = (lease_until IS NULL)", name="lease_pair"),
+    )
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     next_request_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    lease_token: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

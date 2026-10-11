@@ -1,5 +1,9 @@
 # C2d-5f1 — citation reconcile qua runtime
 
+**Cập nhật sau review 2026-10-11:** PR #55 đã merge `e6b5991dd7ea9df6b8a5d9307f100ab0b87c7faa`; tree khớp head `bca5d90`. Kết quả dưới đây giữ theo source trước merge, không rerun mới. [C2d-5f2 discovery runtime](tasks/m6c2b2c2d5f2-discovery-runtime.md) đã giao theo [kế hoạch MVP](mvp-delivery-plan.md); mới giao tài liệu, chưa triển khai. Source `0045`, safety pending tới C4; các trạng thái chưa merge dưới đây là lịch sử.
+
+**Review độc lập ngày 2026-10-11:** PR #55 tại `bca5d90` không có điểm chặn merge mới trong scope; reviewer 121/121 pass, artifact agent 1.203 pass kiểm riêng. PR vẫn OPEN/chưa merge; source `0045`, safety pending tới C4. [Report và giới hạn](reviews/pr55-c2d5f1-citation-reconcile-runtime.md).
+
 **Trạng thái: nhánh `feat/m6c2b2c2d5f1-citation-reconcile-runtime`, PR chưa merge.** Base `origin/main` = merge PR #54 `37edd5c9c28e60ba43425f0b1bd9f42946585e28` (tree khớp head review `cf66f1c`, đã fetch/xác minh lại trước khi tạo nhánh). Source migration **giữ `0045`**: không migration, không đổi grants/provision. **Safety pending tới C4.** Discovery harvesting (`run_sync`: engine/gate/HTTP/pacing/lease/cursor/outcome) **chưa chuyển**, là C2d-5f2.
 
 [Task](tasks/m6c2b2c2d5f1-citation-reconcile-runtime.md) · [Inventory](c2d5f1-test-inventory.json) · [Worker/extraction C2d-5d2a](c2d5d2a-worker-runtime-extraction.md) · [Cleanup C2d-5e1](c2d5e1-revoked-common-cleanup-runtime.md) · [Orphan C2d-5e2](c2d5e2-orphan-original-reconcile-runtime.md)

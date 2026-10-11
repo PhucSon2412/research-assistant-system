@@ -797,7 +797,6 @@ def test_revoke_committing_between_hint_and_lock_is_rechecked_under_lock(cit, mo
 def test_late_common_item_under_exclusive_lock_is_nowait_busy(cit, monkeypatch):
     h = cit
     copy = common_copy(h.w, indexed=False)
-    monkeypatch.setattr('app.discovery._reserve_request', lambda db, policy: None)  # no arXiv clock/network
     real = citations._lock
     holder = {}
 
@@ -825,11 +824,11 @@ def test_late_common_item_under_exclusive_lock_is_nowait_busy(cit, monkeypatch):
     assert time.monotonic() - started < 5  # NOWAIT: never waited under the exclusive lock
     holder['c'].rollback()
     holder['c'].close()
-    assert result == {'busy': False, 'pages': 0, 'records': 0}
+    assert result == {'busy': False, 'pages': 0, 'records': 0, 'requests': 1, 'error:citation_retarget_busy': 1}
     # Nothing partial: no paper, no link update, and the page cursor did not advance.
     assert q(h, 'SELECT count(*) FROM discovery_papers') == 0
     assert q(h, "SELECT match_status FROM reference_citation_links") == 'no_discovery_record'
-    assert q(h, "SELECT last_error FROM discovery_sources WHERE topic='cs.AI'") == 'RetargetBusy'
+    assert q(h, "SELECT last_error FROM discovery_sources WHERE topic='cs.AI'") == 'citation_retarget_busy'
     after = q(h, "SELECT row(window_from, window_until, resumption_token, pages_seen)::text FROM discovery_sources"
                  " WHERE topic='cs.AI'")
     assert after.split(',')[2:] == before.split(',')[2:]  # same token and page counter

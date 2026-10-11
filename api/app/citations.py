@@ -299,6 +299,11 @@ class RetargetBusy(Exception):
         super().__init__("citation_retarget_busy")
 
 
+class RetargetLimit(Exception):
+    def __init__(self):
+        super().__init__("retarget_limit_exceeded")
+
+
 def _exact_links(ids: set[str]):
     return (select(ReferenceCitationLink.reference_id, ReferenceCitationLink.arxiv_id,
                    ReferenceCitationLink.match_status, ReferenceCitationLink.discovery_paper_id,
@@ -317,23 +322,30 @@ def _key_share(db: Session, item_ids, *, nowait: bool = False, skip: bool = Fals
                           .with_for_update(read=True, key_share=True, nowait=nowait, skip_locked=skip)))
 
 
-def reconcile_arxiv_ids(db: Session, arxiv_ids: Iterable[str], now: datetime | None = None) -> int:
+def reconcile_arxiv_ids(db: Session, arxiv_ids: Iterable[str], now: datetime | None = None,
+                        *, limit: int | None = None) -> int:
     """Re-target existing exact links after discovery rows or tombstones change.
 
     Discovery hook in the page transaction; never commits. Common items of the
     candidate links are locked (UUID order, waiting) BEFORE the exclusive
     citation lock; an item that only appears under it is tried ``NOWAIT`` and
     a busy one aborts the page with ``RetargetBusy`` (nothing partial commits,
-    the page cursor is not advanced). Fan-out per page is not bounded here (C2d-5f2).
+    the page cursor is not advanced). Discovery supplies a hard page fan-out cap.
     """
     ids = set(arxiv_ids)
     if not ids:
         return 0
     now = now or datetime.now(UTC)
-    hint = {r.item_id for r in db.execute(_exact_links(ids)) if r.visibility == "common"}
+    def candidates():
+        stmt = _exact_links(ids).order_by(ReferenceCitationLink.reference_id)
+        rows = db.execute(stmt.limit(limit + 1) if limit is not None else stmt).all()
+        if limit is not None and len(rows) > limit:
+            raise RetargetLimit()
+        return rows
+    hint = {r.item_id for r in candidates() if r.visibility == "common"}
     _key_share(db, hint)
     _lock(db, exclusive=True)
-    rows = db.execute(_exact_links(ids).order_by(ReferenceCitationLink.reference_id)).all()
+    rows = candidates()
     late = {r.item_id for r in rows if r.visibility == "common"} - hint
     if late:
         try:
@@ -342,7 +354,7 @@ def reconcile_arxiv_ids(db: Session, arxiv_ids: Iterable[str], now: datetime | N
             if getattr(getattr(exc, "orig", None), "sqlstate", None) == "55P03":
                 raise RetargetBusy() from None
             raise
-        rows = db.execute(_exact_links(ids).order_by(ReferenceCitationLink.reference_id)).all()
+        rows = candidates()
     targets = _targets(db, ids)
     link = ReferenceCitationLink
     changed = 0
