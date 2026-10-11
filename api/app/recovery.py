@@ -273,10 +273,25 @@ def _mirror(record: Record, via: str, result: str, tombstone_id: uuid.UUID | Non
         auth_domain="credential" if record.kind == journal.CREDENTIAL_TRANSITION else "status",
         auth_decision="changed" if record.kind == journal.CREDENTIAL_TRANSITION else record.body["decision"],
         auth_reason_code=record.body["reason_code"], auth_recorded_at=datetime.fromisoformat(record.body["recorded_at"]))
+    if record.kind == journal.OPERATOR_RECOVERY_CASE:
+        raise RecoveryError("case_record_needs_sql_mirror")  # typed case columns: insert_case_mirror
     return RevocationJournalRecord(seq=record.seq, kind=record.kind, record_hash=record.hash, line=record.line,
                                    tombstone_id=tombstone_id, review_request_id=review_request_id, applied_via=via,
                                    session_id=session_id, session_user_id=session_user_id,
                                    result=result, journal_confirmed=confirmed, **token_fields, **invitation_fields, **auth_fields)
+
+
+def insert_case_mirror(db: Session, record: Record, via: str, result: str, *, confirmed: bool) -> None:
+    """Mirror an ``operator_recovery_case`` with its typed binding (C3). Replay uses ``via='replay'``;
+    a live use exists only through the operator routine, which the SQL trigger enforces."""
+    b = record.body
+    db.execute(text("""INSERT INTO revocation_journal_records(seq,kind,record_hash,line,applied_via,result,recorded_at,
+        journal_confirmed,case_id,case_operator_id,case_user_id,case_action,case_operation_id,case_recorded_at)
+        VALUES(:seq,:kind,:hash,:line,:via,:result,:at,:confirmed,:case,:operator,:user,:action,:operation,:at)"""),
+        {"seq": record.seq, "kind": record.kind, "hash": record.hash, "line": record.line, "via": via, "result": result,
+         "at": datetime.fromisoformat(b["recorded_at"]), "confirmed": confirmed, "case": uuid.UUID(b["case_id"]),
+         "operator": uuid.UUID(b["operator_id"]), "user": uuid.UUID(b["user_id"]), "action": b["action"],
+         "operation": uuid.UUID(b["operation_id"])})
 
 
 def _unconfirmed(db: Session) -> int:
@@ -714,6 +729,8 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
             or (record.kind == INVITATION_CLOSURE and invitation_routines)):
         db.execute(text("SELECT ras_auth_closure_mirror(:line,:via,:result)"), {"line": record.line,"via":via,"result":result})
         db.execute(text("SELECT ras_auth_confirm(:seq)"), {"seq": record.seq})
+    elif record.kind == journal.OPERATOR_RECOVERY_CASE:
+        insert_case_mirror(db, record, via, result, confirmed=True)
     else:
         db.add(_mirror(record, via, result, tombstone_id, confirmed=True, review_request_id=request_id,
                        session_id=uuid.UUID(record.body["session_id"]) if record.kind == SESSION_REVOCATION else None,
@@ -921,6 +938,8 @@ class RecoveryReport:
     gate: str = "closed"
     reconciliation_complete: bool = False
     safety_ready: bool = False
+    # C3: reconciled, but the recovery stays open (maintenance hold) for operator decisions.
+    held_for_operator: bool = False
 
 
 def _records_from_rows(rows: list[RevocationJournalRecord], prev: str) -> list[Record]:
@@ -1311,12 +1330,18 @@ def hold(engine: Engine, settings: Settings, now: datetime) -> str:
 
 
 def recover(engine: Engine, storage, settings: Settings, now: datetime, *,
-            confirm_db_current: bool = False) -> RecoveryReport:
+            confirm_db_current: bool = False, hold_for_operator: bool = False) -> RecoveryReport:
     """Verify the journal, replay what the database lacks, clean up, verify, then close the recovery.
 
     Idempotent: run it again after any failure. The gate stays closed from the
     ``recovery_begin`` record until the ``recovery_end`` record is written and
     mirrored; a failure in between leaves it closed.
+
+    ``hold_for_operator`` (C3) runs every step and postcondition but writes no
+    ``recovery_end``: the recovery stays open, mirrored and reconciled, so the
+    gate stays closed (``recovery_in_progress``) while an operator records
+    credential/initial-status decisions. Progress is recorded only after all
+    checks pass; a later plain ``recover`` verifies again before closing.
     """
     path = _path(settings)
     report = RecoveryReport()
@@ -1344,22 +1369,25 @@ def recover(engine: Engine, storage, settings: Settings, now: datetime, *,
             with Session(engine) as db:
                 verify(db, journal.read(path).records)
             purged = sum(v for k, v in report.cleanup.items() if not k.startswith("error:"))
-            _append_marker(engine, path, RECOVERY_END, {
-                "recovery_id": recovery_id, "finished_at": now.isoformat(),
-                "replayed": sum(v for k, v in report.replayed.items() if k not in ("present", "tombstone_present")),
-                "tombstones_purged": purged, "objects_removed": report.objects_removed})
-            _replay_all(engine, now, path, report)
+            if not hold_for_operator:
+                _append_marker(engine, path, RECOVERY_END, {
+                    "recovery_id": recovery_id, "finished_at": now.isoformat(),
+                    "replayed": sum(v for k, v in report.replayed.items() if k not in ("present", "tombstone_present")),
+                    "tombstones_purged": purged, "objects_removed": report.objects_removed})
+                _replay_all(engine, now, path, report)
             with Session(engine) as db:
                 _lock_journal(db)
                 db.execute(text("SELECT ras_auth_progress(:seq)"), {"seq": journal.read(path).head.seq})
                 db.commit()
-            report.reconciliation_complete = True
+            report.reconciliation_complete = not hold_for_operator
+            report.held_for_operator = hold_for_operator
         finally:
             mutex.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": RECOVER_LOCK})
             mutex.commit()
     status = evaluate(settings, engine)
     report.gate = status.reason
-    if not status.open and status.reason != "auth_safety_pending":
+    expected = "recovery_in_progress" if hold_for_operator else "auth_safety_pending"
+    if not status.open and status.reason != expected:
         raise RecoveryError(f"gate_still_closed_{status.reason}"[:64])
     return report
 

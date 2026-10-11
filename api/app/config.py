@@ -267,6 +267,27 @@ class RecoveryPolicy(BaseModel):
         return self
 
 
+class AuthRecoveryPolicy(BaseModel):
+    """Operator credential/initial-status recovery (C3).
+
+    ``case_max_lifetime`` caps ``expires_at - approved_at`` of a recovery case;
+    an approval is a short, single-use decision, never a standing permission.
+    ``lock_timeout_ms`` bounds waits for the target User/token/session rows and
+    the journal lock; a busy target is refused, never retried automatically.
+    ``case_file_max_bytes`` bounds the restricted case file read by the CLI.
+    """
+
+    case_max_lifetime: timedelta = Field(default=timedelta(hours=24))
+    lock_timeout_ms: int = Field(default=5000, ge=50, le=60_000)
+    case_file_max_bytes: int = Field(default=4096, ge=512, le=65_536)
+
+    @model_validator(mode="after")
+    def _check_lifetime(self) -> "AuthRecoveryPolicy":
+        if not timedelta(minutes=5) <= self.case_max_lifetime <= timedelta(days=7):
+            raise ValueError("auth_recovery case_max_lifetime must be between 5 minutes and 7 days")
+        return self
+
+
 class ProviderBudget(BaseModel):
     """Application trial budget in USD/day (M3+).
 
@@ -501,6 +522,7 @@ class Settings(BaseSettings):
     citations: CitationPolicy = CitationPolicy()
     retention: Retention = Retention()
     recovery: RecoveryPolicy = RecoveryPolicy()
+    auth_recovery: AuthRecoveryPolicy = AuthRecoveryPolicy()
     budget: ProviderBudget = ProviderBudget()
     embedding: EmbeddingPolicy = EmbeddingPolicy()
     search: SearchPolicy = SearchPolicy()

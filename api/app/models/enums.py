@@ -28,6 +28,8 @@ class SessionRevokeReason(StrEnum):
     USER_REVOKED = "user_revoked"
     PASSWORD_RESET = "password_reset"
     USER_DISABLED = "user_disabled"
+    # C3: an authorised operator set a new credential or initial status decision.
+    OPERATOR_RECOVERY = "operator_recovery"
 
 
 class Visibility(StrEnum):

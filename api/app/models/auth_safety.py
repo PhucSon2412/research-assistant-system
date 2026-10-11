@@ -64,3 +64,56 @@ class AuthSafetyState(Base):
     cutover_state: Mapped[str] = mapped_column(Text)
     projection_seq: Mapped[int] = mapped_column(BigInteger)
     backfill_complete: Mapped[bool] = mapped_column(Boolean)
+
+
+class AuthRecoveryOperator(Base):
+    """C3: trusted provisioning maps one real LOGIN role to one operator UUID.
+
+    Only the migrator/provisioner writes it; routines resolve the operator from
+    ``session_user``, never from a caller argument or role name supplied by CLI.
+    A row may only be revoked once; it is never deleted or rebound.
+    """
+
+    __tablename__ = "auth_recovery_operators"
+    __table_args__ = (
+        UniqueConstraint("login_role", name="uq_auth_recovery_operators_login_role"),
+        CheckConstraint("login_role ~ '^[a-z][a-z0-9_]{0,62}$'", name="login_role_valid"),
+        CheckConstraint("revoked_at IS NULL OR revoked_at >= provisioned_at", name="revoked_after_provisioned"),
+    )
+    operator_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    login_role: Mapped[str] = mapped_column(Text)
+    provisioned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AuthRecoveryCase(Base):
+    """C3: one approved, single-use decision registered by trusted provisioning.
+
+    Mirrors the restricted case file outside repo/backup: IDs, codes and times
+    only. Consumption is recorded in the independent journal, not here.
+    """
+
+    __tablename__ = "auth_recovery_cases"
+    __table_args__ = (
+        CheckConstraint("case_id::text ~ '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'",
+                        name="case_id_v4"),
+        CheckConstraint("action IN ('set_credential','resolve_initial_status')", name="action_valid"),
+        CheckConstraint("expected_role IN ('admin','user')", name="expected_role_valid"),
+        CheckConstraint("verification_method ~ '^[a-z][a-z0-9_]{2,40}$'", name="verification_method_code"),
+        CheckConstraint("isfinite(approved_at) AND isfinite(expires_at) AND expires_at > approved_at",
+                        name="window_valid"),
+    )
+    case_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    action: Mapped[str] = mapped_column(Text)
+    operator_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("auth_recovery_operators.operator_id", ondelete="RESTRICT"))
+    approver_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    journal_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    expected_role: Mapped[str] = mapped_column(Text)
+    expected_credential_operation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    expected_status_operation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    verification_method: Mapped[str] = mapped_column(Text)
+    approved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    registered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))

@@ -26,6 +26,10 @@
     any failure leaves the gate closed. ``--confirm-db-is-current`` also lets
     it repair the *journal* from the database (lost, truncated or older
     file): only when the database is known to be the live one.
+    ``--hold-for-operator`` (C3) runs the same replay/cleanup/verification but
+    keeps the recovery open: the maintenance hold in which
+    ``app.cli.auth_recovery`` may record operator decisions. It never opens the
+    gate; run ``recover`` without it afterwards to verify again and close.
 """
 
 from __future__ import annotations
@@ -47,7 +51,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("init").add_argument("--if-new", action="store_true")
     sub.add_parser("register-existing").add_argument("--confirm-db-is-current", action="store_true")
     sub.add_parser("hold")
-    sub.add_parser("recover").add_argument("--confirm-db-is-current", action="store_true")
+    recover = sub.add_parser("recover")
+    recover.add_argument("--confirm-db-is-current", action="store_true")
+    recover.add_argument("--hold-for-operator", action="store_true")
     args = parser.parse_args(argv)
     settings = get_settings()
     engine = get_engine()
@@ -79,7 +85,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Recovery held open: {recovery_id}; gate={recovery.evaluate(settings, engine).reason}")
             return 0
         report = recovery.recover(engine, get_storage(settings), settings, utcnow(),
-                                  confirm_db_current=args.confirm_db_is_current)
+                                  confirm_db_current=args.confirm_db_is_current,
+                                  hold_for_operator=args.hold_for_operator)
         print("Recovered: " + " ".join(f"{k}={v}" for k, v in vars(report).items()))
         return 0
     except recovery.RecoveryError as exc:
