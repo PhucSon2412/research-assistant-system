@@ -390,6 +390,22 @@ def test_cli_celery_same_boundary_and_disabled(disc, monkeypatch, capsys):
     assert 'Discovery:' in output and 'page-two' not in output
 
 
+@pytest.mark.parametrize('entry', ['cli', 'celery'])
+def test_cli_celery_owner_login_is_refused_before_http(disc, monkeypatch, entry):
+    from app.cli import sync_arxiv as cli
+    from app.ingest import celery_app as tasks
+    get_settings().discovery = policy()
+    tasks.settings.discovery = policy()
+    monkeypatch.setattr(d, 'fetch_page', lambda *_: pytest.fail('HTTP reached'))
+    if entry == 'cli':
+        monkeypatch.setattr(cli, 'get_engine', lambda: disc.engine)
+        assert cli.main([]) == 1
+    else:
+        monkeypatch.setattr(tasks, 'get_engine', lambda: disc.engine)
+        assert tasks.sync_arxiv.run()['halted:worker_runtime_required'] == 1
+    assert q(disc, 'SELECT count(*) FROM discovery_sources')[0][0] == 0
+
+
 @pytest.mark.parametrize('kw', [{'lease_seconds': 40}, {'retarget_limit': 0}, {'retarget_limit': 50001},
                                {'max_records_per_page': 0}, {'max_pass_seconds': 0}, {'http_deadline_seconds': 181}])
 def test_config_new_bounds(kw):

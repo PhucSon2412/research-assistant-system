@@ -216,12 +216,11 @@ def assert_blocked(api, browsers, copy: str, canary: str, *, listed: bool = Fals
 def world(upload_api, monkeypatch):
     """A (Markdown + PDF) and B (same Markdown bytes) indexed privately; three common copies with derived rows."""
     api, storage = upload_api
-    monkeypatch.setattr("app.discovery._reserve_request", lambda db, policy: None)
     api.bootstrap_admin()
     api.create_user("a@example.org")
     api.create_user("b@example.org")
     a, b, admin = api.user_browser("a@example.org"), api.user_browser("b@example.org"), api.admin_browser()
-    harvest(api.setup_engine, oai_page([(ARXIV_ID, "Exact Linking Study", 1, "2026-09-28")]))
+    harvest(api.engine, oai_page([(ARXIV_ID, "Exact Linking Study", 1, "2026-09-28")]))
     settings = settings_with_fake_key()
     fake_provider(monkeypatch)
     ids = {"a_md": indexed(storage, a, MD_BODY, settings), "a_pdf": indexed(storage, a, PDF_BODY, settings, pdf=True),

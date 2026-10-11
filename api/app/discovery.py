@@ -492,6 +492,10 @@ def run_sync(engine: Engine, policy: DiscoveryPolicy, *, fetcher=None,
     try:
         _claim(engine, policy, nonce, facts)
         for topic in policy.topics:
+            if time.monotonic() - started >= policy.max_pass_seconds:
+                counts['bound:time'] = 1
+                _release_lease(engine, policy, nonce, facts)
+                return counts
             cursor = _prepare(engine, policy, nonce, topic, force, facts)
             if cursor is None:
                 continue

@@ -105,8 +105,8 @@ def test_linux_kill_fetch_resume_idempotent_runtime(disc, entry):
            'RAS_RECOVERY__JOURNAL_PATH':'/journal/'+w.path.name,
            'RAS_EMBEDDING__API_KEY':'', 'RAS_EMBEDDING__PRICING_VERIFIED':'false',
            'RAS_DISCOVERY__TOPICS':'["cs.AI"]', 'RAS_DISCOVERY__MAX_PAGES_PER_TOPIC':'2',
-           'RAS_DISCOVERY__HTTP_DEADLINE_SECONDS':'4', 'RAS_DISCOVERY__TIMEOUT_SECONDS':'3',
-           'RAS_DISCOVERY__LEASE_SECONDS':'8', 'RAS_DISCOVERY__LEASE_MARGIN_SECONDS':'1',
+           'RAS_DISCOVERY__HTTP_DEADLINE_SECONDS':'6', 'RAS_DISCOVERY__TIMEOUT_SECONDS':'6',
+           'RAS_DISCOVERY__LEASE_SECONDS':'12', 'RAS_DISCOVERY__LEASE_MARGIN_SECONDS':'1',
            'SMOKE_ROLE':'cli' if entry=='cli' else 'worker', 'PYTHONPATH':'/harness:/srv/api'}
     env_file = evidence / 'runtime.env'
     env_file.write_text('\n'.join(k+'='+v for k,v in env.items())+'\n', encoding='utf-8')
@@ -140,13 +140,18 @@ def test_linux_kill_fetch_resume_idempotent_runtime(disc, entry):
             send('send-initial')
         wait(lambda:(evidence/'in-second-fetch').exists(),'second fetch not reached')
         assert state() == (1,1,'page-two')
+        # A second OS process (same topic for CLI, different topic for Celery) must stop before GET.
+        topic = 'cs.AI' if entry == 'cli' else 'cs.LG'
+        busy = command('concurrent-busy', base+['--rm','-e','SMOKE_ROLE=cli',
+            '-e','RAS_DISCOVERY__TOPICS='+json.dumps([topic]),IMAGE,'python','-m','app.cli.sync_arxiv'], check=False)
+        assert busy.returncode == 3 and 'busy:discovery_lease_busy=1' in busy.stdout
         command('kill',['docker','kill','--signal','KILL',worker])
         killed = command('exit',['docker','inspect','--format','{{.State.ExitCode}} {{.State.Running}}',worker])
         assert killed.stdout.split() == ['137','false']
         assert state() == (1,1,'page-two')
         (evidence/'resume').write_text('1')
         # Wait for actual lease expiry + conservative pacing; no artificial DB clock advance.
-        time.sleep(9)
+        time.sleep(13)
         if entry == 'cli':
             resumed = command('resume',base+['--rm']+args)
             assert 'pages=1' in resumed.stdout and 'records=1' in resumed.stdout

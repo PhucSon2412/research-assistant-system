@@ -55,11 +55,6 @@ def harvest(engine, page: bytes, now: datetime = NOW) -> dict:
     return result
 
 
-@pytest.fixture(autouse=True)
-def _no_arxiv_clock(monkeypatch):
-    monkeypatch.setattr("app.discovery._reserve_request", lambda db, policy: None)
-
-
 SEED = [("2609.00011", "Exact Linking Study", 1, "2026-09-28"),
         ("2609.00012", "Versioned Work", 3, "2026-09-28"),
         ("2609.00013", "Second Merged Work", 1, "2026-09-28"),

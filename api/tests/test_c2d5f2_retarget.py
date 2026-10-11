@@ -31,6 +31,9 @@ def test_cap_exact_boundary_is_atomic(cit, n, cap, allowed):
         assert 'error:retarget_limit_exceeded' in result
         assert result['error:retarget_limit_exceeded'] == 1 and states == ['no_discovery_record'] * n and count == 0
         assert tuple(row) == (0, None, 'retarget_limit_exceeded')
+        status = h.admin_browser().get('/discovery/sources')
+        assert status.status_code == 200
+        assert status.json()['sources'][0]['last_error'] == 'retarget_limit_exceeded'
 
 
 def test_late_fanout_over_cap_is_rechecked_under_exclusive(cit, monkeypatch):

@@ -56,6 +56,7 @@ def main():
         'citations':[T+'citations.py',T+'c2d5f1_citation_runtime.py',T+'c2d5f1_worker_hooks.py'],
         'extraction':[T+'c2d5d2a_worker_runtime.py',T+'c2d5d2a_common_extraction.py'],
         'schema':[T+'migrations.py',T+'config.py'],
+        'cleanup':[T+'common_cleanup.py'],
         'recovery':[T+'recovery.py::'+n for n in (
             'test_runtime_commit_exception_never_replays_until_operator_recovery',
             'test_runtime_commit_exception_never_invokes_replay_and_gate_stays_shut',
@@ -91,7 +92,7 @@ def main():
     # Each pytest process owns disposable DBs, buckets, journal/tmp paths and
     # settings. Grant revocations in this selection are per test database. Bound host
     # concurrency to three; the Linux CLI/worker smoke never overlaps another group.
-    waves=[[n for n in w if n in groups] for w in [['smoke'],['discovery','citations','schema'],['extraction','recovery']]]
+    waves=[[n for n in w if n in groups] for w in [['smoke'],['discovery','citations','schema'],['extraction','recovery','cleanup']]]
     waves=[w for w in waves if w]
     summary['execution_waves']=waves
     for wave in waves:
