@@ -204,6 +204,9 @@ def test_expiry_old_day_late_duplicate_settlement_and_no_legacy_adoption(ready):
     assert sql(b,'SELECT cost_usd FROM search_usage')==legacy.money(2,b.settings.embedding.max_usd_per_million_tokens)
     with Session(b.api.engine) as db,pytest.raises(ApiError,match='search_reservation_binding_required'):
         legacy.settle(db,p.id,tokens=1,price=1)
+    from app.rag import _settle
+    with Session(b.api.engine) as db,pytest.raises(ApiError,match='search_reservation_binding_required'):
+        _settle(db,p.id,b.settings)
     assert len(b.calls)==1
 
 

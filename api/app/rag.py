@@ -432,6 +432,8 @@ def _validate_answer(content: str, evidence: dict[uuid.UUID, dict], settings: Se
 def _settle(db: Session, usage_id: uuid.UUID, settings: Settings, result: GenerationResult | None = None,
             error: GenerationError | None = None) -> dict:
     row = db.get(SearchUsage, usage_id, with_for_update=True)
+    if row is None or row.task_type != 'generation' or row.reservation_token is not None:
+        raise ApiError(503, 'search_reservation_binding_required')
     if row.status in ("completed", "rejected"):
         db.commit()
         return {"status": row.cost_status, "estimated_usd": str(row.cost_usd) if row.cost_usd is not None else None}
