@@ -1,6 +1,8 @@
 # Tài liệu dự án
 
-**Trạng thái hiện hành:** C2d-7 RAG/generation trên nhánh review, source `0048`, chưa merge; [handoff](c2d7-rag-generation-runtime.md) · [inventory](c2d7-test-inventory.json). Base PR #57 merge `2e948b7`, `0047`. **Safety pending tới C4**. Gói A còn review; tiếp C3 + hồi quy/debt/tích hợp C4 theo [kế hoạch MVP](mvp-delivery-plan.md). Docs orchestrator/review/task được giữ trong PR C2d-7.
+**Trạng thái hiện hành:** PR #58 đã merge `58d059a`, source **0048**; đã giao [C3 operator auth recovery](tasks/m6c2b2c3-operator-auth-recovery.md), mới giao/chưa triển khai hoặc kiểm. Tiếp debt/hồi quy và tích hợp C4 theo [kế hoạch MVP](mvp-delivery-plan.md); **safety pending tới C4**. Giữ và đưa docs review/task chưa commit vào PR kế tiếp.
+
+**Review PR #58 trước merge:** [không phát hiện điểm chặn merge mới trong scope RAG/generation runtime](reviews/pr58-c2d7-rag-generation-runtime.md); [handoff](c2d7-rag-generation-runtime.md) · [inventory](c2d7-test-inventory.json) giữ kết quả theo source kiểm. Chưa rerun tại merge; không chứng nhận C3/C4, provider thật hoặc readiness bằng fake provider. Docs orchestrator trước task đã vào PR #58; review mới được giữ cho PR kế tiếp.
 
 **C2d-6 đã merge:** [handoff](c2d6-search-query-rerank-runtime.md) và [review PR #57](reviews/pr57-c2d6-search-query-rerank-runtime.md) giữ chứng cứ trước merge, chưa rerun tại merge. Không phát hiện điểm chặn merge mới trong phạm vi đã review; không chứng nhận RAG runtime, provider thật hoặc cutover. Các trạng thái nhánh review bên dưới là lịch sử.
 

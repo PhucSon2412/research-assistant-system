@@ -1,5 +1,13 @@
 # Nhật ký quyết định
 
+## Giao C3 operator recovery sau merge PR #58 (2026-10-11)
+
+PR #58 đã merge `58d059a`, source **0048**, tree khớp head review `aa9c8a2`; chưa rerun tại merge. Gói A hoàn tất chuyển runtime trong phạm vi đã review, chưa là bản end-to-end ready. [Task C3](tasks/m6c2b2c3-operator-auth-recovery.md) là một PR tiếp theo, mới giao/chưa triển khai hoặc kiểm; tiếp debt/hồi quy và tích hợp C4 trong [kế hoạch MVP](mvp-delivery-plan.md).
+
+Orchestrator chọn theo ủy quyền hoàn thành MVP: chủ dự án/người được chỉ định là recovery operator, có login riêng và case bind installation/User UUID/action/role/latest heads; inventory và chứng cứ người nhận được quản lý ngoài backup. CLI nhập credential qua TTY an toàn, không password argv/file, cookie/link hoặc tự retry. Credential không đổi status/role; initial active là quyết định riêng cho active/held đủ điều kiện, không mở business/latest disabled. Mọi Admin disabled tiếp tục khóa; không dùng bootstrap thay Admin. Mutation yêu cầu maintenance hold có chain/DB đã đối chiếu sạch; không vượt integrity hoặc mở cutover. MVP dùng đường nhập trực tiếp đã kiểm thay vì thêm email recovery/outbox. Delivery phục vụ nhóm thử giữ gói E.
+
+Đây là lựa chọn kỹ thuật/quy trình của orchestrator, **không** là xác nhận danh tính người vận hành, inventory User UUID thật, nơi lưu journal production hoặc bằng chứng đã phục hồi account thật. C3 chỉ provision/kiểm với hồ sơ và tài khoản tổng hợp cô lập; actual designation/inventory phải được lập trước vận hành. Không xây approval nhiều tầng/PKI/UI operator. Giữ trust boundary của người provision và hồ sơ ngoài app rõ; quyền DB không tự chứng minh danh tính User. Safety **pending tới C4**, không thao tác dev/provider/pricing trong task.
+
 ## Triển khai C2d-7 RAG/generation runtime (2026-10-11)
 
 Theo task chủ dự án, một PR chuyển cả RAG item/collection/all × keyword/hybrid, giữ API/pack/ranking/model/quota, không streaming. Base PR #57 merge `2e948b7` đã fetch/xác minh, source `0047 → 0048`; chưa merge C2d-7. [Handoff/caller map](c2d7-rag-generation-runtime.md) · [Inventory](c2d7-test-inventory.json).

@@ -10,11 +10,11 @@ Ngày chốt **2026-10-11**. Chủ dự án giao orchestrator chọn phạm vi v
 
 ## Trạng thái hiện tại
 
-- PR #57 đã merge tại `2e948b78157bf4d498bdca4ea52ca81dd85c15c1`; head review `44f1da1` là ancestor, tree khớp. Source migration **0047**; không suy revision DB dev.
+- PR #58 đã merge tại `58d059ab7a383d5f97e1b04e909e9628a11bf78a`; head review `aa9c8a2` là ancestor, tree khớp. Source migration **0048**; không suy revision DB dev.
 - Các chức năng chính đã có, nhưng đợt chuyển auth/runtime chưa kết thúc. **Safety vẫn pending tới C4**; không coi Compose dev đang lỗi readiness/restart là một bản sẵn dùng.
 - Citation reconcile và [discovery harvesting](c2d5f2-discovery-runtime.md) đã chuyển runtime. [Review PR #56](reviews/pr56-c2d5f2-discovery-runtime.md) giữ kết quả trước merge; chưa rerun tại merge. Docs orchestrator bị sót đã được đưa vào commit của PR #57.
 - [C2d-6 search/query embedding/rerank](c2d6-search-query-rerank-runtime.md) đã merge; [review độc lập](reviews/pr57-c2d6-search-query-rerank-runtime.md) giữ chứng cứ trước merge, chưa rerun tại merge. Không suy kết quả này thành RAG runtime hoặc cutover.
-- [C2d-7 RAG/generation runtime](c2d7-rag-generation-runtime.md) đã triển khai trên nhánh review trong một PR cho cả luồng, source **0048**, chưa merge. [Inventory](c2d7-test-inventory.json) giữ bằng chứng theo source. Gói A còn review; tiếp operator recovery/C3, hồi quy/debt và tích hợp C4. Private deletion/restore, provider thật và vận hành triển khai cần nghiệm thu riêng. Đưa đủ docs orchestrator modified/untracked vào commit/PR C2d-7.
+- [C2d-7 RAG/generation runtime](c2d7-rag-generation-runtime.md) đã merge PR #58, source **0048**; [review độc lập](reviews/pr58-c2d7-rag-generation-runtime.md) và [inventory](c2d7-test-inventory.json) giữ chứng cứ trước merge, chưa rerun tại merge. Gói A hoàn tất chuyển runtime trong scope đã review, chưa cutover/nghiệm thu end-to-end. Đã giao [C3 operator auth recovery](tasks/m6c2b2c3-operator-auth-recovery.md), chưa triển khai/kiểm; sau đó hồi quy/debt và tích hợp C4. Private deletion/restore, provider thật và vận hành triển khai cần nghiệm thu riêng. Giữ và đưa docs review/task mới chưa commit vào PR kế tiếp.
 - Nhãn đánh giá RAG hiện còn `pending_human_review`. Charge thật chưa đối soát; không bật `pricing_verified` bằng kết quả provider giả.
 
 ## Các gói công việc còn lại
@@ -23,8 +23,8 @@ Ngày chốt **2026-10-11**. Chủ dự án giao orchestrator chọn phạm vi v
 
 | Gói | Phạm vi và đầu ra | Ước lượng | Trạng thái |
 | --- | --- | --- | --- |
-| A — hoàn tất runtime | Search + query embedding + rerank đã merge; RAG + generation trong một PR. Giữ quyền trước retrieval/provider và kế toán hiện hành | Còn review và xử lý findings nếu có | PR #57 đã merge; C2d-7 đã triển khai trên nhánh review, chưa merge |
-| B — recovery và bản chạy đầy đủ | C3 CLI operator tối thiểu; xử lý debt hồi quy; C4 Compose/image/role/journal, readiness thật, HTTP/browser không patch pending, hai vòng restore/recover | 5–8 ngày | Chưa giao |
+| A — hoàn tất runtime | Search + query embedding + rerank; RAG + generation. Giữ quyền trước retrieval/provider và kế toán hiện hành | Đã merge | PR #57/#58 đã merge; chưa cutover/nghiệm thu end-to-end |
+| B — recovery và bản chạy đầy đủ | C3 CLI operator tối thiểu; xử lý debt hồi quy; C4 Compose/image/role/journal, readiness thật, HTTP/browser không patch pending, hai vòng restore/recover | 5–8 ngày | Đã giao C3, chưa triển khai/kiểm; debt và C4 chưa giao |
 | C — đóng yêu cầu sản phẩm còn thiếu | Xóa item private + chống xuất hiện lại sau restore; nghiệm thu duplicate/retry hiện hành, chỉ bổ sung chỗ thiếu để luồng dùng được | 2–4 ngày | Chưa giao |
 | D — provider và chất lượng | Smoke tổng hợp có trần chi phí, đối soát charge, routing/retention; sau đó thử paper được phép xử lý, người đọc kiểm câu trả lời/citation/abstention | 2–4 ngày | Chưa giao; chưa mở trả phí |
 | E — triển khai nhóm thử | HTTPS/cookie Secure, kênh invite/reset dùng được, rate limit, CI, journal độc lập, backup/retention/alert tối thiểu và nghiệm thu browser | 3–5 ngày | Chưa giao |
@@ -60,7 +60,7 @@ Streaming RAG, graph giao diện nâng cao, OCR, định dạng mới, import DO
 
 ## Rủi ro và quyết định ở đúng mốc
 
-- **C3:** chốt inventory UUID/chứng cứ và người vận hành trước khi thực sự phục hồi account. Không tự coi quyền DB là bằng chứng danh tính User.
+- **C3:** cách làm đã chốt trong [task](tasks/m6c2b2c3-operator-auth-recovery.md): operator được chỉ định, login riêng/case đúng UUID, TTY an toàn, status riêng và không mở disabled. Inventory/ủy quyền người thật vẫn phải được lập trước vận hành; coding dùng hồ sơ tổng hợp. Không coi quyền DB là bằng chứng danh tính User.
 - **C4/triển khai:** chọn host, nơi lưu journal ngoài miền sự cố DB/object/backup và cách cập nhật hiện hành. File khác volume trên cùng máy chưa chứng minh độc lập; DB/journal cùng rollback có thể không phát hiện.
 - **Gói D:** charge/routing/retention và quyền gửi paper thật phải được kiểm trước khi bật. Kế toán common embedding hiện là phương án orchestrator chọn, cần ghi đúng nguồn quyết định khi nghiệm thu.
 - **Debt:** 27 node được tách ở PR #55 và bốn mục PR #50 là lịch sử cần đối chiếu theo node, không cộng máy móc thành số lỗi khác nhau. C2d-5f2 đã chuyển hai fixture discovery sang runtime và thực chạy harvesting; gói B nhận các mục còn lại.
@@ -69,3 +69,5 @@ Streaming RAG, graph giao diện nâng cao, OCR, định dạng mới, import DO
 **Cập nhật sau merge PR #57, 2026-10-11:** search/query/rerank đã merge, chưa cutover. Gói A còn [C2d-7 RAG/generation](tasks/m6c2b2c2d7-rag-generation-runtime.md), khoảng 2–3 ngày coding cộng review theo giả định. Các gói B–E chưa giảm bằng test provider giả; giữ forecast 4–6 tuần tính từ mốc kế hoạch và đánh giá lại khi gói A/C4 có chứng cứ tích hợp. Không chia thêm theo endpoint nếu không có phụ thuộc thật. Kết quả C2d-6 tập trung tại [handoff](c2d6-search-query-rerank-runtime.md) và [review](reviews/pr57-c2d6-search-query-rerank-runtime.md).
 
 **Cập nhật C2d-7 trên nhánh review, 2026-10-11:** phần code gói A đã hoàn tất RAG/generation trong một PR; review/seal/source và giới hạn xem [handoff](c2d7-rag-generation-runtime.md). Không suy thử provider giả thành checklist nghiệm thu MVP đã đạt. C3 + hồi quy/debt/tích hợp C4 là gói kế tiếp, không mở thêm runtime vi mô; forecast B–E giữ các giả định và cần đánh giá lại tại C4. Safety vẫn pending.
+
+**Cập nhật sau merge PR #58, 2026-10-11:** gói A đã merge, giao C3 thành một PR để khép đường operator recovery; tiếp debt/hồi quy/C4 trong gói B. Giữ khoảng B–E và forecast 4–6 tuần theo giả định, đánh giá lại sau lần C4 đầu với lỗi tích hợp/restore thực tế; không trừ thời gian máy móc bằng số PR hoặc fake-provider pass. Kết quả review trước merge không là kiểm mới, checklist MVP chưa được đánh dấu đạt.
