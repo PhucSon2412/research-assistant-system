@@ -1,5 +1,7 @@
 # Thiết kế search và RAG
 
+**C2d-6 (nhánh review, chưa merge):** HTTP search/query embedding/rerank và chunk viewer dùng checkpoint runtime, nonce financial và final caller/resource mới; [hợp đồng và kiểm chứng](c2d6-search-query-rerank-runtime.md). Source `0047`, safety pending C4. RAG giữ compatibility legacy và chờ gói runtime kế tiếp.
+
 [Mục lục](README.md) · [Quyền và dữ liệu](access-and-data.md) · [Kiểm thử](testing.md)
 
 ## Retrieval
