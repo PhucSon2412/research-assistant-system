@@ -54,6 +54,8 @@ Bỏ `rag._limit_request`, `_fresh`, `_checked_hits`, `_settle`, legacy `search.
 
 Hook test chuyển tới internal retrieval/checkpoint thật, giữ ACL/pack/citation assertion. Pre-send denial trước khi gửi nay giữ reserved ceiling thay vì legacy rejected/no-charge. Test CHECK C2d-6 cập nhật theo migration mới cho phép generation, vẫn kiểm partial/duplicate nonce độc lập; generation entry kiểm không nhận query proof. Không chấm/tuning holdout hoặc đổi `pending_human_review`.
 
+Ma trận common nhiều attempt độc lập phải đi qua expiry giữa các hàng: fixture tăng clock và gọi reaper thật, kiểm row thành uncertain với ceiling còn giữ. Không tăng concurrency, xóa reservation hoặc đổi pre-send denial thành rejected để làm test xanh. Lượt seal đầu phát hiện thiếu bước này được giữ riêng trong inventory, không gọi là lỗi baseline.
+
 ## Kiểm chứng và giới hạn
 
 Kết quả seal cuối, source SHA/hashes trước/sau, exact selection/JUnit/pass/fail/error/skip/not-run và countercheck ở inventory. Các lượt chuẩn bị giữ riêng, không cộng pass lịch sử. Hồi quy chọn theo rủi ro gồm RAG/common/pack/comparison, search/keyword/viewer/query/rerank, document shared capacity, migration/ORM/config và evaluation capture/validation.

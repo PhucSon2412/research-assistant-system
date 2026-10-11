@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import timedelta
 from threading import Thread
 
 import pytest
@@ -472,13 +473,23 @@ def test_any_change_between_retrieval_and_response_withholds_the_answer(w, monke
         usage = generation_usage(w)[before:]
         if stage == "before_generation":
             assert sent == [] and [row[1] for row in usage] == ["reserved"], label
+            # Each matrix row is an independent attempt. Pre-send denial keeps
+            # its ceiling and live slot until expiry; do not loosen concurrency
+            # or pretend a definitely uncharged rejection to reset the fixture.
+            from app import search_accounting
+            w.api.clock.now += timedelta(seconds=w.settings.generation.reservation_lease_seconds + 1)
+            search_accounting.reap(w.api.engine, w.settings, clock=lambda: w.api.clock.now)
+            assert w.api.scalar("SELECT count(*) FILTER (WHERE status='reserved')=0 AND "
+                "count(*) FILTER (WHERE status='uncertain' AND cost_usd IS NULL AND reserved_usd>0)>0 "
+                "FROM search_usage WHERE user_id=:id AND task_type='generation'", id=usage[0][0]), label
         else:
             [payload] = sent
             assert w.ok in evidence_items(payload) and [row[1] for row in usage] == ["completed"], label
         monkeypatch.setattr("app.rag_runtime.checkpoint", original_reserve)
         _apply(w, undo, params)
         sent = answering(monkeypatch)
-        assert ask(w.a, collection_id=w.collection).json()["status"] == "answered", label
+        restored = ask(w.a, collection_id=w.collection)
+        assert restored.status_code == 200 and restored.json()["status"] == "answered", (label, restored.text)
         assert w.ok in evidence_items(sent[-1]), label
 
 
