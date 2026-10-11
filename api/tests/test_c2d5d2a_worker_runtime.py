@@ -123,7 +123,10 @@ def test_gate_before_claim_no_side_effect(work, monkeypatch, gate):
     monkeypatch.setattr(tasks, 'settings', get_settings())
     assert tasks.discover.run() == 0
     assert tasks.ingest_job.run(str(b.job)) == 'recovery_gate_closed'
-    assert tasks.sync_arxiv.run() == {'skipped':'recovery_gate_closed'}
+    assert tasks.sync_arxiv.run() == {
+        'pages': 0, 'records': 0, 'requests': 0, 'busy': False,
+        'halted:recovery_gate_closed': 1,
+    }
     assert tasks.reconcile_citation_links.run() == {'skipped':'recovery_gate_closed'}
     assert tasks.cleanup_revoked_copies.run() == {'skipped':'recovery_gate_closed'}
     assert b.browser.get('/healthz').status_code == 200
