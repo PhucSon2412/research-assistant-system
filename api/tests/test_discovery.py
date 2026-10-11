@@ -41,8 +41,7 @@ def policy(**kwargs) -> DiscoveryPolicy:
 def test_discovery_get_runtime_metadata_contract(resource_api,monkeypatch):
     """Read contract from checkpoint test; no search/RAG/writer HTTP bypass."""
     h=resource_api
-    monkeypatch.setattr("app.discovery._reserve_request",lambda db,policy:None)
-    result=run_sync(h.engine,policy(),fetcher=lambda params,_: (
+    result=run_sync(h.world.runtime,policy(),fetcher=lambda params,_: (
         PAGE_TWO if params.get("resumptionToken") else PAGE_ONE),now=h.clock.now)
     assert result["pages"]==4 and h.scalar("SELECT count(*) FROM discovery_papers")==2
     h.create_user("a@example.org"); h.create_user("b@example.org")
@@ -98,8 +97,8 @@ def test_discovery_limits_are_validated():
             DiscoveryPolicy(**invalid)
 
 
-def test_checkpoint_retry_overlap_and_api_acl(api, monkeypatch):
-    monkeypatch.setattr("app.discovery._reserve_request", lambda db, policy: None)
+def test_checkpoint_retry_overlap_and_api_acl(resource_api, monkeypatch):
+    api = resource_api
     now = datetime(2026, 9, 29, 12, tzinfo=UTC)
     calls = []
     fail_once = True
@@ -116,17 +115,18 @@ def test_checkpoint_retry_overlap_and_api_acl(api, monkeypatch):
             return PAGE_TWO
         return PAGE_ONE
 
-    first = run_sync(api.engine, policy(), fetcher=fetch, now=now)
-    assert first == {"busy": False, "pages": 2, "records": 2}
+    first = run_sync(api.world.runtime, policy(), fetcher=fetch, now=now)
+    assert first["pages"] == 2 and first["records"] == 2 and first["requests"] == 3
     assert api.scalar("SELECT count(*) FROM discovery_papers") == 1
     assert api.scalar("SELECT count(*) FROM discovery_paper_topics") == 2
     with api.engine.connect() as db:
         assert db.scalar(text("SELECT resumption_token FROM discovery_sources WHERE topic='cs.AI'")) == "page-two"
-    second = run_sync(api.engine, policy(), fetcher=fetch, now=now + timedelta(minutes=2))
+    retry_due(api.engine, errors_only=True)
+    second = run_sync(api.world.runtime, policy(), fetcher=fetch, now=now + timedelta(minutes=2))
     assert second["pages"] == 1
     assert calls[-1] == {"verb": "ListRecords", "resumptionToken": "page-two"}
     assert api.scalar("SELECT count(*) FROM discovery_papers") == 2
-    third = run_sync(api.engine, policy(), fetcher=fetch, now=now + timedelta(days=1), force=True)
+    third = run_sync(api.world.runtime, policy(), fetcher=fetch, now=now + timedelta(days=1), force=True)
     assert third["pages"] >= 2
     assert api.scalar("SELECT count(*) FROM discovery_papers") == 2
     assert api.scalar("SELECT count(*) FROM library_items") == 0
@@ -168,8 +168,8 @@ def test_checkpoint_retry_overlap_and_api_acl(api, monkeypatch):
     assert admin.get(f"/search/chunks/{paper_id}").status_code == 404
 
 
-def test_expired_token_restarts_window_and_two_workers_do_not_duplicate(engine, monkeypatch):
-    monkeypatch.setattr("app.discovery._reserve_request", lambda db, policy: None)
+def test_expired_token_restarts_window_and_two_workers_do_not_duplicate(resource_world, monkeypatch):
+    engine = resource_world.runtime
     now = datetime(2026, 9, 29, 12, tzinfo=UTC)
     one = DiscoveryPolicy(topics=["cs.AI"], max_pages_per_topic=1)
     assert run_sync(engine, one, fetcher=lambda *_: PAGE_ONE, now=now)["pages"] == 1
@@ -178,6 +178,7 @@ def test_expired_token_restarts_window_and_two_workers_do_not_duplicate(engine, 
     def replay(p, _):
         params.append(p)
         return PAGE_ONE
+    retry_due(resource_world.engine)
     run_sync(engine, one, fetcher=replay, now=now + timedelta(minutes=3))
     assert "resumptionToken" not in params[0]
     with engine.connect() as db:
@@ -200,13 +201,15 @@ def test_expired_token_restarts_window_and_two_workers_do_not_duplicate(engine, 
         assert db.scalar(text("SELECT count(*) FROM discovery_papers")) == 2
 
 
-def test_metadata_version_update_preserves_discovery_time(engine, monkeypatch):
-    monkeypatch.setattr("app.discovery._reserve_request", lambda db, policy: None)
+def test_metadata_version_update_preserves_discovery_time(resource_world, monkeypatch):
+    engine = resource_world.runtime
     now = datetime(2026, 9, 29, 12, tzinfo=UTC)
     one = DiscoveryPolicy(topics=["cs.AI"], max_pages_per_topic=1)
     first_page = PAGE_ONE.replace(b"<resumptionToken>page-two</resumptionToken>", b"<resumptionToken />")
     first_page = first_page.replace(ARXIV_LICENSE, CC)
     run_sync(engine, one, fetcher=lambda *_: first_page, now=now)
+    with engine.connect() as db:
+        first_discovered = db.scalar(text("SELECT first_discovered_at FROM discovery_papers"))
     updated = first_page.replace(b"<datestamp>2026-09-28</datestamp>", b"<datestamp>2026-09-29</datestamp>")
     updated = updated.replace(b"<title>Discovery Alpha</title>", b"<version version=\"v2\"><date>Tue, 29 Sep 2026 10:00:00 GMT</date></version><title>Discovery Alpha revised</title>")
     updated = updated.replace(CC, ARXIV_LICENSE)
@@ -215,7 +218,7 @@ def test_metadata_version_update_preserves_discovery_time(engine, monkeypatch):
         row = db.execute(text("SELECT title, latest_version, first_discovered_at, source_updated_at, content_status FROM discovery_papers")).one()
         assert row.title == "Discovery Alpha revised"
         assert row.latest_version == "v2"
-        assert row.first_discovered_at == now
+        assert row.first_discovered_at == first_discovered
         assert row.source_updated_at == datetime(2026, 9, 29, 10, tzinfo=UTC)
         assert row.content_status == "metadata_only"
         assert db.scalar(text("SELECT count(*) FROM discovery_papers")) == 1
@@ -226,8 +229,8 @@ def test_metadata_version_update_preserves_discovery_time(engine, monkeypatch):
 
 
 @pytest.mark.parametrize("topic", ["cs.CL", "cs.LG"])
-def test_http_406_does_not_advance_until_success(engine, monkeypatch, topic):
-    monkeypatch.setattr("app.discovery._reserve_request", lambda db, policy: None)
+def test_http_406_does_not_advance_until_success(resource_world, monkeypatch, topic):
+    engine = resource_world.runtime
     now = datetime(2026, 9, 29, 12, tzinfo=UTC)
     one = DiscoveryPolicy(topics=[topic], max_pages_per_topic=1)
 
@@ -237,17 +240,18 @@ def test_http_406_does_not_advance_until_success(engine, monkeypatch, topic):
     assert run_sync(engine, one, fetcher=rejected, now=now)["pages"] == 0
     with engine.connect() as db:
         row = db.execute(text("SELECT window_from,window_until,resumption_token,last_success_at,pages_seen,records_seen,state,last_error FROM discovery_sources WHERE topic=:t"), {"t": topic}).one()
-        assert row.window_from == now.date() - timedelta(days=7)
-        assert row.window_until == now.date()
+        assert row.window_from == datetime.now(UTC).date() - timedelta(days=7)
+        assert row.window_until == datetime.now(UTC).date()
         assert row.resumption_token is None and row.last_success_at is None
         assert row.pages_seen == 0 and row.records_seen == 0
         assert row.state == "error" and row.last_error == "http_406"
         assert db.scalar(text("SELECT count(*) FROM discovery_papers")) == 0
 
+    retry_due(resource_world.engine)
     assert run_sync(engine, one, fetcher=lambda *_: PAGE_ONE, now=now + timedelta(minutes=2))["pages"] == 1
     with engine.connect() as db:
         row = db.execute(text("SELECT window_from,resumption_token,last_success_at FROM discovery_sources WHERE topic=:t"), {"t": topic}).one()
-        assert row.window_from == now.date() - timedelta(days=7)
+        assert row.window_from == datetime.now(UTC).date() - timedelta(days=7)
         assert row.resumption_token == "page-two" and row.last_success_at is None
     assert run_sync(engine, one, fetcher=rejected, now=now + timedelta(minutes=3))["pages"] == 0
     with engine.connect() as db:
@@ -258,26 +262,34 @@ def test_http_406_does_not_advance_until_success(engine, monkeypatch, topic):
     def successful_next_page(params, _):
         seen_params.append(params)
         return PAGE_TWO
+    retry_due(resource_world.engine)
     assert run_sync(engine, one, fetcher=successful_next_page, now=now + timedelta(minutes=5))["pages"] == 1
     assert seen_params == [{"verb": "ListRecords", "resumptionToken": "page-two"}]
     with engine.connect() as db:
         row = db.execute(text("SELECT window_from,window_until,resumption_token,last_success_at,state FROM discovery_sources WHERE topic=:t"), {"t": topic}).one()
-        assert row.window_from == now.date() and row.window_until is None
+        assert row.window_from == datetime.now(UTC).date() and row.window_until is None
         assert row.resumption_token is None and row.last_success_at is not None and row.state == "idle"
 
 
-def test_persistent_oai_deleted_record_is_hidden_and_checkpointed(api, monkeypatch):
-    monkeypatch.setattr("app.discovery._reserve_request", lambda db, policy: None)
+def test_persistent_oai_deleted_record_is_hidden_and_checkpointed(resource_api, monkeypatch):
+    api = resource_api
     now = datetime(2026, 9, 29, 12, tzinfo=UTC)
     one = DiscoveryPolicy(topics=["cs.AI"], max_pages_per_topic=1)
-    assert run_sync(api.engine, one, fetcher=lambda *_: PAGE_ONE, now=now)["records"] == 1
+    assert run_sync(api.world.runtime, one, fetcher=lambda *_: PAGE_ONE, now=now)["records"] == 1
     api.bootstrap_admin()
     admin = api.admin_browser()
     assert admin.get("/discovery/papers").json()["total"] == 1
     assert parse_page(PAGE_DELETED, 100_000).deleted == [("2609.00001", now.date())]
-    assert run_sync(api.engine, one, fetcher=lambda *_: PAGE_DELETED, now=now + timedelta(minutes=2))["records"] == 1
+    retry_due(api.engine)
+    assert run_sync(api.world.runtime, one, fetcher=lambda *_: PAGE_DELETED, now=now + timedelta(minutes=2))["records"] == 1
     assert admin.get("/discovery/papers").json()["total"] == 0
     with api.engine.connect() as db:
         assert db.scalar(text("SELECT count(*) FROM discovery_deleted_records")) == 1
         assert db.scalar(text("SELECT last_success_at FROM discovery_sources WHERE topic='cs.AI'")) is not None
         assert db.scalar(text("SELECT count(*) FROM source_files")) == 0
+
+
+def retry_due(engine, errors_only=False):
+    """Labelled owner setup advances only retry/poll scheduling, never the runtime clock."""
+    with engine.begin() as db:
+        db.execute(text("UPDATE discovery_sources SET next_attempt_at=NULL" + (" WHERE state='error'" if errors_only else "")))

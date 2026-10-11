@@ -46,7 +46,6 @@ def main() -> None:
         from tests.test_citations import LATE, MD_REFS, NOW, SEED, harvest, markdown, oai_page, tally
         from tests.test_ingest_worker import upload
 
-        discovery._reserve_request = lambda *_: None  # fixture feed only; nothing is fetched
         storage = get_storage(get_settings())
         storage.ensure_bucket()
         api = Harness(engine=get_engine(), clock=FakeClock())

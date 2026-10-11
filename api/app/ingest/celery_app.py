@@ -102,8 +102,7 @@ def ingest_job(job_id: str) -> str:
 
 @celery_app.task(name="ras.discovery.sync")
 def sync_arxiv() -> dict:
-    if not _gate("ras.discovery.sync"):
-        return {"skipped": "recovery_gate_closed"}
+    # Boundary checks identity/grants/gate at every checkpoint; disabled does no DB work.
     return run_sync(get_engine(), settings.discovery)
 
 
