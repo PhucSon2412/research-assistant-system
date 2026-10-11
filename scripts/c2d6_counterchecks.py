@@ -37,7 +37,7 @@ def main():
          t+'test_expiry_old_day_late_duplicate_settlement_and_no_legacy_adoption'),
         ('capacity', 'api/app/search_accounting.py', [('if active_document + active_query >= settings.embedding.max_concurrent_requests:', 'if False:')],
          t+'test_document_query_share_slots_but_rerank_is_separate'),
-        ('acl-before-topk', 'api/app/search.py', [(' WHERE {_audience(include_common)} AND i.content_status=', " WHERE TRUE AND i.content_status=")],
+        ('acl-before-topk', 'api/app/search.py', [(" WHERE {_audience(include_common)} AND i.content_status='indexed'\n   AND i.rights_epoch=", " WHERE TRUE AND i.content_status='indexed'\n   AND i.rights_epoch=")],
          'api/tests/test_search.py::test_search_acl_before_keyword_vector_topk_and_rerank_payload'),
         ('final-scope', boundary, [(' or (expected is not None and scope != expected) or (before is not None and fresh != before)', '')],
          t+'test_new_proof_after_commit_not_precommit_dto[response]'),

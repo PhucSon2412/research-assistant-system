@@ -11,6 +11,7 @@ import httpx
 import pytest
 from sqlalchemy import event, text
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app import auth_safety, search as legacy, search_runtime as search, search_accounting as money, search_boundary as boundary
 from app import recovery
@@ -369,3 +370,23 @@ def test_cancellation_keeps_owned_reservation_and_stops_heartbeat(ready,monkeypa
     assert sql(b,'SELECT cost_usd IS NULL AND reserved_usd>0 FROM search_usage')
     assert not any(t.name=='search-reservation-heartbeat' for t in threading.enumerate())
     assert b.api.engine.pool.checkedout()==0 and not b.calls
+
+
+def test_schema_binding_rejects_partial_duplicate_and_generation_nonce(ready):
+    b=ready
+    assert request(b,rerank=False).status_code==200
+    p=proof(b)
+    # DB constraints protect direct runtime writes too, independently of Python matches().
+    for statement in (
+        "UPDATE search_usage SET operation_id=NULL WHERE id=:i",
+        "UPDATE search_usage SET task_type='generation' WHERE id=:i",
+        """INSERT INTO search_usage(user_id,day,task_type,model_id,provider,status,reserved_usd,
+            cost_status,reservation_token,operation_id,session_id)
+            SELECT user_id,day,task_type,model_id,provider,status,reserved_usd,cost_status,
+                reservation_token,operation_id,session_id FROM search_usage WHERE id=:i""",
+    ):
+        with pytest.raises(IntegrityError):
+            with b.api.engine.begin() as conn:
+                conn.execute(text(statement),{'i':p.id})
+    assert sql(b,'SELECT count(*) FROM search_usage')==1
+    assert len(b.calls)==1
