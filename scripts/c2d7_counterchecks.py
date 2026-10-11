@@ -32,7 +32,7 @@ def main():
          t+'test_exact_scope_and_caller_at_each_external_boundary[after_admission-epoch]'),
         ('nonce', 'api/app/search_accounting.py', [("        and all(getattr(row, k) == getattr(proof, k) for k in FIELDS))", '        and row.id == proof.id)')],
          t+'test_generation_nonce_cannot_adopt_another_financial_tuple[reservation_token]'),
-        ('late-settlement', 'api/app/search_accounting.py', [("        row = db.scalar(select(SearchUsage).where(SearchUsage.id == proof.id).with_for_update())\n        if not matches(row, proof):\n", "        if clock().date() != proof.day: raise s.ApiError(503, 'expired_financial_owner')\n        row = db.scalar(select(SearchUsage).where(SearchUsage.id == proof.id).with_for_update())\n        if not matches(row, proof):\n")],
+        ('late-settlement', 'api/app/search_accounting.py', [("        row = db.scalar(select(SearchUsage).where(SearchUsage.id == proof.id).with_for_update())\n        if not matches(row, proof):\n", "        if clock().date() != proof.day: return {'status': 'unknown'}\n        row = db.scalar(select(SearchUsage).where(SearchUsage.id == proof.id).with_for_update())\n        if not matches(row, proof):\n")],
          t+'test_lease_old_day_late_duplicate_settlement_and_legacy_refusal'),
         ('capacity', 'api/app/search_accounting.py', [('if active >= settings.generation.max_concurrent_requests:', 'if False:')],
          t+'test_concurrent_generation_has_one_slot_and_no_second_dispatch'),
