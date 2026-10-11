@@ -25,7 +25,7 @@ SPECS = [
     ('status-disabled', [(OPS, '        if snap.status != "active":\n            raise OperatorRefused("status_disabled")\n', ''),
                          (SQL, "IF c.action='resolve_initial_status' AND (u.status IS DISTINCT FROM 'active' OR u.status_safety",
                           "IF c.action='resolve_initial_status' AND (u.status_safety")],
-     T + 'test_disabled_never_enabled_and_latest_disabled_refused'),
+     T + 'test_disabled_snapshot_with_later_enable_intent_stays_disabled'),
     ('hold-reconciled', [(OPS, '    if not view.backfill_complete or view.projection_seq is None or view.projection_seq < begin.seq:\n        raise OperatorRefused("hold_not_reconciled")\n', '')],
      T + 'test_inspect_reports_codes_without_secrets_and_requires_hold_for_mutation'),
     ('batch-false', [(OPS, '                attempt.written = False  # absent/torn/prefix/unsynced: the whole batch stays false',

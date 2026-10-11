@@ -496,12 +496,31 @@ def test_disabled_never_enabled_and_latest_disabled_refused(world, monkeypatch):
     result = operate(w, make_case(w, uid, ops.SET_CREDENTIAL))
     assert (result.credential_state, result.status, result.account_live) == ("usable", "disabled", False)
     before = (counts(w), w.path.read_bytes())
-    with pytest.raises(ops.OperatorRefused, match="status_disabled"):
+    with pytest.raises(ops.OperatorRefused, match="^status_disabled$"):
         operate(w, make_case(w, uid, ops.RESOLVE_STATUS))
     assert (counts(w), w.path.read_bytes())[1] == before[1]
     recover(w)
     with pytest.raises(InvalidCredentials):
         sign_in(w, uid, NEW, monkeypatch)
+
+
+def test_disabled_snapshot_with_later_enable_intent_stays_disabled(world):
+    """Business disabled + latest head an enable intent without receipt: only the business guard applies."""
+    w = world
+    uid = account(w)
+    journal_changes(w, uid, [Change(uid, "status", "admin_disable", NOW, decision="disabled")])
+    journal_changes(w, uid, [Change(uid, "status", "admin_enable", NOW, decision="active")], rollback=True)
+    hold(w)
+    u = user(w, uid)
+    assert (u.status, u.status_safety) == ("disabled", "held")
+    _, status = ops.journal_heads(journal.read(w.path), uid)
+    assert status.body["decision"] == "active"
+    c = make_case(w, uid, ops.RESOLVE_STATUS)
+    before = (counts(w), w.path.read_bytes())
+    with pytest.raises(ops.OperatorRefused, match="^status_disabled$"):
+        operate(w, c)
+    assert (counts(w), w.path.read_bytes()) == before
+    assert user(w, uid).status == "disabled"
 
 
 def test_latest_journal_disable_with_active_snapshot_is_refused(world):
