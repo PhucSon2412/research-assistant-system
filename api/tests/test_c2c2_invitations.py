@@ -342,7 +342,7 @@ def test_http_actor_after_real_dependency(world,monkeypatch,phase,change):
                         from app.identity.predicates import lock_users
                         lock_users(db,[w.uid])
                         db.info[AUTH_PENDING]=[auth_safety.Change(w.uid,'status','admin_disable',NOW,decision='disabled')
-                            if change=='disable' else auth_safety.Change(w.uid,'credential','verified_recovery',NOW,verifier=hash_password(SECRET),policy_version=1)]
+                            if change=='disable' else auth_safety.Change(w.uid,'credential','password_reset',NOW,verifier=hash_password(SECRET),policy_version=1)]
                         commit_auth(db)
                 elif change=='role':
                     with w.engine.begin() as db:db.execute(text("UPDATE users SET role='user' WHERE id=:id"),{'id':w.uid})
@@ -411,7 +411,7 @@ def test_delivery_actor_gate_and_compensation(world,phase,change):
             from app.identity.predicates import lock_users
             with Session(w.runtime) as db:
                 lock_users(db,[w.uid]);db.info[AUTH_PENDING]=[auth_safety.Change(w.uid,'status','admin_disable',NOW,decision='disabled')
-                    if change=='disable' else auth_safety.Change(w.uid,'credential','verified_recovery',NOW,verifier=hash_password(SECRET),policy_version=1)]
+                    if change=='disable' else auth_safety.Change(w.uid,'credential','password_reset',NOW,verifier=hash_password(SECRET),policy_version=1)]
                 commit_auth(db)
         elif change=='revoke':
             from app.identity.sessions import revoke_session

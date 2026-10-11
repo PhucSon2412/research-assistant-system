@@ -30,7 +30,8 @@ NEW = "C2b-new-private-password-marker-456!"
 def world(foundation, runtime, monkeypatch, app_env):
     w = foundation
     values = changes(w)
-    values[-1] = replace(values[-1], reason_code="verified_initial_status")
+    # Initial status evidence from a generic runtime reason; verified_initial_status needs a C3 case.
+    values[-1] = replace(values[-1], reason_code="invitation_accept")
     append_changes(w, values, engine=runtime)
     run_recover(w)
     app_env(runtime.url)
@@ -50,10 +51,15 @@ def add_other(w, role="user", *, initial_reason="invitation_accept"):
                     password_verifier=hash_password(SECRET), password_changed_at=NOW))
         db.commit()
     other = SimpleNamespace(**vars(w)); other.uid = uid
-    values = changes(other, decision="active" if initial_reason else None)
-    if initial_reason:
+    operator = initial_reason == "verified_initial_status"
+    values = changes(other, decision="active" if initial_reason and not operator else None)
+    if initial_reason and not operator:
         values[-1] = replace(values[-1], reason_code=initial_reason)
     append_changes(other, values, engine=w.runtime)
+    if operator:
+        # Only a real C3 operator case can mint this reason (0049); recover closes the hold afterwards.
+        from tests.test_c3_operator_recovery import operator_initial_status
+        operator_initial_status(w, uid)
     return other
 
 
@@ -63,7 +69,7 @@ def test_disable_cannot_supply_initial_status_proof(world, history):
     w = world; actor = sign_in(w); target = add_other(w, initial_reason=None)
     if history != "credential_only":
         change = auth_safety.Change(target.uid, "status",
-            "verified_initial_status" if history == "uncommitted_initial" else "admin_enable",
+            "invitation_accept" if history == "uncommitted_initial" else "admin_enable",
             NOW, decision="active")
         append_changes(target, [change], engine=w.runtime, rollback=history == "uncommitted_initial")
         run_recover(w)
@@ -449,6 +455,7 @@ def test_two_admins_disable_each_other_sorted_user_locks(world):
 
 def test_two_confirms_one_token_one_credential_transition(world,monkeypatch):
     w=world;token=issue(w);barrier=threading.Barrier(2);real=reset.hasher_for_policy
+    start=journal.read(w.path).head.seq  # the fixture's own initial credential event is not counted
     class Paused:
         def __init__(self,policy):self.hasher=real(policy)
         def hash(self,password):
@@ -461,7 +468,7 @@ def test_two_confirms_one_token_one_credential_transition(world,monkeypatch):
         jobs=[pool.submit(attempt),pool.submit(attempt)]
         assert sorted(j.result(25) for j in jobs)==["denied","success"]
     records=journal.read(w.path).records
-    assert len([r for r in records if r.kind==journal.CREDENTIAL_TRANSITION and r.body["reason_code"]=="password_reset"])==1
+    assert len([r for r in records if r.seq>start and r.kind==journal.CREDENTIAL_TRANSITION and r.body["reason_code"]=="password_reset"])==1
 
 
 @pytest.mark.parametrize("writer",["confirm","request","status"])

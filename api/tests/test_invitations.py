@@ -46,9 +46,10 @@ def api(api, monkeypatch, app_env):
         with Session(rt) as db:
             lock_users(db, [uid])
             db.info[AUTH_PENDING] = [
-                auth_safety.Change(uid, 'credential', 'verified_recovery', api.clock.now,
+                # Generic runtime reasons; verified_* need a C3 operator case (0049).
+                auth_safety.Change(uid, 'credential', 'password_reset', api.clock.now,
                                    verifier=hash_password(password), policy_version=1),
-                auth_safety.Change(uid, 'status', 'verified_initial_status', api.clock.now, decision='active'),
+                auth_safety.Change(uid, 'status', 'invitation_accept', api.clock.now, decision='active'),
             ]
             commit_auth(db)
         return uid
