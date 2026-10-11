@@ -1,6 +1,6 @@
 # C2d-6 — search, query embedding và rerank qua runtime
 
-**Thực hiện trên nhánh review (chưa merge):** [handoff](../c2d6-search-query-rerank-runtime.md) và [inventory](../c2d6-test-inventory.json) là trạng thái/kết quả C2d-6 mới. Phần giao task bên dưới giữ nguyên mốc lịch sử. Safety pending tới C4.
+**Đã triển khai và merge PR #57 `2e948b7`:** [handoff](../c2d6-search-query-rerank-runtime.md), [inventory](../c2d6-test-inventory.json) và [review](../reviews/pr57-c2d6-search-query-rerank-runtime.md) giữ chứng cứ trước merge. Task kế tiếp [C2d-7 RAG/generation runtime](m6c2b2c2d7-rag-generation-runtime.md) mới giao, chưa triển khai/kiểm. Phần giao C2d-6 bên dưới là lịch sử; safety pending tới C4.
 
 Ngày giao **2026-10-11**, sau khi chủ dự án báo merge PR #56. Đã fetch: `origin/main = 808337dcccfa472eefb05f2c968250948bae9bc2`; head PR #56 `d957872` là ancestor và tree khớp. Source migration **0046**; chưa truy vấn revision DB dev. **Task mới giao, chưa triển khai/kiểm. Safety vẫn pending tới C4.**
 

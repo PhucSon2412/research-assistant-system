@@ -1,8 +1,8 @@
 # Roadmap đề xuất
 
-**C2d-6 (nhánh review, chưa merge):** HTTP search/query embedding/rerank và chunk viewer dùng checkpoint runtime, nonce financial và final caller/resource mới; [hợp đồng và kiểm chứng](c2d6-search-query-rerank-runtime.md). Source `0047`, safety pending C4. RAG giữ compatibility legacy và chờ gói runtime kế tiếp.
+**Trạng thái hiện hành:** C2d-7 RAG/generation đã triển khai trên nhánh review, source `0048`, chưa merge; [handoff](c2d7-rag-generation-runtime.md) và [inventory](c2d7-test-inventory.json) giữ bằng chứng. Base PR #57 merge `2e948b7`, `0047`. Gói A còn review; tiếp C3 + hồi quy/debt/tích hợp C4 theo [kế hoạch MVP](mvp-delivery-plan.md). **Safety pending C4**, không cutover/pricing/provider thật.
 
-**Trạng thái hiện hành:** PR #56 đã merge `808337dc`, source `0046`. Đã giao [C2d-6 search/query embedding/rerank runtime](tasks/m6c2b2c2d6-search-query-rerank-runtime.md) thành một PR hoàn chỉnh, chưa triển khai/kiểm. **Safety pending tới C4**; các mốc giao dưới đây giữ lịch sử.
+**Mốc giao C2d-6 (lịch sử):** PR #56 đã merge `808337dc`, source `0046`; task search/query/rerank lúc đó chưa triển khai. Các mốc giao và trạng thái OPEN dưới đây giữ lịch sử, không là trạng thái hiện hành hoặc pass mới tại merge.
 
 ## Mốc hoàn thành MVP hiện hành — 2026-10-11
 

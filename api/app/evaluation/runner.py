@@ -96,12 +96,13 @@ def eval_settings(base: Settings) -> Settings:
 def instrumented(capture: Capture) -> Iterator[None]:
     """Replace provider adapters and refuse any real outbound HTTP connection."""
     import app.rag as rag
+    import app.rag_runtime as runtime
 
-    original_search = rag.search
+    original_search = runtime.retrieve
 
     def recorded_search(*args, **kwargs):
         result = original_search(*args, **kwargs)
-        capture.rag_hits.append(result["hits"])
+        capture.rag_hits.append((result[0] if isinstance(result, tuple) else result)["hits"])
         return result
 
     def local_embed(value, settings, **kwargs):
@@ -121,7 +122,7 @@ def instrumented(capture: Capture) -> Iterator[None]:
         stack.enter_context(mock.patch("app.ingest.indexer.embed", local_embed))
         stack.enter_context(mock.patch("app.search.embed", local_embed))
         stack.enter_context(mock.patch("app.rag.generate", capture_generation))
-        stack.enter_context(mock.patch("app.rag.search", recorded_search))
+        stack.enter_context(mock.patch("app.rag_runtime.retrieve", recorded_search))
         stack.enter_context(mock.patch.object(httpx.HTTPTransport, "handle_request", refuse))
         yield
 

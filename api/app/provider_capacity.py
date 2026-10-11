@@ -47,8 +47,8 @@ def reap_expired(engine: Engine) -> None:
         from app.config import get_settings
         from app.ingest.document_accounting import reap
         reap(Session(engine, expire_on_commit=False), get_settings())
-    # Legacy RAG admissions cannot expire/adopt nonce-bound query attempts.
-    # Their expiry belongs to a separate short runtime financial boundary.
+    # Direct legacy admissions cannot expire/adopt nonce-bound attempts.
+    # Their expiry belongs to the shared runtime financial boundary.
     from app.config import get_settings
     from app.search_accounting import reap as reap_search
     reap_search(engine, get_settings())

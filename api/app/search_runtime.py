@@ -1,4 +1,4 @@
-"""HTTP search/viewer. RAG deliberately keeps app.search's compatibility entry.
+"""Shared runtime retrieval for HTTP search, RAG and the citation viewer.
 
 Every phase returns detached scalars and releases its Session. No SQL/locks
 survive into provider IO, heartbeat join, response serialization or another phase.
@@ -6,6 +6,8 @@ survive into provider IO, heartbeat join, response serialization or another phas
 import math
 import time
 import uuid
+from types import MappingProxyType
+from collections.abc import Mapping
 from decimal import Decimal
 
 from sqlalchemy import select, text
@@ -19,6 +21,25 @@ from app.identity.final_caller import final_caller
 from app.identity.predicates import lock_users
 from app.ingest.checkpoints import frozen
 from app.models import Collection, LibraryItem, SearchRequestDay, SearchUsage
+
+
+def immutable(value):
+    """Detached content proofs cannot be edited by evaluation/capture consumers."""
+    if isinstance(value, Mapping):
+        return MappingProxyType({key: immutable(v) for key, v in value.items()})
+    if isinstance(value, (tuple, list)):
+        return tuple(immutable(v) for v in value)
+    if isinstance(value, set):
+        return frozenset(value)
+    return value
+
+
+def plain(value):
+    if isinstance(value, Mapping):
+        return {key: plain(v) for key, v in value.items()}
+    if isinstance(value, (tuple, list)):
+        return [plain(v) for v in value]
+    return value
 
 
 def caller(db, principal, settings, clock, csrf=None):
@@ -40,7 +61,13 @@ def snapshot(db, principal, item, collection):
         g.id,g.version_id,g.source_file_id,g.provider,g.pipeline_version,g.index_version,
         f.checksum_sha256,f.byte_size,g.model_id,g.dimensions,v.coverage,
         (i.visibility='private' OR (i.id,g.version_id,f.id,g.id) IN ('''
-        + s.common_fulltext_sql(external_processing=True) + ''')) provider_ok
+        + s.common_fulltext_sql(external_processing=True) + ''')) provider_ok,
+        (SELECT jsonb_agg(jsonb_build_array(r.id,r.version_id,r.source_file_id,r.file_checksum_sha256,
+            r.rights_epoch_at_grant,r.permits_original_download,r.permits_fulltext_search,
+            r.permits_external_processing,r.scope_audience,r.scope_conditions,p.item_id,p.verified_byte_size)
+            ORDER BY r.id,p.item_id)
+         FROM access_rights r JOIN common_publications p ON p.access_rights_id=r.id
+         WHERE r.item_id=i.id AND r.revoked_at IS NULL AND p.revoked_at IS NULL) rights_binding
         FROM library_items i JOIN index_generations g ON g.id=i.active_index_generation_id
         JOIN paper_versions v ON v.id=g.version_id AND v.item_id=i.id
         JOIN source_files f ON f.id=g.source_file_id
@@ -52,7 +79,7 @@ def snapshot(db, principal, item, collection):
         ORDER BY i.id'''), {'owner': principal.user_id, 'item': item, 'collection': collection}).all()
     members = tuple(db.scalars(text('SELECT item_id FROM collection_items WHERE collection_id=:c ORDER BY item_id'),
         {'c': collection})) if collection else ()
-    return models, tuple(tuple(r) for r in rows), members
+    return immutable((frozenset(models), tuple(tuple(r) for r in rows), members))
 
 
 def locks(db, principal, settings, rows, item, collection):
@@ -80,14 +107,14 @@ def observe(db, principal, settings, clock, item, collection, expected=None, bef
         raise
     fresh = s._hydrate_scope(db, current, item, list(before or {}), collection, True)
     stable = snapshot(db, current, item, collection)
-    if scope != stable or (expected is not None and scope != expected) or (before is not None and fresh != before):
+    if scope != stable or (expected is not None and scope != expected) or (before is not None and immutable(fresh) != immutable(before)):
         caller(db, principal, settings, clock, csrf)
         raise ApiError(409, 'search_scope_changed')
     caller(db, principal, settings, clock, csrf)  # clock after every SQL and journal wait
     return scope, fresh
 
 
-def request_limit(engine, principal, settings, clock, csrf, item, collection):
+def request_limit(engine, principal, settings, clock, csrf, item, collection, expected=None):
     def write(db, outcome):
         lock_users(db, [principal.user_id])
         caller(db, principal, settings, clock, csrf)
@@ -102,7 +129,9 @@ def request_limit(engine, principal, settings, clock, csrf, item, collection):
             raise ApiError(429, 'search_request_limit')
         row.request_count += 1
         db.flush()
-        scope, _ = observe(db, principal, settings, clock, item, collection, csrf=csrf, writer=True)
+        scope, _ = observe(db, principal, settings, clock, item, collection, expected=expected, csrf=csrf, writer=True)
+        if day != clock().date():
+            raise ApiError(503, 'search_counter_day_changed')
         boundary.commit(db, outcome)
         return scope
     return boundary.checkpoint(engine, 'counter', write)
@@ -119,7 +148,9 @@ def admission(engine, principal, settings, clock, csrf, item, collection, scope,
         db.execute(text('SET CONSTRAINTS ALL IMMEDIATE'))
         observe(db, principal, settings, clock, item, collection, scope, before, csrf, writer=True)
         db.refresh(row)
-        if not accounting.matches(row, proof) or row.status != 'reserved' or clock() >= row.lease_until:
+        at = clock()
+        if (not accounting.matches(row, proof) or row.status != 'reserved'
+                or at >= row.lease_until or at.date() != row.day):
             raise ApiError(503, 'search_reservation_lost')
         caller(db, principal, settings, clock, csrf)
         boundary.commit(db, outcome)
@@ -128,8 +159,8 @@ def admission(engine, principal, settings, clock, csrf, item, collection, scope,
     # A fresh transaction is mandatory after admission commit, immediately before dispatch.
     def presend(db, _):
         locks(db, principal, settings, before or {}, item, collection)
+        row = db.scalar(select(SearchUsage).where(SearchUsage.id == proof.id).with_for_update(read=True))
         observe(db, principal, settings, clock, item, collection, scope, before, csrf)
-        row = db.get(SearchUsage, proof.id)
         if not accounting.matches(row, proof) or row.status != 'reserved' or row.lease_until <= clock():
             raise ApiError(503, 'search_reservation_lost')
         caller(db, principal, settings, clock, csrf)
@@ -146,13 +177,14 @@ def hit(identifier, row, downloads):
             'section_kind', 'visibility')}, 'original_url': downloads.get(row['file_id'])}
 
 
-def search(engine, principal, settings, query, mode, item, use_rerank, collection, *, clock, csrf):
+def search(engine, principal, settings, query, mode, item, use_rerank, collection, *, clock, csrf,
+           expected_scope=None, return_context=False):
     boundary.entry(engine)
     if len(query.encode('utf-8')) > settings.search.max_query_bytes:
         raise ApiError(422, 'search_query_too_long')
     if '\x00' in query:
         raise ApiError(422, 'search_query_invalid')
-    scope = request_limit(engine, principal, settings, clock, csrf, item, collection)
+    scope = request_limit(engine, principal, settings, clock, csrf, item, collection, expected_scope)
     operation = uuid.uuid4()
     vector = None
     costs = {'embed_query': None, 'rerank': None}
@@ -256,7 +288,8 @@ def search(engine, principal, settings, query, mode, item, use_rerank, collectio
         return {'mode': mode, 'rerank_status': status, 'rerank_withheld': withheld, 'count': len(ids),
             'hits': [hit(i, fresh[i], downloads) for i in ids], 'candidate_count': len(ranking.keyword)+len(ranking.semantic),
             'keyword_query': ranking.keyword_query, 'timings': timings, 'cost': costs}
-    return boundary.checkpoint(engine, 'response', response)
+    found = boundary.checkpoint(engine, 'response', response)
+    return (found, immutable(scope), immutable(rows)) if return_context else found
 
 
 def open_chunk(engine, principal, settings, chunk, *, clock):

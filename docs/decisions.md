@@ -1,5 +1,21 @@
 # Nhật ký quyết định
 
+## Triển khai C2d-7 RAG/generation runtime (2026-10-11)
+
+Theo task chủ dự án, một PR chuyển cả RAG item/collection/all × keyword/hybrid, giữ API/pack/ranking/model/quota, không streaming. Base PR #57 merge `2e948b7` đã fetch/xác minh, source `0047 → 0048`; chưa merge C2d-7. [Handoff/caller map](c2d7-rag-generation-runtime.md) · [Inventory](c2d7-test-inventory.json).
+
+Lựa chọn triển khai scoped: reuse C2d-6 qua interface nội bộ `rag_runtime.retrieve`, counter RAG/search mỗi loại một lần; shared financial boundary mở cho generation với nonce riêng và cả hai giá input/output. Revision mới chỉ mở CHECK binding generation, giữ lịch sử all-NULL và chặn downgrade mất binding. Pre-send có transaction/proof mới sau admission known commit + release, khóa usage SHARE trước journal; finance không cấp lại quyền evidence. Denial trước gửi giữ ceiling bảo thủ thay vì legacy suy no-charge. Mỗi shared checkpoint kiểm actual runtime/grants; snapshot quyền common được siết thêm, không mở ACL/grants.
+
+Direct `rag.answer` chỉ wrapper runtime; bỏ orchestration legacy. Evaluation capture internal RAG call site thật; giữ network deny và `pending_human_review`. Các lựa chọn này không là xác nhận trực tiếp mới về chính sách chi phí/charge/provider hoặc bất biến kiến trúc vĩnh viễn. **Safety pending tới C4**; tiếp C3 + hồi quy/debt/tích hợp C4, không dev/.env/provider thật/pricing/cutover.
+
+## Sau merge PR #57: giao C2d-7 RAG/generation — 2026-10-11
+
+Đã fetch và xác minh PR #57 MERGED tại `2e948b78157bf4d498bdca4ea52ca81dd85c15c1`; head review `44f1da1` là ancestor, tree khớp. Source `0047`, không truy vấn DB dev. [Review PR #57](reviews/pr57-c2d6-search-query-rerank-runtime.md) giữ kết quả trước merge, không thêm pass mới.
+
+Theo ủy quyền hiện có, giao [C2d-7](tasks/m6c2b2c2d7-rag-generation-runtime.md) thành **một PR cho toàn luồng RAG/generation**, phần cuối gói A trong [kế hoạch MVP](mvp-delivery-plan.md). Reuse runtime retrieval/query/accounting phù hợp; generation có binding riêng và giá input/output, không adopt nonce task khác/row legacy. Caller/resource/content authority tách financial settlement; pre-send và response dùng proof mới, clock sau SQL cuối. Giữ pack/claim/citation, quota và quyền common hiện hành; không tuning/streaming hoặc mở pricing.
+
+Task mới giao, chưa triển khai/kiểm. Safety pending tới C4; operator/C3, tổng hồi quy/tích hợp C4, private deletion/restore, provider thật/chất lượng và vận hành nhóm thử vẫn theo checklist cố định. Giữ forecast 4–6 tuần tại mốc kế hoạch, đánh giá lại sau gói A/C4 thay vì tự rút ngắn bằng test giả. Docs review/task modified/untracked phải được đưa đủ vào commit/PR kế tiếp; không tạo PR ứng dụng chỉ để sửa lịch sử docs.
+
 ## Sau merge PR #56: ước lượng và giao C2d-6 — 2026-10-11
 
 Đã fetch/xác minh PR #56 merge `808337dcccfa472eefb05f2c968250948bae9bc2`, head `d957872` là ancestor, tree khớp; source `0046`, không truy vấn DB dev. Giữ [kế hoạch MVP](mvp-delivery-plan.md): khoảng 2–3 tuần có bản end-to-end, 4–6 tuần nghiệm thu nhóm nhỏ; còn khoảng 16–27 ngày làm việc theo các gói, không là cam kết/SLO. Discovery hoàn tất giảm một phần runtime; chưa có chứng cứ để rút ngắn tích hợp, provider thật hoặc vận hành.

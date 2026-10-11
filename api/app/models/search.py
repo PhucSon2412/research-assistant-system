@@ -25,7 +25,7 @@ class SearchUsage(Base):
         CheckConstraint("reserved_usd >= 0 AND (cost_usd IS NULL OR cost_usd >= 0)", name="cost_non_negative"),
         CheckConstraint("(reservation_token IS NULL AND operation_id IS NULL AND session_id IS NULL) OR "
             "(reservation_token IS NOT NULL AND operation_id IS NOT NULL AND session_id IS NOT NULL "
-            "AND task_type IN ('embed_query','rerank'))", name="reservation_binding"),
+            "AND task_type IN ('embed_query','rerank','generation'))", name="reservation_binding"),
         Index("ix_search_usage_day_user", "day", "user_id"),
         Index("ix_search_usage_reserved_lease", "lease_until",
               postgresql_where=text("status = 'reserved'")),

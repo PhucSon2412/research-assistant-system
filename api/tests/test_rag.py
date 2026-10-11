@@ -196,14 +196,16 @@ def test_epoch_or_generation_change_before_send_and_answer(upload_api, monkeypat
         conn.execute(text("UPDATE library_items SET rights_epoch=rights_epoch-1 WHERE id=:i"),
                      {"i": uuid.UUID(ids["item_id"])})
     from app import rag
-    original = rag.reserve
-    def switch(*args):
-        usage = original(*args)
+    from app import rag_runtime
+    original = rag_runtime.checkpoint
+    def switch(engine, phase, operation):
+        usage = original(engine, phase, operation)
+        if phase != "reservation": return usage
         with api.engine.begin() as conn:
             conn.execute(text("UPDATE library_items SET active_index_generation_id=NULL WHERE id=:i"),
                          {"i": uuid.UUID(ids["item_id"])})
         return usage
-    monkeypatch.setattr("app.rag.reserve", switch)
+    monkeypatch.setattr("app.rag_runtime.checkpoint", switch)
     sent.clear()
     response = a.post("/rag/ask", {"item_id": ids["item_id"], "question": "Synthetic?", "mode": "keyword"})
     assert response.status_code == 409 and sent == []
@@ -213,17 +215,20 @@ def test_provider_errors_and_reservation(upload_api, monkeypatch):
     api, storage = upload_api
     _, a, _, _, ids, _, settings = setup(api, storage, monkeypatch)
     from app import rag
-    original = rag.reserve
+    from app import rag_runtime
+    original = rag_runtime.checkpoint
     reservations = []
-    def capture_reservation(*args, **kwargs):
-        usage_id = original(*args, **kwargs)
+    def capture_reservation(engine, phase, operation):
+        proof = original(engine, phase, operation)
+        if phase != "reservation": return proof
+        usage_id = proof.id
         reservations.append(usage_id)
         # A wall clock is not a request sequence; equal timestamps must be safe.
         with api.engine.begin() as conn:
             conn.execute(text("UPDATE search_usage SET created_at=:at WHERE id=:id"),
                          {"at": api.clock.now, "id": usage_id})
-        return usage_id
-    monkeypatch.setattr(rag, "reserve", capture_reservation)
+        return proof
+    monkeypatch.setattr(rag_runtime, "checkpoint", capture_reservation)
     for failure, status in ((GenerationError("rag_provider_rate_limited", rejected=True), "rejected"),
                             (GenerationError("rag_provider_outcome_uncertain"), "uncertain"),
                             (GenerationError("rag_provider_response_invalid"), "uncertain")):
@@ -332,8 +337,8 @@ def test_collection_and_all_scope_multi_paper_citations_and_acl(upload_api, monk
     collection = a.post("/collections", {"name": "Pair"}).json()["collection"]["id"]
     for item in (first["item_id"], second["item_id"], str(unindexed), str(common)):
         assert a.post(f"/collections/{collection}/items", {"item_id": item}).status_code == 201
-    from app.search import search as real_search
-    monkeypatch.setattr("app.rag.search", lambda db, principal, cfg, query, mode, item_id, rerank, collection_id, **kw:
+    from app.search_runtime import search as real_search
+    monkeypatch.setattr("app.rag_runtime.retrieval.search", lambda db, principal, cfg, query, mode, item_id, rerank, collection_id, **kw:
                         real_search(db, principal, cfg, "Sharedword", mode, item_id, rerank, collection_id, **kw))
     sent = []
     def compare(messages, cfg):
@@ -428,19 +433,21 @@ def test_scoped_rag_membership_recheck_and_comparison_abstention(upload_api, mon
     assert limited["reason"] == "comparison_requires_multiple_papers"
     assert calls == []
     settings.generation.max_evidence_papers = 3
-    original = __import__("app.rag", fromlist=["reserve"]).reserve
-    def remove_before_provider(*args):
-        usage = original(*args)
+    from app import rag_runtime
+    original = rag_runtime.checkpoint
+    def remove_before_provider(engine, phase, operation):
+        usage = original(engine, phase, operation)
+        if phase != "reservation": return usage
         with api.engine.begin() as conn:
             conn.execute(text("DELETE FROM collection_items WHERE collection_id=:c AND item_id=:i"),
                          {"c": uuid.UUID(collection), "i": uuid.UUID(second["item_id"])})
         return usage
-    monkeypatch.setattr("app.rag.reserve", remove_before_provider)
+    monkeypatch.setattr("app.rag_runtime.checkpoint", remove_before_provider)
     response = a.post("/rag/ask", req)
     assert response.status_code == 409 and response.json()["error"] == "rag_scope_changed"
     assert calls == []
     assert a.post(f"/collections/{collection}/items", {"item_id": second["item_id"]}).status_code == 201
-    monkeypatch.setattr("app.rag.reserve", original)
+    monkeypatch.setattr("app.rag_runtime.checkpoint", original)
     def remove_during_provider(messages, cfg):
         with api.engine.begin() as conn:
             conn.execute(text("DELETE FROM collection_items WHERE collection_id=:c AND item_id=:i"),
@@ -539,14 +546,15 @@ def test_comparison_resolves_full_titles_before_rank_and_abstains_on_equal_pairs
             conn.execute(text("UPDATE library_items SET title=:title WHERE id=:item"),
                          {"title": title, "item": uuid.UUID(item["item_id"])})
     app.dependency_overrides[get_settings] = lambda: settings
-    from app.search import search as real_search
+    from app.search_runtime import search as real_search
     def ranked_search(db, principal, cfg, query, mode, item_id, rerank, collection_id, **kw):
-        found = real_search(db, principal, cfg, "Sharedword", "keyword", item_id, rerank, collection_id, **kw)
+        result = real_search(db, principal, cfg, "Sharedword", "keyword", item_id, rerank, collection_id, **kw)
+        found = result[0]
         order = {item["item_id"]: rank for rank, item in enumerate(ids)}
         found["hits"].sort(key=lambda hit: order[hit["item_id"]])
         assert len(found["hits"]) == 3
-        return found
-    monkeypatch.setattr("app.rag.search", ranked_search)
+        return result
+    monkeypatch.setattr("app.rag_runtime.retrieval.search", ranked_search)
     sent = []
     def compare(messages, cfg):
         evidence = json.loads(messages[1]["content"])["evidence"]
@@ -603,12 +611,12 @@ def test_two_paper_scope_requires_context_or_resolved_names(upload_api, monkeypa
         for item in pair:
             assert a.post(f"/collections/{collection}/items", {"item_id": item["item_id"]}).status_code == 201
         scopes.append(collection)
-    from app.search import search as real_search
+    from app.search_runtime import search as real_search
     def scoped_hits(db, principal, cfg, query, mode, item_id, rerank, collection_id, **kw):
         # Keep the real ACL and membership gate; use a shared fixture term so
         # name resolution, rather than keyword retrieval, is under test.
         return real_search(db, principal, cfg, "Sharedword", "keyword", item_id, rerank, collection_id, **kw)
-    monkeypatch.setattr("app.rag.search", scoped_hits)
+    monkeypatch.setattr("app.rag_runtime.retrieval.search", scoped_hits)
     calls = []
     def compare(messages, cfg):
         rows = json.loads(messages[1]["content"])["evidence"]
@@ -752,14 +760,15 @@ def _two_paper_collection(api, storage, monkeypatch):
         [.1, .2, .3], cfg.embedding.model_id, 2))
     queries = []
     from app import rag
-    original = rag.search
+    from app import search_runtime
+    original = search_runtime.search
     def recorded(db, principal, cfg, query, mode, *args, **kw):
         queries.append((query, mode))
         fixture_query = ("How do Sharedword and codeswitch   in their behaviour on code-switched input?"
                          if mode == "keyword" else
                          "How do Sharedword and codeswitch differ in their behaviour on code-switched input?")
         return original(db, principal, cfg, fixture_query, mode, *args, **kw)
-    monkeypatch.setattr("app.rag.search", recorded)
+    monkeypatch.setattr("app.rag_runtime.retrieval.search", recorded)
     return a, b, admin, first, second, b_items, common, collection, queries
 
 
