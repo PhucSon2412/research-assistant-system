@@ -449,7 +449,8 @@ ERROR_CODES |= {'oai_' + c for c in ('badArgument', 'badVerb', 'cannotDisseminat
 
 
 def _error_checkpoint(engine, policy, nonce, cursor, error, facts):
-    code = str(error) if isinstance(error, (RetargetBusy, RetargetLimit)) else error.code
+    code = ('retarget_limit_exceeded' if isinstance(error, RetargetLimit) else
+            'citation_retarget_busy' if isinstance(error, RetargetBusy) else error.code)
     if code not in ERROR_CODES:
         code = 'fetch_error'
     def write(db, clock, source, at):
