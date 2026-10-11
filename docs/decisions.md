@@ -1,5 +1,21 @@
 # Nhật ký quyết định
 
+## Discovery runtime C2d-5f2 (2026-10-11, nhánh review)
+
+Hiện thực lựa chọn scoped trong task: lease toàn installation trên coordinator có sẵn, nonce/clock PostgreSQL, pacing ngoài DB, async transport có deadline/cancel; HTTP GET có thể lặp sau crash. Page/retarget/cursor/counter cùng transaction. Fan-out cap mặc định **2.000**, tối đa **50.000**, nhằm giới hạn hàng nạp/khóa/ghi; đây là giá trị cần đo, không SLO. Vượt cap rollback page và backoff, operator có thể tăng trong giới hạn; không outbox/eventual-link.
+
+Retry-After áp dụng toàn installation, force chỉ bỏ lịch poll thành công. Process chết giữ quiet window tới lease expiry + pacing; commit exception dừng uncertain, không SELECT inference/mutation retry. Hai fixture discovery debt chuyển sang runtime, giữ kỳ vọng nghiệp vụ. [Handoff](c2d5f2-discovery-runtime.md) ghi chứng cứ/giới hạn; safety pending tới C4, live 406 chưa xác định nguyên nhân. Không thay quyền/provider/pricing hoặc nghiệm thu mạng thật.
+
+## Chốt mốc MVP và giao C2d-5f2 theo ủy quyền — 2026-10-11
+
+Sau khi hỏi ước lượng/phần còn lại, chủ dự án giao orchestrator: “Tùy bạn quyết định, miễn sao dự án thành công nhất có thể”. Orchestrator chọn [kế hoạch hoàn thành MVP](mvp-delivery-plan.md) với checklist nghiệm thu cố định cho một nhóm nhỏ; giữ yêu cầu đã xác nhận, không mở rộng tính năng nâng cao trước MVP. Ước lượng 2–3 tuần runtime/recovery và 4–6 tuần tổng cộng là kế hoạch theo giả định, không cam kết/SLO. Quyết định thiết kế ở đây là lựa chọn theo ủy quyền, không phải các tham số kỹ thuật được chủ dự án xác nhận trực tiếp.
+
+PR #55 đã merge `e6b5991` (tree khớp `bca5d90`, source `0045`). Giao [C2d-5f2](tasks/m6c2b2c2d5f2-discovery-runtime.md) thành một PR hoàn chỉnh: runtime direct/Celery/CLI one-shot, lease/checkpoint bền và pacing, HTTP/parse/sleep ngoài DB, retry và outcome. Chọn giữ atomic page + cursor + citation retarget, thêm hard cap có mã lỗi/backoff khi vượt; không cắt link rồi advance cursor hoặc xây outbox mới. Lease cần deadline/margin và stale-holder fence; không tuyên bố exactly-once HTTP. Không gọi mạng nguồn/provider thật hoặc thao tác dev trong task này.
+
+Task mới giao, **chưa triển khai/kiểm; safety pending tới C4**. Chỉ cập nhật một kế hoạch trạng thái và docs hợp đồng bị ảnh hưởng; report cũ giữ chứng cứ. Hai fixture discovery debt giao C2d-5f2; debt còn lại và full inventory giao tích hợp/C4. Tiếp theo gom search/query/rerank và RAG/generation thành các gói hoàn chỉnh, tránh mặc định chia từng endpoint. Các trạng thái OPEN phía dưới giữ lịch sử trước merge.
+
+**Review PR #55 tại `bca5d90`: không phát hiện điểm chặn merge mới trong phạm vi citation reconcile runtime.** Reviewer thực chạy **121/121 pass** (119 ca repo + hai smoke Linux CLI/Celery SIGKILL); đối chiếu riêng **313 artifact hash**, agent **1.203 unique pass / 3.534 not-run**, 327 source hash và 10 countercheck. PR **OPEN, chưa merge**, source `0045`, **safety pending tới C4**. [Kết luận và bằng chứng](reviews/pr55-c2d5f1-citation-reconcile-runtime.md). Các lựa chọn trong task đã giao giữ phạm vi cũ, không có quyết định mở safety/pricing hoặc xác nhận trực tiếp mới của chủ dự án.
+
 ## Quyết định triển khai C2d-5f1 — citation reconcile runtime (2026-10-10)
 
 Nhánh `feat/m6c2b2c2d5f1-citation-reconcile-runtime` từ merge PR #54 `37edd5c9` (đã fetch/xác minh lại). Source giữ **`0045`**, không migration/grant. Các lựa chọn dưới đây do agent chốt trong phạm vi task scoped của orchestrator; **không** phải xác nhận trực tiếp mới của chủ dự án và không là luật kiến trúc vĩnh viễn. [Handoff](c2d5f1-citation-reconcile-runtime.md).
