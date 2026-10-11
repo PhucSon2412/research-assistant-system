@@ -90,9 +90,10 @@ def main():
         result['selection_in_collection']=set(expected)<=set(all_nodes)
         return name,result
     # Each pytest process owns disposable DBs, buckets, journal/tmp paths and
-    # settings. Grant revocations in this selection are per test database. Bound host
-    # concurrency to three; the Linux CLI/worker smoke never overlaps another group.
-    waves=[[n for n in w if n in groups] for w in [['browser'],['runtime','rag','common_rag'],['retrieval','search','document'],['common_search','schema','evaluation']]]
+    # settings. Grant revocations are per test DB. Chrome runs alone; then a
+    # bounded pool schedules the same finite selection, at most three processes.
+    waves=[[n for n in w if n in groups] for w in [['browser'],
+        ['runtime','common_rag','document','common_search','retrieval','rag','search','schema','evaluation']]]
     waves=[w for w in waves if w]
     summary['execution_waves']=waves
     for wave in waves:
