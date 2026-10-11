@@ -64,12 +64,12 @@ def embed(text: str, settings: Settings, *, input_type: str = "search_document")
         vector = entries[0]["embedding"]
         tokens = payload.get("usage", {}).get("prompt_tokens")
         if (len(entries) != 1 or not isinstance(vector, list) or not vector
-                or not all(isinstance(v, (float, int)) and math.isfinite(v) for v in vector)
-                or (tokens is not None and (not isinstance(tokens, int) or tokens < 0))):
+                or not all(type(v) in (float, int) and math.isfinite(v) for v in vector)
+                or (tokens is not None and (type(tokens) is not int or tokens < 0))):
             raise ValueError()
         return EmbeddingResult([float(v) for v in vector], policy.model_id, tokens,
                                response_model, response_provider)
-    except (KeyError, IndexError, TypeError, ValueError):
+    except (KeyError, IndexError, TypeError, ValueError, OverflowError):
         raise EmbeddingError("provider_response_invalid",
                              response_model_id=response_model,
                              response_provider=response_provider) from None

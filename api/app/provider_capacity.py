@@ -25,6 +25,8 @@ def expire_reservations(db: Session) -> None:
         if model is EmbeddingCall:
             # C2d-5d2b owns nonce-bound maintenance with runtime + journal proof.
             predicate.append(model.reservation_token.is_(None))
+        else:
+            predicate.append(model.reservation_token.is_(None))
         db.execute(update(model).where(*predicate).values(
                 status="uncertain", cost_status="lease_expired_reserved_ceiling",
                 finished_at=now, lease_until=None))
@@ -45,6 +47,11 @@ def reap_expired(engine: Engine) -> None:
         from app.config import get_settings
         from app.ingest.document_accounting import reap
         reap(Session(engine, expire_on_commit=False), get_settings())
+    # Legacy RAG admissions cannot expire/adopt nonce-bound query attempts.
+    # Their expiry belongs to a separate short runtime financial boundary.
+    from app.config import get_settings
+    from app.search_accounting import reap as reap_search
+    reap_search(engine, get_settings())
 
 
 def lease_deadline(seconds: int) -> datetime:
@@ -57,7 +64,7 @@ def renew_lease(engine: Engine, model: type[EmbeddingCall] | type[SearchUsage],
         db.execute(text(LOCK))
         now = datetime.now(timezone.utc)
         result = db.execute(update(model).where(model.id == reservation_id,
-            *([model.reservation_token.is_(None)] if model is EmbeddingCall else []),
+            model.reservation_token.is_(None),
             model.status == "reserved", model.lease_until > now).values(
                 lease_until=func.greatest(model.lease_until, now + timedelta(seconds=seconds))))
         db.commit()

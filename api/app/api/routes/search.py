@@ -1,20 +1,22 @@
 """Authenticated full-text search: the caller's private items and servable common copies (M6b-2b3a).
 
-This route is the only caller that opts in to common text (``include_common=True``);
-``POST /rag/ask`` reaches ``app.search`` without the flag and stays private-owner only.
+HTTP uses short runtime checkpoints. RAG keeps its separate legacy orchestrator
+and also opts in to permitted common text; generation runtime is a later task.
 """
 import uuid
 from typing import Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 from pydantic import model_validator
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_principal
+from app.api.deps import get_clock, get_db, get_principal
+from app.api.cookies import CSRF_HEADER
+from app.api.errors import ApiError
 from app.authz import Principal
 from app.config import Settings, get_settings
-from app.search import open_chunk, search
+from app import search_boundary, search_runtime
 
 router = APIRouter(tags=["search"])
 
@@ -34,13 +36,25 @@ class SearchRequest(BaseModel):
 
 
 @router.post("/search")
-def search_route(body: SearchRequest, principal: Principal = Depends(get_principal),
-                 db: Session = Depends(get_db), settings: Settings = Depends(get_settings)) -> dict:
-    return search(db, principal, settings, body.query, body.mode, body.item_id, body.rerank, body.collection_id,
-                  include_common=True)
+def search_route(body: SearchRequest, request: Request, principal: Principal = Depends(get_principal),
+                 db: Session = Depends(get_db), settings: Settings = Depends(get_settings),
+                 clock=Depends(get_clock)) -> dict:
+    engine = db.get_bind()
+    search_boundary.release(db)
+    try:
+        return search_runtime.search(engine, principal, settings, body.query, body.mode, body.item_id,
+            body.rerank, body.collection_id, clock=clock, csrf=request.headers.get(CSRF_HEADER) or '')
+    except ApiError:
+        raise
+    except Exception:
+        # Unexpected provider/DTO failure keeps the reservation ceiling and never retries.
+        raise ApiError(503, 'search_checkpoint_unavailable') from None
 
 
 @router.get("/search/chunks/{chunk_id}")
 def open_source_chunk(chunk_id: uuid.UUID, principal: Principal = Depends(get_principal),
-                      db: Session = Depends(get_db)) -> dict:
-    return open_chunk(db, principal, chunk_id, include_common=True)
+                      db: Session = Depends(get_db), settings: Settings = Depends(get_settings),
+                      clock=Depends(get_clock)) -> dict:
+    engine = db.get_bind()
+    search_boundary.release(db)
+    return search_runtime.open_chunk(engine, principal, settings, chunk_id, clock=clock)

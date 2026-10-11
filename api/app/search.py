@@ -192,6 +192,8 @@ def settle(db: Session, usage_id: uuid.UUID, *, tokens: int | None = None,
            units: int | None = None, price: float | None = None, rejected: bool = False,
            response_model_id: str | None = None, response_provider: str | None = None) -> str:
     usage = db.get(SearchUsage, usage_id, with_for_update=True)
+    if usage.reservation_token is not None:
+        raise ApiError(503, 'search_reservation_binding_required')
     if usage.status in ("completed", "rejected"):
         status = usage.cost_status
         db.commit()
@@ -475,7 +477,7 @@ def rerank(query: str, docs: list[str], settings: Settings) -> RerankResult:
         if units is not None and (type(units) is not int or units < 0):
             raise ValueError()
         return RerankResult(data["results"], tokens, units, response_model, response_provider)
-    except (KeyError, TypeError, ValueError):
+    except (KeyError, TypeError, ValueError, OverflowError):
         raise RerankError("rerank_response_invalid", response_model_id=response_model,
                           response_provider=response_provider) from None
 
