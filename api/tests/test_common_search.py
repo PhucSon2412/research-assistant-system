@@ -255,7 +255,7 @@ def test_forbidden_copies_never_take_a_top_k_slot(w, monkeypatch):
     """With top-k 1, a revoked copy's stronger keyword and nearer vector rows must not win the only slot."""
     w.settings.search.keyword_top_k = 1
     w.settings.search.vector_top_k = 1
-    with w.api.engine.begin() as conn:
+    with w.api.setup_engine.begin() as conn:
         # Out-of-band: the revoked copy's rows (still present) match best on both lists.
         conn.execute(text("SET LOCAL session_replication_role = replica"))
         conn.execute(text("""UPDATE embedding_calls SET vector='[1,0,0]' WHERE source_file_id IN
@@ -353,7 +353,7 @@ def test_serving_gate_rechecks_rights_publication_epoch_and_generation(w, monkey
 
 def test_chunk_of_another_file_or_version_of_the_copy_stays_closed(w):
     """Derived rows are matched on their own version/file: only the rights' file of the active version opens."""
-    with w.api.engine.begin() as conn:
+    with w.api.setup_engine.begin() as conn:
         conn.execute(text("SET LOCAL session_replication_role = replica"))
         version = conn.scalar(text("INSERT INTO paper_versions (item_id, version_label) VALUES (:i, 'v2') RETURNING id"),
                               {"i": uuid.UUID(w.ok)})
@@ -454,18 +454,19 @@ def test_revoke_before_retrieval_blocks_new_requests_before_cleanup(w, monkeypat
 def test_revoke_before_rerank_sends_nothing(w, monkeypatch):
     sent = []
     fake_rerank(monkeypatch, sent)
-    original = search_module.reserve
+    from app import search_boundary
+    original = search_boundary.checkpoint
 
-    def revoke_after_reservation(db, principal, cfg, task, amount):
-        usage = original(db, principal, cfg, task, amount)
-        if task == "rerank":
+    def revoke_after_reservation(engine, phase, operation):
+        result = original(engine, phase, operation)
+        if phase == "reservation":
             revoke_in_own_session(w.api, w.ok)
-        return usage
-    monkeypatch.setattr("app.search.reserve", revoke_after_reservation)
+        return result
+    monkeypatch.setattr(search_boundary, "checkpoint", revoke_after_reservation)
     response = search(w.admin, rerank=True)
     assert (response.status_code, response.json()) == (409, {"error": "search_scope_changed"})
-    assert sent == [] and rerank_usage_statuses(w) == ["rejected"]
-    monkeypatch.setattr("app.search.reserve", original)
+    assert sent == [] and rerank_usage_statuses(w) == ["reserved"]  # conservative, never dispatched
+    monkeypatch.setattr(search_boundary, "checkpoint", original)
     assert_gone_for_new_requests(w)
 
 
@@ -482,35 +483,40 @@ def test_revoke_during_rerank_withholds_the_response(w, monkeypatch):
 
 
 def test_revoke_committed_before_the_response_lock_withholds_it(w, monkeypatch):
-    original = search_module._lock_hits
+    from app import search_runtime
+    original = search_runtime.locks
 
-    def revoke_then_lock(db, rows, collection_id):
-        revoke_in_own_session(w.api, w.ok)
-        return original(db, rows, collection_id)
-    monkeypatch.setattr("app.search._lock_hits", revoke_then_lock)
+    def revoke_then_lock(db, *args):
+        if db.info.get('search_phase') == 'response':
+            revoke_in_own_session(w.api, w.ok)
+        return original(db, *args)
+    monkeypatch.setattr(search_runtime, "locks", revoke_then_lock)
     response = search(w.admin)
     assert (response.status_code, response.json()) == (409, {"error": "search_scope_changed"})
-    monkeypatch.setattr("app.search._lock_hits", original)
+    monkeypatch.setattr(search_runtime, "locks", original)
     assert_gone_for_new_requests(w)
 
 
 def test_revoke_waiting_on_the_response_lock_lets_that_response_finish(w, monkeypatch):
-    original = search_module._lock_hits
+    from app import search_runtime
+    original = search_runtime.locks
     done = {}
 
-    def lock_then_revoke(db, rows, collection_id):
-        original(db, rows, collection_id)
+    def lock_then_revoke(db, *args):
+        original(db, *args)
+        if db.info.get('search_phase') != 'response':
+            return
         thread = Thread(target=lambda: done.setdefault("status", revoke(w.api.admin_browser(), w.ok).status_code))
         thread.start()
         wait_for_lock_wait(w.api)  # the revoke waits on the item lock this response holds
         done["thread"] = thread
-    monkeypatch.setattr("app.search._lock_hits", lock_then_revoke)
+    monkeypatch.setattr(search_runtime, "locks", lock_then_revoke)
     response = search(w.admin)
     # The response passed its last check before t_rev and is sent whole (a stated limit).
     assert hit_items(response) == {w.ok}
     done["thread"].join(10)
     assert done["status"] == 200
-    monkeypatch.setattr("app.search._lock_hits", original)
+    monkeypatch.setattr(search_runtime, "locks", original)
     assert_gone_for_new_requests(w)
 
 

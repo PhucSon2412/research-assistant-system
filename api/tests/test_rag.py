@@ -22,6 +22,7 @@ from app.search import reserve
 from tests.test_search import indexed
 from tests.test_private_index import fake_provider, settings_with_fake_key
 from tests.test_uploads import upload_api
+from tests.test_c2c1_bootstrap import installation  # noqa: F401 - fixture dependency
 from tests.test_pdf_ingest import partial_pdf, upload_pdf
 from app.ingest.worker import process_job
 from app.ingest.embedding import EmbeddingResult

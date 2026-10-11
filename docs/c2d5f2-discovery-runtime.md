@@ -1,5 +1,7 @@
 # C2d-5f2 — discovery harvesting qua runtime
 
+**Đã merge PR #56 `808337dc`, 2026-10-11:** tree khớp `d957872`, source `0046`. Kết quả dưới đây giữ source trước merge; chưa rerun tại merge. Bước tiếp theo là [C2d-6 search/query/rerank](tasks/m6c2b2c2d6-search-query-rerank-runtime.md), mới giao, chưa triển khai/kiểm. **Safety pending tới C4**; các trạng thái chờ review bên dưới là lịch sử.
+
 Nhánh `feat/m6c2b2c2d5f2-discovery-runtime`, base PR #55 merge `e6b5991dd7ea9df6b8a5d9307f100ab0b87c7faa`, source **0045 → 0046**. PR chờ review, không merge. **Safety pending tới C4**. [Kế hoạch MVP](mvp-delivery-plan.md) · [Inventory](c2d5f2-test-inventory.json) · [Task](tasks/m6c2b2c2d5f2-discovery-runtime.md).
 
 ## Luồng và phạm vi

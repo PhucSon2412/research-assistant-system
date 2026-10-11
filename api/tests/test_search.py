@@ -192,7 +192,7 @@ def test_scope_changes_before_rerank_and_response(upload_api, monkeypatch):
     monkeypatch.setattr(module, "hydrate", revoke_before_hydrate)
     monkeypatch.setattr(module, "rerank", lambda *args: payload.append("provider"))
     resp = browser.post("/search", {"query": "keyword", "mode": "keyword", "rerank": True})
-    assert resp.status_code == 200 and resp.json()["count"] == 0
+    assert resp.status_code == 409 and resp.json() == {"error": "search_scope_changed"}
     assert "provider" not in payload
 
 
@@ -473,6 +473,7 @@ def test_parallel_query_embedding_obeys_shared_concurrency(upload_api, monkeypat
 
 def test_worker_index_and_query_embedding_share_concurrency(upload_api, monkeypatch):
     api, storage = upload_api
+    monkeypatch.setattr("app.ingest.worker.utcnow", lambda: api.clock.now)
     api.create_user("a@example.org")
     api.create_user("b@example.org")
     a, b = api.user_browser("a@example.org"), api.user_browser("b@example.org")

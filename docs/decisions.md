@@ -1,5 +1,13 @@
 # Nhật ký quyết định
 
+## Sau merge PR #56: ước lượng và giao C2d-6 — 2026-10-11
+
+Đã fetch/xác minh PR #56 merge `808337dcccfa472eefb05f2c968250948bae9bc2`, head `d957872` là ancestor, tree khớp; source `0046`, không truy vấn DB dev. Giữ [kế hoạch MVP](mvp-delivery-plan.md): khoảng 2–3 tuần có bản end-to-end, 4–6 tuần nghiệm thu nhóm nhỏ; còn khoảng 16–27 ngày làm việc theo các gói, không là cam kết/SLO. Discovery hoàn tất giảm một phần runtime; chưa có chứng cứ để rút ngắn tích hợp, provider thật hoặc vận hành.
+
+Theo ủy quyền hiện có, chọn [C2d-6 search/query embedding/rerank runtime](tasks/m6c2b2c2d6-search-query-rerank-runtime.md) trong một PR, gồm POST search, query/rerank accounting và chunk viewer. Giữ ranking/model/quota/common rights; content authorization tách late financial settlement. RAG/generation là gói kế tiếp; không cấp quyền rộng hoặc fallback legacy để gọi toàn bộ đã chuyển. Safety pending C4, không mở giá hoặc thao tác dev.
+
+PR #56 đã merge khi docs review/task của orchestrator còn untracked. Chuyển việc đưa đủ docs vào commit và kiểm link theo cây Git sang PR C2d-6; không mở lại PR #56 hoặc tạo task code riêng. Task C2d-6 mới giao, chưa triển khai/kiểm. Kết quả review/agent PR #56 giữ theo source riêng, chưa rerun tại merge. Các trạng thái nhánh review bên dưới là lịch sử.
+
 ## Discovery runtime C2d-5f2 (2026-10-11, nhánh review)
 
 Hiện thực lựa chọn scoped trong task: lease toàn installation trên coordinator có sẵn, nonce/clock PostgreSQL, pacing ngoài DB, async transport có deadline/cancel; HTTP GET có thể lặp sau crash. Page/retarget/cursor/counter cùng transaction. Fan-out cap mặc định **2.000**, tối đa **50.000**, nhằm giới hạn hàng nạp/khóa/ghi; đây là giá trị cần đo, không SLO. Vượt cap rollback page và backoff, operator có thể tăng trong giới hạn; không outbox/eventual-link.
@@ -1628,3 +1636,9 @@ Runtime worker/beat chỉ được kiểm bằng override cô lập; mặc đị
 [Handoff](c2d5d2b-document-index-runtime.md) · [Inventory](c2d5d2b-test-inventory.json). Theo phạm vi đã giao, chọn content boundary riêng và financial maintenance riêng; revision `0043` thêm nonce/job/token trên ledger có sẵn, không grants/bảng dẫn xuất mới. Completed response settle usage ngay cả khi quyền mất, rồi transaction khác kiểm đầy đủ trước vector/entry; không bỏ chi phí vì job/revoke/cleanup thắng. Crash giữa financial settlement và vector commit giữ completed không vector, không tự gọi lại; operator đối soát còn riêng. Hash sau entry cuối bắt buộc kể cả reuse; giữ khe overwrite tới provider/commit được nêu thẳng. Worker không tự terminal sau mất quyền; runtime claim dùng item SKIP.
 
 Đây là lựa chọn scoped, không bất biến kiến trúc hoặc xác nhận mới của chủ dự án về common billing. Giữ config app $10/ngày, embedding $3/ngày, private $1/User/ngày; common NULL owner/application-only theo quyết định cũ; không mở pricing. Source có `_locked` alias extraction dù prompt nói import thiếu; bỏ phụ thuộc alias trong indexer. Query/rerank/RAG/background khác, default Compose/API/C3/C4, charge/SLO riêng. Safety pending tới C4.
+
+## Quyết định triển khai C2d-6 (2026-10-11)
+
+Theo gói task do chủ dự án giao, HTTP search/viewer chuyển sang `search_runtime` và `search_accounting`; giữ `app.search.search` cho RAG/evaluation compatibility. Không đổi model, retrieval/RRF, giá hoặc quyền common; không chứng nhận RAG runtime. Revision `0047` thêm nonce/operation/session binding query/rerank, all-NULL cho lịch sử/generation; legacy renew/settle không nhận nonce mới. Session ID không FK để late financial settlement không mất ownership sau dọn session.
+
+Scope đổi giữa attempt dừng `409 search_scope_changed` (thay expectation cũ 200 rỗng), viewer stale vẫn 404. Financial commit/release không rõ dừng attempt, không degraded success hay tự retry provider; lease hết giải slot, giữ ceiling. Giữ ngưỡng/cap/warnings hiện hành, generation vẫn vào app total. Boundary, caller map và giới hạn response sau release ở [handoff](c2d6-search-query-rerank-runtime.md). Safety pending tới C4, chưa mở pricing/cutover.
