@@ -1,5 +1,7 @@
 # C2d-6 — search/query embedding/rerank runtime
 
+**Cập nhật sau review:** PR #57 đã merge `2e948b78157bf4d498bdca4ea52ca81dd85c15c1`, tree khớp head `44f1da1`; chưa rerun tại merge. [Review độc lập](reviews/pr57-c2d6-search-query-rerank-runtime.md) giữ chứng cứ riêng. Giao [C2d-7 RAG/generation runtime](tasks/m6c2b2c2d7-rag-generation-runtime.md), mới giao, chưa triển khai/kiểm; safety vẫn pending C4. Nội dung kiểm chứng bên dưới giữ source/lượt trước merge.
+
 Nhánh `feat/m6c2b2c2d6-search-query-rerank-runtime`, base PR #56 merge `808337dcccfa472eefb05f2c968250948bae9bc2` (đã fetch và kiểm tree `a5d0e02b`, khớp head `d957872`). Source **0046 → 0047**; không query revision DB dev. **Safety pending tới C4**, RAG/generation runtime còn riêng. [Task](tasks/m6c2b2c2d6-search-query-rerank-runtime.md) · [Inventory](c2d6-test-inventory.json) · [Kế hoạch MVP](mvp-delivery-plan.md).
 
 ## Caller và transaction

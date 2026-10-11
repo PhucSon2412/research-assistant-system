@@ -1,6 +1,6 @@
 """Financial authority only: capacity -> usage -> flush -> journal -> binding/clock.
 
-No content, caller renewal, provider dispatch or generation adoption. An expired
+No content, caller renewal or provider dispatch. An expired
 lease loses its slot and keeps its ceiling; late settlement never restores access.
 """
 import threading
@@ -24,7 +24,7 @@ FIELDS = ('id', 'user_id', 'session_id', 'operation_id', 'reservation_token', 'd
 
 def matches(row, proof):
     return (row is not None and proof.reservation_token is not None
-        and proof.task_type in ('embed_query', 'rerank')
+        and proof.task_type in ('embed_query', 'rerank', 'generation')
         and all(getattr(row, k) == getattr(proof, k) for k in FIELDS))
 
 
@@ -39,17 +39,26 @@ def final(db, row, proof, clock, *, deadline=None):
     snapshot = frozen(row)
     auth_safety.require_final(db, writer=True)
     db.refresh(row)
-    if not matches(row, proof) or frozen(row) != snapshot or (deadline and clock() >= deadline):
+    at = clock()  # even settlement/duplicate proofs sample after SQL and journal wait
+    if not matches(row, proof) or frozen(row) != snapshot or (deadline and at >= deadline):
         raise s.ApiError(503, 'search_reservation_lost')
 
 
 def costs(row):
-    return {'status': row.cost_status, 'estimated_usd': str(row.cost_usd) if row.cost_usd is not None else None,
+    value = {'status': row.cost_status, 'estimated_usd': str(row.cost_usd) if row.cost_usd is not None else None,
         'reserved_usd': str(row.reserved_usd), 'input_tokens': row.input_tokens,
         'search_units': row.search_units, 'warnings': list(row.warnings)}
+    if row.task_type == 'generation':
+        value.pop('search_units')
+        value['output_tokens'] = row.output_tokens
+    return value
 
 
-def settle(engine, proof, settings, *, tokens=None, units=None, rejected=False,
+def policy_for(settings, task):
+    return settings.embedding if task == 'embed_query' else settings.generation if task == 'generation' else settings.rerank
+
+
+def settle(engine, proof, settings, *, tokens=None, units=None, output_tokens=None, rejected=False,
            response_model_id=None, response_provider=None, clock=utcnow):
     boundary.entry(engine)
     def write(db, outcome):
@@ -63,6 +72,19 @@ def settle(engine, proof, settings, *, tokens=None, units=None, rejected=False,
             row.response_model_id, row.response_provider = response_model_id, response_provider
             if rejected:
                 row.status, row.cost_usd, row.cost_status = 'rejected', Decimal(0), 'rejected_no_charge'
+            elif row.task_type == 'generation':
+                policy = settings.generation
+                valid = (type(tokens) is int and 0 <= tokens <= policy.max_input_tokens_estimate
+                    and type(output_tokens) is int and 0 <= output_tokens <= policy.max_output_tokens
+                    and response_model_id == proof.model_id and isinstance(response_provider, str)
+                    and bool(response_provider))
+                amount = (s.money(tokens, policy.max_input_usd_per_million_tokens)
+                    + s.money(output_tokens, policy.max_output_usd_per_million_tokens)) if valid else None
+                if amount is not None and amount <= row.reserved_usd:
+                    row.status, row.cost_usd, row.cost_status = 'completed', amount, 'usage_price_estimate'
+                    row.input_tokens, row.output_tokens = tokens, output_tokens
+                else:
+                    row.status, row.cost_status = 'uncertain', 'unknown_reserved_ceiling'
             elif tokens is not None:
                 price = settings.embedding.max_usd_per_million_tokens if row.task_type == 'embed_query' else settings.rerank.max_usd_per_million_tokens
                 if type(tokens) is not int or tokens < 0 or (units is not None and (type(units) is not int or units < 0)):
@@ -92,7 +114,7 @@ def renew(engine, proof, settings, *, clock=utcnow):
         old, at = row.lease_until, clock()
         if old <= at:
             return False
-        policy = settings.embedding if row.task_type == 'embed_query' else settings.rerank
+        policy = policy_for(settings, row.task_type)
         row.lease_until = max(old, at + timedelta(seconds=policy.reservation_lease_seconds))
         final(db, row, proof, clock, deadline=old)
         boundary.commit(db, outcome)
@@ -129,7 +151,7 @@ def reap(engine, settings, *, clock=utcnow):
 @contextmanager
 def heartbeat(engine, proof, settings, *, clock=utcnow):
     stopped, failed = threading.Event(), threading.Event()
-    policy = settings.embedding if proof.task_type == 'embed_query' else settings.rerank
+    policy = policy_for(settings, proof.task_type)
     def run():
         while not stopped.wait(max(1, policy.reservation_lease_seconds // 3)):
             try:
@@ -149,10 +171,10 @@ def heartbeat(engine, proof, settings, *, clock=utcnow):
 
 
 def admit(db, principal, settings, task, amount, operation_id, clock):
-    if task not in ('embed_query', 'rerank'):
+    if task not in ('embed_query', 'rerank', 'generation'):
         raise s.ApiError(503, 'search_task_invalid')
-    day = clock().date()
     locked(db, settings)
+    day = clock().date()
     if task == "embed_query":
         active_document = db.scalar(select(func.count()).select_from(EmbeddingCall).where(
             EmbeddingCall.status == "reserved", EmbeddingCall.lease_until > clock()))
@@ -165,6 +187,11 @@ def admit(db, principal, settings, task, amount, operation_id, clock):
             SearchUsage.task_type == "rerank", SearchUsage.status == "reserved", SearchUsage.lease_until > clock()))
         if active_rerank >= settings.rerank.max_concurrent_requests:
             raise s.ApiError(429, "search_rerank_concurrency_limit")
+    else:
+        active = db.scalar(select(func.count()).select_from(SearchUsage).where(
+            SearchUsage.task_type == 'generation', SearchUsage.status == 'reserved', SearchUsage.lease_until > clock()))
+        if active >= settings.generation.max_concurrent_requests:
+            raise s.ApiError(429, 'rag_generation_concurrency_limit')
     used = s._total(db, day)
     doc = db.get(EmbeddingBudgetDay, day)
     doc_used = (doc.committed_usd + doc.reserved_usd) if doc else Decimal(0)
@@ -200,6 +227,17 @@ def admit(db, principal, settings, task, amount, operation_id, clock):
             warnings.append("rerank_bucket_near_limit")
         model = settings.rerank.model_id
         lease_seconds = settings.rerank.reservation_lease_seconds
+    else:
+        spend = s._total(db, day, 'generation')
+        cap = Decimal(str(settings.budget.generation_daily_usd))
+        if spend + amount > cap:
+            raise s.ApiError(429, 'rag_generation_budget_exhausted')
+        if s._total(db, day, 'generation', principal.user_id) + amount > Decimal(str(settings.budget.user_generation_daily_usd)):
+            raise s.ApiError(429, 'rag_user_budget_exhausted')
+        if spend + amount >= cap * Decimal(str(settings.budget.generation_warning_fraction)):
+            warnings.append('generation_bucket_near_limit')
+        model = settings.generation.model_id
+        lease_seconds = settings.generation.reservation_lease_seconds
     usage = SearchUsage(reservation_token=uuid.uuid4(), operation_id=operation_id, session_id=principal.session_id, user_id=principal.user_id, day=day, task_type=task, model_id=model,
         provider="openrouter", status="reserved", reserved_usd=amount, cost_status="unknown",
         warnings=warnings, lease_until=clock() + timedelta(seconds=lease_seconds))

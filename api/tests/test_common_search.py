@@ -457,8 +457,8 @@ def test_revoke_before_rerank_sends_nothing(w, monkeypatch):
     from app import search_boundary
     original = search_boundary.checkpoint
 
-    def revoke_after_reservation(engine, phase, operation):
-        result = original(engine, phase, operation)
+    def revoke_after_reservation(engine, phase, operation, **kwargs):
+        result = original(engine, phase, operation, **kwargs)
         if phase == "reservation":
             revoke_in_own_session(w.api, w.ok)
         return result

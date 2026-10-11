@@ -1,6 +1,8 @@
 # Thiết kế search và RAG
 
-**C2d-6 (nhánh review, chưa merge):** HTTP search/query embedding/rerank và chunk viewer dùng checkpoint runtime, nonce financial và final caller/resource mới; [hợp đồng và kiểm chứng](c2d6-search-query-rerank-runtime.md). Source `0047`, safety pending C4. RAG giữ compatibility legacy và chờ gói runtime kế tiếp.
+**C2d-7 trên nhánh review:** toàn luồng RAG dùng runtime retrieval, evidence proof, generation nonce/admission/pre-send/heartbeat/settlement và final response; source `0048`, chưa merge. [Handoff/caller map](c2d7-rag-generation-runtime.md) · [Inventory](c2d7-test-inventory.json). Giữ pack/ranking/model/quota, không streaming. **Safety pending C4**. Nội dung lịch sử bên dưới không là pass mới.
+
+**Trạng thái runtime:** PR #57/C2d-6 đã merge `2e948b7`, source `0047`; HTTP search/query/rerank và viewer dùng [checkpoint runtime](c2d6-search-query-rerank-runtime.md). RAG orchestration/generation vẫn legacy. Đã giao [C2d-7](tasks/m6c2b2c2d7-rag-generation-runtime.md) cho cả luồng trong một PR, **chưa triển khai/kiểm**; hợp đồng task là đích triển khai, chưa là hành vi code. Safety pending C4.
 
 [Mục lục](README.md) · [Quyền và dữ liệu](access-and-data.md) · [Kiểm thử](testing.md)
 

@@ -1,6 +1,8 @@
 # Tài liệu dự án
 
-**C2d-6 trên nhánh review (chưa merge):** search keyword/hybrid, query embedding/rerank và chunk viewer qua runtime riêng, source `0047`; [handoff](c2d6-search-query-rerank-runtime.md) giữ kết quả kiểm và giới hạn. RAG/generation runtime là gói kế tiếp; **safety pending tới C4**. Docs orchestrator bị sót đã được đưa vào commit của nhánh này. Các mốc giao/chưa triển khai bên dưới là lịch sử.
+**Trạng thái hiện hành:** C2d-7 RAG/generation trên nhánh review, source `0048`, chưa merge; [handoff](c2d7-rag-generation-runtime.md) · [inventory](c2d7-test-inventory.json). Base PR #57 merge `2e948b7`, `0047`. **Safety pending tới C4**. Gói A còn review; tiếp C3 + hồi quy/debt/tích hợp C4 theo [kế hoạch MVP](mvp-delivery-plan.md). Docs orchestrator/review/task được giữ trong PR C2d-7.
+
+**C2d-6 đã merge:** [handoff](c2d6-search-query-rerank-runtime.md) và [review PR #57](reviews/pr57-c2d6-search-query-rerank-runtime.md) giữ chứng cứ trước merge, chưa rerun tại merge. Không phát hiện điểm chặn merge mới trong phạm vi đã review; không chứng nhận RAG runtime, provider thật hoặc cutover. Các trạng thái nhánh review bên dưới là lịch sử.
 
 **Mốc trước C2d-6 (lịch sử); [kế hoạch hoàn thành MVP](mvp-delivery-plan.md):** trạng thái, ước lượng và checklist nghiệm thu cố định. PR #56 đã merge `808337dc` (tree khớp `d957872`), source `0046`, **safety pending tới C4**. [C2d-6 search/query embedding/rerank runtime](tasks/m6c2b2c2d6-search-query-rerank-runtime.md) mới giao, chưa triển khai/kiểm. [Review PR #56](reviews/pr56-c2d5f2-discovery-runtime.md) giữ chứng cứ trước merge; docs bị sót được đưa vào PR kế tiếp. Các trạng thái OPEN bên dưới là lịch sử, không là pass mới tại merge.
 

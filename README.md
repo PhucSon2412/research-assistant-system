@@ -1,6 +1,6 @@
 # Research Assistant System
 
-**C2d-6 trên nhánh review (chưa merge):** search keyword/hybrid, query embedding/rerank và chunk viewer qua runtime riêng, source `0047`; [handoff](docs/c2d6-search-query-rerank-runtime.md) giữ kết quả kiểm và giới hạn. RAG/generation runtime là gói kế tiếp; **safety pending tới C4**. Docs orchestrator bị sót đã được đưa vào commit của nhánh này. Các mốc giao/chưa triển khai bên dưới là lịch sử.
+**Trạng thái hiện hành:** C2d-7 RAG/generation đã triển khai trên nhánh review, source `0048`, chưa merge; [handoff](docs/c2d7-rag-generation-runtime.md) và [inventory](docs/c2d7-test-inventory.json) giữ kết quả theo source kiểm. Base PR #57 merge `2e948b7`, source `0047`. **Safety pending tới C4**; tiếp C3 + hồi quy/debt/tích hợp C4 theo [kế hoạch MVP](docs/mvp-delivery-plan.md). Provider thật, pricing, restore/cutover còn riêng. Các mốc OPEN bên dưới là lịch sử.
 
 **Mốc trước C2d-6 (lịch sử, 2026-10-11):** PR #56 đã merge `808337dc`, source `0046`; **safety pending tới C4**. [Kế hoạch MVP và checklist nghiệm thu](docs/mvp-delivery-plan.md) giữ dự kiến 2–3 tuần cho bản chạy đầy đủ, 4–6 tuần cho MVP nhóm nhỏ theo các giả định đã ghi. Đã giao [C2d-6 search/query embedding/rerank runtime](docs/tasks/m6c2b2c2d6-search-query-rerank-runtime.md) thành một PR hoàn chỉnh, chưa triển khai/kiểm. Các mốc OPEN/kết quả bên dưới giữ lịch sử trước merge, không là chứng nhận bản đang chạy.
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import timedelta
 from threading import Thread
 
 import pytest
@@ -120,13 +121,14 @@ def test_every_account_asks_the_permitted_copy_and_never_anothers_private(w, mon
     fake_query_embedding(monkeypatch, [])
     sent = answering(monkeypatch)
     recorded = []
-    real_search = search_module.search
+    from app import search_runtime
+    real_search = search_runtime.search
 
     def recording_search(*args, **kwargs):
         found = real_search(*args, **kwargs)
-        recorded.append(found)
+        recorded.append(found[0])
         return found
-    monkeypatch.setattr("app.rag.search", recording_search)
+    monkeypatch.setattr("app.rag_runtime.retrieval.search", recording_search)
     others = {"a": w.b_same["item_id"], "b": w.a_main["item_id"], "admin": w.a_main["item_id"]}
     for who, browser in w.browsers.items():
         # Item scope: the common copy itself, for every account alike.
@@ -277,9 +279,10 @@ def cite_one_paper(evidence: list[dict]) -> list[dict]:
 @pytest.mark.parametrize("mode", ["keyword", "hybrid"])
 def test_comparison_cites_exactly_the_two_resolved_papers(w, monkeypatch, mode):
     fake_query_embedding(monkeypatch, [])
-    real_search = search_module.search
+    from app import search_runtime
+    real_search = search_runtime.search
     # Keep the real gate; a shared fixture term lets title resolution, not keyword matching, pick the pair.
-    monkeypatch.setattr("app.rag.search", lambda db, principal, cfg, query, m, *args, **kwargs:
+    monkeypatch.setattr("app.rag_runtime.retrieval.search", lambda db, principal, cfg, query, m, *args, **kwargs:
                         real_search(db, principal, cfg, "Sharedcanary result", m, *args, **kwargs))
     second = copy_of(w, extracted(w, w.a, SECOND), SECOND, index=True)
     for item, title, browser in ((w.ok, "Aurora Routing", w.admin), (second, "Birch Adapters", w.admin),
@@ -348,17 +351,19 @@ def assert_gone_for_new_requests(w, monkeypatch) -> None:
 
 def test_revoke_before_generation_sends_nothing(w, monkeypatch):
     sent = answering(monkeypatch)
-    original = rag_module.reserve
+    from app import rag_runtime
+    original = rag_runtime.checkpoint
 
-    def revoke_after_reservation(db, principal, cfg, task, amount):
-        usage = original(db, principal, cfg, task, amount)
+    def revoke_after_reservation(engine, phase, operation):
+        usage = original(engine, phase, operation)
+        if phase != "reservation": return usage
         revoke_in_own_session(w.api, w.ok)
         return usage
-    monkeypatch.setattr("app.rag.reserve", revoke_after_reservation)
+    monkeypatch.setattr("app.rag_runtime.checkpoint", revoke_after_reservation)
     response = ask(w.b)
     assert (response.status_code, response.json()) == (409, {"error": "rag_scope_changed"})
-    assert sent == [] and [row[1:] for row in generation_usage(w)] == [("rejected", "rejected_no_charge")]
-    monkeypatch.setattr("app.rag.reserve", original)
+    assert sent == [] and [row[1:] for row in generation_usage(w)] == [("reserved", "unknown")]
+    monkeypatch.setattr("app.rag_runtime.checkpoint", original)
     assert_gone_for_new_requests(w, monkeypatch)
 
 
@@ -448,31 +453,43 @@ def test_any_change_between_retrieval_and_response_withholds_the_answer(w, monke
     """Epoch, active version, rights file, generation, provider permission or membership changed after the
     pack was chosen: 409 before the provider (nothing sent) or before the response (sent before the change)."""
     params = ok_ids(w) | {"other": uuid.UUID(w.a_main["version_id"])}
-    original_reserve = rag_module.reserve
+    from app import rag_runtime
+    original_reserve = rag_runtime.checkpoint
     for label, (change, undo) in CHANGES.items():
         before = len(generation_usage(w))
         if stage == "before_generation":
             sent = answering(monkeypatch)
 
-            def change_after_reservation(db, principal, cfg, task, amount, change=change):
-                usage = original_reserve(db, principal, cfg, task, amount)
+            def change_after_reservation(engine, phase, operation, change=change):
+                usage = original_reserve(engine, phase, operation)
+                if phase != "reservation": return usage
                 _apply(w, change, params)
                 return usage
-            monkeypatch.setattr("app.rag.reserve", change_after_reservation)
+            monkeypatch.setattr("app.rag_runtime.checkpoint", change_after_reservation)
         else:
             sent = answering(monkeypatch, action=lambda change=change: _apply(w, change, params))
         response = ask(w.a, collection_id=w.collection)
         assert (response.status_code, response.json()) == (409, {"error": "rag_scope_changed"}), label
         usage = generation_usage(w)[before:]
         if stage == "before_generation":
-            assert sent == [] and [row[1] for row in usage] == ["rejected"], label
+            assert sent == [] and [row[1] for row in usage] == ["reserved"], label
+            # Each matrix row is an independent attempt. Pre-send denial keeps
+            # its ceiling and live slot until expiry; do not loosen concurrency
+            # or pretend a definitely uncharged rejection to reset the fixture.
+            from app import search_accounting
+            w.api.clock.now += timedelta(seconds=w.settings.generation.reservation_lease_seconds + 1)
+            search_accounting.reap(w.api.engine, w.settings, clock=lambda: w.api.clock.now)
+            assert w.api.scalar("SELECT count(*) FILTER (WHERE status='reserved')=0 AND "
+                "count(*) FILTER (WHERE status='uncertain' AND cost_usd IS NULL AND reserved_usd>0)>0 "
+                "FROM search_usage WHERE user_id=:id AND task_type='generation'", id=usage[0][0]), label
         else:
             [payload] = sent
             assert w.ok in evidence_items(payload) and [row[1] for row in usage] == ["completed"], label
-        monkeypatch.setattr("app.rag.reserve", original_reserve)
+        monkeypatch.setattr("app.rag_runtime.checkpoint", original_reserve)
         _apply(w, undo, params)
         sent = answering(monkeypatch)
-        assert ask(w.a, collection_id=w.collection).json()["status"] == "answered", label
+        restored = ask(w.a, collection_id=w.collection)
+        assert restored.status_code == 200 and restored.json()["status"] == "answered", (label, restored.text)
         assert w.ok in evidence_items(sent[-1]), label
 
 
@@ -480,21 +497,24 @@ def test_a_half_opt_in_fails_closed_and_sends_nothing(w, monkeypatch):
     """Control for a partial opt-in: a recheck that forgets ``include_common`` loses the common rows and must
     surface as 409 (never an answer with unchecked text); a retrieval that forgets it never finds common text."""
     sent = answering(monkeypatch)
-    real_hydrate = rag_module.hydrate
-    monkeypatch.setattr("app.rag.hydrate", lambda *args, **kwargs: real_hydrate(*args, **(kwargs | {
+    real_hydrate = search_module.hydrate
+    monkeypatch.setattr(search_module, "hydrate", lambda *args, **kwargs: real_hydrate(*args, **(kwargs | {
         "include_common": False})))
     for who, browser in w.browsers.items():
         response = ask(browser, item_id=w.ok)
         assert (response.status_code, response.json()) == (409, {"error": "rag_scope_changed"}), who
     assert sent == [] and generation_usage(w) == []
-    monkeypatch.setattr("app.rag.hydrate", real_hydrate)
-    real_search = rag_module.search
-    monkeypatch.setattr("app.rag.search", lambda *args, **kwargs: real_search(*args, **(kwargs | {
+    monkeypatch.setattr(search_module, "hydrate", real_hydrate)
+    real_scope = search_module._scope
+    monkeypatch.setattr(search_module, "_scope", lambda *args, **kwargs: real_scope(*args, **(kwargs | {
         "include_common": False})))
-    # The item scope is refused by search's own scope check; the all scope finds nothing for the Admin.
     assert ask(w.admin, item_id=w.ok).json() == MISSING
-    assert ask(w.admin).json()["status"] == "insufficient_evidence" and sent == []
-    monkeypatch.setattr("app.rag.search", real_search)
+    monkeypatch.setattr(search_module, "_scope", real_scope)
+    real_rank = search_module._rank
+    monkeypatch.setattr(search_module, '_rank', lambda *args, **kwargs: real_rank(*args, **(kwargs | {
+        'include_common': False})))
+    assert ask(w.admin).json()['status'] == 'insufficient_evidence' and sent == []
+    monkeypatch.setattr(search_module, '_rank', real_rank)
     assert ask(w.admin, item_id=w.ok).json()["status"] == "answered"
 
 

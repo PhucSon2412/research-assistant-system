@@ -205,18 +205,18 @@ def test_expiry_old_day_late_duplicate_settlement_and_no_legacy_adoption(ready):
     assert sql(b,'SELECT cost_usd FROM search_usage')==legacy.money(2,b.settings.embedding.max_usd_per_million_tokens)
     with Session(b.api.engine) as db,pytest.raises(ApiError,match='search_reservation_binding_required'):
         legacy.settle(db,p.id,tokens=1,price=1)
-    from app.rag import _settle
-    with Session(b.api.engine) as db,pytest.raises(ApiError,match='search_reservation_binding_required'):
-        _settle(db,p.id,b.settings)
+    from app.rag_runtime import settle as settle_generation
+    with pytest.raises(ApiError,match='rag_reservation_lost'):
+        settle_generation(b.api.engine,p,b.settings,tokens=1,output_tokens=1)
     assert len(b.calls)==1
 
 
 @pytest.mark.parametrize('phase',['presend','response'])
 def test_new_proof_after_commit_not_precommit_dto(ready,monkeypatch,phase):
     b=ready; original=boundary.checkpoint
-    def change(engine,name,operation):
+    def change(engine,name,operation,**kwargs):
         if name==phase: sql(b,'UPDATE library_items SET rights_epoch=rights_epoch+1 WHERE id=:i',i=b.item)
-        return original(engine,name,operation)
+        return original(engine,name,operation,**kwargs)
     monkeypatch.setattr(boundary,'checkpoint',change)
     response=request(b)
     assert response.status_code==409 and response.json()=={'error':'search_scope_changed'}
@@ -372,14 +372,13 @@ def test_cancellation_keeps_owned_reservation_and_stops_heartbeat(ready,monkeypa
     assert b.api.engine.pool.checkedout()==0 and not b.calls
 
 
-def test_schema_binding_rejects_partial_duplicate_and_generation_nonce(ready):
+def test_schema_binding_rejects_partial_and_duplicate_nonce(ready):
     b=ready
     assert request(b,rerank=False).status_code==200
     p=proof(b)
     # DB constraints protect direct runtime writes too, independently of Python matches().
     for statement in (
         "UPDATE search_usage SET operation_id=NULL WHERE id=:i",
-        "UPDATE search_usage SET task_type='generation' WHERE id=:i",
         """INSERT INTO search_usage(user_id,day,task_type,model_id,provider,status,reserved_usd,
             cost_status,reservation_token,operation_id,session_id)
             SELECT user_id,day,task_type,model_id,provider,status,reserved_usd,cost_status,

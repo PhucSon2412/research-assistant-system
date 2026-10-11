@@ -14,11 +14,16 @@ def release(db):
         raise ApiError(503, 'search_release_unavailable') from None
 
 
-def checkpoint(engine, phase, operation):
+def checkpoint(engine, phase, operation, *, domain='search'):
     db = Session(engine, expire_on_commit=False)
     outcome = runtime.Outcome()
     db.info['search_phase'] = phase
+    db.info['runtime_domain'] = domain
+    if domain == 'rag':
+        db.info['rag_phase'] = phase
     try:
+        runtime.require_runtime(db)
+        grants(db)
         result = operation(db, outcome)
     except BaseException as exc:
         try:
@@ -43,11 +48,9 @@ def commit(db, outcome):
         raise ApiError(503, 'search_commit_uncertain') from None
 
 
-def entry(engine):
-    def check(db, _):
-        runtime.require_runtime(db)
-        missing = db.scalar(text("""SELECT EXISTS (
-            SELECT 1 FROM unnest(ARRAY['search_usage','search_request_days']) t(name)
+def grants(db):
+    missing = db.scalar(text("""SELECT EXISTS (
+            SELECT 1 FROM unnest(ARRAY['search_usage','search_request_days','rag_request_days']) t(name)
             CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE']) p(name)
             WHERE NOT has_table_privilege(t.name,p.name))
             OR NOT has_table_privilege('library_items','UPDATE')
@@ -57,7 +60,11 @@ def entry(engine):
                 'embedding_user_budget_days','collections','collection_items','access_rights',
                 'common_publications','deletion_tombstones','ingestion_jobs','sessions','users']) t(name)
             WHERE NOT has_table_privilege(t.name,'SELECT'))"""))
-        if missing is not False:
-            raise ApiError(503, 'search_runtime_grants_missing')
+    if missing is not False:
+        raise ApiError(503, 'search_runtime_grants_missing')
+
+
+def entry(engine, *, domain='search'):
+    def check(db, _):
         auth_safety.require_writer(db)
-    return checkpoint(engine, 'entry', check)
+    return checkpoint(engine, 'entry', check, domain=domain)

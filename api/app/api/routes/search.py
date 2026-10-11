@@ -1,7 +1,7 @@
 """Authenticated full-text search: the caller's private items and servable common copies (M6b-2b3a).
 
-HTTP uses short runtime checkpoints. RAG keeps its separate legacy orchestrator
-and also opts in to permitted common text; generation runtime is a later task.
+HTTP and RAG share short runtime retrieval checkpoints. Generation has its own
+content orchestration and nonce-bound financial attempt.
 """
 import uuid
 from typing import Literal
