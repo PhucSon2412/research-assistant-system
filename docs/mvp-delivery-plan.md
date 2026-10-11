@@ -10,9 +10,10 @@ Ngày chốt **2026-10-11**. Chủ dự án giao orchestrator chọn phạm vi v
 
 ## Trạng thái hiện tại
 
-- PR #55 đã merge tại `e6b5991dd7ea9df6b8a5d9307f100ab0b87c7faa`; tree khớp head review `bca5d90`. Source migration **0045**; không suy revision DB dev.
+- PR #56 đã merge tại `808337dcccfa472eefb05f2c968250948bae9bc2`; head review `d957872` là ancestor, tree khớp. Source migration **0046**; không suy revision DB dev.
 - Các chức năng chính đã có, nhưng đợt chuyển auth/runtime chưa kết thúc. **Safety vẫn pending tới C4**; không coi Compose dev đang lỗi readiness/restart là một bản sẵn dùng.
-- Citation reconcile đã chuyển runtime. **[C2d-5f2 discovery harvesting](c2d5f2-discovery-runtime.md)** đã triển khai trên nhánh review, source `0046`: direct/CLI/Celery, lease/pacing và page/cursor nguyên tử; kết quả/giới hạn tại handoff và inventory, chưa merge.
+- Citation reconcile và [discovery harvesting](c2d5f2-discovery-runtime.md) đã chuyển runtime. [Review PR #56](reviews/pr56-c2d5f2-discovery-runtime.md) giữ kết quả trước merge; chưa rerun tại merge. Docs orchestrator còn modified/untracked được giao đưa vào PR kế tiếp, không mở lại PR #56.
+- Đã giao [C2d-6 search/query embedding/rerank](tasks/m6c2b2c2d6-search-query-rerank-runtime.md) thành một PR hoàn chỉnh; mới giao, chưa triển khai/kiểm.
 - Còn search/query/rerank, RAG/generation, operator recovery và tích hợp/cutover. Private deletion/restore, provider thật và vận hành triển khai cần nghiệm thu riêng.
 - Nhãn đánh giá RAG hiện còn `pending_human_review`. Charge thật chưa đối soát; không bật `pricing_verified` bằng kết quả provider giả.
 
@@ -22,13 +23,15 @@ Ngày chốt **2026-10-11**. Chủ dự án giao orchestrator chọn phạm vi v
 
 | Gói | Phạm vi và đầu ra | Ước lượng | Trạng thái |
 | --- | --- | --- | --- |
-| A — hoàn tất runtime | Discovery trong một PR; search + query embedding + rerank trong một gói; RAG + generation trong một gói. Giữ quyền trước retrieval/provider và kế toán hiện hành | 5–8 ngày | C2d-5f2 chờ review; tiếp theo search/query embedding/rerank, rồi RAG/generation |
+| A — hoàn tất runtime | Search + query embedding + rerank trong một gói (2–3 ngày); RAG + generation trong một gói (2–3 ngày). Giữ quyền trước retrieval/provider và kế toán hiện hành | 4–6 ngày còn lại | Discovery đã merge PR #56; C2d-6 đã giao, chưa triển khai/kiểm; RAG/generation kế tiếp |
 | B — recovery và bản chạy đầy đủ | C3 CLI operator tối thiểu; xử lý debt hồi quy; C4 Compose/image/role/journal, readiness thật, HTTP/browser không patch pending, hai vòng restore/recover | 5–8 ngày | Chưa giao |
 | C — đóng yêu cầu sản phẩm còn thiếu | Xóa item private + chống xuất hiện lại sau restore; nghiệm thu duplicate/retry hiện hành, chỉ bổ sung chỗ thiếu để luồng dùng được | 2–4 ngày | Chưa giao |
 | D — provider và chất lượng | Smoke tổng hợp có trần chi phí, đối soát charge, routing/retention; sau đó thử paper được phép xử lý, người đọc kiểm câu trả lời/citation/abstention | 2–4 ngày | Chưa giao; chưa mở trả phí |
 | E — triển khai nhóm thử | HTTPS/cookie Secure, kênh invite/reset dùng được, rate limit, CI, journal độc lập, backup/retention/alert tối thiểu và nghiệm thu browser | 3–5 ngày | Chưa giao |
 
 **Dự kiến:** khoảng **2–3 tuần** để hoàn tất runtime/recovery và có bản end-to-end; khoảng **4–6 tuần tổng cộng từ mốc kế hoạch này** để nghiệm thu MVP cho nhóm nhỏ. Đây là khoảng lập kế hoạch, không phải cam kết ngày giao hay SLO. Cập nhật sau gói A và sau lần C4 đầu; nếu vượt khoảng, nêu rõ việc phát sinh và ảnh hưởng trước khi mở thêm scope.
+
+**Cập nhật sau merge PR #56, 2026-10-11:** tổng còn lại khoảng **16–27 ngày làm việc** theo bảng, có thể chồng một phần. Giữ dự báo thực tế **4–6 tuần**, vì discovery mới giảm một phần của gói A; lỗi tích hợp, debt, restore và nghiệm thu provider/triển khai vẫn chưa được đo đầy đủ. M6 kéo dài do phạm vi đã mở sang chống rollback auth sau restore và chuyển runtime toàn hệ thống, kèm nhiều PR theo endpoint. Hai gói runtime còn lại được gom theo luồng; không thêm tính năng ngoài checklist để kéo dài đích MVP. Usage limit hoặc chờ hạ tầng/charge có thể khiến lịch vượt khoảng, khi đó báo nguyên nhân cụ thể.
 
 ## Checklist nghiệm thu cố định
 

@@ -1,12 +1,12 @@
 # Roadmap đề xuất
 
-**C2d-5f2 chờ review, chưa merge:** [discovery runtime](c2d5f2-discovery-runtime.md), source `0046`; kết quả/giới hạn tại handoff/inventory. Tiếp theo search/query embedding/rerank trong một gói hoàn chỉnh. **Safety pending tới C4**; các mốc giao dưới đây giữ lịch sử.
+**Trạng thái hiện hành:** PR #56 đã merge `808337dc`, source `0046`. Đã giao [C2d-6 search/query embedding/rerank runtime](tasks/m6c2b2c2d6-search-query-rerank-runtime.md) thành một PR hoàn chỉnh, chưa triển khai/kiểm. **Safety pending tới C4**; các mốc giao dưới đây giữ lịch sử.
 
 ## Mốc hoàn thành MVP hiện hành — 2026-10-11
 
 Chủ dự án giao orchestrator chốt cách làm để hoàn thành dự án. [Kế hoạch MVP](mvp-delivery-plan.md) là nguồn theo dõi hiện hành: runtime discovery → search/query/rerank → RAG/generation; C3 + hồi quy/C4; private deletion/restore; provider/chất lượng; vận hành nhóm thử. Dự kiến 2–3 tuần cho runtime/recovery end-to-end, 4–6 tuần tổng cộng cho MVP theo giả định trong kế hoạch. Không mở thêm scope nâng cao trước checklist nghiệm thu; các ngưỡng đề xuất vẫn cần đo, không tự thành SLO.
 
-PR #55 đã merge `e6b5991dd7ea9df6b8a5d9307f100ab0b87c7faa`, tree khớp `bca5d90`, source `0045`. **Đang giao [C2d-5f2 discovery runtime](tasks/m6c2b2c2d5f2-discovery-runtime.md), chưa triển khai/kiểm; safety pending tới C4.** Các mốc OPEN bên dưới giữ lịch sử trước merge. Không suy kết quả review/agent thành pass tại merge.
+PR #56 merge tree khớp `d957872`; [review](reviews/pr56-c2d5f2-discovery-runtime.md) và [handoff discovery](c2d5f2-discovery-runtime.md) giữ chứng cứ trước merge, chưa rerun tại merge. Docs orchestrator còn untracked được đưa vào PR C2d-6. Sau đó RAG/generation → C3/hồi quy/C4 và các gói còn lại trong kế hoạch; không mở thêm scope nâng cao trước MVP.
 
 **Review PR #55 tại `bca5d90`: không phát hiện điểm chặn merge mới trong phạm vi citation reconcile runtime.** Reviewer thực chạy **121/121 pass** (119 ca repo + hai smoke Linux CLI/Celery SIGKILL); đối chiếu riêng **313 artifact hash**, agent **1.203 unique pass / 3.534 not-run**, 327 source hash và 10 countercheck. PR **OPEN, chưa merge**, source `0045`, **safety pending tới C4**. [Report](reviews/pr55-c2d5f1-citation-reconcile-runtime.md). Sau merge mới giao C2d-5f2 discovery harvesting; search/query/rerank, RAG, tổng hồi quy C2d và C3/C4 giữ phạm vi riêng.
 
