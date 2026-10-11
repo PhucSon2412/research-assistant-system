@@ -1,4 +1,5 @@
 """Populated/provisioned 0038 -> 0039, least grants, pending and downgrade fence."""
+import json
 import uuid
 from types import SimpleNamespace
 import pytest
@@ -33,7 +34,12 @@ def test_0038_populated_provisioned_upgrade(empty_db_url,journal_path,app_env,mo
         raw=journal_path.read_bytes()
         upgrade(empty_db_url)
         with eng.connect() as db:
-            assert {t:db.execute(text(f'SELECT row_to_json(r)::text FROM {t} r')).scalars().all() for t in tables}==before
+            # Columns added by later revisions (0049 case_*) are NULL on every existing row; compare the rest.
+            later=('case_id','case_operator_id','case_user_id','case_action','case_operation_id','case_recorded_at')
+            for t in tables:
+                after=[json.loads(v) for v in db.execute(text(f'SELECT row_to_json(r)::text FROM {t} r')).scalars().all()]
+                assert all(row.pop(k,None) is None for row in after for k in later)
+                assert after==[json.loads(v) for v in before[t]]
             assert db.execute(text("SELECT oid,proowner,proacl::text FROM pg_proc WHERE proname='ras_auth_bootstrap_prepare'")).one()==bootstrap
             assert db.execute(text('SELECT creation_transaction_id,acceptance_transaction_id FROM invitations')).one()==(None,None)
             for role in ('c1_runtime','c1_recovery'):
