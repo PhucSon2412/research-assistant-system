@@ -106,21 +106,45 @@ class OperatorResult:
     account_live: bool
 
 
+class ConnectionReleaseFailed(OperatorRefused):
+    """Rollback/close of a finished phase failed. The connection was invalidated and returned, but
+    the phase is not clean evidence: callers stop and classify by their own Attempt facts."""
+
+    def __init__(self):
+        super().__init__("connection_release_failed")
+
+
+def _release(conn) -> bool:
+    """Always hand the connection back; a failed rollback/close invalidates it (never pooled dirty).
+    Returns False when the release was not clean, even if the invalidate/close fallback succeeded."""
+    try:
+        conn.rollback()
+        conn.close()
+        return True
+    except Exception:  # noqa: BLE001 - reported to the caller, never swallowed as success
+        try:
+            conn.invalidate()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            conn.close()
+        except Exception:  # noqa: BLE001
+            pass
+        return False
+
+
 @contextmanager
 def connection(engine: Engine):
-    """Always hand the connection back; a failed rollback/close invalidates it (never pooled dirty)."""
+    """A phase's connection. The body's own error wins (a cleanup error never masks it); a clean body
+    followed by an unclean release raises ConnectionReleaseFailed instead of looking successful."""
     conn = engine.connect()
     try:
         yield conn
-    finally:
-        try:
-            conn.rollback()
-            conn.close()
-        except Exception:  # noqa: BLE001 - release must not mask the outcome
-            try:
-                conn.invalidate()
-            finally:
-                conn.close()
+    except BaseException:
+        _release(conn)
+        raise
+    if not _release(conn):
+        raise ConnectionReleaseFailed()
 
 
 def _timeout(conn, settings: Settings) -> None:
@@ -338,6 +362,22 @@ def mutate(engine: Engine, settings: Settings, prepared: Prepared, *, verifier: 
     """User -> tokens -> sessions -> journal exclusive -> stage -> append/fsync -> confirm -> commit."""
     case, snap0 = prepared.case, prepared.snap
     attempt = attempt or Attempt()
+    try:
+        return _mutate(engine, settings, prepared, case, snap0, verifier, clock, attempt, append)
+    except ConnectionReleaseFailed:
+        # Classified by the attempt's own facts; teardown never turns a commit into "not committed".
+        if attempt.committed:
+            if not attempt.written:
+                raise OperatorOutcomeError("auth_journal_unavailable", committed=True) from None
+            raise OperatorOutcomeError("connection_release_failed", committed=True) from None
+        if attempt.commit_started:
+            raise OperatorOutcomeError("auth_outcome_uncertain", committed=None) from None
+        if attempt.append_started:
+            raise OperatorOutcomeError("rolled_back_after_journal", committed=False) from None
+        raise
+
+
+def _mutate(engine, settings, prepared, case, snap0, verifier, clock, attempt, append):
     path = settings.recovery.journal_path
     with connection(engine) as conn:
         trans = conn.begin()
@@ -376,9 +416,11 @@ def mutate(engine: Engine, settings: Settings, prepared: Prepared, *, verifier: 
                 attempt.written = True
             except (OSError, JournalError):
                 attempt.written = False  # absent/torn/prefix/unsynced: the whole batch stays false
+            # Final authority/case window with a fresh clock after EVERY append result (written, absent,
+            # torn, prefix or fsync error) and before any COMMIT: a lost authority rolls the decision back,
+            # so the journal can only restrict. Valid authority + failed append still commits batch false.
+            _recheck(conn, case, settings, clock)
             if attempt.written:
-                # Append/fsync can be slow: authority and case time are rechecked before confirm/commit.
-                _recheck(conn, case, settings, clock)
                 conn.execute(text("SELECT ras_auth_operator_confirm(:c,CAST(:lines AS text[]))"), {"c": case.case_id, "lines": lines})
                 _recheck(conn, case, settings, clock)
             attempt.commit_started = True

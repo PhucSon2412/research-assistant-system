@@ -1135,3 +1135,177 @@ def test_case_file_strict_schema_and_location(world, tmp_path):
     big.write_bytes(b" " * 5000)
     with pytest.raises(CaseError, match="too_large"):
         load_case_file(big, max_bytes=4096)
+
+
+# --- PR #59 review fixes: final authority after any append result; release failures are outcomes -------------
+
+@pytest.mark.parametrize("change", ["expire", "revoke"])
+@pytest.mark.parametrize("action", [ops.SET_CREDENTIAL, ops.RESOLVE_STATUS])
+def test_final_authority_rechecked_when_real_fsync_fails(world, monkeypatch, action, change):
+    """Fault injection at journal.os.fsync (not a device/power failure): lines written, fsync raises."""
+    w = world
+    uid = account(w)
+    quarantine(w, uid)
+    if action == ops.RESOLVE_STATUS:
+        hold_status(w, uid)
+    hold(w)
+    c = make_case(w, uid, action, expires=NOW + timedelta(minutes=1))
+    now = [NOW]
+    real = journal.os.fsync
+    def fsync(fd):
+        monkeypatch.setattr(journal.os, "fsync", real)  # one shot
+        if change == "expire":
+            now[0] = NOW + timedelta(minutes=2)
+        else:
+            revoke_operator(w.engine, operator_id=w.operator_id, now=datetime.now(UTC))
+        raise OSError("fsync failed")
+    monkeypatch.setattr(journal.os, "fsync", fsync)
+    receipts = counts(w)["auth_change_receipts"]
+    with pytest.raises(ops.OperatorOutcomeError) as err:
+        operate(w, c, clock=lambda: now[0])
+    monkeypatch.setattr(journal.os, "fsync", real)
+    assert (err.value.code, err.value.committed) == ("rolled_back_after_journal", False)
+    assert counts(w)["auth_change_receipts"] == receipts  # no receipt/mutation committed
+    recover(w, hold_for_operator=True)
+    u = user(w, uid)
+    if action == ops.SET_CREDENTIAL:
+        assert u.credential_state == "quarantined" and verify_password(u.password_verifier, SECRET)
+    else:
+        assert (u.status, u.status_safety) == ("active", "held")
+    assert counts(w)["auth_change_receipts"] == receipts  # replay never rebuilds it
+    assert ops.case_used(journal.read(w.path), c.case_id)  # full lines became durable: the case is spent
+    if change == "expire":
+        with pytest.raises(ops.OperatorRefused, match="^case_already_used$"):
+            operate(w, c)
+        fresh = make_case(w, uid, action)  # a different decision on the new head
+        assert operate(w, fresh).operation_id
+
+
+def test_real_fsync_error_with_valid_authority_still_commits_batch_false(world, monkeypatch):
+    w = world
+    uid = account(w)
+    quarantine(w, uid)
+    hold(w)
+    c = make_case(w, uid, ops.SET_CREDENTIAL)
+    real = journal.os.fsync
+    def fsync(fd):
+        monkeypatch.setattr(journal.os, "fsync", real)
+        raise OSError("fsync failed")
+    monkeypatch.setattr(journal.os, "fsync", fsync)
+    with pytest.raises(ops.OperatorOutcomeError) as err:
+        operate(w, c)
+    assert (err.value.code, err.value.committed) == ("auth_journal_unavailable", True)
+    assert scalar(w, "SELECT count(*) FROM revocation_journal_records WHERE NOT journal_confirmed") == 2
+    assert recovery.evaluate_integrity(w.settings, w.engine).reason == "journal_unconfirmed"
+    recover(w, hold_for_operator=True)
+    assert user(w, uid).credential_state == "usable"
+
+
+def fail_rollback(monkeypatch, calls, *, invalidate=False):
+    """Connection.rollback (the release step) raises on the given call numbers of this attempt."""
+    from sqlalchemy.engine.base import Connection
+    real_rollback, real_invalidate = Connection.rollback, Connection.invalidate
+    seen = [0]
+    def rollback(self):
+        seen[0] += 1
+        if seen[0] in calls:
+            raise ConnectionResetError("rollback lost")
+        return real_rollback(self)
+    def broken_invalidate(self, *a, **k):
+        real_invalidate(self, *a, **k)
+        raise ConnectionResetError("invalidate lost")
+    monkeypatch.setattr(Connection, "rollback", rollback)
+    if invalidate:
+        monkeypatch.setattr(Connection, "invalidate", broken_invalidate)
+    return seen
+
+
+@pytest.mark.parametrize("invalidate", [False, True])
+def test_prepare_release_failure_stops_before_prompt(world, monkeypatch, invalidate):
+    w = world
+    uid = account(w)
+    quarantine(w, uid)
+    hold(w)
+    c = make_case(w, uid, ops.SET_CREDENTIAL)
+    before = (counts(w), w.path.read_bytes())
+    fail_rollback(monkeypatch, {1}, invalidate=invalidate)  # call 1 = prepare release
+    prompts = []
+    with pytest.raises(ops.OperatorRefused, match="^connection_release_failed$"):
+        ops.run(w.operator, w.settings, c, user_id=uid, installation=w.journal_id, action=c.action,
+                clock=lambda: NOW, read_password=lambda: prompts.append(1) or NEW)
+    monkeypatch.undo()
+    assert prompts == [] and (counts(w), w.path.read_bytes()) == before
+    no_leak(w.operator)
+
+
+def test_release_failure_never_masks_a_refusal(world, monkeypatch):
+    w = world
+    uid = account(w)
+    quarantine(w, uid)
+    hold(w)
+    c = make_case(w, uid, ops.SET_CREDENTIAL)
+    before = (counts(w), w.path.read_bytes())
+    fail_rollback(monkeypatch, {2})  # call 2 = mutation release, after a refusal under lock
+    def prompt():
+        with w.engine.begin() as conn:
+            conn.execute(text("UPDATE users SET role='admin' WHERE id=:u"), {"u": uid})
+        return NEW
+    with pytest.raises(ops.OperatorRefused, match="^target_changed$"):
+        ops.run(w.operator, w.settings, c, user_id=uid, installation=w.journal_id, action=c.action,
+                clock=lambda: NOW, read_password=prompt)
+    monkeypatch.undo()
+    assert counts(w)["auth_change_receipts"] == before[0]["auth_change_receipts"] and w.path.read_bytes() == before[1]
+    no_leak(w.operator)
+
+
+@pytest.mark.parametrize("phase", ["mutation_after_commit", "mutation_after_commit_journal_unavailable", "proof"])
+def test_release_failure_after_known_commit_is_not_success(world, monkeypatch, phase):
+    w = world
+    uid = account(w)
+    quarantine(w, uid)
+    hold(w)
+    c = make_case(w, uid, ops.SET_CREDENTIAL)
+    receipts = counts(w)["auth_change_receipts"]
+    proofs = []
+    real_prove = ops.prove
+    monkeypatch.setattr(ops, "prove", lambda *a, **k: proofs.append(1) or real_prove(*a, **k))
+    fail_rollback(monkeypatch, {3} if phase == "proof" else {2})
+    kw = {}
+    if phase == "mutation_after_commit_journal_unavailable":
+        kw["append"] = fault_append("full")
+    with pytest.raises(ops.OperatorOutcomeError) as err:
+        operate(w, c, **kw)
+    monkeypatch.undo()
+    expected = {"mutation_after_commit": "connection_release_failed",
+                "mutation_after_commit_journal_unavailable": "auth_journal_unavailable",
+                "proof": "postcommit_proof_failed"}[phase]
+    assert (err.value.code, err.value.committed) == (expected, True)
+    assert proofs == ([1] if phase == "proof" else [])  # no proof/success after an unclean release
+    assert counts(w)["auth_change_receipts"] == receipts + 1  # known commit kept, nothing reversed
+    if phase == "mutation_after_commit_journal_unavailable":
+        recover(w, hold_for_operator=True)
+    with pytest.raises(ops.OperatorRefused, match="^case_already_used$"):  # never resubmitted
+        operate(w, c)
+    no_leak(w.operator)
+
+
+def test_cli_proof_release_failure_exit_and_output(world, monkeypatch):
+    """Labelled in-process prompt: checks CLI outcome/output only (ConPTY covers the real terminal)."""
+    import io
+    from app.cli import auth_recovery as cli
+    w = world
+    uid = account(w)
+    quarantine(w, uid)
+    hold(w)
+    c = make_case(w, uid, ops.SET_CREDENTIAL)
+    class Tty(io.StringIO):
+        def isatty(self):
+            return True
+    fail_rollback(monkeypatch, {3})
+    out, err = io.StringIO(), io.StringIO()
+    code = cli.main(["set-credential", "--user-id", str(uid), "--case-id", str(c.case_id), "--case-file",
+                     str(w.cases / f"{c.case_id}.json"), "--expected-installation", str(c.journal_id)],
+                    stdin=Tty(), stdout=out, stderr=err, getpass_fn=lambda _l: NEW, engine=w.operator, clock=lambda: NOW)
+    monkeypatch.undo()
+    assert code == 4 and "credential recovered" not in out.getvalue() and "postcommit_proof_failed" in err.getvalue()
+    assert NEW not in out.getvalue() + err.getvalue() and "ConnectionResetError" not in err.getvalue()
