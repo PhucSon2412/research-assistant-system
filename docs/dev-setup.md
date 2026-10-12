@@ -1766,3 +1766,18 @@ Hợp đồng/phase và giới hạn nằm ở [handoff publish](c2d5c1-common-p
 Lượt này dùng PostgreSQL port `58485`, MinIO `59485`, socket API `58486`, Next proxy `53486`, label `ras.task=c2d5c1-20261008`; credentials/artifacts ngoài repo. Business tests dùng scoped cutover, pending HTTP riêng giữ gate thật. Test Chrome chạy installed Chrome headless → Next `start` production build → socket Uvicorn working tree → runtime PostgreSQL/MinIO; không chứng minh Compose API image đã được kiểm. Các runtime fixture publish dùng `runtime_publish`; owner revoke/cleanup/corruption có nhãn, không mở rộng scope runtime C2d-5c2/C3.
 
 Compose source có `RAS_FILES__PUBLICATION_VERIFY_MAX_CONCURRENT` (2/process), `RAS_FILES__PUBLICATION_VERIFY_DEADLINE_SECONDS` (90) và `WEB_PROXY_PUBLICATION_TIMEOUT_SECONDS` (120, chỉ exact publish POST). Đề xuất cần đo; không SLO. Web kiểm bằng `npm test --prefix web`, `npm run typecheck --prefix web`, `npm run build --prefix web`. Inventory giữ wrapper commands và union node IDs để review/reproduce selection mà không trộn pass lịch sử. Chỉ xóa resources thử sau khi kiểm exact container ID/label/image/mount/sole consumer và đối chiếu container có sẵn; không journal/artifact/paper/secret trong repo. Safety pending tới C4.
+
+## C3 operator auth recovery cô lập
+
+Source `0049` trên nhánh review; [handoff](c3-operator-auth-recovery.md) · [inventory](c3-test-inventory.json). Conda ras, project Compose riêng `rasc3c6f3a777` (pgvector pg16, MinIO, Redis, cổng loopback ngẫu nhiên, label `ras.task`), credentials/journal/case/log ngoài repo `%TEMP%\ras-c3-20261011`. Không đọc `.env`, không chạm stack dev, không gọi provider hay đổi pricing; safety vẫn pending.
+
+Lệnh đã chạy từ gốc repo (PowerShell, `$py` = Conda ras, `$ctx` = thư mục context ngoài repo):
+
+```powershell
+& $py scripts/c3_test_host.py --context $ctx setup
+& $py scripts/c3_test_host.py --context $ctx test <pytest args>
+& $py scripts/c3_counterchecks.py --context $ctx --out <thư mục mới ngoài repo>
+& $py scripts/c3_pending_smoke.py --context $ctx
+```
+
+Runner đặt URL admin tường minh, mật khẩu runtime/recovery/operator tổng hợp và chặn HTTP ngoài loopback. Runbook vận hành (writer dừng): `python -m app.cli.recovery hold` → migrate → `python -m app.cli.recovery recover --hold-for-operator` → migrator `python -m app.cli.provision_auth_operator operator --login <login> --operator-id <uuid>` và `… register-case --case-file <file ngoài repo>` → login operator `python -m app.cli.auth_recovery inspect|set-credential|resolve-initial-status …` → `python -m app.cli.recovery recover`. `set-credential` chỉ nhận mật khẩu từ TTY thật; không có cờ password/enable/role/force.

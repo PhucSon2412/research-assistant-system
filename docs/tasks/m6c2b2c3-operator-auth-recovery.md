@@ -1,5 +1,7 @@
 # C3 — Khôi phục credential và initial status qua operator
 
+**Cập nhật triển khai (2026-10-11):** đã triển khai trên nhánh review `feat/m6c2b2c3-operator-auth-recovery`, source `0049`, chưa merge; [handoff](../c3-operator-auth-recovery.md) và [inventory](../c3-test-inventory.json) ghi kết quả/giới hạn. Đoạn dưới giữ nguyên nội dung lúc giao. Safety vẫn pending tới C4.
+
 **Mới giao ngày 2026-10-11; chưa triển khai hoặc kiểm chứng C3.** PR #58 đã merge tại `58d059ab7a383d5f97e1b04e909e9628a11bf78a`; head review `aa9c8a2` là ancestor và tree khớp. Source migration **0048**, không suy revision DB dev. [Review PR #58](../reviews/pr58-c2d7-rag-generation-runtime.md) giữ chứng cứ trước merge, không là kết quả chạy mới.
 
 ## Mục tiêu và cách tổ chức

@@ -1,5 +1,16 @@
 # Nhật ký quyết định
 
+## Triển khai C3 operator recovery (2026-10-11, nhánh review)
+
+Coding agent chọn trong phạm vi task C3 đã được orchestrator chốt theo ủy quyền; không phải chủ dự án trực tiếp duyệt từng lựa chọn, và không có danh tính/inventory người thật trong PR. Chi tiết và kết quả kiểm ở [handoff C3](c3-operator-auth-recovery.md).
+
+- **Maintenance hold:** recovery mở đã đối chiếu xong, tạo bằng `recover --hold-for-operator` (mọi bước/hậu điều kiện như `recover`, không ghi `recovery_end`, progress ≥ seq `recovery_begin`). `hold` journal-only hoặc recover dở bị từ chối; hold/pending không bỏ qua lỗi chain. `recover` thường sau đó kiểm lại và đóng; gate vẫn `auth_safety_pending`.
+- **Hồ sơ/case:** file JSON strict ngoài repo (`ras.auth_recovery_case.v1`) + hàng `auth_recovery_cases` do migrator đăng ký; CLI yêu cầu khớp từng trường. Tiêu case ghi bằng kind journal mới `operator_recovery_case` trong cùng batch, một `case_id` một lần trên chain; chống tái dùng theo journal hiện hành, không chỉ hàng DB.
+- **Authority:** `auth_recovery_operators` ánh xạ login thật → operator UUID, routine xác định bằng `session_user` và từ chối login có membership/thuộc tính đặc quyền/quyền bảng auth; operator chỉ có EXECUTE routine riêng.
+- **Reason:** receipt `verified_recovery`/`verified_initial_status` cần bản ghi case live cùng transaction của operator; thêm reason closure `operator_recovery` cho session/reset token. Receipt `bootstrap`/`invitation_accept` qua generic chưa bị ràng buộc — ghi debt cho gói B/C4.
+- **Downgrade/ORM:** 0049 chỉ downgrade DB pristine; cột typed `case_*` không map ORM để code hiện hành vẫn ghi mirror kind khác vào snapshot chưa migrate.
+- **CLI:** engine không pool, TTY ẩn hai lần, không retry; exit code tách từ chối (3), không xác định/journal có thể giữ (4), commit chưa confirm (5).
+
 ## Giao C3 operator recovery sau merge PR #58 (2026-10-11)
 
 PR #58 đã merge `58d059a`, source **0048**, tree khớp head review `aa9c8a2`; chưa rerun tại merge. Gói A hoàn tất chuyển runtime trong phạm vi đã review, chưa là bản end-to-end ready. [Task C3](tasks/m6c2b2c3-operator-auth-recovery.md) là một PR tiếp theo, mới giao/chưa triển khai hoặc kiểm; tiếp debt/hồi quy và tích hợp C4 trong [kế hoạch MVP](mvp-delivery-plan.md).

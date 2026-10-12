@@ -1,5 +1,7 @@
 # Tài liệu dự án
 
+**C3 trên nhánh review (chưa merge):** [handoff operator auth recovery](c3-operator-auth-recovery.md) · [inventory](c3-test-inventory.json). Source `0049`; login operator riêng, case bind UUID/installation/heads dùng một lần theo journal, TTY ẩn, maintenance hold, credential/status tách; không mở disabled/ready. **Safety pending tới C4**; tiếp debt/hồi quy và tích hợp C4.
+
 **Trạng thái hiện hành:** PR #58 đã merge `58d059a`, source **0048**; đã giao [C3 operator auth recovery](tasks/m6c2b2c3-operator-auth-recovery.md), mới giao/chưa triển khai hoặc kiểm. Tiếp debt/hồi quy và tích hợp C4 theo [kế hoạch MVP](mvp-delivery-plan.md); **safety pending tới C4**. Giữ và đưa docs review/task chưa commit vào PR kế tiếp.
 
 **Review PR #58 trước merge:** [không phát hiện điểm chặn merge mới trong scope RAG/generation runtime](reviews/pr58-c2d7-rag-generation-runtime.md); [handoff](c2d7-rag-generation-runtime.md) · [inventory](c2d7-test-inventory.json) giữ kết quả theo source kiểm. Chưa rerun tại merge; không chứng nhận C3/C4, provider thật hoặc readiness bằng fake provider. Docs orchestrator trước task đã vào PR #58; review mới được giữ cho PR kế tiếp.

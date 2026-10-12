@@ -479,3 +479,7 @@ Code `dfca84a`, source migration `0042`; [handoff](c2d5d2a-worker-runtime-extrac
 Suite mới phủ role/gate, scalar binding/status/lease/clock sau SQL/wait, S3/parser barrier với revoke/hold/disable, retry/reuse/locator/coverage, landed/rollback commit uncertainty và teardown. Tám đối chứng tuần tự bị assertion bắt, source khôi phục trước suite cuối. Regression chọn PR #50/revoke/upload/M2/citations/recovery và schema/fence theo call graph; node ID/JUnit/hash và các lượt chuẩn bị lỗi được giữ riêng, không gọi toàn API inventory xanh. Bốn lỗi baseline PR #50 không sửa/rerun/tính pass; web không đổi nên Chrome/npm không chạy. Không index/provider/cutover/C3/C4 certification; safety pending tới C4.
 
 Sealed cuối tại `dfca84a`: **549/549 API unique pass**, collect 4343, 3794 not-run, 0 failure/error/skip/missing/duplicate/extra; 293 source hashes trước/sau trùng. 8 cơ chế đối chứng/9 lượt raw (1 yếu không tính); lỗi chuẩn bị và lượt sealed đầu giữ riêng trong inventory.
+
+## C3 operator auth recovery
+
+Kết quả, selection, debt xác nhận tại base, ConPTY, đối chứng và smoke HTTP pending: [handoff C3](c3-operator-auth-recovery.md#kiểm-chứng) · [inventory](c3-test-inventory.json). Suite cuối `cb9518b`: 997/997 pass, 4.098 not-run; không tính là full inventory hay nghiệm thu C4.
