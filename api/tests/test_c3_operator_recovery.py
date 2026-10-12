@@ -1471,3 +1471,31 @@ def test_interrupt_while_typing_password_still_cancels_safely(world, monkeypatch
                     stdin=Tty(), stdout=io.StringIO(), stderr=err, getpass_fn=prompt, engine=w.operator, clock=lambda: NOW)
     assert code == 2 and "nothing was changed" in err.getvalue()
     assert (counts(w), w.path.read_bytes()) == before
+
+
+@pytest.mark.parametrize("where,error,expected", [
+    ("rollback", KeyboardInterrupt, "interrupted"), ("close", KeyboardInterrupt, "interrupted"),
+    ("rollback", ConnectionResetError, "failed"), (None, None, "clean")])
+def test_release_absorbs_interrupt_and_still_invalidates_and_closes(where, error, expected):
+    """Unit contract of the release step: an interrupt never skips invalidate/close and is reported."""
+    calls = []
+    class Fake:
+        def rollback(self):
+            calls.append("rollback")
+            if where == "rollback":
+                raise error()
+        def close(self):
+            calls.append("close")
+            if where == "close" and calls.count("close") == 1:
+                raise error()
+        def invalidate(self):
+            calls.append("invalidate")
+    try:
+        state = ops._release(Fake())
+    except BaseException as exc:  # noqa: BLE001
+        raise AssertionError(f"release let {type(exc).__name__} escape") from None
+    assert state == expected
+    if expected == "clean":
+        assert calls == ["rollback", "close"]
+    else:
+        assert calls[-2:] == ["invalidate", "close"]  # the fallback always runs to the end
