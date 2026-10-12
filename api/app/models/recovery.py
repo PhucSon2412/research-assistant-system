@@ -3,13 +3,13 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, Index, SmallInteger, Text, UniqueConstraint, text
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, DateTime, Index, SmallInteger, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
 
-JOURNAL_KINDS = "'genesis', 'revocation', 'recovery_begin', 'recovery_end', 'review_closure', 'session_revocation', 'reset_token_closure', 'invitation_closure', 'credential_transition', 'account_status_decision'"
+JOURNAL_KINDS = "'genesis', 'revocation', 'recovery_begin', 'recovery_end', 'review_closure', 'session_revocation', 'reset_token_closure', 'invitation_closure', 'credential_transition', 'account_status_decision', 'operator_recovery_case'"
 TOKEN_IDS_REQUIRED = ("CASE WHEN kind = 'reset_token_closure' THEN reset_token_id IS NOT NULL"
                       " AND reset_token_user_id IS NOT NULL AND reset_end_kind IS NOT NULL"
                       " AND reset_reason_code IS NOT NULL AND reset_ended_at IS NOT NULL"
@@ -24,7 +24,10 @@ TOKEN_MATCHES_BODY = ("CASE WHEN kind = 'reset_token_closure' THEN"
     " AND (line::jsonb ->> 'kind' IS NOT DISTINCT FROM kind)"
     " AND COALESCE((reset_end_kind = 'consumed' AND reset_reason_code IN ('password_reset', 'legacy_consumed'))"
     " OR (reset_end_kind = 'revoked' AND reset_reason_code IN"
-    " ('reset_replaced', 'reset_completed', 'user_disabled', 'legacy_revoked', 'auth_safety_backfill')), false) ELSE true END")
+    " ('reset_replaced', 'reset_completed', 'user_disabled', 'legacy_revoked', 'auth_safety_backfill', 'operator_recovery')), false) ELSE true END")
+CASE_FIELDS = ("case_id", "case_operator_id", "case_user_id", "case_action", "case_operation_id", "case_recorded_at")
+CASE_FIELDS_REQUIRED = (f"CASE WHEN kind = 'operator_recovery_case' THEN num_nonnulls({', '.join(CASE_FIELDS)}) = 6"
+                        f" ELSE num_nonnulls({', '.join(CASE_FIELDS)}) = 0 END")
 INVITATION_IDS_REQUIRED = ("CASE WHEN kind = 'invitation_closure' THEN invitation_id IS NOT NULL"
                       " AND invitation_end_kind IS NOT NULL"
                       " AND invitation_reason_code IS NOT NULL AND invitation_ended_at IS NOT NULL"
@@ -99,6 +102,10 @@ class RevocationJournalRecord(Base):
         UniqueConstraint("session_id", name="uq_revocation_journal_records_session_id"),
         UniqueConstraint("reset_token_id", name="uq_revocation_journal_records_reset_token_id"),
         UniqueConstraint("invitation_id", name="uq_revocation_journal_records_invitation_id"),
+        # C3 (0049): a case is consumed once and authorises exactly one auth operation.
+        UniqueConstraint("case_id", name="uq_revocation_journal_records_case_id"),
+        UniqueConstraint("case_operation_id", name="uq_revocation_journal_records_case_operation_id"),
+        CheckConstraint(CASE_FIELDS_REQUIRED, name="case_fields_required"),
         CheckConstraint(INVITATION_IDS_REQUIRED, name="invitation_fields_required"),
         CheckConstraint(INVITATION_MATCHES_BODY, name="invitation_matches_body"),
         CheckConstraint(TOKEN_IDS_REQUIRED, name="reset_fields_required"),
@@ -131,7 +138,8 @@ class RevocationJournalRecord(Base):
                         " AND (session_user_id::text IS NOT DISTINCT FROM (line::jsonb #>> '{body,user_id}'))"
                         " AND (line::jsonb ->> 'kind' IS NOT DISTINCT FROM kind)"
                         " AND COALESCE((line::jsonb #>> '{body,reason_code}') IN"
-                        " ('logout', 'replaced', 'user_revoked', 'password_reset', 'user_disabled', 'auth_safety_backfill'), false)"
+                        " ('logout', 'replaced', 'user_revoked', 'password_reset', 'user_disabled', 'auth_safety_backfill',"
+                        " 'operator_recovery'), false)"
                         " AND COALESCE(length(line::jsonb #>> '{body,revoked_at}') > 0, false)"
                         " ELSE true END", name="session_matches_body"),
     )
@@ -161,6 +169,16 @@ class RevocationJournalRecord(Base):
     invitation_end_kind: Mapped[str | None] = mapped_column(Text)
     invitation_reason_code: Mapped[str | None] = mapped_column(Text)
     invitation_ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # C3 (0049) typed binding of ``operator_recovery_case``; SQL triggers check the line body independently.
+    # Table-only (not mapped): ORM INSERTs never name them, so current code still writes the other
+    # kinds into a not-yet-migrated snapshot; case rows are written by SQL (recovery.insert_case_mirror).
+    case_id = Column(UUID(as_uuid=True))
+    case_operator_id = Column(UUID(as_uuid=True))
+    case_user_id = Column(UUID(as_uuid=True))
+    case_action = Column(Text)
+    case_operation_id = Column(UUID(as_uuid=True))
+    case_recorded_at = Column(DateTime(timezone=True))
+    __mapper_args__ = {"exclude_properties": list(CASE_FIELDS)}
     applied_via: Mapped[str] = mapped_column(Text)
     result: Mapped[str] = mapped_column(Text)
     journal_confirmed: Mapped[bool] = mapped_column(Boolean)

@@ -357,21 +357,24 @@ def test_0048_preserves_historical_rows_and_refuses_lossy_downgrade(generated):
     from alembic import command
     from tests.conftest import alembic_config
     from sqlalchemy.exc import IntegrityError
+    from tests.conftest import HEAD_REVISION
     cfg=alembic_config(b.owner.url)
-    command.downgrade(cfg,'0047')
+    # C3 (0049) refuses any downgrade of a registered installation before 0048 is reached, so the
+    # historical all-NULL row is written at head by the owner (labelled pre-0048 writer shape).
+    with pytest.raises(Exception,match='auth safety history prevents downgrade'):
+        command.downgrade(cfg,'0047')
     old=sql(b,"""INSERT INTO search_usage(user_id,day,task_type,model_id,provider,status,reserved_usd,cost_status)
         VALUES (:u,:d,'generation','historical','openrouter','uncertain',0.01,'unknown') RETURNING id""",
         u=b.uid,d=b.api.clock.now.date())
-    command.upgrade(cfg,'head')
     assert sql(b,'SELECT reservation_token IS NULL AND operation_id IS NULL AND session_id IS NULL FROM search_usage WHERE id=:i',i=old)
     assert ask(b).status_code==200
     # The first row is historical; select the new nonce for independent DB checks.
     new=sql(b,"SELECT id FROM search_usage WHERE reservation_token IS NOT NULL AND task_type='generation'")
     with pytest.raises(IntegrityError), b.owner.begin() as conn:
         conn.execute(text('UPDATE search_usage SET session_id=NULL WHERE id=:i'),{'i':new})
-    with pytest.raises(Exception,match='generation reservation bindings exist'):
+    with pytest.raises(Exception,match='auth safety history prevents downgrade'):
         command.downgrade(cfg,'0047')
-    assert sql(b,'SELECT version_num FROM alembic_version')=='0048'
+    assert sql(b,'SELECT version_num FROM alembic_version')==HEAD_REVISION
 
 
 def test_evaluation_captures_actual_runtime_retrieval_and_pack(generated):

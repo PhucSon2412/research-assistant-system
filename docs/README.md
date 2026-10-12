@@ -1,6 +1,18 @@
 # Tài liệu dự án
 
-**Trạng thái hiện hành:** C2d-7 RAG/generation trên nhánh review, source `0048`, chưa merge; [handoff](c2d7-rag-generation-runtime.md) · [inventory](c2d7-test-inventory.json). Base PR #57 merge `2e948b7`, `0047`. **Safety pending tới C4**. Gói A còn review; tiếp C3 + hồi quy/debt/tích hợp C4 theo [kế hoạch MVP](mvp-delivery-plan.md). Docs orchestrator/review/task được giữ trong PR C2d-7.
+**Sửa review lại PR #59 tại `d2d56f3` (2026-10-12, chờ review lại, chưa merge):** Ctrl-C khi trả connection giờ là outcome theo `Attempt` (không còn “nothing was changed” sau commit), connection luôn invalidate/close. Agent: nhóm C3 106/106 có niêm hash, đối chứng 9/9, smoke API/proxy 28/28; [handoff](c3-operator-auth-recovery.md#review-lại-tại-6465dc0-ctrl-c-khi-trả-connection). **Safety pending tới C4.**
+
+**Review lại PR #59 tại `6465dc0`:** còn nhánh P2-2 Ctrl-C trong release sau known commit làm CLI báo chưa thay đổi; [report và giới hạn](reviews/pr59-c3-operator-auth-recovery.md) · [prompt sửa hẹp cùng PR](tasks/fix-pr59-c3-final-authority-and-release.md). Reviewer 95 repo + 11 ca ngoài repo pass, một ca interruption fail và đã xác nhận lại. P2-1/release lỗi thông thường đã qua kiểm. Source `0049`, PR OPEN/chưa merge, **safety pending tới C4**; các mốc dưới đây giữ lịch sử.
+
+**Sửa review PR #59 tại `0ee17f3` (2026-10-12, chờ review lại, chưa merge):** hai P2 đã sửa trong `app/operator_recovery.py` — authority/hạn case kiểm lại sau **mọi** kết quả append trước COMMIT (mất quyền → rollback, journal chỉ hạn chế), lỗi trả connection thành kết quả không thành công theo pha. Agent: 1.009/1.009 selection pass, 4.098 not-run, 281 debt xác nhận tại base, 8/8 đối chứng; [handoff](c3-operator-auth-recovery.md#sửa-review-pr-59-2026-10-12) · [inventory](c3-test-inventory.json). Debt generic `bootstrap`/`invitation_accept` và toàn inventory thuộc gói B/C4. **Safety pending tới C4.**
+
+**Review PR #59 (2026-10-12):** [hai P2 chặn merge C3](reviews/pr59-c3-operator-auth-recovery.md); [prompt sửa cùng PR](tasks/fix-pr59-c3-final-authority-and-release.md). Source `0049`, PR OPEN/chưa merge, **safety pending C4**. Review/agent giữ kết quả riêng; tiếp gói B/C4 sau khi sửa và merge C3. Giữ docs review/task chưa commit.
+
+**C3 trên nhánh review (chưa merge):** [handoff operator auth recovery](c3-operator-auth-recovery.md) · [inventory](c3-test-inventory.json). Source `0049`; login operator riêng, case bind UUID/installation/heads dùng một lần theo journal, TTY ẩn, maintenance hold, credential/status tách; không mở disabled/ready. **Safety pending tới C4**; tiếp debt/hồi quy và tích hợp C4.
+
+**Trạng thái hiện hành:** PR #58 đã merge `58d059a`, source **0048**; đã giao [C3 operator auth recovery](tasks/m6c2b2c3-operator-auth-recovery.md), mới giao/chưa triển khai hoặc kiểm. Tiếp debt/hồi quy và tích hợp C4 theo [kế hoạch MVP](mvp-delivery-plan.md); **safety pending tới C4**. Giữ và đưa docs review/task chưa commit vào PR kế tiếp.
+
+**Review PR #58 trước merge:** [không phát hiện điểm chặn merge mới trong scope RAG/generation runtime](reviews/pr58-c2d7-rag-generation-runtime.md); [handoff](c2d7-rag-generation-runtime.md) · [inventory](c2d7-test-inventory.json) giữ kết quả theo source kiểm. Chưa rerun tại merge; không chứng nhận C3/C4, provider thật hoặc readiness bằng fake provider. Docs orchestrator trước task đã vào PR #58; review mới được giữ cho PR kế tiếp.
 
 **C2d-6 đã merge:** [handoff](c2d6-search-query-rerank-runtime.md) và [review PR #57](reviews/pr57-c2d6-search-query-rerank-runtime.md) giữ chứng cứ trước merge, chưa rerun tại merge. Không phát hiện điểm chặn merge mới trong phạm vi đã review; không chứng nhận RAG runtime, provider thật hoặc cutover. Các trạng thái nhánh review bên dưới là lịch sử.
 

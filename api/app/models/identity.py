@@ -190,7 +190,8 @@ class PasswordResetToken(Base):
         CheckConstraint("used_at IS NULL OR revoked_at IS NULL", name="used_or_revoked"),
         CheckConstraint("closure_reason IS NULL OR (used_at IS NOT NULL AND closure_reason IN"
                         " ('password_reset', 'legacy_consumed')) OR (revoked_at IS NOT NULL AND closure_reason IN"
-                        " ('reset_replaced', 'reset_completed', 'user_disabled', 'legacy_revoked', 'auth_safety_backfill'))",
+                        " ('reset_replaced', 'reset_completed', 'user_disabled', 'legacy_revoked', 'auth_safety_backfill',"
+                        " 'operator_recovery'))",
                         name="closure_reason_valid"),
         Index(
             "uq_password_reset_tokens_open_user_id",

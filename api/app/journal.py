@@ -27,6 +27,11 @@ removed or reordered record breaks the chain. Kinds:
   reason code and time. Replay closes the link without recreating an account.
 - ``reset_token_closure`` (M6c-2b2b1): token ID, User ID, consumed/revoked,
   reason code and time. No raw token/hash; replay never changes credentials.
+- ``operator_recovery_case`` (C3): one authorised operator case was consumed
+  for one User/action, naming the auth operation it authorised. Case, operator,
+  User and operation IDs, the action code and time; never the evidence,
+  identity documents, email, verifier or password. A case ID appears at most
+  once in a chain, so a restored database cannot reuse a consumed case.
 
 Only this module reads or writes the file. Writers hold the journal advisory
 lock in PostgreSQL (``app.recovery``), so there is one appender at a time;
@@ -61,14 +66,18 @@ INVITATION_END_REASONS = {"accepted": {"invitation_accepted", "legacy_accepted"}
                           "revoked": {"admin_revoked", "invitation_replaced", "delivery_failed", "legacy_revoked"}}
 RESET_TOKEN_CLOSURE = "reset_token_closure"
 RESET_END_REASONS = {"consumed": {"password_reset", "legacy_consumed"},
-                     "revoked": {"reset_replaced", "reset_completed", "user_disabled", "legacy_revoked", "auth_safety_backfill"}}
+                     "revoked": {"reset_replaced", "reset_completed", "user_disabled", "legacy_revoked", "auth_safety_backfill",
+                                 "operator_recovery"}}
 CREDENTIAL_TRANSITION = "credential_transition"
 ACCOUNT_STATUS_DECISION = "account_status_decision"
 AUTH_KINDS = (CREDENTIAL_TRANSITION, ACCOUNT_STATUS_DECISION)
 AUTH_REASONS = {"credential": {"bootstrap", "invitation_accept", "password_reset", "verified_recovery"},
                 "active": {"bootstrap", "invitation_accept", "verified_initial_status", "admin_enable"},
                 "disabled": {"admin_disable", "legacy_disabled"}}
-KINDS = (*AUTH_KINDS, GENESIS, REVOCATION, RECOVERY_BEGIN, RECOVERY_END, REVIEW_CLOSURE, SESSION_REVOCATION, RESET_TOKEN_CLOSURE, INVITATION_CLOSURE)
+OPERATOR_RECOVERY_CASE = "operator_recovery_case"
+CASE_ACTIONS = ("set_credential", "resolve_initial_status")
+KINDS = (*AUTH_KINDS, GENESIS, REVOCATION, RECOVERY_BEGIN, RECOVERY_END, REVIEW_CLOSURE, SESSION_REVOCATION, RESET_TOKEN_CLOSURE, INVITATION_CLOSURE,
+         OPERATOR_RECOVERY_CASE)
 GENESIS_MODES = ("new_install", "existing_db", "rebuilt_from_db")
 REVOCATION_FIELDS = ("id", "target_kind", "item_id", "version_id", "source_file_id", "storage_key",
                      "access_rights_id", "reason_code", "prior_publication_state", "rights_epoch", "recorded_at",
@@ -88,7 +97,9 @@ BODY_FIELDS = {
     SESSION_REVOCATION: frozenset(SESSION_FIELDS),
     INVITATION_CLOSURE: frozenset({"invitation_id", "end_kind", "reason_code", "ended_at"}),
     RESET_TOKEN_CLOSURE: frozenset({"token_id", "user_id", "end_kind", "reason_code", "ended_at"}),
+    OPERATOR_RECOVERY_CASE: frozenset({"case_id", "operator_id", "user_id", "action", "operation_id", "recorded_at"}),
 }
+_STAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})")
 _KEY = re.compile(r"originals/[0-9a-f]{32}")
 _HASH = re.compile(r"[0-9a-f]{64}")
 
@@ -266,6 +277,17 @@ def _check_body(kind: str, body) -> None:
             _time(body["ended_at"])
             if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})", body["ended_at"]):
                 raise ValueError("time")
+        elif kind == OPERATOR_RECOVERY_CASE:
+            for key in ("case_id", "operator_id", "user_id", "operation_id"):
+                _uuid(body[key])
+            for key in ("case_id", "operation_id"):
+                if uuid.UUID(body[key]).version != 4:
+                    raise ValueError("uuid_version")
+            if not isinstance(body["action"], str) or body["action"] not in CASE_ACTIONS:
+                raise ValueError("action")
+            _time(body["recorded_at"])
+            if not _STAMP.fullmatch(body["recorded_at"]):
+                raise ValueError("time")
         elif kind == SESSION_REVOCATION:
             _uuid(body["session_id"])
             _uuid(body["user_id"])
@@ -322,6 +344,7 @@ def parse(data: bytes) -> JournalState:
     prev = ZERO_HASH
     open_recovery = None
     auth_ids = set()
+    case_ids = set()
     for number, raw in enumerate(parts, start=1):
         if len(raw) + 1 > MAX_LINE_BYTES:
             raise JournalError("journal_corrupt")
@@ -341,6 +364,11 @@ def parse(data: bytes) -> JournalState:
             if identifiers.intersection(auth_ids):
                 raise JournalError("auth_uuid_reused")
             auth_ids.update(identifiers)
+        if record.kind == OPERATOR_RECOVERY_CASE:
+            # A case authorises one decision, ever: independent of any DB snapshot.
+            if record.body["case_id"] in case_ids:
+                raise JournalError("operator_case_reused")
+            case_ids.add(record.body["case_id"])
         records.append(record)
         prev = record.hash
     if not records:

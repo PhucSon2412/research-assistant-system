@@ -39,7 +39,8 @@ def foundation(engine, app_env, migrated_db_url, journal_path):
 
 
 def changes(w, *, credential=True, decision="active", at=NOW):
-    out = [Change(w.uid,"credential","verified_recovery",at,verifier=hash_password(SECRET),policy_version=1)] if credential else []
+    # Generic runtime reason: C3 (0049) reserves verified_recovery for an operator case use.
+    out = [Change(w.uid,"credential","password_reset",at,verifier=hash_password(SECRET),policy_version=1)] if credential else []
     if decision:
         out.append(Change(w.uid,"status","admin_enable" if decision == "active" else "admin_disable",at,decision=decision))
     return out

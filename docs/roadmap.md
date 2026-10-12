@@ -1,6 +1,6 @@
 # Roadmap đề xuất
 
-**Trạng thái hiện hành:** C2d-7 RAG/generation đã triển khai trên nhánh review, source `0048`, chưa merge; [handoff](c2d7-rag-generation-runtime.md) và [inventory](c2d7-test-inventory.json) giữ bằng chứng. Base PR #57 merge `2e948b7`, `0047`. Gói A còn review; tiếp C3 + hồi quy/debt/tích hợp C4 theo [kế hoạch MVP](mvp-delivery-plan.md). **Safety pending C4**, không cutover/pricing/provider thật.
+**Trạng thái hiện hành:** PR #58 đã merge `58d059a`, source **0048**; gói A hoàn tất chuyển runtime trong phạm vi các PR đã review, chưa cutover/nghiệm thu end-to-end. [C3 operator auth recovery](tasks/m6c2b2c3-operator-auth-recovery.md) được giao thành một PR, chưa triển khai/kiểm; sau đó debt/hồi quy và tích hợp C4 theo [kế hoạch MVP](mvp-delivery-plan.md). [Review PR #58](reviews/pr58-c2d7-rag-generation-runtime.md) giữ chứng cứ trước merge, chưa rerun tại merge. **Safety pending C4**, không mở pricing/provider thật.
 
 **Mốc giao C2d-6 (lịch sử):** PR #56 đã merge `808337dc`, source `0046`; task search/query/rerank lúc đó chưa triển khai. Các mốc giao và trạng thái OPEN dưới đây giữ lịch sử, không là trạng thái hiện hành hoặc pass mới tại merge.
 

@@ -253,3 +253,20 @@ def test_recovery_journal_is_required_absolute_and_bounded(monkeypatch: pytest.M
                 {"gate_lock_timeout_ms": 30_001}, {"cleanup_passes": 0}, {"cleanup_passes": 101}):
         with pytest.raises(ValidationError):
             RecoveryPolicy(**bad)
+
+
+def test_auth_recovery_case_and_lock_limits(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.config import AuthRecoveryPolicy
+    policy = Settings(database_url=URL).auth_recovery
+    assert (policy.case_max_lifetime, policy.lock_timeout_ms, policy.case_file_max_bytes) == (timedelta(hours=24), 5000, 4096)
+    monkeypatch.setenv("RAS_AUTH_RECOVERY__CASE_MAX_LIFETIME", "PT2H")
+    monkeypatch.setenv("RAS_AUTH_RECOVERY__LOCK_TIMEOUT_MS", "50")
+    configured = Settings(database_url=URL).auth_recovery
+    assert (configured.case_max_lifetime, configured.lock_timeout_ms) == (timedelta(hours=2), 50)
+    assert AuthRecoveryPolicy(case_max_lifetime=timedelta(minutes=5)).case_max_lifetime == timedelta(minutes=5)
+    assert AuthRecoveryPolicy(case_max_lifetime=timedelta(days=7)).case_max_lifetime == timedelta(days=7)
+    for bad in ({"case_max_lifetime": timedelta(minutes=4)}, {"case_max_lifetime": timedelta(days=7, seconds=1)},
+                {"lock_timeout_ms": 49}, {"lock_timeout_ms": 60_001}, {"case_file_max_bytes": 511},
+                {"case_file_max_bytes": 65_537}):
+        with pytest.raises(ValidationError):
+            AuthRecoveryPolicy(**bad)
