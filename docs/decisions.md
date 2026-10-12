@@ -1,5 +1,9 @@
 # Nhật ký quyết định
 
+## Review lại PR #59: ngắt khi trả connection (2026-10-12)
+
+Cleanup mỗi pha hấp thụ cả ngắt (`BaseException`) để luôn invalidate/close và báo `connection_release_interrupted`; outcome phân loại theo `Attempt`, không đổi known commit thành hủy. Ctrl-C trong lúc nhập mật khẩu trước mutation vẫn là hủy an toàn. Không migration/grant; safety pending tới C4.
+
 ## Sửa review PR #59 (2026-10-12, nhánh review)
 
 Theo [prompt sửa](tasks/fix-pr59-c3-final-authority-and-release.md): final authority (login operator + cửa sổ case, clock mới) chạy sau mọi kết quả append và trước COMMIT; mất quyền thì rollback, giữ file để recovery chỉ hạn chế; quyền còn hợp lệ mà append lỗi vẫn commit batch false. Lỗi rollback/close của một pha được báo bằng mã `connection_release_failed` và phân loại theo `Attempt`, không còn dẫn tới success/proof. Không đổi migration/grant; safety pending tới C4.

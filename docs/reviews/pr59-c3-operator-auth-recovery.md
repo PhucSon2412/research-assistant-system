@@ -1,5 +1,32 @@
 # Review PR #59 — operator auth recovery
 
+## Review lại tại `6465dc0` — còn nhánh P2-2 khi Ctrl-C trong release
+
+Ngày **2026-10-12**, head `6465dc0789ffedf414b84611215571b721dfa11e`, PR **OPEN, chưa merge**, source **0049**. Production sửa ở `54a2d02`; suite agent tại `0ee17f3`, head chỉ thêm docs. Hai cơ chế đã báo ở lượt đầu được sửa đúng cho lỗi `Exception`: P2-1 đã qua kiểm lại, P2-2 rollback/close lỗi thông thường đã qua kiểm lại. **Còn một nhánh P2-2 cần sửa trước merge:** interruption lúc release sau known commit không được phân loại theo outcome.
+
+### P2-2 còn lại — Ctrl-C sau commit bị báo “nothing was changed”
+
+`app/operator_recovery.py:117–133` chỉ bắt `Exception` trong `_release`; `KeyboardInterrupt` thoát helper trước khi hoàn tất cleanup. `mutate:367` chỉ phân loại `ConnectionReleaseFailed`, nên interruption này thoát ra CLI. `app/cli/auth_recovery.py:145–147` nhận nó như hủy nhập mật khẩu, trả **exit 2** với `error: input cancelled; nothing was changed`.
+
+Reviewer tái hiện với PostgreSQL/journal/login operator thật, gọi CLI in-process (TTY/getpass tổng hợp, **không** tính là kiểm ConPTY cho ca này). Thay `Connection.rollback` bằng fault một lần **chỉ khi release mutation** để ném `KeyboardInterrupt`. Kết quả sau CLI:
+
+- DB tăng đúng một receipt; credential `usable`, verifier khớp mật khẩu mới.
+- CLI exit 2 và khẳng định chưa thay đổi gì; kỳ vọng outcome không thành công **sau known commit** (exit 4), giữ quyết định/case, không submit lại.
+- Ca fail đúng assertion nghiệp vụ ở lượt đầu và lượt xác nhận có kiểm thêm verifier; không setup error/skip. Đây là fault injection trong Python, không phải SIGINT/ConPTY hay lỗi thiết bị thật.
+
+Không chỉ đổi câu chữ: interruption trong release phải được cleanup và phân loại bằng `Attempt` độc lập, gồm known commit/unconfirmed/uncertain. Ctrl-C tại TTY **trước mutation** vẫn được hủy an toàn theo hợp đồng hiện có. Không tuyên bố connection leak từ ca tái hiện này. [Prompt sửa hẹp cùng PR](../tasks/fix-pr59-c3-final-authority-and-release.md#lượt-review-lại-tại-6465dc0--interruption-trong-release).
+
+### Kiểm độc lập và đối chiếu agent ở lượt này
+
+- **95/95 repo pass**, 0 failure/error/skip, 336,02 s: C3 core 82, CLI 10, migration 2, ORM/schema 1. Bao gồm 12 regression agent mới, ConPTY, pending HTTP qua API/proxy và hai vòng dump/restore.
+- **11/11 ca ngoài repo pass:** 5 ca từng tái hiện ở lượt đầu, 3 ca kiểm trực tiếp `os.fsync`, 3 ca one-shot `Connection.close` lỗi tại prepare/mutation/proof. Lỗi close ở prepare dừng trước prompt và không thay DB/journal; lỗi close sau commit giữ receipt, không báo success; các ca kiểm pool trả hết connection.
+- **1 ca ngoài repo fail** là interruption nêu trên; chạy xác nhận lại vẫn fail, không đếm lượt lặp thành ca mới.
+- Artifact agent: JUnit **1.009 unique pass**, 0 fail/error/skip; selection khớp chính xác JUnit, nằm trong 5.107 collected, 4.098 not-run. **358 source hash khớp head**, nội dung chuẩn hóa LF/CRLF khớp seal `0ee17f3`. **26 artifact hash** lưu riêng; tám XML countercheck mỗi file có một assertion failure, không error/skip. `before-fix.xml` đúng 9 fail/3 pass. Reviewer không chạy lại full 1.009, 281 debt/base hoặc tám mutants.
+- **408 tracked source hash trước/sau trùng.** Không đổi app/test repo, migration/grants, `.env`, pricing hay safety; không query/migrate/restart dev, không gọi provider/arXiv. Evidence mới: `%TEMP%\ras-pr59-rereview-20261012`; các chứng cứ lượt đầu bên dưới giữ nguyên lịch sử.
+- Cleanup đã kiểm label rồi gỡ đúng **3 container** và volume/network thử, xóa credentials/compose/empty-env của context. Chín container có sẵn giữ nguyên ID/image/mounts/labels; volume/image khớp baseline. Worker/beat vẫn restart, chỉ `StartedAt`/`RestartCount` đổi; không suy nguyên nhân. Quét 18 artifact log/XML/JSON: 0 hit mật khẩu fixture, mẫu provider key/PHC/URL DB chứa password (không là quét mọi secret trên máy). Kiểm **99 Markdown, 1.944 liên kết nội bộ**, 0 lỗi; `git diff --check` sạch. Năm docs reviewer modified giữ chưa commit cho cùng PR, không comment/push/merge.
+
+## Lượt review đầu tại `8fa504f` — lịch sử trước sửa
+
 Ngày **2026-10-12**, PR **OPEN, chưa merge**. Head `8fa504f49504d4a1c3e36830f02cfca4c730c33c`, base merge PR #58 `58d059ab7a383d5f97e1b04e909e9628a11bf78a`, source **0049**. [Handoff](../c3-operator-auth-recovery.md) · [Inventory agent](../c3-test-inventory.json) · [Task gốc](../tasks/m6c2b2c3-operator-auth-recovery.md) · [Prompt sửa cùng PR](../tasks/fix-pr59-c3-final-authority-and-release.md).
 
 ## Kết luận

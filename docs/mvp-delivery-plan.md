@@ -1,5 +1,9 @@
 # Kế hoạch hoàn thành MVP
 
+**Sửa review lại PR #59 tại `d2d56f3` (2026-10-12, chờ review lại, chưa merge):** Ctrl-C khi trả connection giờ là outcome theo `Attempt` (không còn “nothing was changed” sau commit), connection luôn invalidate/close. Agent: nhóm C3 106/106 có niêm hash, đối chứng 9/9, smoke API/proxy 28/28; [handoff](c3-operator-auth-recovery.md#review-lại-tại-6465dc0-ctrl-c-khi-trả-connection). **Safety pending tới C4.**
+
+**Review lại C3 tại `6465dc0`, 2026-10-12:** còn một nhánh P2-2 (Ctrl-C trong release sau known commit báo `nothing was changed`); [report](reviews/pr59-c3-operator-auth-recovery.md) và [prompt sửa cùng PR](tasks/fix-pr59-c3-final-authority-and-release.md). P2-1/release lỗi thông thường đã qua kiểm độc lập. PR #59 vẫn OPEN/chưa merge, source `0049`; gói B đang C3, chưa mở C4 hoặc thay forecast/checklist. Safety pending; các cập nhật trước dưới đây giữ lịch sử.
+
 **Cập nhật sửa review C3, 2026-10-12:** hai P2 PR #59 đã sửa trên cùng PR (head `0ee17f3`), chờ review lại, chưa merge; [handoff](c3-operator-auth-recovery.md#sửa-review-pr-59-2026-10-12). Gói B vẫn ở C3; debt/hồi quy toàn inventory và C4 chưa giao. Không giảm checklist hay forecast bằng suite pass. Safety pending.
 
 **Cập nhật review C3, 2026-10-12:** PR #59 còn OPEN, source `0049`; [review](reviews/pr59-c3-operator-auth-recovery.md) có hai P2 và [prompt sửa cùng PR](tasks/fix-pr59-c3-final-authority-and-release.md). Gói B đang C3, chưa giao cutover C4 hoặc giảm checklist bằng suite pass. Safety vẫn pending; giữ forecast/giả định bên dưới, đánh giá lại tại C4 với debt và tích hợp thực tế.

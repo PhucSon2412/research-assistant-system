@@ -1,5 +1,9 @@
 # Tài liệu dự án
 
+**Sửa review lại PR #59 tại `d2d56f3` (2026-10-12, chờ review lại, chưa merge):** Ctrl-C khi trả connection giờ là outcome theo `Attempt` (không còn “nothing was changed” sau commit), connection luôn invalidate/close. Agent: nhóm C3 106/106 có niêm hash, đối chứng 9/9, smoke API/proxy 28/28; [handoff](c3-operator-auth-recovery.md#review-lại-tại-6465dc0-ctrl-c-khi-trả-connection). **Safety pending tới C4.**
+
+**Review lại PR #59 tại `6465dc0`:** còn nhánh P2-2 Ctrl-C trong release sau known commit làm CLI báo chưa thay đổi; [report và giới hạn](reviews/pr59-c3-operator-auth-recovery.md) · [prompt sửa hẹp cùng PR](tasks/fix-pr59-c3-final-authority-and-release.md). Reviewer 95 repo + 11 ca ngoài repo pass, một ca interruption fail và đã xác nhận lại. P2-1/release lỗi thông thường đã qua kiểm. Source `0049`, PR OPEN/chưa merge, **safety pending tới C4**; các mốc dưới đây giữ lịch sử.
+
 **Sửa review PR #59 tại `0ee17f3` (2026-10-12, chờ review lại, chưa merge):** hai P2 đã sửa trong `app/operator_recovery.py` — authority/hạn case kiểm lại sau **mọi** kết quả append trước COMMIT (mất quyền → rollback, journal chỉ hạn chế), lỗi trả connection thành kết quả không thành công theo pha. Agent: 1.009/1.009 selection pass, 4.098 not-run, 281 debt xác nhận tại base, 8/8 đối chứng; [handoff](c3-operator-auth-recovery.md#sửa-review-pr-59-2026-10-12) · [inventory](c3-test-inventory.json). Debt generic `bootstrap`/`invitation_accept` và toàn inventory thuộc gói B/C4. **Safety pending tới C4.**
 
 **Review PR #59 (2026-10-12):** [hai P2 chặn merge C3](reviews/pr59-c3-operator-auth-recovery.md); [prompt sửa cùng PR](tasks/fix-pr59-c3-final-authority-and-release.md). Source `0049`, PR OPEN/chưa merge, **safety pending C4**. Review/agent giữ kết quả riêng; tiếp gói B/C4 sau khi sửa và merge C3. Giữ docs review/task chưa commit.

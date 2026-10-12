@@ -1,5 +1,26 @@
 # Sửa PR #59 — final authority khi append lỗi và release proof
 
+## Lượt review lại tại `6465dc0` — interruption trong release
+
+**Task hiện hành: sửa nhánh còn lại của P2-2 trên cùng PR #59.** P2-1 và release lỗi `Exception` đã qua kiểm độc lập; không làm lại các cơ chế đó hoặc mở C4. [Report review lại](../reviews/pr59-c3-operator-auth-recovery.md#review-lại-tại-6465dc0--còn-nhánh-p2-2-khi-ctrl-c-trong-release) ghi 95 repo pass, 11 ca reviewer pass và một ca interruption fail.
+
+### Lỗi đã tái hiện
+
+`_release` chỉ bắt `Exception`. Khi `Connection.rollback` trong release mutation sau known commit ném `KeyboardInterrupt`, cleanup bị ngắt và `mutate` không đổi nó thành outcome. CLI bắt như hủy TTY, exit 2 `nothing was changed`, dù receipt mới và credential mới đã commit/usable. Reviewer gọi CLI in-process với prompt tổng hợp; fault injection, không là SIGINT/ConPTY thật. Test nằm ngoài repo tại `%TEMP%\ras-pr59-rereview-20261012\test_interrupt_release.py`; chạy hai lượt đều fail đúng assertion, không setup error.
+
+### Yêu cầu sửa
+
+1. Cleanup của từng pha phải xử lý interruption/BaseException phù hợp, tiếp tục trả/invalidate connection và không để lỗi cleanup che outcome của thân pha. Không chỉ đổi thông báo CLI hoặc nuốt Ctrl-C rồi báo thành công.
+2. Dùng `Attempt` độc lập để phân loại interruption trong mutation release: known commit giữ credential/status/case/receipt và trả non-success outcome; batch chưa xác nhận giữ exit 5; commit đã gửi chưa rõ là uncertain, không đổi thành known-not; đã append nhưng chưa commit không báo nothing-written. Không retry/proof/success sau release lỗi.
+3. Prepare release bị ngắt dừng trước TTY/hash/mutation; proof sau known commit bị ngắt trả postcommit failure. Ctrl-C/EOF **trong nhập mật khẩu trước mutation** vẫn giữ hành vi hủy an toàn, không thay dữ liệu.
+4. Thêm regression ít nhất cho interruption lúc rollback/close release sau known commit (kiểm receipt/verifier hoặc status thực, output/exit và không retry). Kiểm thêm nhánh release của prepare/proof và outcome unconfirmed/uncertain theo cách fault có thể xảy ra; không dùng test chỉ so exception type. Giữ ca Ctrl-C TTY hiện có và hai P2 đã sửa.
+5. Chạy regression trên head review trước sửa để xác nhận lỗi, rồi bản sửa; chạy nhóm C3 core/CLI/migration/ORM và hồi quy outcome liên quan. Một đối chứng bỏ cơ chế mới phải bị test bắt; khôi phục source/hash trước lượt cuối. Không cần chạy lại full inventory chỉ để tăng số pass, nhưng ghi selection/not-run chính xác.
+6. Cập nhật handoff/inventory và cửa sổ lỗi; giữ report này cùng chứng cứ agent/reviewer riêng. Commit/push cùng PR #59 tiếng Việt, không merge/AI attribution. Giữ mọi docs reviewer modified vào PR, safety pending C4, không migration/grant mới nếu không có phụ thuộc thật. Không đọc `.env`, tác động dev hay provider.
+
+Phần dưới là prompt lượt đầu, giữ làm lịch sử và yêu cầu hồi quy cho các cơ chế đã sửa.
+
+## Prompt lượt đầu tại `8fa504f` (lịch sử)
+
 Review tại head `8fa504f49504d4a1c3e36830f02cfca4c730c33c`, source **0049**, PR OPEN/chưa merge. [Report](../reviews/pr59-c3-operator-auth-recovery.md) ghi tái hiện và kiểm độc lập. Sửa trên **cùng PR #59**, không bắt đầu C4, không mở safety/pricing. Giữ mọi docs review/task modified/untracked và đưa vào commit/PR.
 
 ## P2-1 — Không được bỏ kiểm authority/expiry khi ghi journal lỗi

@@ -2,7 +2,7 @@
  "stage": "C3 operator auth recovery + PR #59 review fix (same PR, not merged)",
  "base": "58d059ab7a383d5f97e1b04e909e9628a11bf78a (merge PR #58; review head aa9c8a2 ancestor, tree equal)",
  "review": "docs/reviews/pr59-c3-operator-auth-recovery.md (reviewer results kept there, separate from agent results)",
- "final_head": "0ee17f3682a9aef1a57d5d15d16fe9faad41db41",
+ "final_head": "d2d56f3f3582120e58b652c685e0d65e576cad2a",
  "source_migration": "0048 -> 0049 (fix changes only api/app/operator_recovery.py, tests and scripts; no migration/grant)",
  "environment": "Conda ras via scripts/c3_test_host.py; isolated Compose project rasc33fbab45f (pgvector pg16, MinIO, Redis) on random loopback ports; synthetic secrets/journals/cases outside repo; external HTTP blocked; no .env, dev stack, provider or pricing change",
  "regressions_before_fix": {
@@ -1668,5 +1668,293 @@
   ],
   "countercheck_note": "Counterchecks ran at 62cbbbf; cb9518b and 8a622a8 change only a test fixture and the smoke script, the mutated production/migration targets are byte-identical at the final head.",
   "note": "First submission (review head 8fa504f; suite at cb9518b). Reviewer found two P2 not covered by it; kept as history, not a pass of the current head."
+ },
+ "rereview_fix_6465dc0": {
+  "review": "docs/reviews/pr59-c3-operator-auth-recovery.md#review-lại-tại-6465dc0--còn-nhánh-p2-2-khi-ctrl-c-trong-release",
+  "fix_head": "d2d56f3f3582120e58b652c685e0d65e576cad2a",
+  "change": "api/app/operator_recovery.py only: _release absorbs BaseException (Ctrl-C) and always invalidates/closes; connection_release_interrupted classified by Attempt; run() classifies an interrupt after the decision started.",
+  "before_fix_on_6465dc0": {
+   "test_interrupt_in_release_after_known_commit_is_reported_not_cancelled[True]": "fail: exit 2 'nothing was changed' after commit",
+   "test_interrupt_in_release_after_known_commit_is_reported_not_cancelled[False]": "fail: exit 2 'nothing was changed' after commit",
+   "test_interrupt_in_prepare_release_stops_before_prompt": "KeyboardInterrupt escaped (pytest session aborted)",
+   "test_interrupt_in_proof_release_after_commit_is_postcommit_failure": "fail: connection checked out (leak)",
+   "test_interrupt_in_release_never_turns_uncertain_into_known": "KeyboardInterrupt escaped (pytest session aborted)",
+   "test_interrupt_in_rollback_after_append_started_is_not_nothing_written": "KeyboardInterrupt escaped; first version armed the interrupt in prepare by mistake, corrected test re-run on a 6465dc0 worktree outside the repo: still escaped",
+   "test_interrupt_while_typing_password_still_cancels_safely": "pass (safe cancel already correct)",
+   "note": "Fault injection on Connection/RootTransaction.rollback raising KeyboardInterrupt; in-process CLI prompt. Not a real SIGINT or ConPTY; the real-terminal Ctrl-C during the prompt stays covered by the ConPTY test."
+  },
+  "final": {
+   "exit": 0,
+   "selection_collected": 106,
+   "junit_cases": 106,
+   "unique_junit": 106,
+   "passed": 106,
+   "failed": [],
+   "errors": [],
+   "skipped": [],
+   "all_collected": 5118,
+   "not_run": 5012,
+   "source_files": 358,
+   "source_equal": true
+  },
+  "selection_args": [
+   "api/tests/test_c3_operator_recovery.py",
+   "api/tests/test_c3_operator_cli.py",
+   "api/tests/test_c3_migration.py",
+   "api/tests/test_migrations.py::test_orm_models_match_migrated_schema"
+  ],
+  "pass_nodes": [
+   "tests/test_c3_migration.py::test_0048_provisioned_history_upgrades_and_refuses_downgrade",
+   "tests/test_c3_migration.py::test_0049_pristine_roundtrip_restores_0048_allowlists",
+   "tests/test_c3_operator_cli.py::test_cli_inspect_and_refusals_with_real_logins",
+   "tests/test_c3_operator_cli.py::test_conpty_hidden_prompt_twice[ctrl_c]",
+   "tests/test_c3_operator_cli.py::test_conpty_hidden_prompt_twice[mismatch]",
+   "tests/test_c3_operator_cli.py::test_conpty_hidden_prompt_twice[policy]",
+   "tests/test_c3_operator_cli.py::test_conpty_hidden_prompt_twice[success]",
+   "tests/test_c3_operator_cli.py::test_in_process_prompt_failures_change_nothing[eof]",
+   "tests/test_c3_operator_cli.py::test_in_process_prompt_failures_change_nothing[getpass_warning]",
+   "tests/test_c3_operator_cli.py::test_in_process_prompt_failures_change_nothing[interrupt]",
+   "tests/test_c3_operator_cli.py::test_operator_cannot_register_its_own_case_but_provisioner_can",
+   "tests/test_c3_operator_cli.py::test_pending_http_unpatched_during_hold_and_after_recover",
+   "tests/test_c3_operator_recovery.py::test_absent_user_and_same_email_other_uuid_refused",
+   "tests/test_c3_operator_recovery.py::test_all_admins_quarantined_and_legacy_only_admin",
+   "tests/test_c3_operator_recovery.py::test_bootstrap_singleton_is_only_supporting_evidence",
+   "tests/test_c3_operator_recovery.py::test_case_binding_refusals_write_nothing[expired]",
+   "tests/test_c3_operator_recovery.py::test_case_binding_refusals_write_nothing[file_mismatch]",
+   "tests/test_c3_operator_recovery.py::test_case_binding_refusals_write_nothing[lifetime]",
+   "tests/test_c3_operator_recovery.py::test_case_binding_refusals_write_nothing[not_yet]",
+   "tests/test_c3_operator_recovery.py::test_case_binding_refusals_write_nothing[other_operator]",
+   "tests/test_c3_operator_recovery.py::test_case_binding_refusals_write_nothing[role]",
+   "tests/test_c3_operator_recovery.py::test_case_binding_refusals_write_nothing[stale_credential]",
+   "tests/test_c3_operator_recovery.py::test_case_binding_refusals_write_nothing[stale_status]",
+   "tests/test_c3_operator_recovery.py::test_case_binding_refusals_write_nothing[unregistered]",
+   "tests/test_c3_operator_recovery.py::test_case_binding_refusals_write_nothing[used_twice]",
+   "tests/test_c3_operator_recovery.py::test_case_binding_refusals_write_nothing[wrong_action]",
+   "tests/test_c3_operator_recovery.py::test_case_binding_refusals_write_nothing[wrong_installation]",
+   "tests/test_c3_operator_recovery.py::test_case_file_strict_schema_and_location",
+   "tests/test_c3_operator_recovery.py::test_change_between_proof_and_lock_refuses[operator_revoked]",
+   "tests/test_c3_operator_recovery.py::test_change_between_proof_and_lock_refuses[other_operator_credential]",
+   "tests/test_c3_operator_recovery.py::test_change_between_proof_and_lock_refuses[role]",
+   "tests/test_c3_operator_recovery.py::test_change_between_proof_and_lock_refuses[verifier]",
+   "tests/test_c3_operator_recovery.py::test_cli_proof_release_failure_exit_and_output",
+   "tests/test_c3_operator_recovery.py::test_direct_sql_stage_binds_case_user_action_time_and_operation[extra_field]",
+   "tests/test_c3_operator_recovery.py::test_direct_sql_stage_binds_case_user_action_time_and_operation[null_user]",
+   "tests/test_c3_operator_recovery.py::test_direct_sql_stage_binds_case_user_action_time_and_operation[operation]",
+   "tests/test_c3_operator_recovery.py::test_direct_sql_stage_binds_case_user_action_time_and_operation[other_action]",
+   "tests/test_c3_operator_recovery.py::test_direct_sql_stage_binds_case_user_action_time_and_operation[other_operator]",
+   "tests/test_c3_operator_recovery.py::test_direct_sql_stage_binds_case_user_action_time_and_operation[other_user]",
+   "tests/test_c3_operator_recovery.py::test_direct_sql_stage_binds_case_user_action_time_and_operation[reason]",
+   "tests/test_c3_operator_recovery.py::test_direct_sql_stage_binds_case_user_action_time_and_operation[time]",
+   "tests/test_c3_operator_recovery.py::test_direct_sql_stage_binds_case_user_action_time_and_operation[valid]",
+   "tests/test_c3_operator_recovery.py::test_disabled_never_enabled_and_latest_disabled_refused",
+   "tests/test_c3_operator_recovery.py::test_disabled_snapshot_with_later_enable_intent_stays_disabled",
+   "tests/test_c3_operator_recovery.py::test_expiry_during_fsync_rolls_back_after_journal_and_replay_only_restricts",
+   "tests/test_c3_operator_recovery.py::test_expiry_during_hash_or_lock_wait_refuses_without_writes",
+   "tests/test_c3_operator_recovery.py::test_final_authority_rechecked_when_real_fsync_fails[resolve_initial_status-expire]",
+   "tests/test_c3_operator_recovery.py::test_final_authority_rechecked_when_real_fsync_fails[resolve_initial_status-revoke]",
+   "tests/test_c3_operator_recovery.py::test_final_authority_rechecked_when_real_fsync_fails[set_credential-expire]",
+   "tests/test_c3_operator_recovery.py::test_final_authority_rechecked_when_real_fsync_fails[set_credential-revoke]",
+   "tests/test_c3_operator_recovery.py::test_generic_paths_cannot_mint_operator_reasons",
+   "tests/test_c3_operator_recovery.py::test_held_stays_held_until_separate_status_case",
+   "tests/test_c3_operator_recovery.py::test_hold_never_excuses_damaged_or_unconfirmed_chain[missing]",
+   "tests/test_c3_operator_recovery.py::test_hold_never_excuses_damaged_or_unconfirmed_chain[torn]",
+   "tests/test_c3_operator_recovery.py::test_hold_never_excuses_damaged_or_unconfirmed_chain[unconfirmed]",
+   "tests/test_c3_operator_recovery.py::test_inspect_reports_codes_without_secrets_and_requires_hold_for_mutation",
+   "tests/test_c3_operator_recovery.py::test_interrupt_in_prepare_release_stops_before_prompt",
+   "tests/test_c3_operator_recovery.py::test_interrupt_in_proof_release_after_commit_is_postcommit_failure",
+   "tests/test_c3_operator_recovery.py::test_interrupt_in_release_after_known_commit_is_reported_not_cancelled[False]",
+   "tests/test_c3_operator_recovery.py::test_interrupt_in_release_after_known_commit_is_reported_not_cancelled[True]",
+   "tests/test_c3_operator_recovery.py::test_interrupt_in_release_never_turns_uncertain_into_known",
+   "tests/test_c3_operator_recovery.py::test_interrupt_in_rollback_after_append_started_is_not_nothing_written",
+   "tests/test_c3_operator_recovery.py::test_interrupt_while_typing_password_still_cancels_safely",
+   "tests/test_c3_operator_recovery.py::test_latest_journal_disable_with_active_snapshot_is_refused",
+   "tests/test_c3_operator_recovery.py::test_membership_set_role_and_unmapped_grants_never_impersonate",
+   "tests/test_c3_operator_recovery.py::test_no_db_session_or_lock_held_across_prompt_and_hash",
+   "tests/test_c3_operator_recovery.py::test_non_operator_logins_cannot_use_operator_boundary[owner]",
+   "tests/test_c3_operator_recovery.py::test_non_operator_logins_cannot_use_operator_boundary[recovery]",
+   "tests/test_c3_operator_recovery.py::test_non_operator_logins_cannot_use_operator_boundary[runtime]",
+   "tests/test_c3_operator_recovery.py::test_only_admin_disabled_stays_locked_and_bootstrap_refused",
+   "tests/test_c3_operator_recovery.py::test_password_policy_and_snapshot_reuse_refused_before_db_write[SECRET]",
+   "tests/test_c3_operator_recovery.py::test_password_policy_and_snapshot_reuse_refused_before_db_write[blank]",
+   "tests/test_c3_operator_recovery.py::test_password_policy_and_snapshot_reuse_refused_before_db_write[email]",
+   "tests/test_c3_operator_recovery.py::test_password_policy_and_snapshot_reuse_refused_before_db_write[short]",
+   "tests/test_c3_operator_recovery.py::test_prepare_release_failure_stops_before_prompt[False]",
+   "tests/test_c3_operator_recovery.py::test_prepare_release_failure_stops_before_prompt[True]",
+   "tests/test_c3_operator_recovery.py::test_provisioning_refuses_runtime_privileged_and_conflicting_logins",
+   "tests/test_c3_operator_recovery.py::test_quarantine_active_proven_recovers_only_credential[admin]",
+   "tests/test_c3_operator_recovery.py::test_quarantine_active_proven_recovers_only_credential[user]",
+   "tests/test_c3_operator_recovery.py::test_real_fsync_error_with_valid_authority_still_commits_batch_false",
+   "tests/test_c3_operator_recovery.py::test_real_operator_set_credential_commits_receipt_and_new_login",
+   "tests/test_c3_operator_recovery.py::test_release_absorbs_interrupt_and_still_invalidates_and_closes[None-None-clean]",
+   "tests/test_c3_operator_recovery.py::test_release_absorbs_interrupt_and_still_invalidates_and_closes[close-KeyboardInterrupt-interrupted]",
+   "tests/test_c3_operator_recovery.py::test_release_absorbs_interrupt_and_still_invalidates_and_closes[rollback-ConnectionResetError-failed]",
+   "tests/test_c3_operator_recovery.py::test_release_absorbs_interrupt_and_still_invalidates_and_closes[rollback-KeyboardInterrupt-interrupted]",
+   "tests/test_c3_operator_recovery.py::test_release_failure_after_known_commit_is_not_success[mutation_after_commit]",
+   "tests/test_c3_operator_recovery.py::test_release_failure_after_known_commit_is_not_success[mutation_after_commit_journal_unavailable]",
+   "tests/test_c3_operator_recovery.py::test_release_failure_after_known_commit_is_not_success[proof]",
+   "tests/test_c3_operator_recovery.py::test_release_failure_never_masks_a_refusal",
+   "tests/test_c3_operator_recovery.py::test_revoked_operator_and_registry_rows_are_final",
+   "tests/test_c3_operator_recovery.py::test_rollback_failure_and_lost_commit_reply_never_success",
+   "tests/test_c3_operator_recovery.py::test_t15_fault_matrix[commit-full]",
+   "tests/test_c3_operator_recovery.py::test_t15_fault_matrix[commit-none]",
+   "tests/test_c3_operator_recovery.py::test_t15_fault_matrix[commit-prefix]",
+   "tests/test_c3_operator_recovery.py::test_t15_fault_matrix[commit-torn]",
+   "tests/test_c3_operator_recovery.py::test_t15_fault_matrix[rollback-full]",
+   "tests/test_c3_operator_recovery.py::test_t15_fault_matrix[rollback-none]",
+   "tests/test_c3_operator_recovery.py::test_t15_fault_matrix[rollback-prefix]",
+   "tests/test_c3_operator_recovery.py::test_t15_fault_matrix[rollback-torn]",
+   "tests/test_c3_operator_recovery.py::test_t15_fault_matrix[uncertain-full]",
+   "tests/test_c3_operator_recovery.py::test_t15_fault_matrix[uncertain-none]",
+   "tests/test_c3_operator_recovery.py::test_t15_fault_matrix[uncertain-prefix]",
+   "tests/test_c3_operator_recovery.py::test_t15_fault_matrix[uncertain-torn]",
+   "tests/test_c3_operator_recovery.py::test_two_dump_restore_rounds_never_reuse_case_or_rebuild_credential",
+   "tests/test_c3_operator_recovery.py::test_two_operators_same_target_concurrently_one_decision",
+   "tests/test_migrations.py::test_orm_models_match_migrated_schema"
+  ],
+  "not_run_note": "Scoped to the changed file's behaviour (C3 core/CLI/ConPTY/HTTP pending/migration/ORM). The 1.009-node selection at 0ee17f3 is the latest broad run; full inventory and the 281 debt nodes remain for gói B/C4.",
+  "counterchecks": [
+   {
+    "name": "receipt-guard",
+    "node": "api/tests/test_c3_operator_recovery.py::test_generic_paths_cannot_mint_operator_reasons",
+    "valid_countercheck": true,
+    "exit": 1,
+    "failures": 1,
+    "cases": 1,
+    "code_sha": "d2d56f3f3582120e58b652c685e0d65e576cad2a",
+    "original_sha256": {
+     "api/migrations/versions/0049_operator_auth_recovery.sql": "6583afa9c82978e7e6592485b2412ce84ee6604a0d451a4378b6e0f2c36f8da6"
+    },
+    "mutant_sha256": {
+     "api/migrations/versions/0049_operator_auth_recovery.sql": "c26590db37eb3844de81f31f1b54cef90a19ef676d2f3b654e63b0597cd1a279"
+    }
+   },
+   {
+    "name": "login-binding",
+    "node": "api/tests/test_c3_operator_recovery.py::test_membership_set_role_and_unmapped_grants_never_impersonate",
+    "valid_countercheck": true,
+    "exit": 1,
+    "failures": 1,
+    "cases": 1,
+    "code_sha": "d2d56f3f3582120e58b652c685e0d65e576cad2a",
+    "original_sha256": {
+     "api/migrations/versions/0049_operator_auth_recovery.sql": "6583afa9c82978e7e6592485b2412ce84ee6604a0d451a4378b6e0f2c36f8da6"
+    },
+    "mutant_sha256": {
+     "api/migrations/versions/0049_operator_auth_recovery.sql": "370087ad66e059a159f6f4eaded466e27aa7b5c6d3ed3b7bd3b5091aad33c886"
+    }
+   },
+   {
+    "name": "status-disabled",
+    "node": "api/tests/test_c3_operator_recovery.py::test_disabled_snapshot_with_later_enable_intent_stays_disabled",
+    "valid_countercheck": true,
+    "exit": 1,
+    "failures": 1,
+    "cases": 1,
+    "code_sha": "d2d56f3f3582120e58b652c685e0d65e576cad2a",
+    "original_sha256": {
+     "api/app/operator_recovery.py": "fc89a833d04485dfd03e8c387fb72be133c4aad211e0c4a13167ce7a4522d5ff",
+     "api/migrations/versions/0049_operator_auth_recovery.sql": "6583afa9c82978e7e6592485b2412ce84ee6604a0d451a4378b6e0f2c36f8da6"
+    },
+    "mutant_sha256": {
+     "api/app/operator_recovery.py": "6faaa67427602926d44cdc3dbf4c1137d80253242d28c4e844f492dabfa50df3",
+     "api/migrations/versions/0049_operator_auth_recovery.sql": "2aa442548cb290702e0ded5b2b3b6a4943979552d060f0b5e56f95846dc074f1"
+    }
+   },
+   {
+    "name": "hold-reconciled",
+    "node": "api/tests/test_c3_operator_recovery.py::test_inspect_reports_codes_without_secrets_and_requires_hold_for_mutation",
+    "valid_countercheck": true,
+    "exit": 1,
+    "failures": 1,
+    "cases": 1,
+    "code_sha": "d2d56f3f3582120e58b652c685e0d65e576cad2a",
+    "original_sha256": {
+     "api/app/operator_recovery.py": "fc89a833d04485dfd03e8c387fb72be133c4aad211e0c4a13167ce7a4522d5ff"
+    },
+    "mutant_sha256": {
+     "api/app/operator_recovery.py": "bafda1182c4594f12a0aee89241a089ca916e49deeb7eff9b6cb061d45d38ab7"
+    }
+   },
+   {
+    "name": "batch-false",
+    "node": "api/tests/test_c3_operator_recovery.py::test_t15_fault_matrix[commit-full]",
+    "valid_countercheck": true,
+    "exit": 1,
+    "failures": 1,
+    "cases": 1,
+    "code_sha": "d2d56f3f3582120e58b652c685e0d65e576cad2a",
+    "original_sha256": {
+     "api/app/operator_recovery.py": "fc89a833d04485dfd03e8c387fb72be133c4aad211e0c4a13167ce7a4522d5ff"
+    },
+    "mutant_sha256": {
+     "api/app/operator_recovery.py": "9b6b21b0efdf7879e209fa07192a8ce5f612ea16b20887c7fc95d5eb9038ce71"
+    }
+   },
+   {
+    "name": "journal-case-reuse",
+    "node": "api/tests/test_c3_operator_recovery.py::test_two_dump_restore_rounds_never_reuse_case_or_rebuild_credential",
+    "valid_countercheck": true,
+    "exit": 1,
+    "failures": 1,
+    "cases": 1,
+    "code_sha": "d2d56f3f3582120e58b652c685e0d65e576cad2a",
+    "original_sha256": {
+     "api/app/operator_recovery.py": "fc89a833d04485dfd03e8c387fb72be133c4aad211e0c4a13167ce7a4522d5ff"
+    },
+    "mutant_sha256": {
+     "api/app/operator_recovery.py": "1172863b9d0658957d66bbcd377fd5c0dd043d6d10442824714a65b5e5157028"
+    }
+   },
+   {
+    "name": "final-authority-after-append",
+    "node": "api/tests/test_c3_operator_recovery.py::test_final_authority_rechecked_when_real_fsync_fails[set_credential-expire]",
+    "valid_countercheck": true,
+    "exit": 1,
+    "failures": 1,
+    "cases": 1,
+    "code_sha": "d2d56f3f3582120e58b652c685e0d65e576cad2a",
+    "original_sha256": {
+     "api/app/operator_recovery.py": "fc89a833d04485dfd03e8c387fb72be133c4aad211e0c4a13167ce7a4522d5ff"
+    },
+    "mutant_sha256": {
+     "api/app/operator_recovery.py": "db7a36eef3d5f93783f252d498d2106d9f8c03e4cf9ea9b5609a5be2d842ee11"
+    }
+   },
+   {
+    "name": "release-reported",
+    "node": "api/tests/test_c3_operator_recovery.py::test_prepare_release_failure_stops_before_prompt[False]",
+    "valid_countercheck": true,
+    "exit": 1,
+    "failures": 1,
+    "cases": 1,
+    "code_sha": "d2d56f3f3582120e58b652c685e0d65e576cad2a",
+    "original_sha256": {
+     "api/app/operator_recovery.py": "fc89a833d04485dfd03e8c387fb72be133c4aad211e0c4a13167ce7a4522d5ff"
+    },
+    "mutant_sha256": {
+     "api/app/operator_recovery.py": "522b532785eb2ba3d2c2138fa62c88a7d7143b47976fd8690634f5871a5070bf"
+    }
+   },
+   {
+    "name": "release-interrupt",
+    "node": "api/tests/test_c3_operator_recovery.py::test_release_absorbs_interrupt_and_still_invalidates_and_closes[rollback-KeyboardInterrupt-interrupted]",
+    "valid_countercheck": true,
+    "exit": 1,
+    "failures": 1,
+    "cases": 1,
+    "code_sha": "d2d56f3f3582120e58b652c685e0d65e576cad2a",
+    "original_sha256": {
+     "api/app/operator_recovery.py": "fc89a833d04485dfd03e8c387fb72be133c4aad211e0c4a13167ce7a4522d5ff"
+    },
+    "mutant_sha256": {
+     "api/app/operator_recovery.py": "e5bdca5c4d5797559f86aa18e2b29dfbc9b4fc978e238251c6bb90a23ea3dd35"
+    }
+   }
+  ],
+  "countercheck_preparation": [
+   "Run 1 stopped safely: the old release-reported mutant no longer matched the rewritten release code (no source change).",
+   "Run 2: 8/9; release-interrupt mutant not caught by the CLI test because run() classification and GC still produced exit 4 without a visible leak. Added a direct _release unit test and pointed the mutant at it; run 3: 9/9."
+  ],
+  "pending_smoke_log": "﻿operator CLI: resolve-initial-status exit 0 (credential still quarantined)\npending HTTP [maintenance-hold]: api GET /healthz 200\npending HTTP [maintenance-hold]: api GET /readyz 503\npending HTTP [maintenance-hold]: api POST /auth/login 503\npending HTTP [maintenance-hold]: api GET /auth/csrf 503\npending HTTP [maintenance-hold]: api GET /library/items 503\npending HTTP [maintenance-hold]: api GET /admin/users 503\npending HTTP [maintenance-hold]: api POST /search 503\npending HTTP [maintenance-hold]: api POST /rag/ask 503\npending HTTP [maintenance-hold]: web POST /api/auth/login 503\npending HTTP [maintenance-hold]: web GET /api/auth/csrf 503\npending HTTP [maintenance-hold]: web GET /api/library/items 503\npending HTTP [maintenance-hold]: web GET /api/admin/users 503\npending HTTP [maintenance-hold]: web POST /api/search 503\npending HTTP [maintenance-hold]: web POST /api/rag/ask 503\npending HTTP [after-recover-pending]: api GET /healthz 200\npending HTTP [after-recover-pending]: api GET /readyz 503\npending HTTP [after-recover-pending]: api POST /auth/login 503\npending HTTP [after-recover-pending]: api GET /auth/csrf 503\npending HTTP [after-recover-pending]: api GET /library/items 503\npending HTTP [after-recover-pending]: api GET /admin/users 503\npending HTTP [after-recover-pending]: api POST /search 503\npending HTTP [after-recover-pending]: api POST /rag/ask 503\npending HTTP [after-recover-pending]: web POST /api/auth/login 503\npending HTTP [after-recover-pending]: web GET /api/auth/csrf 503\npending HTTP [after-recover-pending]: web GET /api/library/items 503\npending HTTP [after-recover-pending]: web GET /api/admin/users 503\npending HTTP [after-recover-pending]: web POST /api/search 503\npending HTTP [after-recover-pending]: web POST /api/rag/ask 503\nsafety remains pending; no product bypass; pricing unchanged\n"
  }
 }
