@@ -34,17 +34,10 @@ SPECS = [
     ('journal-case-reuse', [(OPS, '        if case_used(hold.state, case.case_id):\n            raise OperatorRefused("case_already_used")\n        registered_case(conn, case)\n        at = clock()',
                              '        registered_case(conn, case)\n        at = clock()')],
      T + 'test_two_dump_restore_rounds_never_reuse_case_or_rebuild_credential'),
-    ('final-authority-after-append', [(OPS, '            _recheck(conn, case, settings, clock)
-            if attempt.written:
-                conn.execute(',
-                                       '            if attempt.written:
-                _recheck(conn, case, settings, clock)
-                conn.execute(')],
+    ('final-authority-after-append', [(OPS, '            _recheck(conn, case, settings, clock)\n            if attempt.written:\n                conn.execute(',
+                                       '            if attempt.written:\n                _recheck(conn, case, settings, clock)\n                conn.execute(')],
      T + 'test_final_authority_rechecked_when_real_fsync_fails[set_credential-expire]'),
-    ('release-reported', [(OPS, '    if not _release(conn):
-        raise ConnectionReleaseFailed()
-', '    _release(conn)
-')],
+    ('release-reported', [(OPS, '    if not _release(conn):\n        raise ConnectionReleaseFailed()\n', '    _release(conn)\n')],
      T + 'test_prepare_release_failure_stops_before_prompt[False]'),
 ]
 
