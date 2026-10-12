@@ -1,5 +1,9 @@
 # Kế hoạch hoàn thành MVP
 
+**Cập nhật sửa review C3, 2026-10-12:** hai P2 PR #59 đã sửa trên cùng PR (head `0ee17f3`), chờ review lại, chưa merge; [handoff](c3-operator-auth-recovery.md#sửa-review-pr-59-2026-10-12). Gói B vẫn ở C3; debt/hồi quy toàn inventory và C4 chưa giao. Không giảm checklist hay forecast bằng suite pass. Safety pending.
+
+**Cập nhật review C3, 2026-10-12:** PR #59 còn OPEN, source `0049`; [review](reviews/pr59-c3-operator-auth-recovery.md) có hai P2 và [prompt sửa cùng PR](tasks/fix-pr59-c3-final-authority-and-release.md). Gói B đang C3, chưa giao cutover C4 hoặc giảm checklist bằng suite pass. Safety vẫn pending; giữ forecast/giả định bên dưới, đánh giá lại tại C4 với debt và tích hợp thực tế.
+
 Ngày chốt **2026-10-11**. Chủ dự án giao orchestrator chọn phạm vi và cách làm hợp lý để đưa dự án tới một bản dùng được. Kế hoạch này là nguồn trạng thái hiện hành; các report/handoff cũ giữ chứng cứ tại thời điểm chạy. Không suy kết quả kiểm trước merge thành kết quả mới.
 
 ## Đích phát hành

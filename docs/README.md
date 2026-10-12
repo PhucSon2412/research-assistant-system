@@ -1,5 +1,9 @@
 # Tài liệu dự án
 
+**Sửa review PR #59 tại `0ee17f3` (2026-10-12, chờ review lại, chưa merge):** hai P2 đã sửa trong `app/operator_recovery.py` — authority/hạn case kiểm lại sau **mọi** kết quả append trước COMMIT (mất quyền → rollback, journal chỉ hạn chế), lỗi trả connection thành kết quả không thành công theo pha. Agent: 1.009/1.009 selection pass, 4.098 not-run, 281 debt xác nhận tại base, 8/8 đối chứng; [handoff](c3-operator-auth-recovery.md#sửa-review-pr-59-2026-10-12) · [inventory](c3-test-inventory.json). Debt generic `bootstrap`/`invitation_accept` và toàn inventory thuộc gói B/C4. **Safety pending tới C4.**
+
+**Review PR #59 (2026-10-12):** [hai P2 chặn merge C3](reviews/pr59-c3-operator-auth-recovery.md); [prompt sửa cùng PR](tasks/fix-pr59-c3-final-authority-and-release.md). Source `0049`, PR OPEN/chưa merge, **safety pending C4**. Review/agent giữ kết quả riêng; tiếp gói B/C4 sau khi sửa và merge C3. Giữ docs review/task chưa commit.
+
 **C3 trên nhánh review (chưa merge):** [handoff operator auth recovery](c3-operator-auth-recovery.md) · [inventory](c3-test-inventory.json). Source `0049`; login operator riêng, case bind UUID/installation/heads dùng một lần theo journal, TTY ẩn, maintenance hold, credential/status tách; không mở disabled/ready. **Safety pending tới C4**; tiếp debt/hồi quy và tích hợp C4.
 
 **Trạng thái hiện hành:** PR #58 đã merge `58d059a`, source **0048**; đã giao [C3 operator auth recovery](tasks/m6c2b2c3-operator-auth-recovery.md), mới giao/chưa triển khai hoặc kiểm. Tiếp debt/hồi quy và tích hợp C4 theo [kế hoạch MVP](mvp-delivery-plan.md); **safety pending tới C4**. Giữ và đưa docs review/task chưa commit vào PR kế tiếp.

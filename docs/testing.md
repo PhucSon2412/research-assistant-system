@@ -483,3 +483,5 @@ Sealed cuối tại `dfca84a`: **549/549 API unique pass**, collect 4343, 3794 n
 ## C3 operator auth recovery
 
 Kết quả, selection, debt xác nhận tại base, ConPTY, đối chứng và smoke HTTP pending: [handoff C3](c3-operator-auth-recovery.md#kiểm-chứng) · [inventory](c3-test-inventory.json). Suite cuối `cb9518b`: 997/997 pass, 4.098 not-run; không tính là full inventory hay nghiệm thu C4.
+
+Sửa review PR #59 tại `0ee17f3`: 1.009/1.009 selection pass, 12 regression mới (9 fail trên code review trước sửa), 8/8 đối chứng, smoke pending API/proxy 28/28; xem [handoff](c3-operator-auth-recovery.md#sửa-review-pr-59-2026-10-12).

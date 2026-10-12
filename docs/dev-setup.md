@@ -1781,3 +1781,5 @@ Lệnh đã chạy từ gốc repo (PowerShell, `$py` = Conda ras, `$ctx` = thư
 ```
 
 Runner đặt URL admin tường minh, mật khẩu runtime/recovery/operator tổng hợp và chặn HTTP ngoài loopback. Runbook vận hành (writer dừng): `python -m app.cli.recovery hold` → migrate → `python -m app.cli.recovery recover --hold-for-operator` → migrator `python -m app.cli.provision_auth_operator operator --login <login> --operator-id <uuid>` và `… register-case --case-file <file ngoài repo>` → login operator `python -m app.cli.auth_recovery inspect|set-credential|resolve-initial-status …` → `python -m app.cli.recovery recover`. `set-credential` chỉ nhận mật khẩu từ TTY thật; không có cờ password/enable/role/force.
+
+Sửa review PR #59 dùng cùng lệnh với context mới ngoài repo (`%TEMP%\ras-c3fix-20261012`, project `rasc33fbab45f`). CLI trả exit 4 cả khi lỗi trả connection sau commit hoặc ở proof; khi đó không chạy lại lệnh, dùng `inspect --case-id` rồi `recover`.

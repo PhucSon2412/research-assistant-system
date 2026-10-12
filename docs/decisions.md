@@ -1,5 +1,9 @@
 # Nhật ký quyết định
 
+## Sửa review PR #59 (2026-10-12, nhánh review)
+
+Theo [prompt sửa](tasks/fix-pr59-c3-final-authority-and-release.md): final authority (login operator + cửa sổ case, clock mới) chạy sau mọi kết quả append và trước COMMIT; mất quyền thì rollback, giữ file để recovery chỉ hạn chế; quyền còn hợp lệ mà append lỗi vẫn commit batch false. Lỗi rollback/close của một pha được báo bằng mã `connection_release_failed` và phân loại theo `Attempt`, không còn dẫn tới success/proof. Không đổi migration/grant; safety pending tới C4.
+
 ## Triển khai C3 operator recovery (2026-10-11, nhánh review)
 
 Coding agent chọn trong phạm vi task C3 đã được orchestrator chốt theo ủy quyền; không phải chủ dự án trực tiếp duyệt từng lựa chọn, và không có danh tính/inventory người thật trong PR. Chi tiết và kết quả kiểm ở [handoff C3](c3-operator-auth-recovery.md).
