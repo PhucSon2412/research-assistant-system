@@ -58,12 +58,17 @@ def main():
     base = {k: v for k, v in os.environ.items() if not k.startswith('RAS_')}
     base.update({'PYTHONPATH': str(API), 'PYTHONUTF8': '1', 'RAS_ENVIRONMENT': 'development', 'RAS_HTTP__COOKIE_SECURE': 'false',
                  'RAS_DB__HOST': '127.0.0.1', 'RAS_DB__PORT': str(c['db_port']), 'RAS_DB__NAME': name,
-                 'RAS_RECOVERY__JOURNAL_PATH': str(journal)})
+                 'RAS_RECOVERY__JOURNAL_PATH': str(journal),
+                 'RAS_STORAGE__ENDPOINT_URL': f"http://127.0.0.1:{c['minio_port']}",
+                 'RAS_STORAGE__ACCESS_KEY': 'task_minio', 'RAS_STORAGE__SECRET_KEY': c['minio']})
     def env(user, password):
         return base | {'RAS_DB__USER': user, 'RAS_DB__PASSWORD': password}
     owner = env('task_admin', c['password'])
     def py(args, e, **kw):
-        return subprocess.run([sys.executable, *args], cwd=API, env=e, check=True, capture_output=True, text=True, **kw)
+        result = subprocess.run([sys.executable, *args], cwd=API, env=e, capture_output=True, text=True, **kw)
+        if result.returncode:
+            raise SystemExit(f'step failed: {args[:3]} exit={result.returncode} {result.stderr.strip()[-400:]}')
+        return result
     from sqlalchemy import create_engine, text
     from sqlalchemy.engine import URL
     admin = create_engine(URL.create('postgresql+psycopg', username='task_admin', password=c['password'], host='127.0.0.1',
@@ -92,7 +97,9 @@ def main():
         recovery_env = env('c1_recovery', c['recovery'])
         py(['-m', 'app.cli.recovery', 'hold'], recovery_env)
         py(['-m', 'app.cli.recovery', 'recover', '--hold-for-operator'], owner)
-        journal_id = db.connect().execute(text('SELECT journal_id FROM recovery_registrations')).scalar_one()
+        with db.connect() as conn:
+            journal_id = conn.execute(text('SELECT journal_id FROM recovery_registrations')).scalar_one()
+        db.dispose()
         from datetime import UTC, datetime, timedelta
         now = datetime.now(UTC).replace(microsecond=0)
         case = {'schema': 'ras.auth_recovery_case.v1', 'case_id': str(uuid.uuid4()), 'action': 'resolve_initial_status',
