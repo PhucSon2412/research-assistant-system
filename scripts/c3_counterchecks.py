@@ -39,6 +39,8 @@ SPECS = [
      T + 'test_final_authority_rechecked_when_real_fsync_fails[set_credential-expire]'),
     ('release-reported', [(OPS, '    if not _release(conn):\n        raise ConnectionReleaseFailed()\n', '    _release(conn)\n')],
      T + 'test_prepare_release_failure_stops_before_prompt[False]'),
+    ('release-interrupt', [(OPS, '    except BaseException:  # noqa: BLE001 - Ctrl-C during cleanup: still return the connection\n        state = "interrupted"\n', '')],
+     T + 'test_interrupt_in_release_after_known_commit_is_reported_not_cancelled[True]'),
 ]
 
 

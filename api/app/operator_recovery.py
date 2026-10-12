@@ -107,30 +107,34 @@ class OperatorResult:
 
 
 class ConnectionReleaseFailed(OperatorRefused):
-    """Rollback/close of a finished phase failed. The connection was invalidated and returned, but
-    the phase is not clean evidence: callers stop and classify by their own Attempt facts."""
+    """Rollback/close of a finished phase failed or was interrupted (Ctrl-C). The connection was
+    invalidated and returned, but the phase is not clean evidence: callers stop and classify by their
+    own Attempt facts. ``code`` is ``connection_release_failed`` or ``connection_release_interrupted``."""
 
-    def __init__(self):
-        super().__init__("connection_release_failed")
+    def __init__(self, interrupted: bool = False):
+        super().__init__("connection_release_interrupted" if interrupted else "connection_release_failed")
 
 
-def _release(conn) -> bool:
-    """Always hand the connection back; a failed rollback/close invalidates it (never pooled dirty).
-    Returns False when the release was not clean, even if the invalidate/close fallback succeeded."""
+def _release(conn) -> str:
+    """Always hand the connection back; an unclean rollback/close invalidates it (never pooled dirty).
+    An interruption (KeyboardInterrupt/other BaseException) is absorbed here so cleanup always finishes;
+    the result says what happened: ``clean``, ``failed`` or ``interrupted``."""
     try:
         conn.rollback()
         conn.close()
-        return True
+        return "clean"
     except Exception:  # noqa: BLE001 - reported to the caller, never swallowed as success
+        state = "failed"
+    except BaseException:  # noqa: BLE001 - Ctrl-C during cleanup: still return the connection
+        state = "interrupted"
+    for step in (conn.invalidate, conn.close):
         try:
-            conn.invalidate()
-        except Exception:  # noqa: BLE001
+            step()
+        except Exception:  # noqa: BLE001 - the fallback must finish; outcome is reported by state
             pass
-        try:
-            conn.close()
-        except Exception:  # noqa: BLE001
-            pass
-        return False
+        except BaseException:  # noqa: BLE001
+            state = "interrupted"
+    return state
 
 
 @contextmanager
@@ -141,10 +145,11 @@ def connection(engine: Engine):
     try:
         yield conn
     except BaseException:
-        _release(conn)
+        _release(conn)  # the body's error (or interrupt) wins; cleanup never masks it
         raise
-    if not _release(conn):
-        raise ConnectionReleaseFailed()
+    state = _release(conn)
+    if state != "clean":
+        raise ConnectionReleaseFailed(interrupted=state == "interrupted")
 
 
 def _timeout(conn, settings: Settings) -> None:
@@ -364,17 +369,22 @@ def mutate(engine: Engine, settings: Settings, prepared: Prepared, *, verifier: 
     attempt = attempt or Attempt()
     try:
         return _mutate(engine, settings, prepared, case, snap0, verifier, clock, attempt, append)
-    except ConnectionReleaseFailed:
-        # Classified by the attempt's own facts; teardown never turns a commit into "not committed".
-        if attempt.committed:
-            if not attempt.written:
-                raise OperatorOutcomeError("auth_journal_unavailable", committed=True) from None
-            raise OperatorOutcomeError("connection_release_failed", committed=True) from None
-        if attempt.commit_started:
-            raise OperatorOutcomeError("auth_outcome_uncertain", committed=None) from None
-        if attempt.append_started:
-            raise OperatorOutcomeError("rolled_back_after_journal", committed=False) from None
+    except ConnectionReleaseFailed as exc:
+        _classify(attempt, exc.code)
         raise
+
+
+def _classify(attempt: Attempt, code: str) -> None:
+    """Raise the outcome implied by the attempt's own facts; teardown or an interrupt never turns a
+    commit into "not committed", an uncertain commit into a known one, or a started append into nothing."""
+    if attempt.committed:
+        if not attempt.written:
+            raise OperatorOutcomeError("auth_journal_unavailable", committed=True) from None
+        raise OperatorOutcomeError(code, committed=True) from None
+    if attempt.commit_started:
+        raise OperatorOutcomeError("auth_outcome_uncertain", committed=None) from None
+    if attempt.append_started:
+        raise OperatorOutcomeError("rolled_back_after_journal", committed=False) from None
 
 
 def _mutate(engine, settings, prepared, case, snap0, verifier, clock, attempt, append):
@@ -431,7 +441,7 @@ def _mutate(engine, settings, prepared, case, snap0, verifier, clock, attempt, a
                 try:
                     trans.rollback()
                     attempt.rolled_back = True
-                except Exception:  # noqa: BLE001 - COMMIT was never sent; teardown invalidates
+                except BaseException:  # noqa: BLE001 - COMMIT was never sent; release invalidates
                     pass
                 if attempt.append_started:
                     # The file may hold the decision (or a prefix) while the DB rolled back: the gate stays
@@ -488,8 +498,13 @@ def run(engine: Engine, settings: Settings, case: RecoveryCase, *, user_id: uuid
         check_password(prepared, password, settings)
         verifier = hash_password(prepared, password)
         del password
-    operation, generation, at = mutate(engine, settings, prepared, verifier=verifier, clock=clock,
-                                       attempt=attempt, append=append)
+    attempt = attempt if attempt is not None else Attempt()
+    try:
+        operation, generation, at = mutate(engine, settings, prepared, verifier=verifier, clock=clock,
+                                           attempt=attempt, append=append)
+    except KeyboardInterrupt:
+        _classify(attempt, "connection_release_interrupted")  # an interrupt after the decision started
+        raise  # nothing was appended or committed: a real cancel
     try:
         return prove(engine, settings, case, operation, generation, at, clock)
     except BaseException:  # noqa: BLE001 - a known commit without fresh proof (even Ctrl-C) is not a success

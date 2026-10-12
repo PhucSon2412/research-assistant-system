@@ -1309,3 +1309,165 @@ def test_cli_proof_release_failure_exit_and_output(world, monkeypatch):
     monkeypatch.undo()
     assert code == 4 and "credential recovered" not in out.getvalue() and "postcommit_proof_failed" in err.getvalue()
     assert NEW not in out.getvalue() + err.getvalue() and "ConnectionResetError" not in err.getvalue()
+
+
+# --- PR #59 re-review: an interruption (Ctrl-C) while releasing a phase is an outcome, not a cancel ----------
+
+def interrupt_at(monkeypatch, calls, exc=KeyboardInterrupt):
+    """Connection.rollback (the release step) raises ``exc`` on the given call numbers (1 prepare, 2 mutation, 3 proof)."""
+    from sqlalchemy.engine.base import Connection
+    real = Connection.rollback
+    seen = [0]
+    def rollback(self):
+        seen[0] += 1
+        if seen[0] in calls:
+            raise exc()
+        return real(self)
+    monkeypatch.setattr(Connection, "rollback", rollback)
+
+
+def run_cli(w, c, monkeypatch, **kw):
+    """Labelled in-process prompt (fault injection, not a real SIGINT/ConPTY): checks exit/output only."""
+    import io
+    from app.cli import auth_recovery as cli
+    class Tty(io.StringIO):
+        def isatty(self):
+            return True
+    out, err = io.StringIO(), io.StringIO()
+    code = cli.main(["set-credential", "--user-id", str(c.user_id), "--case-id", str(c.case_id), "--case-file",
+                     str(w.cases / f"{c.case_id}.json"), "--expected-installation", str(c.journal_id)],
+                    stdin=Tty(), stdout=out, stderr=err, getpass_fn=lambda _l: NEW, engine=w.operator,
+                    clock=lambda: NOW, **kw)
+    return code, out.getvalue(), err.getvalue()
+
+
+@pytest.mark.parametrize("journal_ok", [True, False])
+def test_interrupt_in_release_after_known_commit_is_reported_not_cancelled(world, monkeypatch, journal_ok):
+    w = world
+    uid = account(w)
+    quarantine(w, uid)
+    hold(w)
+    c = make_case(w, uid, ops.SET_CREDENTIAL)
+    receipts = counts(w)["auth_change_receipts"]
+    proofs = []
+    real_prove, real_mutate = ops.prove, ops.mutate
+    monkeypatch.setattr(ops, "prove", lambda *a, **k: proofs.append(1) or real_prove(*a, **k))
+    if not journal_ok:
+        monkeypatch.setattr(ops, "mutate", lambda *a, **k: real_mutate(*a, **{**k, "append": fault_append("full")}))
+    interrupt_at(monkeypatch, {2})
+    code, out, err = run_cli(w, c, monkeypatch)
+    monkeypatch.undo()
+    assert code == (4 if journal_ok else 5), err
+    assert "nothing was changed" not in err and "credential recovered" not in out and NEW not in out + err
+    assert proofs == []  # no proof/success after an interrupted release
+    assert counts(w)["auth_change_receipts"] == receipts + 1
+    u = user(w, uid)
+    assert u.credential_state == "usable" and verify_password(u.password_verifier, NEW)  # the commit is kept
+    if not journal_ok:
+        recover(w, hold_for_operator=True)
+    with pytest.raises(ops.OperatorRefused, match="^case_already_used$"):  # never resubmitted
+        operate(w, c)
+    no_leak(w.operator)
+
+
+def test_interrupt_in_prepare_release_stops_before_prompt(world, monkeypatch):
+    w = world
+    uid = account(w)
+    quarantine(w, uid)
+    hold(w)
+    c = make_case(w, uid, ops.SET_CREDENTIAL)
+    before = (counts(w), w.path.read_bytes())
+    prompts = []
+    interrupt_at(monkeypatch, {1})
+    with pytest.raises(ops.OperatorRefused, match="^connection_release_interrupted$"):
+        ops.run(w.operator, w.settings, c, user_id=uid, installation=w.journal_id, action=c.action,
+                clock=lambda: NOW, read_password=lambda: prompts.append(1) or NEW)
+    monkeypatch.undo()
+    assert prompts == [] and (counts(w), w.path.read_bytes()) == before
+    no_leak(w.operator)
+
+
+def test_interrupt_in_proof_release_after_commit_is_postcommit_failure(world, monkeypatch):
+    w = world
+    uid = account(w)
+    quarantine(w, uid)
+    hold(w)
+    c = make_case(w, uid, ops.SET_CREDENTIAL)
+    interrupt_at(monkeypatch, {3})
+    code, out, err = run_cli(w, c, monkeypatch)
+    monkeypatch.undo()
+    assert code == 4 and "postcommit_proof_failed" in err and "nothing was changed" not in err
+    assert "credential recovered" not in out
+    assert verify_password(user(w, uid).password_verifier, NEW)
+    no_leak(w.operator)
+
+
+def test_interrupt_in_release_never_turns_uncertain_into_known(world, monkeypatch):
+    from sqlalchemy.engine.base import RootTransaction
+    w = world
+    uid = account(w)
+    quarantine(w, uid)
+    hold(w)
+    c = make_case(w, uid, ops.SET_CREDENTIAL)
+    real = RootTransaction.commit
+    def lost(self):
+        real(self)
+        raise ConnectionResetError("reply lost")
+    monkeypatch.setattr(RootTransaction, "commit", lost)
+    interrupt_at(monkeypatch, {2})
+    with pytest.raises(ops.OperatorOutcomeError) as err:
+        operate(w, c)
+    monkeypatch.undo()
+    assert (err.value.code, err.value.committed) == ("auth_outcome_uncertain", None)
+    no_leak(w.operator)
+
+
+def test_interrupt_in_rollback_after_append_started_is_not_nothing_written(world, monkeypatch):
+    from sqlalchemy.engine.base import RootTransaction
+    w = world
+    uid = account(w)
+    quarantine(w, uid)
+    hold(w)
+    c = make_case(w, uid, ops.SET_CREDENTIAL)
+    receipts = counts(w)["auth_change_receipts"]
+    real = RootTransaction.rollback
+    armed = [False]
+    def rollback(self):
+        if armed[0]:  # only the mutation's own rollback, after the append started
+            armed[0] = False
+            raise KeyboardInterrupt()
+        return real(self)
+    monkeypatch.setattr(RootTransaction, "rollback", rollback)
+    failing = fault_append("full", fail_with=RuntimeError)
+    def append(*a):
+        armed[0] = True
+        return failing(*a)
+    with pytest.raises(ops.OperatorOutcomeError) as err:
+        operate(w, c, append=append)
+    monkeypatch.undo()
+    assert (err.value.code, err.value.committed) == ("rolled_back_after_journal", False)
+    assert counts(w)["auth_change_receipts"] == receipts  # COMMIT never sent: the session ended rolled back
+    no_leak(w.operator)
+
+
+def test_interrupt_while_typing_password_still_cancels_safely(world, monkeypatch):
+    """Ctrl-C during the prompt (before any mutation) keeps the safe cancel: exit 2, nothing changed."""
+    w = world
+    uid = account(w)
+    quarantine(w, uid)
+    hold(w)
+    c = make_case(w, uid, ops.SET_CREDENTIAL)
+    before = (counts(w), w.path.read_bytes())
+    def prompt(_label):
+        raise KeyboardInterrupt
+    import io
+    from app.cli import auth_recovery as cli
+    class Tty(io.StringIO):
+        def isatty(self):
+            return True
+    err = io.StringIO()
+    code = cli.main(["set-credential", "--user-id", str(uid), "--case-id", str(c.case_id), "--case-file",
+                     str(w.cases / f"{c.case_id}.json"), "--expected-installation", str(c.journal_id)],
+                    stdin=Tty(), stdout=io.StringIO(), stderr=err, getpass_fn=prompt, engine=w.operator, clock=lambda: NOW)
+    assert code == 2 and "nothing was changed" in err.getvalue()
+    assert (counts(w), w.path.read_bytes()) == before
