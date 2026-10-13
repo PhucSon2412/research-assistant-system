@@ -46,6 +46,7 @@ class Browser:
 
     def __init__(self, base_url: str = "http://testserver") -> None:
         self.client = TestClient(app, base_url=base_url)
+        self.client.headers["origin"] = WEB_ORIGIN
 
     def csrf(self) -> str:
         token = self.client.cookies.get("ras_csrf")
@@ -98,7 +99,8 @@ class Harness:
         raise AssertionError(f"no {kind} message for {recipient}")
 
     def bootstrap_admin(self) -> uuid.UUID:
-        return bootstrap_admin(self.engine, email=ADMIN_EMAIL, password=ADMIN_PASSWORD, policy=PasswordPolicy()).user_id
+        return bootstrap_admin(self.engine, email=ADMIN_EMAIL, password=ADMIN_PASSWORD,
+                               policy=PasswordPolicy(), clock=lambda: self.clock.now).user_id
 
     def admin_browser(self) -> Browser:
         b = self.browser()
@@ -106,12 +108,26 @@ class Harness:
         return b
 
     def create_user(self, email: str, password: str = USER_PASSWORD) -> uuid.UUID:
-        """Direct insert (fixture), bypassing the invitation flow."""
-        with self.engine.begin() as conn:
-            return conn.scalar(
-                text("INSERT INTO users (email, password_verifier) VALUES (:e, :v) RETURNING id"),
-                {"e": email, "v": hash_password(password)},
-            )
+        """Allowed accounts have real invitation parents and initial receipts."""
+        from sqlalchemy.orm import Session
+        from app.config import get_settings
+        from app.identity.invitations import create_invitation, accept_invitation
+        from app.identity.login import login
+        settings = get_settings()
+        with Session(self.engine) as db:
+            admin = db.scalar(text("SELECT id FROM users WHERE email=:e"), {"e": ADMIN_EMAIL})
+        if admin is None:
+            admin = self.bootstrap_admin()
+        with Session(self.engine) as db:
+            actor = login(db, email=ADMIN_EMAIL, password=ADMIN_PASSWORD, now=self.clock.now,
+                          settings=settings, clock=lambda: self.clock.now)[1]
+        with Session(self.engine) as db:
+            invitation = create_invitation(db, inviter_id=admin, actor_session_id=actor.session_id,
+                csrf_token=actor.csrf_token, email=email, display_name=None, now=self.clock.now,
+                lifetime=settings.auth.invite, clock=lambda: self.clock.now)
+        with Session(self.engine) as db:
+            return accept_invitation(db, raw_token=invitation.token, password=password, display_name=None,
+                now=self.clock.now, policy=settings.password, clock=lambda: self.clock.now).id
 
     def user_browser(self, email: str, password: str = USER_PASSWORD) -> Browser:
         b = self.browser()

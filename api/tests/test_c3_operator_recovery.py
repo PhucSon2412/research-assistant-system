@@ -28,7 +28,7 @@ from app.identity.passwords import PasswordPolicyError, hash_password, verify_pa
 from app.identity.predicates import session_live
 from app.models import AuthChangeReceipt, PasswordResetToken, User, UserSession
 from app.operator_cases import SCHEMA, CaseError, load_case_file, parse_case
-from tests.test_auth_safety_foundation import NOW, SECRET
+from tests.test_auth_safety_foundation import NOW, SECRET, LEGACY_SECRET
 from tests.test_c2c1_bootstrap import installation  # noqa: F401 - fixture
 
 NEW = "C3-operator-new-password-marker-789!"
@@ -73,11 +73,11 @@ def account(w, role="user", *, live=True, email=None, status="active"):
     uid = uuid.uuid4()
     with Session(w.engine) as db:
         db.add(User(id=uid, email=email or f"{uid.hex}@example.test", role=role, status=status,
-                    password_verifier=hash_password(SECRET), password_changed_at=NOW, created_at=NOW, updated_at=NOW))
+                    password_verifier=hash_password(LEGACY_SECRET if live else SECRET), password_changed_at=NOW, created_at=NOW, updated_at=NOW))
         db.commit()
     if live:
-        journal_changes(w, uid, [Change(uid, "credential", "password_reset", NOW, verifier=hash_password(SECRET), policy_version=1),
-                                 Change(uid, "status", "invitation_accept", NOW, decision="active")])
+        operator_credential(w,uid,password=SECRET)
+        operator_initial_status(w, uid)
     return uid
 
 
@@ -175,7 +175,7 @@ def live_session(w, uid, monkeypatch):
     return issued.session_id
 
 
-def operator_initial_status(w, uid):
+def _operator_decision(w, uid, action, password=NEW):
     """Real C3 path for other suites that need a verified_initial_status receipt (no shortcut exists)."""
     import shutil
     import tempfile
@@ -192,12 +192,20 @@ def operator_initial_status(w, uid):
     engine = create_engine(url, hide_parameters=True)
     try:
         hold(ns)
-        result = operate(ns, make_case(ns, uid, ops.RESOLVE_STATUS), engine=engine)
+        result = operate(ns, make_case(ns, uid, action), engine=engine,password=password)
         recover(ns)
         return result
     finally:
         engine.dispose()
         shutil.rmtree(cases, ignore_errors=True)
+
+
+def operator_initial_status(w,uid):
+    return _operator_decision(w,uid,ops.RESOLVE_STATUS)
+
+
+def operator_credential(w,uid,*,password=SECRET):
+    return _operator_decision(w,uid,ops.SET_CREDENTIAL,password)
 
 
 def no_leak(*engines):
@@ -237,7 +245,8 @@ def test_real_operator_set_credential_commits_receipt_and_new_login(world, monke
                                              "session_revocation"] and all(m.journal_confirmed for m in mirrors)
         assert db.get(UserSession, old_session).revoked_reason == "operator_recovery"
         assert db.get(PasswordResetToken, token.token_id).closure_reason == "operator_recovery"
-        audit = db.execute(text("SELECT details FROM audit_events WHERE action='auth.operator_recovery.credential'")).scalar_one()
+        audit = db.execute(text("SELECT details FROM audit_events WHERE action='auth.operator_recovery.credential'"
+                                " AND details->>'operation_id'=:op"), {"op": str(result.operation_id)}).scalar_one()
         assert audit["case_id"] == str(c.case_id) and audit["operator_id"] == str(w.operator_id)
         assert set(audit) == {"case_id", "operator_id", "operation_id", "method", "tokens_revoked", "sessions_revoked"}
     raw = w.path.read_text(encoding="ascii")
@@ -856,7 +865,7 @@ def test_two_operators_same_target_concurrently_one_decision(world):
     losses = [r for r in results if isinstance(r, ops.OperatorRefused)]
     assert len(wins) == 1 and len(losses) == 1
     assert losses[0].code in ("target_changed", "case_stale_credential_head", "target_busy", "journal_lock_busy")
-    assert scalar(w, "SELECT count(*) FROM auth_change_receipts WHERE reason_code='verified_recovery'") == 1
+    assert scalar(w, "SELECT count(*) FROM auth_change_receipts WHERE operation_id=:op AND reason_code='verified_recovery'",op=wins[0].operation_id) == 1
     no_leak(w.operator, w.operator2)
 
 

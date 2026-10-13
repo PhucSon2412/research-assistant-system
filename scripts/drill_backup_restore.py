@@ -76,7 +76,15 @@ WRITERS = ("api", "web", "worker", "beat")
 
 import ras_backup  # noqa: E402
 
-ENV = ras_backup.env_subset()
+if not all(os.environ.get(name) for name in ras_backup.ALLOWED):
+    raise SystemExit("supply synthetic POSTGRES/MINIO variables explicitly; this drill never reads .env")
+ENV = {name:os.environ[name] for name in ras_backup.ALLOWED}
+EXPLICIT_ENV=Path(os.environ.get("RAS_COMPOSE_ENV_FILE",""))
+if not EXPLICIT_ENV.is_absolute() or ROOT==EXPLICIT_ENV.resolve() or ROOT in EXPLICIT_ENV.resolve().parents:
+    raise SystemExit("RAS_COMPOSE_ENV_FILE must be an explicit file outside the repository")
+from drill_accounts import seed_accounts, runtime_url
+# Validate the explicit identity before creating directories or Compose resources.
+runtime_url(URL.create("postgresql+psycopg",username=ENV["POSTGRES_USER"]))
 for name, value in {
     "RAS_DB__HOST": "127.0.0.1", "RAS_DB__PORT": PORTS[SRC]["POSTGRES_HOST_PORT"], "RAS_DB__USER": ENV["POSTGRES_USER"],
     "RAS_DB__PASSWORD": ENV["POSTGRES_PASSWORD"], "RAS_DB__NAME": ENV["POSTGRES_DB"],
@@ -126,7 +134,7 @@ def dc(project: str, *args: str, check: bool = True, **kwargs) -> subprocess.Com
     kwargs.setdefault("capture_output", True)
     kwargs.setdefault("encoding", "utf-8")
     kwargs.setdefault("errors", "replace")  # container logs are UTF-8; the Windows default codec is not
-    result = subprocess.run(["docker", "compose", "-p", project, *args], cwd=ROOT, env=project_env(project),
+    result = subprocess.run(["docker", "compose", "--env-file",str(EXPLICIT_ENV),"-p", project, *args], cwd=ROOT, env=kwargs.pop("env",project_env(project)),
                             **kwargs)
     if check and result.returncode != 0:
         raise RuntimeError(f"docker compose -p {project} {args[0]} failed ({result.returncode})")
@@ -151,6 +159,22 @@ def engine_for(project: str):
                                     password=ENV["POSTGRES_PASSWORD"], host="127.0.0.1",
                                     port=int(PORTS[project]["POSTGRES_HOST_PORT"]), database=ENV["POSTGRES_DB"]),
                          hide_parameters=True)
+
+
+def runtime_engine_for(project):
+    owner=engine_for(project)
+    try:url=runtime_url(owner.url)
+    finally:owner.dispose()
+    # Host worker/index calls use the same explicit runtime role. The separate
+    # engine_for connection remains the migrator for read/setup/recovery work.
+    for key,value in {"HOST":url.host,"PORT":url.port,"NAME":url.database,"USER":url.username,"PASSWORD":url.password}.items():
+        os.environ["RAS_DB__"+key]=str(value)
+    BASE.db=BASE.db.model_copy(update={"host":url.host,"port":url.port,"name":url.database,
+                                      "user":url.username,"password":SecretStr(url.password)})
+    FAKE.db=BASE.db.model_copy(deep=True)
+    from app import db as app_db
+    get_settings.cache_clear();app_db.get_engine.cache_clear()
+    return create_engine(url,hide_parameters=True,pool_pre_ping=True)
 
 
 def scalar(engine, sql: str, **params):
@@ -264,7 +288,11 @@ def start_app(project: str) -> None:
 
 
 def recovery_cli(project: str, command: str) -> subprocess.CompletedProcess:
-    return dc(project, "run", "--rm", "--no-deps", "api", "python", "-m", "app.cli.recovery", command, check=False)
+    # Explicit migrator identity for this privileged command, even after C4
+    # configures the API service with runtime. Values travel via env, not argv.
+    return dc(project, "run", "--rm", "--no-deps", "-e","RAS_DB__USER","-e","RAS_DB__PASSWORD",
+              "api", "python", "-m", "app.cli.recovery", command, check=False,
+              env=project_env(project)|{"RAS_DB__USER":ENV["POSTGRES_USER"],"RAS_DB__PASSWORD":ENV["POSTGRES_PASSWORD"]})
 
 
 def main() -> None:
@@ -290,10 +318,9 @@ def main() -> None:
     # 1. Synthetic workload.
     run = uuid.uuid4().hex[:8]
     password = secrets.token_urlsafe(24)
-    with src_db.begin() as conn:
-        for who, role in (("admin", "admin"), ("a", "user"), ("b", "user")):
-            conn.execute(text("INSERT INTO users(email, password_verifier, role) VALUES (:e, :p, :r)"),
-                         {"e": f"{PREFIX}{run}-{who}@example.org", "p": hash_password(password), "r": role})
+    runtime=runtime_engine_for(SRC)
+    try:seed_accounts(runtime,{who:f"{PREFIX}{run}-{who}@example.org" for who in ("admin","a","b")},password)
+    finally:runtime.dispose()
     admin, a, b = (Person(SRC, email=f"{PREFIX}{run}-{who}@example.org", password=password)
                    for who in ("admin", "a", "b"))
     indexer.embed = fake_embed

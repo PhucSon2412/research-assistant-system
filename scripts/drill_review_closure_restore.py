@@ -91,11 +91,12 @@ def main() -> None:
     # 1. Accounts, uploads, four open requests; the Admin opens each one.
     run = uuid.uuid4().hex[:8]
     password = secrets.token_urlsafe(24)
-    with src_db.begin() as conn:
-        for who, role in (("admin", "admin"), ("a", "user"), ("b", "user")):
-            conn.execute(text("INSERT INTO users(email, password_verifier, role) VALUES (:e, :p, :r)"),
-                         {"e": f"{PREFIX}{run}-{who}@example.org", "p": hash_password(password), "r": role})
     emails = {who: f"{PREFIX}{run}-{who}@example.org" for who in ("admin", "a", "b")}
+    from drill_backup_restore import runtime_engine_for
+    from drill_accounts import seed_accounts
+    runtime=runtime_engine_for(SRC)
+    try:seed_accounts(runtime,emails,password)
+    finally:runtime.dispose()
     admin, a, b = (Person(SRC, email=emails[who], password=password) for who in ("admin", "a", "b"))
     term = f"Reviewdrill{run}"
     bodies = {name: f"# {name} {run}\n\n## Methods\n{term} {name} private body.\n".encode()

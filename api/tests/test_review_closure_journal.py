@@ -8,6 +8,7 @@ journal a ``copy_journal`` copy of the current one, kept apart. Crashes are simu
 exact step raise. No provider is called (nothing here indexes).
 """
 from __future__ import annotations
+from tests.test_recovery import replayed_decisions
 
 import hashlib
 import json
@@ -140,10 +141,10 @@ def test_db_refuses_a_close_without_the_record_naming_that_target_and_code(uploa
     closed_at = w.api.clock.now
     withdraw = text("""UPDATE review_requests SET status='withdrawn', closed_at=:closed_at,
         closed_by_user_id=requester_user_id, close_reason_code='withdrawn_by_requester' WHERE id=:r""")
-    with pytest.raises(IntegrityError, match="needs its revocation journal record"), w.api.engine.begin() as conn:
+    with pytest.raises(IntegrityError, match="needs its revocation journal record"), w.api.setup_engine.begin() as conn:
         conn.execute(withdraw, {"r": uuid.UUID(w.rid), "closed_at": closed_at})
     # A record naming B's file, or A's file with another decision, does not cover A's withdraw.
-    close_journaled(w.api.engine, w.rid_b)
+    close_journaled(w.api.setup_engine, w.rid_b)
     head = journal.read(journal_file()).head
     a_target = {"request_id": w.rid, "item_id": w.ids_a["item_id"], "version_id": w.ids_a["version_id"],
                 "source_file_id": w.ids_a["file_id"], "closed_at": closed_at.isoformat()}
@@ -152,7 +153,7 @@ def test_db_refuses_a_close_without_the_record_naming_that_target_and_code(uploa
     for body in (other_file | {"status": "withdrawn", "reason_code": "withdrawn_by_requester"},
                  a_target | {"status": "rejected", "reason_code": "other"}):
         record = journal.next_record(head, journal.REVIEW_CLOSURE, body)
-        with pytest.raises(IntegrityError, match="needs its revocation journal record"), w.api.engine.begin() as conn:
+        with pytest.raises(IntegrityError, match="needs its revocation journal record"), w.api.setup_engine.begin() as conn:
             conn.execute(withdraw, {"r": uuid.UUID(w.rid), "closed_at": closed_at})
             conn.execute(text("""INSERT INTO revocation_journal_records(seq, kind, record_hash, line,
                 review_request_id, applied_via, result, journal_confirmed)
@@ -161,7 +162,7 @@ def test_db_refuses_a_close_without_the_record_naming_that_target_and_code(uploa
     # closed_by_recovery carries the original code and time, never an actor or a note.
     for sets in ("close_reason_code='other', closed_by_user_id=requester_user_id",
                  "close_reason_code='other', rejection_note='x'", "close_reason_code='made_up'"):
-        with pytest.raises(IntegrityError), w.api.engine.begin() as conn:
+        with pytest.raises(IntegrityError), w.api.setup_engine.begin() as conn:
             conn.execute(text(f"""UPDATE review_requests SET status='closed_by_recovery', closed_at=:closed_at, {sets}
                 WHERE id=:r"""), {"r": uuid.UUID(w.rid), "closed_at": closed_at})
     assert status_in(w.api.engine, w.rid)[0] == "open" and gate(w.api.engine) == "open"
@@ -208,7 +209,7 @@ def test_restore_of_a_backup_with_the_request_open_does_not_give_the_grant_back(
         assert TestClient(app).get("/readyz").status_code == 503
 
         report = do_recover(snap.engine, w.storage, w.api.clock.now)
-        assert report.replayed == {"recovery_begin": 1, "closed": 1, "recovery_end": 1} and report.gate == "open"
+        assert replayed_decisions(report) == {"recovery_begin": 1, "closed": 1, "recovery_end": 1} and report.gate == "ready"
         assert status_in(snap.engine, w.rid) == ("closed_by_recovery", CODES[how], True, None)
         assert_grant_closed_for_admin(w)
         # The owner sees the original decision's code; the request is not an approval.
@@ -232,7 +233,7 @@ def test_restore_of_a_backup_with_the_request_open_does_not_give_the_grant_back(
             assert w.admin.get(f"/admin/common-copies/{copy}").json() == MISSING
             assert w.b.get(f"/library/items/{copy}").json() == MISSING
         # Replay again: nothing changes.
-        assert do_recover(snap.engine, w.storage, w.api.clock.now).replayed == {"recovery_begin": 1,
+        assert replayed_decisions(do_recover(snap.engine, w.storage, w.api.clock.now)) == {"recovery_begin": 1,
                                                                                  "recovery_end": 1}
         with Session(snap.engine) as db:
             assert recovery.apply_record(db, record, utcnow()) == ("present", 0)
@@ -251,6 +252,11 @@ def clone(admin_engine, url):
     copy = url.set(database=f"ras_test_{uuid.uuid4().hex[:12]}")
     with admin_engine.connect() as conn:
         conn.execute(text(f'CREATE DATABASE "{copy.database}" TEMPLATE "{url.database}"'))
+    owner = app_db.make_engine(admin_engine.url.set(database=copy.database))
+    from tests.test_auth_safety_foundation import runtime_engine
+    if url.username=="c1_runtime":
+        runtime = runtime_engine(SimpleNamespace(engine=owner)); runtime.dispose()
+    owner.dispose()
     return copy
 
 
@@ -265,11 +271,11 @@ def test_restoring_the_same_backup_twice_ends_the_same_way(upload_api, monkeypat
             url = clone(admin_engine, snap.url)
             try:
                 app_env(url)
-                engine = app_db.get_engine()
+                engine = app_db.make_engine(admin_engine.url.set(database=url.database))
                 recovery.hold(engine, get_settings(), utcnow())
                 assert gate(engine) == "db_behind_journal"
                 report = do_recover(engine, w.storage, w.api.clock.now)
-                assert report.replayed["closed"] == 2 and report.gate == "open"
+                assert report.replayed["closed"] == 2 and report.gate == "ready"
                 ends.append((status_in(engine, w.rid), status_in(engine, w.rid_b)))
                 assert_grant_closed_for_admin(w)
                 assert w.admin.get(original_url(w.rid_b, w.ids_b["file_id"])).json() == MISSING
@@ -290,7 +296,7 @@ def test_a_record_naming_another_target_is_refused_and_the_gate_stays_shut(uploa
     journal.append(journal_file(), state, [journal.next_record(state.head, journal.REVIEW_CLOSURE, forged)])
     assert gate(w.api.engine) == "db_behind_journal"
     with pytest.raises(RecoveryError, match="record_names_another_request"):
-        do_recover(w.api.engine, w.storage, w.api.clock.now)
+        do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
     assert status_in(w.api.engine, w.rid)[0] == "open" and gate(w.api.engine) == "db_behind_journal"
     assert_recovering(w.browsers, [("GET", w.file_url)])
 
@@ -317,7 +323,7 @@ def test_db_refuses_at_insert_a_mirror_row_whose_line_names_another_or_no_reques
     absent = str(uuid.uuid4())
     for filed_under, named in ((w.rid, w.rid_b), (w.rid, absent), (absent, w.rid)):
         record = journal.next_record(head, journal.REVIEW_CLOSURE, closure_of(w, named))
-        with w.api.engine.connect() as conn:
+        with w.api.setup_engine.connect() as conn:  # privileged malformed mirror fixture
             # Refused by the INSERT itself (not at commit), so a writer stops before appending the line.
             with pytest.raises(IntegrityError, match="closure_request_matches_body"):
                 conn.execute(MIRROR_INSERT, {"s": record.seq, "h": record.hash, "l": record.line,
@@ -326,14 +332,14 @@ def test_db_refuses_at_insert_a_mirror_row_whose_line_names_another_or_no_reques
     # A request the database does not hold is a valid record when it is filed under that same ID
     # (a restored snapshot may lack a request the journal names).
     record = journal.next_record(head, journal.REVIEW_CLOSURE, closure_of(w, absent))
-    with w.api.engine.connect() as conn:
+    with w.api.setup_engine.connect() as conn:
         conn.execute(MIRROR_INSERT, {"s": record.seq, "h": record.hash, "l": record.line, "r": uuid.UUID(absent)})
         conn.rollback()
     # The closing trigger compares body.request_id with the request on its own too: with the CHECK
     # dropped (inside the transaction, rolled back), a row filed under A's request whose line names B's
     # does not let A's request close.
     record = journal.next_record(head, journal.REVIEW_CLOSURE, closure_of(w, w.rid_b))
-    with pytest.raises(IntegrityError, match="needs its revocation journal record"), w.api.engine.begin() as conn:
+    with pytest.raises(IntegrityError, match="needs its revocation journal record"), w.api.setup_engine.begin() as conn:
         conn.execute(text("ALTER TABLE revocation_journal_records"
                           " DROP CONSTRAINT ck_revocation_journal_records_closure_request_matches_body"))
         conn.execute(MIRROR_INSERT, {"s": record.seq, "h": record.hash, "l": record.line, "r": uuid.UUID(w.rid)})
@@ -360,11 +366,11 @@ def test_db_refuses_at_insert_a_mirror_row_whose_line_has_no_request_id(upload_a
         value["body"]["request_id"] = None
     line = journal.canonical(value)
     params = {"s": head.seq + 1, "h": "e" * 64, "l": line, "r": uuid.UUID(w.rid)}
-    with w.api.engine.connect() as conn:
+    with w.api.setup_engine.connect() as conn:
         with pytest.raises(IntegrityError, match="closure_request_matches_body"):
             conn.execute(MIRROR_INSERT, params)  # refused by the INSERT itself
         conn.rollback()
-    with pytest.raises(IntegrityError, match="closure_request_matches_body"), w.api.engine.begin() as conn:
+    with pytest.raises(IntegrityError, match="closure_request_matches_body"), w.api.setup_engine.begin() as conn:
         conn.execute(text("""UPDATE review_requests SET status='withdrawn', closed_at=:closed,
             closed_by_user_id=requester_user_id, close_reason_code='withdrawn_by_requester' WHERE id=:r"""),
                      {"r": uuid.UUID(w.rid), "closed": w.api.clock.now})
@@ -381,12 +387,14 @@ def test_db_refuses_at_insert_a_mirror_row_whose_line_has_no_request_id(upload_a
 def test_a_close_whose_record_names_another_request_writes_nothing_and_the_grant_stays_open(
         upload_api, monkeypatch, how, named):
     w = review_world(upload_api, monkeypatch)
-    real = recovery.closure_body
+    real = journal.next_record
     wrong = w.rid_b if named == "other_request" else str(uuid.uuid4())
-    monkeypatch.setattr(recovery, "closure_body", lambda rr: real(rr) | {"request_id": wrong})
+    def wrong_record(head,kind,body):
+        return real(head,kind,body | {"request_id":wrong} if kind==journal.REVIEW_CLOSURE else body)
+    monkeypatch.setattr(journal, "next_record", wrong_record)  # both current runtime closure boundaries
     journal_before, mirror_before, keys = journal_file().read_bytes(), mirror(w.api.engine), object_keys(w.storage)
     response = close(w, how)
-    expected = "approval_unavailable" if how == "approve" else "review_closure_unavailable"
+    expected = "approval_unavailable" if how == "approve" else "review_write_unavailable"
     assert (response.status_code, response.json()) == (503, {"error": expected})
     # The DB refused the mirror row before the append: the journal file and the mirror are unchanged.
     assert journal_file().read_bytes() == journal_before and mirror(w.api.engine) == mirror_before
@@ -395,7 +403,7 @@ def test_a_close_whose_record_names_another_request_writes_nothing_and_the_grant
     assert object_keys(w.storage) == keys  # approve's copy, unreferenced, was removed
     assert gate(w.api.engine) == "open"
     assert w.admin.get(w.file_url).content == A_BODY  # never reported closed, so still open
-    monkeypatch.setattr(recovery, "closure_body", real)
+    monkeypatch.setattr(journal, "next_record", real)
     assert close(w, how).status_code == 200
     (record,) = closures()
     assert record.body["request_id"] == w.rid
@@ -413,8 +421,8 @@ def test_a_request_journaled_after_the_backup_stays_absent_and_its_record_is_val
         app_env(snap.url)
         recovery.hold(snap.engine, get_settings(), utcnow())
         report = do_recover(snap.engine, w.storage, w.api.clock.now)
-        assert report.replayed == {"recovery_begin": 1, "closed": 1, "recorded_request_absent": 1,
-                                   "recovery_end": 1} and report.gate == "open"
+        assert replayed_decisions(report) == {"recovery_begin": 1, "closed": 1, "recorded_request_absent": 1,
+                                   "recovery_end": 1} and report.gate == "ready"
         with snap.engine.connect() as conn:
             assert conn.scalar(text("SELECT count(*) FROM review_requests WHERE id=:r"), {"r": uuid.UUID(later)}) == 0
             filed = conn.execute(text("SELECT review_request_id::text, line::jsonb #>> '{body,request_id}', result"
@@ -430,13 +438,12 @@ def test_a_request_journaled_after_the_backup_stays_absent_and_its_record_is_val
 
 def failing_close_commit(monkeypatch, *, lands: bool):
     """The first commit after the closure record raises; ``lands``: it committed anyway (lost reply)."""
-    real_record, real_commit = recovery.record_review_closure, Session.commit
+    real_append, real_commit = journal.append, Session.commit
     armed = []
 
-    def record(*args, **kwargs):
-        out = real_record(*args, **kwargs)
-        armed.append(True)
-        return out
+    def append(path,state,new):
+        if any(r.kind==journal.REVIEW_CLOSURE for r in new):armed.append(True)
+        return real_append(path,state,new)
 
     def commit(self):
         if armed:
@@ -447,9 +454,9 @@ def failing_close_commit(monkeypatch, *, lands: bool):
                 self.rollback()
             raise OperationalError("COMMIT", {}, Exception("connection lost"))
         return real_commit(self)
-    monkeypatch.setattr(recovery, "record_review_closure", record)
+    monkeypatch.setattr(journal, "append", append)
     monkeypatch.setattr(Session, "commit", commit)
-    return lambda: (monkeypatch.setattr(recovery, "record_review_closure", real_record),
+    return lambda: (monkeypatch.setattr(journal, "append", real_append),
                     monkeypatch.setattr(Session, "commit", real_commit))
 
 
@@ -475,8 +482,8 @@ def test_journal_write_failure_still_ends_the_grant_and_shuts_the_gate_until_rep
     assert closures() == [] and gate(w.api.engine) == "journal_behind_db"
     assert_recovering(w.browsers, [("GET", w.file_url), ("GET", w.detail_url)])
     with pytest.raises(RecoveryError, match="journal_behind_db"):
-        do_recover(w.api.engine, w.storage, w.api.clock.now)
-    assert do_recover(w.api.engine, w.storage, w.api.clock.now, confirm_db_current=True).gate == "open"
+        do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
+    assert do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True).gate == "ready"
     assert [r.body["request_id"] for r in closures()] == [w.rid]
     assert_grant_closed_for_admin(w)
 
@@ -493,11 +500,11 @@ def test_complete_closure_line_whose_fsync_fails_keeps_the_gate_shut_until_recov
     assert unconfirmed(w.api.engine) == [record.seq] and gate(w.api.engine) == "journal_unconfirmed"
     # No later close is journaled behind an unconfirmed line.
     with pytest.raises(ApiError) as caught:
-        close_journaled(w.api.engine, w.rid_b)
+        close_journaled(w.api.setup_engine, w.rid_b)
     assert (caught.value.status_code, caught.value.code) == (503, "service_recovering")
     assert status_in(w.api.engine, w.rid_b)[0] == "open"
-    report = do_recover(w.api.engine, w.storage, w.api.clock.now)
-    assert report.journal_confirmed == 1 and report.gate == "open"
+    report = do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
+    assert report.journal_confirmed == 1 and report.gate == "ready"
     assert_grant_closed_for_admin(w)
 
 
@@ -512,8 +519,8 @@ def test_torn_closure_line_shuts_the_gate_and_needs_the_database_confirmed(uploa
     restore()
     assert status_in(w.api.engine, w.rid)[0] == "withdrawn" and gate(w.api.engine) == "journal_torn"
     with pytest.raises(RecoveryError, match="journal_behind_db"):
-        do_recover(w.api.engine, w.storage, w.api.clock.now)
-    assert do_recover(w.api.engine, w.storage, w.api.clock.now, confirm_db_current=True).gate == "open"
+        do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
+    assert do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True).gate == "ready"
     assert_grant_closed_for_admin(w)
 
 
@@ -524,10 +531,15 @@ def test_journaled_close_whose_commit_fails_is_replayed_at_once(upload_api, monk
     restore = failing_close_commit(monkeypatch, lands=lands)
     response = close(w, how)
     restore()
-    assert response.status_code == 200, response.text
-    # A lost reply leaves the real decision; a failed commit is completed by the replay (no actor, no note).
+    assert (response.status_code,response.json())==(503,{"error":"review_write_outcome_uncertain"})
+    # Current runtime never infers a successful response or replays on an
+    # uncertain commit. Explicit operator recover only ends a lost grant.
+    assert status_in(w.api.engine,w.rid)[0]==(DECISION[how] if lands else "open")
+    assert gate(w.api.engine)==("open" if lands else "db_behind_journal")
+    if not lands:assert_recovering(w.browsers,[("GET",w.file_url)])
+    do_recover(w.api.setup_engine,w.storage,w.api.clock.now)
     expected = DECISION[how] if lands else "closed_by_recovery"
-    assert response.json()["request"]["status"] == expected == status_in(w.api.engine, w.rid)[0]
+    assert expected == status_in(w.api.engine, w.rid)[0]
     assert gate(w.api.engine) == "open" and len(closures()) == 1
     via = w.api.scalar("SELECT applied_via FROM revocation_journal_records WHERE review_request_id=:r",
                        r=uuid.UUID(w.rid))
@@ -543,14 +555,16 @@ def test_journaled_approval_whose_commit_fails_never_becomes_an_approval_by_repl
     response = approve(w.admin, w.api, w.rid)
     restore()
     copies = w.api.scalar("SELECT count(*) FROM library_items WHERE visibility='common'")
+    assert (response.status_code,response.json())==(503,{"error":"approval_outcome_uncertain"})
     if lands:  # the approval committed, the reply was lost: it stands, as before M6c-2b1
-        assert response.json() == {"error": "approval_outcome_uncertain"}
         assert status_in(w.api.engine, w.rid)[0] == "approved" and copies == 1
     else:  # nothing committed: the durable close ends the grant, with no copy and no approval
-        assert response.json() == {"error": "approval_unavailable"}
-        assert status_in(w.api.engine, w.rid) == ("closed_by_recovery", "approved_by_admin", True, None)
+        assert status_in(w.api.engine, w.rid)[0] == "open" and gate(w.api.engine)=="db_behind_journal"
         assert copies == 0 and w.api.scalar("SELECT count(*) FROM access_rights") == 0
-        assert object_keys(w.storage) == keys  # the unreferenced copy was removed
+    # Once commit started its outcome cannot authorize deleting an object.
+    assert len(object_keys(w.storage)-keys)==1
+    do_recover(w.api.setup_engine,w.storage,w.api.clock.now)
+    if not lands:assert status_in(w.api.engine,w.rid)==("closed_by_recovery","approved_by_admin",True,None)
     assert gate(w.api.engine) == "open"
     assert_grant_closed_for_admin(w)
 
@@ -566,12 +580,12 @@ def test_journaled_close_whose_commit_and_replay_fail_keeps_the_gate_shut(upload
     response = close(w, "withdraw")
     restore()
     monkeypatch.setattr(recovery, "replay_record", real_replay)
-    assert (response.status_code, response.json()) == (503, {"error": "review_closure_pending_recovery"})
+    assert (response.status_code, response.json()) == (503, {"error": "review_write_outcome_uncertain"})
     # The database still says open, but the journal line is a decision: nothing is served until it is applied.
     assert status_in(w.api.engine, w.rid)[0] == "open" and gate(w.api.engine) == "db_behind_journal"
     assert_recovering(w.browsers, [("GET", w.file_url), ("GET", w.detail_url)])
-    report = do_recover(w.api.engine, w.storage, w.api.clock.now)
-    assert report.replayed["closed"] == 1 and report.gate == "open"
+    report = do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
+    assert report.replayed["closed"] == 1 and report.gate == "ready"
     assert status_in(w.api.engine, w.rid)[0] == "closed_by_recovery"
     assert_grant_closed_for_admin(w)
 
@@ -584,7 +598,7 @@ def test_when_neither_journal_nor_database_take_the_close_the_grant_is_still_ope
     response = close(w, "withdraw")
     restore()
     restore_append()
-    assert (response.status_code, response.json()) == (503, {"error": "review_closure_unavailable"})
+    assert (response.status_code, response.json()) == (503, {"error": "review_write_outcome_uncertain"})
     assert status_in(w.api.engine, w.rid)[0] == "open" and closures() == [] and gate(w.api.engine) == "open"
     assert w.admin.get(w.file_url).content == A_BODY  # never reported closed, still open
     assert close(w, "withdraw").status_code == 200  # a retry closes it
@@ -620,7 +634,7 @@ def test_close_during_a_recovery_writes_nothing_and_works_after_it(upload_api, m
     recovery.hold(w.api.engine, get_settings(), utcnow())  # a recovery is open (e.g. right after a restore)
     assert close(w, "withdraw").json() == RECOVERING[1]  # the middleware
     with pytest.raises(ApiError) as caught:  # and the close itself, behind it
-        close_journaled(w.api.engine, w.rid)
+        close_journaled(w.api.setup_engine, w.rid)
     assert (caught.value.status_code, caught.value.code) == (503, "service_recovering")
     assert status_in(w.api.engine, w.rid)[0] == "open" and closures() == []
 
@@ -628,11 +642,11 @@ def test_close_during_a_recovery_writes_nothing_and_works_after_it(upload_api, m
     results: list = []
 
     def recover_now():
-        results.append(("recover", do_recover(w.api.engine, w.storage, w.api.clock.now).gate))
+        results.append(("recover", do_recover(w.api.setup_engine, w.storage, w.api.clock.now).gate))
 
     def close_now():
         try:
-            close_journaled(w.api.engine, w.rid)
+            close_journaled(w.api.setup_engine, w.rid)
             results.append(("close", 200))
         except ApiError as exc:
             results.append(("close", exc.code))
@@ -641,9 +655,9 @@ def test_close_during_a_recovery_writes_nothing_and_works_after_it(upload_api, m
         t.start()
     for t in threads:
         t.join()
-    assert ("recover", "open") in results
+    assert ("recover", "ready") in results
     if ("close", 200) not in results:
-        close_journaled(w.api.engine, w.rid)
+        close_journaled(w.api.setup_engine, w.rid)
     assert status_in(w.api.engine, w.rid)[0] == "withdrawn" and len(closures()) == 1
     assert mirror(w.api.engine) == [(r.seq, r.kind, r.hash, r.line) for r in records()]
     assert gate(w.api.engine) == "open"
@@ -657,28 +671,20 @@ def test_a_download_past_its_last_check_finishes_and_a_new_one_after_the_close_i
     ids = upload(a, big)
     rid = submit(a, ids).json()["request"]["id"]
     url = original_url(rid, ids["file_id"])
-    real = tempfile.TemporaryFile
+    from app.common_original import VerifiedOriginal
+    real = VerifiedOriginal.__next__
     reads = []
-
-    class Spool:
-        """The verified spool; the owner's withdraw commits between two chunks of the response."""
-
-        def __init__(self):
-            self.inner = real()
-
-        def __getattr__(self, name):
-            return getattr(self.inner, name)
-
-        def read(self, n=-1):
-            reads.append(n)
-            if len(reads) == 2:
-                done = Thread(target=lambda: write(a, "POST", f"/review-requests/{rid}/withdraw"))
-                done.start()
-                done.join()
-            return self.inner.read(n)
-    monkeypatch.setattr(reviews.tempfile, "TemporaryFile", Spool)
+    outcomes=[]
+    def stream_next(verified):
+        reads.append(True)
+        if len(reads)==2:
+            done=Thread(target=lambda:outcomes.append(write(a,"POST",f"/review-requests/{rid}/withdraw").status_code))
+            done.start();done.join(15)
+            assert not done.is_alive() and outcomes==[200]
+        return real(verified)
+    monkeypatch.setattr(VerifiedOriginal,"__next__",stream_next)
     response = admin.get(url)
-    monkeypatch.setattr(reviews.tempfile, "TemporaryFile", real)
+    monkeypatch.setattr(VerifiedOriginal,"__next__",real)
     assert response.status_code == 200 and response.content == big  # passed its last check before the close
     assert len(reads) > 2 and status_in(api.engine, rid)[0] == "withdrawn"
     assert admin.get(url).json() == MISSING  # every request after the commit is refused
@@ -717,7 +723,9 @@ def _legacy_world(conn) -> dict:
 
 
 def test_upgrade_from_0027_journals_old_closes_before_the_gate_opens_and_protects_older_backups(
-        empty_db_url, admin_engine, tmp_path):
+        empty_db_url, admin_engine, tmp_path,monkeypatch):
+    from app import auth_safety
+    monkeypatch.setattr(auth_safety,"cutover",lambda db:"ready")  # exact pending seam only
     upgrade(empty_db_url, "0027")
     live = create_engine(empty_db_url)
     path = tmp_path / "journal" / "revocations.jsonl"
@@ -748,10 +756,10 @@ def test_upgrade_from_0027_journals_old_closes_before_the_gate_opens_and_protect
         settings = _settings(path)
         assert recovery.evaluate(settings, live).reason == "review_closures_not_journaled"
         assert recovery.status(live, settings)["unjournaled_review_closures"] == 2
-        with pytest.raises(Exception, match="registered with a revocation journal"):
+        with pytest.raises(Exception, match="auth safety history prevents downgrade"):
             command.downgrade(alembic_config(empty_db_url), "0027")
         report = recovery.recover(live, None, settings, utcnow())  # no --confirm-db-is-current needed
-        assert report.closures_imported == 2 and report.gate == "open"
+        assert report.closures_imported == 2 and report.gate == "ready"
         imported = {r.body["request_id"]: r.body for r in journal.read(path).records if r.kind == "review_closure"}
         assert {k: (v["status"], v["reason_code"]) for k, v in imported.items()} == {
             str(withdrawn): ("withdrawn", "withdrawn_by_requester"), str(rejected): ("rejected", "other")}
@@ -767,7 +775,7 @@ def test_upgrade_from_0027_journals_old_closes_before_the_gate_opens_and_protect
         assert recovery.evaluate(settings, old_engine).reason in ("db_behind_journal", "db_not_migrated")
         upgrade(old)
         assert recovery.evaluate(settings, old_engine).reason == "db_behind_journal"
-        assert recovery.recover(old_engine, None, settings, utcnow()).gate == "open"
+        assert recovery.recover(old_engine, None, settings, utcnow()).gate == "ready"
         with old_engine.connect() as conn:
             assert conn.execute(text("SELECT status, close_reason_code FROM review_requests ORDER BY close_reason_code"
                                      )).all() == [("closed_by_recovery", "other"),
@@ -780,7 +788,7 @@ def test_upgrade_from_0027_journals_old_closes_before_the_gate_opens_and_protect
         old2_engine = create_engine(old2)
         recovery.hold(old2_engine, older, utcnow())
         upgrade(old2)
-        assert recovery.recover(old2_engine, None, older, utcnow()).gate == "open"
+        assert recovery.recover(old2_engine, None, older, utcnow()).gate == "ready"
         with old2_engine.connect() as conn:
             assert conn.scalar(text("SELECT count(*) FROM review_requests WHERE status='open'")) == 2
         old2_engine.dispose()
@@ -803,7 +811,8 @@ def test_register_existing_journals_closed_requests_too(empty_db_url, tmp_path):
     upgrade(empty_db_url)
     settings = _settings(tmp_path / "revocations.jsonl")
     _, imported = recovery.register_existing(eng, settings, utcnow())
-    assert imported == 1 and recovery.evaluate(settings, eng).reason == "open"
+    assert imported == 1 and recovery.evaluate_integrity(settings,eng).open
+    assert recovery.evaluate(settings, eng).reason == "auth_safety_pending"
     (record,) = [r for r in journal.read(settings.recovery.journal_path).records if r.kind == "review_closure"]
     assert record.body["request_id"] == str(w0["requests"][0]) and record.body["status"] == "withdrawn"
     eng.dispose()

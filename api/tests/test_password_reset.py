@@ -186,7 +186,7 @@ def test_reset_ttl_comes_from_config(api: Harness, monkeypatch: pytest.MonkeyPat
     from datetime import timedelta
 
     monkeypatch.setenv("RAS_AUTH__PASSWORD_RESET", "PT5M")
-    app_env(migrated_db_url)
+    app_env(api.engine.url)
     api.create_user(EMAIL)
     request_reset(api)
     created, expires = api.scalar("SELECT ARRAY[created_at, expires_at] FROM password_reset_tokens")

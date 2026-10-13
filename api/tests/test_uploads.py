@@ -34,6 +34,8 @@ def upload_api(installation, monkeypatch):
     from app.identity.bootstrap import bootstrap_admin
     from app.identity.invitations import create_invitation, accept_invitation
     from app.identity.login import login
+    from app.delivery import get_delivery
+    get_delivery.cache_clear()
     monkeypatch.setattr(auth_safety, 'cutover', lambda db: 'ready')
     for key,value in DEV_ENV.items(): monkeypatch.setenv(key,value)
     clock=FakeClock();clock.now=NOW
@@ -64,6 +66,7 @@ def upload_api(installation, monkeypatch):
                     now=clock.now,policy=settings.password,clock=lambda:clock.now)
                 return user.id
     api=RuntimeHarness(installation.runtime,clock)
+    api.setup_engine=installation.engine  # explicit privileged corruption/recovery fixture only
     env = {k: os.environ[k] for k in ("MINIO_ROOT_USER", "MINIO_ROOT_PASSWORD", "MINIO_API_HOST_PORT") if k in os.environ}
     assert all(env.get(k) for k in ("MINIO_ROOT_USER", "MINIO_ROOT_PASSWORD", "MINIO_API_HOST_PORT"))
     monkeypatch.setenv("RAS_STORAGE__ENDPOINT_URL", f"http://127.0.0.1:{env.get('MINIO_API_HOST_PORT', '9000')}")
@@ -84,6 +87,7 @@ def upload_api(installation, monkeypatch):
         pass
     app_config.get_settings.cache_clear()
     app.dependency_overrides.clear()
+    get_delivery.cache_clear()
 
 
 def pdf(pages=1) -> bytes:

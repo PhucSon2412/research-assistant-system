@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.audit import record_event
@@ -27,7 +27,7 @@ from app.config import get_settings
 from app.identity.predicates import lock_users, session_live
 from app.identity.tokens import digest_matches
 from app.identity.session_commit import AUTH_PENDING
-from app.models import AuthChangeReceipt, AuthSafetyHead, RevocationJournalRecord, UserSession
+from app.models import UserSession
 
 
 def _initial_status_verified(db: Session, user_id: uuid.UUID) -> bool:
@@ -37,25 +37,7 @@ def _initial_status_verified(db: Session, user_id: uuid.UUID) -> bool:
     checks the real journal/integrity gate after all row locks, before staging.
     Journal intent alone (including a replayed initial decision) is insufficient.
     """
-    receipt = AuthChangeReceipt
-    record = RevocationJournalRecord
-    head = AuthSafetyHead
-    return db.scalar(select(receipt.operation_id).join(record,
-        (record.auth_operation_id == receipt.operation_id)
-        & (record.auth_user_id == receipt.user_id)
-        & (record.auth_domain == receipt.domain)
-        & (record.auth_generation == receipt.generation)
-        & (record.auth_decision == receipt.decision)
-        & (record.auth_reason_code == receipt.reason_code)
-        & (record.auth_recorded_at == receipt.recorded_at)
-    ).join(head, head.user_id == receipt.user_id).where(
-        receipt.user_id == user_id,
-        receipt.domain == "status",
-        receipt.decision == "active",
-        receipt.reason_code.in_(("bootstrap", "invitation_accept", "verified_initial_status")),
-        record.journal_confirmed.is_(True),
-        record.seq <= head.status_seq,
-    ).limit(1)) is not None
+    return bool(db.scalar(text("SELECT ras_auth_initial_status_verified(:uid)"), {"uid": user_id}))
 
 
 def list_users(db: Session) -> list[User]:

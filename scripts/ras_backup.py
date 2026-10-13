@@ -317,16 +317,19 @@ def do_restore(args, env: dict) -> int:
             raise BackupError("pg_restore_failed", f"exit {loaded.returncode}")
     with timed(timings, "hold"):
         # Before objects or migrations: from here the gate is shut until `recover` ends this recovery.
-        held = compose(target, "run", "--rm", "--no-deps", "api", "python", "-m", "app.cli.recovery", "hold",
-                       extra_env=extra, check=False, encoding="utf-8", errors="replace")
+        recovery_env=extra|{"RAS_DB__USER":env["POSTGRES_USER"],"RAS_DB__PASSWORD":env["POSTGRES_PASSWORD"]}
+        held = compose(target, "run", "--rm", "--no-deps","-e","RAS_DB__USER","-e","RAS_DB__PASSWORD",
+                       "api", "python", "-m", "app.cli.recovery", "hold",
+                       extra_env=recovery_env, check=False, encoding="utf-8", errors="replace")
         if held.returncode != 0:
             raise BackupError("recovery_hold_failed", (held.stderr or "").strip().split(";")[0][-80:])
     with timed(timings, "objects"):
         counts = backup.restore_objects(storage_at(minio_port, env), artifact, manifest)
     with timed(timings, "migrate"):
         compose(target, "run", "--rm", "migrate", extra_env=extra)
-    status = compose(target, "run", "--rm", "--no-deps", "api", "python", "-m", "app.cli.recovery", "status",
-                     extra_env=extra, check=False, encoding="utf-8", errors="replace")
+    status = compose(target, "run", "--rm", "--no-deps","-e","RAS_DB__USER","-e","RAS_DB__PASSWORD",
+                     "api", "python", "-m", "app.cli.recovery", "status",
+                     extra_env=recovery_env, check=False, encoding="utf-8", errors="replace")
     gate = next((part.split("=", 1)[1] for part in status.stdout.split() if part.startswith("gate=")), "unknown")
     if status.returncode != 3 or gate == "open":
         raise BackupError("gate_not_closed_after_restore", gate)

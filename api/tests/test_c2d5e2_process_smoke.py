@@ -25,7 +25,7 @@ from tests.test_c2d5a_review_writes import writers  # noqa: F401
 from tests.test_c2d5e2_orphan_reconcile import orphan, put, present, body, refer, business  # noqa: F401
 from tests.resource_fixtures import BODY
 
-IMAGE = 'rasc2d5e2-cli:20261010'
+IMAGE = os.environ.get('RAS_TEST_PROCESS_IMAGE', 'rasc2d5e2-cli:20261010')
 HARNESS = '''
 import json, os, socket, time
 from pathlib import Path

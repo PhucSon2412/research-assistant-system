@@ -21,7 +21,7 @@ from tests.conftest import REPO_DIR
 from tests.resource_fixtures import resource_api, resource_world, installation, source  # noqa: F401
 from tests.test_c2d5f1_citation_runtime import cit, refs  # noqa: F401
 
-IMAGE = 'rasc2d5f1-worker:20261010'
+IMAGE = os.environ.get('RAS_TEST_PROCESS_IMAGE', 'rasc2d5f1-worker:20261010')
 RAWS = ['RAWCANARY one arXiv:2609.00011', 'RAWCANARY two arXiv:2609.00012', 'RAWCANARY three no id',
         'RAWCANARY four arXiv:2609.00013', 'RAWCANARY five arXiv:2609.00014']
 HARNESS = '''

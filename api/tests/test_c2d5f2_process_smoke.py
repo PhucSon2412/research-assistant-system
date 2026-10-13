@@ -19,7 +19,7 @@ from tests.resource_fixtures import installation  # noqa: F401
 from tests.test_c2d5f2_discovery_runtime import disc  # noqa: F401
 from tests.test_discovery import PAGE_ONE, PAGE_TWO
 
-IMAGE = 'rasc2d5f2-worker:20261011'
+IMAGE = os.environ.get('RAS_TEST_PROCESS_IMAGE', 'rasc2d5f2-worker:20261011')
 HARNESS = '''
 import os, socket, json, uuid
 from pathlib import Path

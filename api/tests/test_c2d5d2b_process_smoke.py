@@ -144,7 +144,7 @@ if sys.argv[0].endswith('celery'):
 ''',encoding='utf-8')
     extra={'services':{},'networks':{'default':{'external':True,'name':c['project']+'_default'}}}
     for name in ('worker','beat'):
-        extra['services'][name]={'image':'rasc2d5d2b-worker:20261010', 'build':str(REPO_DIR/'api'),
+        extra['services'][name]={'image':os.environ.get('RAS_TEST_PROCESS_IMAGE','rasc2d5d2b-worker:20261010'), 'build':str(REPO_DIR/'api'),
             'labels':{'ras.task':c['project']},'environment':{'PYTHONPATH':'/harness:/srv/api',
                 'RAS_REDIS_PORT':'6379'},
             'volumes':[str(REPO_DIR/'api'/'app').replace('\\','/')+':/srv/api/app:ro',

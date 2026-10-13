@@ -39,8 +39,15 @@ def world(upload_api, monkeypatch):
     import httpx
     monkeypatch.setattr(httpx.HTTPTransport, "handle_request",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("provider blocked")))
+    contexts = {}
+    original = invitations.create_invitation
+    def create(*args, **kwargs):
+        created = original(*args, **kwargs)
+        contexts[created._binding.invitation_id] = created  # known-commit backend result, not reconstructed from a request
+        return created
+    monkeypatch.setattr(invitations,"create_invitation",create)
     return SimpleNamespace(h=h, storage=storage, aid=aid, admin=admin,
-                           cookies=dict(public.client.cookies))
+                           cookies=dict(public.client.cookies), contexts=contexts)
 
 
 def issue(w, email=EMAIL):
@@ -62,7 +69,19 @@ def records():
 
 
 def recover(w, engine=None, **kwargs):
-    return recovery.recover(engine or w.h.engine, w.storage, get_settings(), w.h.clock.now, **kwargs)
+    return recovery.recover(engine or w.h.setup_engine, w.storage, get_settings(), w.h.clock.now, **kwargs)
+
+
+def compensate(w, old):
+    """The current backend helper with the actual committed issuance context."""
+    with Session(w.h.engine) as db:
+        invitations._compensate_delivery(db,w.contexts[old.id],lambda:w.h.clock.now)
+
+
+def batch_actor(w, db):
+    context = w.admin.get("/auth/session").json()
+    return invitations._actor(db, w.aid, uuid.UUID(context["session"]["id"]),
+                              w.admin.client.cookies.get("ras_csrf"), lambda: w.h.clock.now)
 
 
 def sample(w, iid=None, **changes):
@@ -74,11 +93,12 @@ def sql_mirror(db, body, **overrides):
     # Bypass Python validator to prove independent SQL INSERT guards.
     values = dict(i=body.get("invitation_id"), k=body.get("end_kind"), r=body.get("reason_code"),
                   at=body.get("ended_at")) | overrides
-    line = journal.canonical(dict(body=body, hash="f"*64, kind=KIND, prev="0"*64, seq=2))
+    seq=db.scalar(text("SELECT coalesce(max(seq),0)+1 FROM revocation_journal_records"))
+    line = journal.canonical(dict(body=body, hash="f"*64, kind=KIND, prev="0"*64, seq=seq))
     db.execute(text("INSERT INTO revocation_journal_records(seq,kind,record_hash,line,applied_via,result,"
                     "journal_confirmed,invitation_id,invitation_end_kind,invitation_reason_code,invitation_ended_at)"
-                    " VALUES(2,'invitation_closure',repeat('f',64),:line,'close','closed',false,:i,:k,:r,:at)"),
-               values | {"line": line})
+                    " VALUES(:seq,'invitation_closure',repeat('f',64),:line,'close','closed',false,:i,:k,:r,:at)"),
+               values | {"line": line,"seq":seq})
 
 
 @pytest.mark.parametrize("how", ["accept", "revoke", "replace", "delivery"])
@@ -103,20 +123,18 @@ def test_restore_twice_blocks_both_endpoints_without_recreating_account(world, a
             issue(w)
         else:
             # Link may have escaped BEFORE adapter reports failure; same compensation helper as route.
-            with Session(w.h.engine) as db:
-                invitations.revoke_invitation(db, invitation_id=old.id, actor_id=w.aid, now=w.h.clock.now,
-                                               reason="delivery_failed", compensation=True)
+            compensate(w,old)
         assert browser(w.cookies).post("/auth/password-reset/confirm", {"token": reset.token,
                                       "new_password": "journal-invitation-New-123"}).status_code == 200
         for snap in (first, second):
             recovery.hold(snap.engine, get_settings(), w.h.clock.now)
             app_env(snap.url)
             assert inspect(w, old.token).status_code == accept(w, old.token).status_code == 503
-            assert recover(w, snap.engine).gate == "open"
+            assert recover(w, snap.engine).gate == "ready"
             for _ in range(2):
                 assert inspect(w, old.token).json() == accept(w, old.token).json() == {"error": "invalid_token"}
                 assert inspect(w, valid.token).status_code == 200
-                assert recover(w, snap.engine).gate == "open"
+                assert recover(w, snap.engine).gate == "ready"
             with snap.engine.connect() as conn:
                 row = conn.execute(text("SELECT accepted_at,accepted_user_id,closed_by_recovery_at,expires_at"
                                         " FROM invitations WHERE id=:i"), {"i": old.id}).one()
@@ -167,6 +185,7 @@ def test_missing_null_body_rejected_before_append(world, field, shape):
     w = world
     issue(w)
     good = sample(w)
+    before=get_settings().recovery.journal_path.read_bytes()
     body = good.copy()
     if shape == "missing":
         del body[field]
@@ -174,9 +193,9 @@ def test_missing_null_body_rejected_before_append(world, field, shape):
         body[field] = None
     with pytest.raises(journal.JournalError):
         journal.next_record(journal.read(get_settings().recovery.journal_path).head, KIND, body)
-    with pytest.raises(DBAPIError), Session(w.h.engine) as db:
+    with pytest.raises(DBAPIError), Session(w.h.setup_engine) as db:
         sql_mirror(db, body, i=good["invitation_id"], k=good["end_kind"], r=good["reason_code"], at=good["ended_at"])
-    assert journal.read(get_settings().recovery.journal_path).head.seq == 1
+    assert get_settings().recovery.journal_path.read_bytes()==before
 
 
 @pytest.mark.parametrize("changes", [dict(invitation_id="bad"), dict(end_kind="consumed"),
@@ -215,7 +234,7 @@ def test_deferred_guard_matches_actual_closure(world, field):
         body["ended_at"] = (w.h.clock.now + timedelta(seconds=1)).isoformat()
     else:
         body["invitation_id"] = str(uuid.uuid4())
-    with pytest.raises(DBAPIError), Session(w.h.engine) as db:
+    with pytest.raises(DBAPIError), Session(w.h.setup_engine) as db:
         sql_mirror(db, body)
         db.execute(text("UPDATE invitations SET revoked_at=:t,closure_reason='admin_revoked' WHERE id=:i"),
                    {"i": old.id, "t": w.h.clock.now})
@@ -225,21 +244,21 @@ def test_deferred_guard_matches_actual_closure(world, field):
 def test_direct_sql_finality_and_append_only(world):
     w = world
     old = issue(w)
-    with pytest.raises(DBAPIError), w.h.engine.begin() as conn:
+    with pytest.raises(DBAPIError), w.h.setup_engine.begin() as conn:
         conn.execute(text("UPDATE invitations SET revoked_at=:t WHERE id=:i"), {"i": old.id, "t": w.h.clock.now})
     assert accept(w, old.token).status_code == 201
     for change in ("accepted_at=NULL,accepted_user_id=NULL,closure_reason=NULL", "accepted_at=accepted_at+interval '1 second'",
                    "closure_reason='legacy_accepted'", "id=gen_random_uuid()", "email='other@example.org'",
                    "token_hash=repeat('a',64)", "expires_at=expires_at+interval '1 day'",
                    "accepted_user_id=NULL", "revoked_at=accepted_at"):
-        with pytest.raises(DBAPIError), w.h.engine.begin() as conn:
+        with pytest.raises(DBAPIError), w.h.setup_engine.begin() as conn:
             conn.execute(text(f"UPDATE invitations SET {change} WHERE id=:i"), {"i": old.id})
-    with pytest.raises(DBAPIError), w.h.engine.begin() as conn:
+    with pytest.raises(DBAPIError), w.h.setup_engine.begin() as conn:
         conn.execute(text("DELETE FROM invitations WHERE id=:i"), {"i": old.id})
     for sql in ("DELETE FROM revocation_journal_records WHERE invitation_id=:i",
                 "UPDATE revocation_journal_records SET journal_confirmed=false WHERE invitation_id=:i",
                 "UPDATE revocation_journal_records SET invitation_reason_code='legacy_accepted' WHERE invitation_id=:i"):
-        with pytest.raises(DBAPIError), w.h.engine.begin() as conn:
+        with pytest.raises(DBAPIError), w.h.setup_engine.begin() as conn:
             conn.execute(text(sql), {"i": old.id})
 
 
@@ -258,13 +277,12 @@ def test_append_faults_close_atomically_but_do_not_report_success(world, monkeyp
         r = w.admin.post(f"/admin/invitations/{old.id}/revoke")
     else:
         from app.api.errors import ApiError
-        with pytest.raises(ApiError), Session(w.h.engine) as db:
-            invitations.revoke_invitation(db, invitation_id=old.id, actor_id=w.aid, now=w.h.clock.now,
-                                           reason="delivery_failed", compensation=True)
+        with pytest.raises(ApiError):
+            compensate(w,old)
         r = SimpleNamespace(status_code=503)
     assert r.status_code == 503
     assert len(w.h.outbox().entries(now=w.h.clock.now)) == count
-    assert w.h.scalar("SELECT count(*) FROM revocation_journal_records WHERE NOT journal_confirmed") == 1
+    assert w.h.scalar("SELECT count(*) FROM revocation_journal_records WHERE NOT journal_confirmed") == (3 if how=="accept" else 1)
     assert w.h.scalar("SELECT accepted_at IS NOT NULL OR revoked_at IS NOT NULL FROM invitations WHERE id=:i", i=old.id)
     assert w.h.scalar("SELECT count(*) FROM users WHERE email=:e", e=EMAIL) == int(how == "accept")
     assert gate(w.h.engine) != "open"
@@ -272,7 +290,7 @@ def test_append_faults_close_atomically_but_do_not_report_success(world, monkeyp
     if shape != "fsync":
         with pytest.raises(recovery.RecoveryError, match="journal_behind_db"):
             recover(w)
-    assert recover(w, confirm_db_current=shape != "fsync").gate == "open"
+    assert recover(w, confirm_db_current=shape != "fsync").gate == "ready"
     assert inspect(w, old.token).status_code == accept(w, old.token).status_code == 400
 
 
@@ -289,6 +307,9 @@ def test_commit_reply_loss_never_reports_success_or_delivery(world, monkeypatch,
     assert (r.status_code, r.json()) == (503, {"error": "auth_outcome_uncertain"})
     fix()
     assert len(w.h.outbox().entries(now=w.h.clock.now)) == count
+    if how=="accept" and not lands:
+        assert gate(w.h.engine)=="db_behind_journal"  # no receipt-based inference or automatic replay
+        recover(w)
     assert gate(w.h.engine) == "open"
     assert accept(w, old.token).status_code == 400
     assert w.h.scalar("SELECT count(*) FROM users WHERE email=:e", e=EMAIL) == int(lands and how == "accept")
@@ -317,15 +338,18 @@ def test_multi_invitation_batch_prefix_with_rollback(world, monkeypatch, shape):
     fix_commit = failing_commit(monkeypatch, False)
     from app.api.errors import ApiError
     with pytest.raises(ApiError), Session(w.h.engine) as db:
+        actor=batch_actor(w,db)  # User before email/invitation and journal
         for email in sorted([EMAIL, "batch.invitation@example.org"]):
             lock_email(db, email)
-        rows = db.query(Invitation).order_by(Invitation.id).with_for_update().all()
+        from app.identity.invitation_endings import lock_invitations
+        lock_invitations(db,[a.id,b.id])
+        rows = db.query(Invitation).filter(Invitation.id.in_([a.id,b.id])).order_by(Invitation.id).all()
         for row in rows:
-            end_invitation(db, row, kind="revoked", reason="admin_revoked", now=w.h.clock.now)
+            end_invitation(db, row, kind="revoked", reason="admin_revoked", now=w.h.clock.now,actor=actor)
         ids = [r.id for r in rows]
         commit_auth(db)
     fix_write(); fix_commit()
-    assert recover(w).gate == "open"
+    assert recover(w).gate == "ready"
     ended = {uuid.UUID(r.body["invitation_id"]) for r in records()}
     assert ended == (set(ids) if shape == "fsync" else {ids[0]} if shape == "prefix" else set())
     assert w.h.scalar("SELECT count(*) FROM invitations WHERE closed_by_recovery_at IS NOT NULL") == len(ended)
@@ -338,10 +362,10 @@ def test_failed_replay_stays_gated(world, monkeypatch):
     fix = failing_commit(monkeypatch, False)
     real = recovery.replay_record
     monkeypatch.setattr(recovery, "replay_record", lambda *a: (_ for _ in ()).throw(RuntimeError("down")))
-    assert accept(w, old.token).json() == {"error": "auth_closure_pending_recovery"}
+    assert accept(w, old.token).json() == {"error": "auth_outcome_uncertain"}
     assert gate(w.h.engine) == "db_behind_journal"
     monkeypatch.setattr(recovery, "replay_record", real); fix()
-    assert recover(w).gate == "open"
+    assert recover(w).gate == "ready"
     assert accept(w, old.token).status_code == 400
     assert w.h.scalar("SELECT count(*) FROM users WHERE email=:e", e=EMAIL) == 0
 
@@ -354,7 +378,7 @@ def test_recover_postcondition_even_if_mirror_exists(world, admin_engine, app_en
     with backup(w.h, admin_engine) as snap:
         assert w.admin.post(f"/admin/invitations/{old.id}/revoke").status_code == 204
         if mirrored:
-            assert recover(w, snap.engine).gate == "open"
+            assert recover(w, snap.engine).gate == "ready"
         # A superuser bypass represents a corrupt snapshot; normal SQL is fenced.
         with snap.engine.begin() as conn:
             conn.execute(text("ALTER TABLE invitations DISABLE TRIGGER USER"))
@@ -367,7 +391,7 @@ def test_recover_postcondition_even_if_mirror_exists(world, admin_engine, app_en
             conn.execute(text("ALTER TABLE invitations ENABLE TRIGGER USER"))
         app_env(snap.url)
         if change == "open" and not mirrored:
-            assert recover(w, snap.engine).gate == "open"  # expected replay of an open snapshot
+            assert recover(w, snap.engine).gate == "ready"  # expected replay of an open snapshot
         else:
             with pytest.raises(recovery.RecoveryError, match="invitation_not_ended|invitation_closure_conflict"):
                 recover(w, snap.engine)
@@ -389,12 +413,17 @@ def test_absent_invitation_and_user_not_recreated(world, admin_engine, app_env):
 def test_hashing_outside_locks_and_expiry_rechecked_after_hash(world, monkeypatch):
     w = world
     old = issue(w)
-    actual = invitations.hash_password
-    def slow(password):
-        result = actual(password)
-        w.h.clock.advance(hours=72)
-        return result
-    monkeypatch.setattr(invitations, "hash_password", slow)
+    actual = invitations.hasher_for_policy
+    def factory(policy):
+        hasher=actual(policy)
+        class Slow:
+            def hash(self,password):
+                assert w.h.engine.pool.checkedout()==0
+                result=hasher.hash(password)
+                w.h.clock.advance(hours=72)
+                return result
+        return Slow()
+    monkeypatch.setattr(invitations, "hasher_for_policy", factory)
     assert accept(w, old.token).json() == {"error": "invalid_token"}
     assert records() == []
     assert w.h.scalar("SELECT count(*) FROM users WHERE email=:e", e=EMAIL) == 0
@@ -415,14 +444,17 @@ def test_configured_ttl_boundary_has_no_new_closure(world, monkeypatch):
 
 def test_all_mirrors_false_and_flushed_before_one_append(world, monkeypatch):
     w = world
-    issue(w); issue(w, "batch.invitation@example.org")
+    a,b=issue(w),issue(w, "batch.invitation@example.org")
     actual = journal.append
     observed = []
     with Session(w.h.engine) as db:
+        actor=batch_actor(w,db)
         for email in sorted([EMAIL, "batch.invitation@example.org"]):
             lock_email(db, email)
-        for row in db.query(Invitation).order_by(Invitation.id).with_for_update():
-            end_invitation(db, row, kind="revoked", reason="admin_revoked", now=w.h.clock.now)
+        from app.identity.invitation_endings import lock_invitations
+        lock_invitations(db,[a.id,b.id])
+        for row in db.query(Invitation).order_by(Invitation.id):
+            end_invitation(db, row, kind="revoked", reason="admin_revoked", now=w.h.clock.now,actor=actor)
         def append(path, state, batch):
             flags = db.execute(text("SELECT journal_confirmed FROM revocation_journal_records WHERE invitation_id IS NOT NULL")).scalars().all()
             assert flags == [False, False]  # Same transaction, INSERT guards have already run.
@@ -437,14 +469,11 @@ def test_all_mirrors_false_and_flushed_before_one_append(world, monkeypatch):
 def test_invalid_mirror_flush_rejects_before_any_journal_byte(world, monkeypatch):
     w = world
     old = issue(w)
-    actual = recovery._mirror
+    actual = recovery.invitation_body
     before = get_settings().recovery.journal_path.read_bytes()
     def wrong(*args, **kwargs):
-        row = actual(*args, **kwargs)
-        if row.invitation_id:
-            row.invitation_id = uuid.uuid4()
-        return row
-    monkeypatch.setattr(recovery, "_mirror", wrong)
+        return actual(*args, **kwargs) | {"invitation_id":str(uuid.uuid4())}
+    monkeypatch.setattr(recovery, "invitation_body", wrong)
     assert accept(w, old.token).json() == {"error": "auth_unavailable"}
     assert get_settings().recovery.journal_path.read_bytes() == before
     assert w.h.scalar("SELECT count(*) FROM users WHERE email=:e", e=EMAIL) == 0
@@ -457,8 +486,8 @@ def test_absent_journal_identity_cannot_be_inserted_open(world):
     state = journal.read(get_settings().recovery.journal_path)
     record = journal.next_record(state.head, KIND, sample(w, iid=iid))
     journal.append(get_settings().recovery.journal_path, state, [record])
-    assert recovery.replay_record(w.h.engine, record, w.h.clock.now) == ("recorded_invitation_absent", 0)
-    with pytest.raises(DBAPIError), w.h.engine.begin() as conn:
+    assert recovery.replay_record(w.h.setup_engine, record, w.h.clock.now) == ("recorded_invitation_absent", 0)
+    with pytest.raises(DBAPIError), w.h.setup_engine.begin() as conn:
         conn.execute(text("INSERT INTO invitations(id,email,token_hash,invited_by_user_id,created_at,expires_at)"
                           " VALUES(:i,:e,repeat('a',64),:a,:t,:expires)"),
                      dict(i=iid,e=EMAIL,a=w.aid,t=w.h.clock.now,expires=w.h.clock.now+timedelta(hours=72)))
@@ -499,6 +528,20 @@ def test_races_both_lock_orders_check_api_db_journal(world, monkeypatch, pair, r
             second_started.set()
             actual(db, email)
     monkeypatch.setattr(invitations, "lock_email", synchronized)
+    user_lock=invitations.lock_users
+    def synchronized_users(db,ids):
+        if turn.get()==1:second_started.set()
+        return user_lock(db,ids)
+    monkeypatch.setattr(invitations,"lock_users",synchronized_users)
+    # Same-Admin replacements may wait while principal resolution touches the
+    # User, before the handler reaches its email lock. Observe the real API
+    # engine as well as the handler, then require a PostgreSQL blocking edge.
+    from app.db import get_engine
+    from sqlalchemy import event
+    api_engine=get_engine()
+    def observe(conn,cursor,sql,params,context,many):
+        if turn.get()==1:second_started.set()
+    event.listen(api_engine,"before_cursor_execute",observe)
     sequence = list(reversed(pair)) if reverse else list(pair)
     results, errors = {}, []
     def run(index):
@@ -513,9 +556,7 @@ def test_races_both_lock_orders_check_api_db_journal(world, monkeypatch, pair, r
             elif how == "revoke":
                 r = admin.post(f"/admin/invitations/{old.id}/revoke")
             else:
-                with Session(w.h.engine) as db:
-                    invitations.revoke_invitation(db, invitation_id=old.id, actor_id=w.aid, now=w.h.clock.now,
-                                                   reason="delivery_failed", compensation=True)
+                compensate(w,old)
                 r = SimpleNamespace(status_code=204)
             results[index] = r
         except BaseException as exc:
@@ -530,14 +571,15 @@ def test_races_both_lock_orders_check_api_db_journal(world, monkeypatch, pair, r
         until = time.monotonic() + 6
         while time.monotonic() < until:
             if w.h.scalar("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database()"
-                          " AND wait_event='advisory' AND query LIKE '%pg_advisory_xact_lock%'"):
+                          " AND cardinality(pg_blocking_pids(pid))>0"):
                 break
             time.sleep(.01)
         else:
-            pytest.fail("second transaction did not block on the email lock")
+            pytest.fail("second transaction did not block on the ordered User/email locks")
     finally:
         release.set()
         a.join(15); b.join(15)
+        event.remove(api_engine,"before_cursor_execute",observe)
     assert not a.is_alive() and not b.is_alive(), "deadlock/timeout"
     assert errors == []
     first, second = sequence
@@ -557,6 +599,9 @@ def test_races_both_lock_orders_check_api_db_journal(world, monkeypatch, pair, r
 
 
 def test_0031_history_backfill_hold_before_migrate_and_downgrade_fence(empty_db_url, journal_path, monkeypatch):
+    from app import auth_safety
+    from tests.conftest import HEAD_REVISION
+    monkeypatch.setattr(auth_safety,"cutover",lambda db:"ready")  # recovery/hold/auth remain real
     from alembic import command
     from sqlalchemy import create_engine
     from app.identity.passwords import hash_password
@@ -599,13 +644,13 @@ def test_0031_history_backfill_hold_before_migrate_and_downgrade_fence(empty_db_
     assert gate(eng) == "invitations_not_journaled"
     # No revoked objects in this database; storage is never used by cleanup.
     report = recovery.recover(eng, None, settings, now)
-    assert report.gate == "open" and report.invitations_imported == 2
+    assert report.gate == "ready" and report.invitations_imported == 2
     assert {r.body["reason_code"] for r in records()} == {"legacy_accepted", "legacy_revoked"}
     assert recovery.recover(eng, None, settings, now).invitations_imported == 0
     with eng.connect() as conn:
-        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == "0032"
+        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == HEAD_REVISION
         assert conn.scalar(text("SELECT count(*) FROM users")) == 2
         assert conn.scalar(text("SELECT accepted_user_id FROM invitations WHERE accepted_at IS NOT NULL")) == uid
-    with pytest.raises(Exception, match="downgrade would reopen invitations"):
+    with pytest.raises(Exception, match="auth safety history prevents downgrade"):
         command.downgrade(alembic_config(empty_db_url), "0031")
     eng.dispose()

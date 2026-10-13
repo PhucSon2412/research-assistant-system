@@ -19,46 +19,6 @@ INVITEE = "new.user@example.org"
 
 
 @pytest.fixture
-def api(api, monkeypatch, app_env):
-    """Scoped C2 HTTP regression: real runtime, receipts/actor/clock/gate intact.
-
-    Only the pending cutover decision is replaced. Migrator account fixtures
-    get real initial receipts, matching C2a/C2b setup; no receipt/predicate mock.
-    """
-    from types import SimpleNamespace
-    from app import auth_safety
-    from tests.test_auth_safety_foundation import runtime_engine
-    from tests.helpers import Browser, WEB_ORIGIN
-    monkeypatch.setattr(auth_safety, "cutover", lambda db: "ready")
-    rt = runtime_engine(SimpleNamespace(engine=api.engine))
-    app_env(rt.url)
-    original = Browser.__init__
-    def init(self, *args, **kwargs):
-        original(self, *args, **kwargs)
-        self.client.headers['origin'] = WEB_ORIGIN
-    monkeypatch.setattr(Browser, '__init__', init)
-    raw_fixture = api.create_user
-    def create_user(email, password=USER_PASSWORD):
-        from app.identity.passwords import hash_password
-        from app.identity.session_commit import AUTH_PENDING, commit_auth
-        from app.identity.predicates import lock_users
-        uid = raw_fixture(email, password)
-        with Session(rt) as db:
-            lock_users(db, [uid])
-            db.info[AUTH_PENDING] = [
-                # Generic runtime reasons; verified_* need a C3 operator case (0049).
-                auth_safety.Change(uid, 'credential', 'password_reset', api.clock.now,
-                                   verifier=hash_password(password), policy_version=1),
-                auth_safety.Change(uid, 'status', 'invitation_accept', api.clock.now, decision='active'),
-            ]
-            commit_auth(db)
-        return uid
-    monkeypatch.setattr(api, 'create_user', create_user)
-    yield api
-    rt.dispose()
-
-
-@pytest.fixture
 def h(api: Harness) -> Harness:
     api.bootstrap_admin()
     return api

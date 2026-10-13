@@ -210,6 +210,12 @@ def test_common_original_refused_unless_live_rights_open_that_exact_file(upload_
 
     # Revocation: from its commit every new request, a saved URL included, is refused.
     saved = url(allowed_file)
+    # Restore the deliberately corrupt multi-file/version fixture to the
+    # immutable single-copy contract before exercising the runtime writer.
+    with api.setup_engine.begin() as conn:
+        conn.execute(text("DELETE FROM source_files WHERE id=ANY(:ids)"),
+                     {"ids":[uuid.UUID(same_version_other_file),uuid.UUID(other_version_file)]})
+        conn.execute(text("DELETE FROM paper_versions WHERE id=:v"),{"v":new_version})
     assert revoke(admin, allowed).status_code == 200
     for who, browser in (("a", a), ("b", b), ("admin", admin)):
         assert_missing(browser, saved, who)

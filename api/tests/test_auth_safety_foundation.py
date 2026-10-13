@@ -24,13 +24,14 @@ from tests.conftest import upgrade, alembic_config
 
 NOW = datetime(2026, 10, 3, 9, 0, tzinfo=UTC)
 SECRET = "C1-private-password-marker-123!"
+LEGACY_SECRET = "C1-unverified-legacy-password-marker-456!"
 
 
 @pytest.fixture
 def foundation(engine, app_env, migrated_db_url, journal_path):
     app_env(migrated_db_url)
     with Session(engine) as db:
-        u = User(id=uuid.uuid4(), email="c1@example.test", role="admin", password_verifier=hash_password(SECRET),
+        u = User(id=uuid.uuid4(), email="c1@example.test", role="admin", password_verifier=hash_password(LEGACY_SECRET),
                  password_changed_at=NOW, created_at=NOW, updated_at=NOW)
         db.add(u)
         db.commit()
@@ -59,6 +60,18 @@ def append_changes(w, values=None, *, rollback=False, tokens=(), sessions=(), in
 
 def run_recover(w, **kw):
     return recovery.recover(w.engine,SimpleNamespace(),w.settings,NOW,**kw)
+
+
+def prove_initial(w, *, engine=None):
+    """Legacy fixture: real credential write + an independent C3 status case."""
+    runtime = engine or runtime_engine(w)
+    try:
+        from tests.test_c3_operator_recovery import operator_initial_status, operator_credential
+        operator_credential(w,w.uid,password=SECRET)
+        operator_initial_status(w, w.uid)
+    finally:
+        if engine is None:
+            runtime.dispose()
 
 
 def user(w):
@@ -141,8 +154,9 @@ def test_typed_mirror_binding_and_confirm_only(engine,column,null):
 
 def test_batch_valid_receipts_pending_and_secrets(foundation,caplog):
     w=foundation
-    batch=append_changes(w)
-    assert all(r.written for r in batch)
+    prove_initial(w)
+    with w.engine.connect() as conn:
+        assert conn.scalar(text("SELECT count(*) FROM revocation_journal_records WHERE NOT journal_confirmed"))==0
     u=user(w)
     assert (u.credential_state,u.status_safety)==("usable","proven")
     report=run_recover(w)
@@ -162,13 +176,13 @@ def test_batch_valid_receipts_pending_and_secrets(foundation,caplog):
 @pytest.mark.parametrize("shape",["none","torn","prefix","full"])
 @pytest.mark.parametrize("outcome",["commit","rollback","uncertain_commit","uncertain_rollback"])
 def test_fault_matrix(foundation,monkeypatch,shape,outcome):
-    w=foundation; original=journal.append
+    w=foundation; prove_initial(w); original=journal.append
     def fail(path,state,records):
         assert deciding.scalar(text("SELECT count(*) FROM revocation_journal_records WHERE NOT journal_confirmed"))==2
-        assert deciding.scalar(text("SELECT count(*) FROM auth_change_receipts"))==2
+        assert deciding.scalar(text("SELECT count(*) FROM auth_change_receipts"))==4
         with Session(w.engine) as other:
             # The whole batch exists unconfirmed in the deciding transaction, not visible here.
-            assert other.scalar(select(AuthChangeReceipt.operation_id)) is None
+            assert len(other.scalars(select(AuthChangeReceipt.operation_id)).all())==2
         if shape=="torn":
             with path.open("ab") as f:f.write(records[0].line[:30].encode())
         elif shape=="prefix":original(path,state,records[:1])
@@ -196,8 +210,12 @@ def test_fault_matrix(foundation,monkeypatch,shape,outcome):
     if outcome in ("commit","uncertain_commit"):
         assert (u.credential_state,u.status_safety)==("usable","proven")
     else:
-        assert (u.credential_state,u.status_safety)==("quarantined","held")
-        with Session(w.engine) as db:assert db.scalar(select(AuthChangeReceipt.operation_id)) is None
+        # With a genuinely verified baseline, only complete new intents impose
+        # restrictions. A torn/absent append cannot revoke the old permission.
+        expected = {"none": ("usable", "proven"), "torn": ("usable", "proven"),
+                    "prefix": ("quarantined", "proven"), "full": ("quarantined", "held")}[shape]
+        assert (u.credential_state,u.status_safety)==expected
+        with Session(w.engine) as db:assert len(db.scalars(select(AuthChangeReceipt.operation_id)).all())==2
     assert recovery.evaluate(w.settings,w.engine).reason=="auth_safety_pending"
     before=w.path.read_bytes();run_recover(w)
     assert user(w).credential_state==u.credential_state
@@ -206,7 +224,7 @@ def test_fault_matrix(foundation,monkeypatch,shape,outcome):
 
 
 def test_old_disable_does_not_destroy_new_enable_receipt(foundation):
-    w=foundation;append_changes(w)
+    w=foundation;prove_initial(w)
     append_changes(w,changes(w,credential=False,decision="disabled",at=NOW+timedelta(seconds=1)))
     last=append_changes(w,changes(w,credential=False,decision="active",at=NOW+timedelta(seconds=2)))
     before=user(w)
@@ -337,9 +355,9 @@ def test_runtime_raw_mutation_and_fake_guc_denied(foundation,runtime,query):
 
 
 def test_runtime_valid_routines_and_rehash_cas(foundation,runtime):
+    w=foundation;prove_initial(w,engine=runtime);u=user(w);new=hash_password(SECRET)
     with foundation.engine.begin() as conn:
         conn.execute(text("INSERT INTO auth_hash_policies SELECT 2,memory_kib,time_cost,parallelism,salt_bytes,hash_bytes FROM auth_hash_policies WHERE version=1"))
-    w=foundation;append_changes(w,engine=runtime);u=user(w);new=hash_password(SECRET)
     params={"uid":w.uid,"old":u.password_verifier,"gen":u.credential_generation,"op":u.credential_operation_id,"new":new,"policy":2,"at":NOW+timedelta(seconds=2)}
     stmt=text("SELECT ras_auth_rehash(:uid,:old,:gen,:op,:new,:policy,:at)")
     with runtime.begin() as conn:
@@ -360,7 +378,7 @@ def test_runtime_valid_routines_and_rehash_cas(foundation,runtime):
     with runtime.connect() as conn:
         assert conn.scalar(text("SELECT rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb FROM pg_roles WHERE rolname=current_user")) is False
         assert not conn.scalar(text("SELECT pg_has_role(current_user,'c1_definer','MEMBER')"))
-        assert not conn.scalar(text("SELECT pg_has_role(current_user,'c1_migrator','MEMBER')"))
+        assert conn.scalar(text("SELECT pg_has_role(current_user,to_regrole('c1_migrator'),'MEMBER')")) is not True
         assert not conn.scalar(text("SELECT has_database_privilege(current_database(),'TEMP') OR has_database_privilege(current_database(),'CREATE')"))
 
 
@@ -389,7 +407,7 @@ def test_http_pending_real_gate(foundation,route):
         assert client.get("/readyz").status_code==503
 
 
-def test_legacy_writers_empty_batch_and_bootstrap_blocked(foundation):
+def test_legacy_writers_empty_batch_and_bootstrap_blocked(foundation,runtime,app_env):
     from app.identity.session_commit import commit_auth
     from app.identity.bootstrap import bootstrap_admin
     from app.api.errors import ApiError
@@ -397,6 +415,7 @@ def test_legacy_writers_empty_batch_and_bootstrap_blocked(foundation):
     with Session(w.engine) as db,pytest.raises(ApiError):commit_auth(db)
     with pytest.raises(ApiError):bootstrap_admin(w.engine,email="other@example.test",password=SECRET,policy=w.settings.password)
     from app.ingest.worker import process_job
+    app_env(runtime.url)  # the worker identity guard precedes the pending gate
     assert process_job(str(uuid.uuid4()))=="recovery_gate_closed"
 
 
@@ -466,7 +485,7 @@ def test_registration_cannot_prove_legacy(empty_db_url,journal_path,app_env,regi
 
 def test_old_domains_direct_closure_positive_and_reopen_negative(foundation):
     from app.identity.invitation_endings import lock_email
-    w=foundation;append_changes(w);u=user(w)
+    w=foundation;prove_initial(w);u=user(w)
     sid,tid,iid=uuid.uuid4(),uuid.uuid4(),uuid.uuid4()
     with Session(w.engine) as db:
         db.add(UserSession(id=sid,user_id=w.uid,credential_generation=u.credential_generation,token_hash="c"*64,
@@ -553,7 +572,7 @@ def test_recovery_login_role_restricts_without_receipts(foundation,runtime):
 
 
 def test_quarantine_token_allowed_but_normal_token_denied(foundation,runtime):
-    w=foundation;append_changes(w,engine=runtime)
+    w=foundation;prove_initial(w,engine=runtime)
     append_changes(w,changes(w,decision=None,at=NOW+timedelta(seconds=1)),engine=runtime,rollback=True)
     run_recover(w)
     with Session(w.engine) as db:fence=db.get(AuthSafetyHead,w.uid).credential_operation_id
@@ -597,7 +616,7 @@ def test_reset_token_rejects_status_head_ahead_of_snapshot(foundation, runtime, 
 @pytest.mark.parametrize("purpose", ["normal", "quarantine"])
 def test_reset_token_current_status_receipt_allowed_with_credential_fence(foundation, runtime, purpose):
     w = foundation
-    append_changes(w, engine=runtime)
+    prove_initial(w, engine=runtime)
     if purpose == "quarantine":
         with w.engine.begin() as conn:
             conn.execute(text("UPDATE users SET credential_state='quarantined' WHERE id=:u"), {"u": w.uid})

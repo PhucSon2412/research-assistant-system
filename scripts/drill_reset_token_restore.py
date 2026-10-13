@@ -44,12 +44,11 @@ def main():
          and httpx.get(url(SRC, "api") + "/readyz").status_code == 200)
     password, new_password, tag = secrets.token_urlsafe(24), secrets.token_urlsafe(24), uuid.uuid4().hex[:8]
     emails = {who: f"reset-drill-{tag}-{who}@example.org" for who in ("admin", "a", "b", "c", "d")}
-    verifier = hash_password(password)
-    ids = {}
-    with source.begin() as conn:
-        for who in emails:
-            ids[who] = conn.scalar(text("INSERT INTO users(email,password_verifier,role) VALUES(:e,:p,:r) RETURNING id"),
-                                   {"e": emails[who], "p": verifier, "r": "admin" if who == "admin" else "user"})
+    from drill_backup_restore import runtime_engine_for
+    from drill_accounts import seed_accounts
+    runtime=runtime_engine_for(SRC)
+    try:ids=seed_accounts(runtime,emails,password)
+    finally:runtime.dispose()
     admin = Person(SRC, email=emails["admin"], password=password)
     a = [Person(SRC, email=emails["a"], password=password) for _ in range(3)]
     b = Person(SRC, email=emails["b"], password=password)

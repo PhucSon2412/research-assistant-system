@@ -29,7 +29,7 @@ def test_0036_upgrade_preserves_legacy_singleton_history_and_grants(empty_db_url
     rt = runtime_engine(w)
     try:
         append_changes(w, engine=rt)
-        recovery.recover(eng, SimpleNamespace(), w.settings, NOW)
+        recovery.hold(eng, w.settings, NOW)
         before = journal_path.read_bytes()
         with eng.connect() as conn:
             rows = {t: conn.execute(text(f"SELECT row_to_json(r) FROM {t} r")).scalars().all()
@@ -41,8 +41,15 @@ def test_0036_upgrade_preserves_legacy_singleton_history_and_grants(empty_db_url
                 after = conn.execute(text(f"SELECT row_to_json(r) FROM {table} r")).scalars().all()
                 if table == "bootstrap_state":
                     assert after[0].pop("creation_transaction_id") is None
+                if table == "revocation_journal_records":
+                    for row in after:
+                        for col in ("case_id","case_operator_id","case_user_id","case_action","case_operation_id","case_recorded_at"):
+                            assert row.pop(col) is None
                 assert after == values
         assert journal_path.read_bytes() == before
+        recovery.recover(eng, SimpleNamespace(), w.settings, NOW)
+        from tests.test_c3_operator_recovery import operator_initial_status
+        operator_initial_status(w,uid)
         with rt.connect() as conn:
             signature = "ras_auth_bootstrap_prepare(uuid,text,text,text,integer,timestamptz)"
             assert conn.scalar(text("SELECT has_function_privilege(current_user,:fn,'EXECUTE')"), {"fn": signature})
@@ -91,7 +98,16 @@ def test_0037_to_0038_preserves_accounts_binding_owner_and_acl(
     original_cutover = auth_safety.cutover
     try:
         if mode == "new_install": recovery.init_new(eng, w.settings, NOW)
-        else: recovery.register_existing(eng, w.settings, NOW)
+        else:
+            # A real 0037 historical registration; current register-existing
+            # imports closures using the current schema and follows migrate.
+            from app import journal
+            genesis = journal.genesis(uuid.uuid4(), NOW, "existing_db")
+            with Session(eng) as db:
+                db.execute(text("INSERT INTO recovery_registrations(id,journal_id,genesis_hash,mode,registered_at) VALUES(1,:id,:h,'existing_db',:at)"),
+                           {"id":genesis.body["journal_id"],"h":genesis.hash,"at":NOW})
+                db.add(recovery._mirror(genesis,"genesis","existing_db",None,confirmed=True))
+                journal.create(w.path,[genesis]); db.commit()
         rt = runtime_engine(w)
         w.runtime = rt
         app_env(rt.url)
@@ -102,7 +118,7 @@ def test_0037_to_0038_preserves_accounts_binding_owner_and_acl(
                 uid, params = prepare(w, db)
                 db.info[AUTH_PENDING] = initial(uid, params)
                 commit_auth(db)
-        recovery.recover(eng, SimpleNamespace(), w.settings, NOW)
+        recovery.hold(eng, w.settings, NOW)
         before_bytes = journal_path.read_bytes()
         with eng.begin() as conn:
             # Emulate a previously provisioned 0037 definer, lacking the new read.
@@ -115,8 +131,13 @@ def test_0037_to_0038_preserves_accounts_binding_owner_and_acl(
             assert conn.execute(text("SELECT proowner,proacl::text,proconfig FROM pg_proc WHERE oid=to_regprocedure(:fn)"),
                                 {"fn": signature}).one() == acl_before
             assert conn.scalar(text("SELECT has_table_privilege('c1_definer','recovery_registrations','SELECT')"))
-            assert {t: conn.execute(text(f"SELECT row_to_json(r) FROM {t} r")).scalars().all() for t in tables} == before
+            after = {t: conn.execute(text(f"SELECT row_to_json(r) FROM {t} r")).scalars().all() for t in tables}
+            for row in after["revocation_journal_records"]:
+                for col in ("case_id","case_operator_id","case_user_id","case_action","case_operation_id","case_recorded_at"):
+                    assert row.pop(col) is None
+            assert after == before
         assert journal_path.read_bytes() == before_bytes
+        recovery.recover(eng, SimpleNamespace(), w.settings, NOW)
         with Session(rt) as db:
             if mode == "new_install": assert auth_safety.account_live(db, uid)
             with pytest.raises(DBAPIError, match=("bootstrap already completed" if mode == "new_install"

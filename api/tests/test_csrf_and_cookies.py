@@ -79,7 +79,7 @@ def test_lost_csrf_cookie_is_rotated_for_live_session(h: Harness) -> None:
 
 def test_https_mode_uses_secure_host_prefixed_cookie(monkeypatch: pytest.MonkeyPatch, api: Harness, app_env, migrated_db_url) -> None:
     monkeypatch.setenv("RAS_HTTP__COOKIE_SECURE", "true")
-    app_env(migrated_db_url)
+    app_env(api.engine.url)
     api.bootstrap_admin()
     b = Browser(base_url="https://testserver")
     r = b.login(ADMIN_EMAIL, ADMIN_PASSWORD)
