@@ -1,6 +1,6 @@
 # Roadmap đề xuất
 
-**Trạng thái hiện hành:** PR #58 đã merge `58d059a`, source **0048**; gói A hoàn tất chuyển runtime trong phạm vi các PR đã review, chưa cutover/nghiệm thu end-to-end. [C3 operator auth recovery](tasks/m6c2b2c3-operator-auth-recovery.md) được giao thành một PR, chưa triển khai/kiểm; sau đó debt/hồi quy và tích hợp C4 theo [kế hoạch MVP](mvp-delivery-plan.md). [Review PR #58](reviews/pr58-c2d7-rag-generation-runtime.md) giữ chứng cứ trước merge, chưa rerun tại merge. **Safety pending C4**, không mở pricing/provider thật.
+**Trạng thái hiện hành (2026-10-13):** PR #59 đã merge `041f77ef`, source **0049**; head `035cef0` là ancestor, tree khớp, chưa rerun tại merge. [C3 operator recovery](c3-operator-auth-recovery.md) đã qua review trong scope C3; tiếp [B1 — initial receipt và hồi quy trước C4](tasks/pre-c4-auth-receipts-and-regression.md), mới giao/chưa triển khai hoặc kiểm, rồi C4 tích hợp theo [kế hoạch MVP](mvp-delivery-plan.md). **Safety pending tới C4**; provider thật/pricing và nghiệm thu MVP còn riêng. Các mốc OPEN bên dưới là lịch sử.
 
 **Mốc giao C2d-6 (lịch sử):** PR #56 đã merge `808337dc`, source `0046`; task search/query/rerank lúc đó chưa triển khai. Các mốc giao và trạng thái OPEN dưới đây giữ lịch sử, không là trạng thái hiện hành hoặc pass mới tại merge.
 

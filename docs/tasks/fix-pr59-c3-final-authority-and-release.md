@@ -1,8 +1,10 @@
 # Sửa PR #59 — final authority khi append lỗi và release proof
 
+**Đã giải quyết theo review lại tại `035cef0`, 2026-10-12:** cả hai P2 và nhánh Ctrl-C release đã qua kiểm độc lập; không còn điểm chặn merge trong scope C3. [Report hiện hành](../reviews/pr59-c3-operator-auth-recovery.md#review-lại-tại-035cef0--không-còn-điểm-chặn-merge-trong-scope-c3): 106 repo + 4 ca reviewer pass. PR vẫn OPEN/chưa merge, source `0049`, safety pending tới C4. Các prompt dưới đây giữ làm lịch sử và hợp đồng hồi quy, không là task sửa còn mở. Debt/gói B/C4 tiếp sau merge, chưa được chứng nhận bằng kết quả này.
+
 ## Lượt review lại tại `6465dc0` — interruption trong release
 
-**Task hiện hành: sửa nhánh còn lại của P2-2 trên cùng PR #59.** P2-1 và release lỗi `Exception` đã qua kiểm độc lập; không làm lại các cơ chế đó hoặc mở C4. [Report review lại](../reviews/pr59-c3-operator-auth-recovery.md#review-lại-tại-6465dc0--còn-nhánh-p2-2-khi-ctrl-c-trong-release) ghi 95 repo pass, 11 ca reviewer pass và một ca interruption fail.
+**Task tại `6465dc0` (đã sửa và kiểm lại): sửa nhánh còn lại của P2-2 trên cùng PR #59.** P2-1 và release lỗi `Exception` đã qua kiểm độc lập; không làm lại các cơ chế đó hoặc mở C4. [Report review lại](../reviews/pr59-c3-operator-auth-recovery.md#review-lại-tại-6465dc0--còn-nhánh-p2-2-khi-ctrl-c-trong-release) ghi 95 repo pass, 11 ca reviewer pass và một ca interruption fail.
 
 ### Lỗi đã tái hiện
 

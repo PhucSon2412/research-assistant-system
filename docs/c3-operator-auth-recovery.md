@@ -2,7 +2,7 @@
 
 [Mục lục](README.md) · [Task](tasks/m6c2b2c3-operator-auth-recovery.md) · [Thiết kế auth sau restore](auth-restore-safety.md) · [Inventory](c3-test-inventory.json) · [Kế hoạch MVP](mvp-delivery-plan.md)
 
-**Trạng thái:** đã sửa hai P2 review PR #59 và nhánh Ctrl-C khi release của review lại (xem mục dưới), chờ review lại; nhánh review `feat/m6c2b2c3-operator-auth-recovery`, chưa merge. Base `origin/main` = `58d059ab7a383d5f97e1b04e909e9628a11bf78a` (merge PR #58; head review `aa9c8a2` là ancestor, tree khớp). Source migration `0048 → 0049`. Không suy revision DB dev. **Safety vẫn pending tới C4**; C3 không mở `cutover`, readiness hay đường đi vòng nào. Mọi kiểm chứng dùng hồ sơ/tài khoản/login **tổng hợp** trên project cô lập; chưa có danh tính, inventory User UUID hay ủy quyền người thật.
+**Trạng thái hiện hành (2026-10-13):** PR #59 đã merge `041f77ef1c12b6277e7a5f46aaf32155b3673063`; head review `035cef0` là ancestor, tree khớp. Base C3 là merge PR #58 `58d059a`, source `0048 → 0049`; không suy DB dev, chưa rerun tại merge. [Review cuối](reviews/pr59-c3-operator-auth-recovery.md) không phát hiện điểm chặn merge mới trong scope C3. Tiếp [B1 — initial receipt và hồi quy](tasks/pre-c4-auth-receipts-and-regression.md), mới giao/chưa triển khai hoặc kiểm, rồi C4. **Safety pending tới C4**; C3 không mở readiness. Mọi kiểm chứng dùng hồ sơ tổng hợp, chưa có inventory/ủy quyền người thật. Các mục sửa/chờ review dưới đây giữ lịch sử trước merge.
 
 ## Sửa review PR #59 (2026-10-12)
 

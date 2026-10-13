@@ -1,5 +1,30 @@
 # Review PR #59 — operator auth recovery
 
+## Review lại tại `035cef0` — không còn điểm chặn merge trong scope C3
+
+Ngày **2026-10-12**, head `035cef02e38d87bd5e44e0bf5e887ed0ed574e09`, PR **OPEN, chưa merge**, source **0049**. Code sửa tại `5eda25e`, suite agent tại `d2d56f3`; head thêm docs. **P2-1 và P2-2, gồm nhánh Ctrl-C trong release, đã qua review lại; không phát hiện điểm chặn merge mới trong phạm vi C3.** Có thể merge PR #59 theo phạm vi này. Safety vẫn pending tới C4; kết luận không thay full inventory, xử lý debt hoặc nghiệm thu cutover.
+
+### Cơ chế và kiểm độc lập
+
+- `_release` hấp thụ `BaseException` của rollback/close và fallback invalidate/close, trả `clean`/`failed`/`interrupted`; lỗi của thân pha vẫn thắng. Mutation phân loại theo `Attempt`: known commit giữ credential/status/case/receipt, batch unconfirmed giữ exit 5, commit chưa rõ vẫn uncertain, append đã bắt đầu không báo nothing-written. Ngắt rollback nội bộ không còn lọt ra CLI như hủy TTY. Proof sau commit bị ngắt vẫn non-success.
+- **106/106 repo pass**, 0 failure/error/skip, **344,57 s**: C3 core 93, CLI 10, migration 2, ORM/schema 1. Bao gồm ba lượt regression, ConPTY, pending HTTP không patch qua API/proxy và hai vòng dump/restore. Gate 503 không thay nghiệp vụ C4.
+- **4/4 ca reviewer ngoài repo pass**, 0 failure/error/skip, 11,99 s: ca Ctrl-C từng fail tại `6465dc0` và ba ca one-shot `Connection.close` lỗi ở prepare/mutation/proof. Ca Ctrl-C nay có receipt mới và verifier mới usable nhưng CLI exit 4, không in `nothing was changed`. Prepare release lỗi dừng trước prompt/ghi; known commit giữ receipt, không báo success sau release lỗi. Các ca này dùng CLI in-process/fault injection, không là SIGINT/terminal thật; ConPTY riêng phủ terminal thật lúc nhập mật khẩu.
+- **408 tracked source hash trước/sau trùng.** Không đổi app, repo tests, migration/grants trong review. Lượt ghép test repo với test ngoài repo ban đầu dừng ở collect vì plugin `tests.conftest` đăng ký trùng; không có test sản phẩm chạy, không cộng vào pass. Giữ log/XML riêng, tách hai nhóm và chạy lại như trên.
+
+### Đối chiếu agent và giới hạn
+
+Đọc đúng `rereview_fix_6465dc0.final` và artifact `%TEMP%\ras-c3fix2-20261012\final-1`: **106 unique pass**, selection/JUnit khớp chính xác; 5.118 collected, **5.012 not-run**, **358 source hash khớp head**. Ghi SHA-256 cho **28 artifact** final/countercheck; chín XML đối chứng cuối đều một assertion failure, không error/skip. Reviewer kiểm artifact, không chạy lại chín mutants; các lượt đối chứng yếu và lỗi chuẩn bị của agent giữ theo inventory.
+
+Selection rộng **1.009** ở `0ee17f3` là kết quả lịch sử, **không** phải lượt chạy mới tại `d2d56f3`/`035cef0`; không dùng số top-level `final` trong inventory để gộp thành pass hiện hành. Không chạy lại full inventory, 281 debt/base, web suite riêng, provider/charge/routing/retention, C4 hoặc độ bền mất điện. Generic receipt `bootstrap`/`invitation_accept`, lịch sử bị mất, nơi lưu journal độc lập và inventory operator/người thật vẫn cần nghiệm thu gói B/C4, không được miễn bởi review C3.
+
+### Evidence và cleanup lượt cuối
+
+Evidence ngoài repo: `%TEMP%\ras-pr59-rereview2-20261012` gồm logs/JUnit, ca reviewer, hashes, đối chiếu artifact, baseline và cleanup. Quét 13 artifact log/XML/JSON trước cleanup: 0 hit credentials thử, mật khẩu fixture và mẫu provider key/PHC/URL DB chứa password; không là quét toàn máy.
+
+Đã kiểm labels rồi gỡ đúng **3 container** cùng volume/network của project `rasc3b2bf7005`, xóa credentials/compose/empty-env. Chín container có sẵn giữ nguyên ID/image/mounts/labels, volume/image khớp baseline. Worker/beat đang restart chỉ đổi `StartedAt`/`RestartCount`, không suy nguyên nhân. Không đọc/sửa `.env`, query/migrate/restart dev, gọi provider/arXiv, đổi pricing hoặc mở safety. Docs reviewer giữ chưa commit cho PR kế tiếp; root không commit/push/comment GitHub/merge. Các report trước dưới đây là lịch sử, không là điểm chặn hiện hành.
+
+Kiểm docs: **99 Markdown, 1.953 liên kết nội bộ**, 0 lỗi liên kết/control character; `git diff --check` sạch. Năm file docs reviewer modified được giữ cho agent đưa vào PR kế tiếp.
+
 ## Review lại tại `6465dc0` — còn nhánh P2-2 khi Ctrl-C trong release
 
 Ngày **2026-10-12**, head `6465dc0789ffedf414b84611215571b721dfa11e`, PR **OPEN, chưa merge**, source **0049**. Production sửa ở `54a2d02`; suite agent tại `0ee17f3`, head chỉ thêm docs. Hai cơ chế đã báo ở lượt đầu được sửa đúng cho lỗi `Exception`: P2-1 đã qua kiểm lại, P2-2 rollback/close lỗi thông thường đã qua kiểm lại. **Còn một nhánh P2-2 cần sửa trước merge:** interruption lúc release sau known commit không được phân loại theo outcome.

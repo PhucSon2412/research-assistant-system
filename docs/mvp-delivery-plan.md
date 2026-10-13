@@ -1,5 +1,9 @@
 # Kế hoạch hoàn thành MVP
 
+**Sau merge C3, 2026-10-13:** PR #59 đã merge `041f77ef`, tree khớp `035cef0`, source **0049**; chưa rerun tại merge. Gói B tiếp [B1 — initial receipt và hồi quy trước C4](tasks/pre-c4-auth-receipts-and-regression.md) trong một PR, rồi C4 tích hợp. B1 mới giao tài liệu, chưa triển khai/kiểm; **safety pending tới C4**. Giữ forecast/giả định và checklist, không coi merge là nghiệm thu. Các mốc review dưới đây là lịch sử.
+
+**Review lại C3 tại `035cef0`, 2026-10-12:** hai P2/Ctrl-C release đã qua kiểm độc lập, không phát hiện điểm chặn merge mới trong scope C3; [report](reviews/pr59-c3-operator-auth-recovery.md) giữ reviewer 106 repo + 4 ca ngoài repo pass và artifact agent riêng. PR #59 vẫn OPEN/chưa merge, source `0049`. Sau merge tiếp debt/hồi quy gói B và tích hợp C4, không mở safety/pricing hoặc giảm checklist/forecast bằng suite pass; các mốc P2 dưới đây giữ lịch sử.
+
 **Sửa review lại PR #59 tại `d2d56f3` (2026-10-12, chờ review lại, chưa merge):** Ctrl-C khi trả connection giờ là outcome theo `Attempt` (không còn “nothing was changed” sau commit), connection luôn invalidate/close. Agent: nhóm C3 106/106 có niêm hash, đối chứng 9/9, smoke API/proxy 28/28; [handoff](c3-operator-auth-recovery.md#review-lại-tại-6465dc0-ctrl-c-khi-trả-connection). **Safety pending tới C4.**
 
 **Review lại C3 tại `6465dc0`, 2026-10-12:** còn một nhánh P2-2 (Ctrl-C trong release sau known commit báo `nothing was changed`); [report](reviews/pr59-c3-operator-auth-recovery.md) và [prompt sửa cùng PR](tasks/fix-pr59-c3-final-authority-and-release.md). P2-1/release lỗi thông thường đã qua kiểm độc lập. PR #59 vẫn OPEN/chưa merge, source `0049`; gói B đang C3, chưa mở C4 hoặc thay forecast/checklist. Safety pending; các cập nhật trước dưới đây giữ lịch sử.
@@ -18,12 +22,12 @@ Ngày chốt **2026-10-11**. Chủ dự án giao orchestrator chọn phạm vi v
 
 ## Trạng thái hiện tại
 
-- PR #58 đã merge tại `58d059ab7a383d5f97e1b04e909e9628a11bf78a`; head review `aa9c8a2` là ancestor, tree khớp. Source migration **0048**; không suy revision DB dev.
+- PR #59 đã merge tại `041f77ef1c12b6277e7a5f46aaf32155b3673063`; head review `035cef0` là ancestor, tree khớp. Source migration **0049**; không suy revision DB dev hoặc cộng pass mới tại merge.
 - Các chức năng chính đã có, nhưng đợt chuyển auth/runtime chưa kết thúc. **Safety vẫn pending tới C4**; không coi Compose dev đang lỗi readiness/restart là một bản sẵn dùng.
 - Citation reconcile và [discovery harvesting](c2d5f2-discovery-runtime.md) đã chuyển runtime. [Review PR #56](reviews/pr56-c2d5f2-discovery-runtime.md) giữ kết quả trước merge; chưa rerun tại merge. Docs orchestrator bị sót đã được đưa vào commit của PR #57.
 - [C2d-6 search/query embedding/rerank](c2d6-search-query-rerank-runtime.md) đã merge; [review độc lập](reviews/pr57-c2d6-search-query-rerank-runtime.md) giữ chứng cứ trước merge, chưa rerun tại merge. Không suy kết quả này thành RAG runtime hoặc cutover.
-- [C2d-7 RAG/generation runtime](c2d7-rag-generation-runtime.md) đã merge PR #58, source **0048**; [review độc lập](reviews/pr58-c2d7-rag-generation-runtime.md) và [inventory](c2d7-test-inventory.json) giữ chứng cứ trước merge, chưa rerun tại merge. Gói A hoàn tất chuyển runtime trong scope đã review, chưa cutover/nghiệm thu end-to-end. Đã giao [C3 operator auth recovery](tasks/m6c2b2c3-operator-auth-recovery.md), chưa triển khai/kiểm; sau đó hồi quy/debt và tích hợp C4. Private deletion/restore, provider thật và vận hành triển khai cần nghiệm thu riêng. Giữ và đưa docs review/task mới chưa commit vào PR kế tiếp.
-- [C3 operator auth recovery](c3-operator-auth-recovery.md) đã triển khai trên nhánh review, source **0049**, chưa merge: login operator riêng, case bind installation/User UUID/action/role/heads dùng một lần theo journal, TTY ẩn, maintenance hold, credential/status tách riêng; không mở disabled/ready. Kết quả kiểm theo [inventory](c3-test-inventory.json); chưa có inventory/ủy quyền người thật. Tiếp debt/hồi quy và tích hợp C4.
+- [C2d-7 RAG/generation runtime](c2d7-rag-generation-runtime.md) đã merge PR #58, source **0048**; [review độc lập](reviews/pr58-c2d7-rag-generation-runtime.md) và [inventory](c2d7-test-inventory.json) giữ chứng cứ trước merge, chưa rerun tại merge. Gói A hoàn tất chuyển runtime trong scope đã review, chưa cutover/nghiệm thu end-to-end. C3 đã merge PR #59; tiếp B1 hồi quy/debt và tích hợp C4. Private deletion/restore, provider thật và vận hành triển khai cần nghiệm thu riêng. Giữ và đưa docs review/task mới chưa commit vào PR kế tiếp.
+- [C3 operator auth recovery](c3-operator-auth-recovery.md) đã merge PR #59, source **0049**: login operator riêng, case bind installation/User UUID/action/role/heads dùng một lần theo journal, TTY ẩn, maintenance hold, credential/status tách riêng; không mở disabled/ready. Kết quả trước merge theo [inventory](c3-test-inventory.json) và [review](reviews/pr59-c3-operator-auth-recovery.md); chưa có inventory/ủy quyền người thật. Đã giao [B1](tasks/pre-c4-auth-receipts-and-regression.md), mới giao/chưa triển khai hoặc kiểm; tiếp C4 tích hợp.
 - Nhãn đánh giá RAG hiện còn `pending_human_review`. Charge thật chưa đối soát; không bật `pricing_verified` bằng kết quả provider giả.
 
 ## Các gói công việc còn lại
@@ -33,7 +37,7 @@ Ngày chốt **2026-10-11**. Chủ dự án giao orchestrator chọn phạm vi v
 | Gói | Phạm vi và đầu ra | Ước lượng | Trạng thái |
 | --- | --- | --- | --- |
 | A — hoàn tất runtime | Search + query embedding + rerank; RAG + generation. Giữ quyền trước retrieval/provider và kế toán hiện hành | Đã merge | PR #57/#58 đã merge; chưa cutover/nghiệm thu end-to-end |
-| B — recovery và bản chạy đầy đủ | C3 CLI operator tối thiểu; xử lý debt hồi quy; C4 Compose/image/role/journal, readiness thật, HTTP/browser không patch pending, hai vòng restore/recover | 5–8 ngày | C3 đã triển khai trên nhánh review (chưa merge); debt và C4 chưa giao |
+| B — recovery và bản chạy đầy đủ | C3 CLI operator tối thiểu; xử lý debt hồi quy; C4 Compose/image/role/journal, readiness thật, HTTP/browser không patch pending, hai vòng restore/recover | 5–8 ngày | C3 đã merge PR #59; B1 initial receipt/hồi quy mới giao, chưa triển khai/kiểm; C4 chưa giao |
 | C — đóng yêu cầu sản phẩm còn thiếu | Xóa item private + chống xuất hiện lại sau restore; nghiệm thu duplicate/retry hiện hành, chỉ bổ sung chỗ thiếu để luồng dùng được | 2–4 ngày | Chưa giao |
 | D — provider và chất lượng | Smoke tổng hợp có trần chi phí, đối soát charge, routing/retention; sau đó thử paper được phép xử lý, người đọc kiểm câu trả lời/citation/abstention | 2–4 ngày | Chưa giao; chưa mở trả phí |
 | E — triển khai nhóm thử | HTTPS/cookie Secure, kênh invite/reset dùng được, rate limit, CI, journal độc lập, backup/retention/alert tối thiểu và nghiệm thu browser | 3–5 ngày | Chưa giao |
