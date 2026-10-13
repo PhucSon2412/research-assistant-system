@@ -25,15 +25,15 @@ LANGUAGE sql STABLE SET search_path=pg_catalog,public,pg_temp AS $$
            g.line::jsonb#>>'{body,journal_id}',g.line::jsonb#>>'{body,mode}')
     IS NOT DISTINCT FROM ROW('1'::jsonb,'genesis'::text,reg.genesis_hash,repeat('0',64),reg.journal_id::text,reg.mode)
    AND NOT EXISTS (SELECT 1 FROM revocation_journal_records earlier WHERE earlier.auth_user_id=u.id AND earlier.seq<cj.seq)
-   AND ((r.reason_code='bootstrap' AND reg.mode='new_install' AND u.role='admin' AND EXISTS (
+   AND ((r.reason_code='bootstrap' AND reg.mode='new_install' AND EXISTS (
      SELECT 1 FROM bootstrap_state b WHERE b.admin_user_id=u.id AND b.completed_at=c.recorded_at
       AND b.creation_transaction_id=c.transaction_id
       AND EXISTS (SELECT 1 FROM audit_events a WHERE a.action='admin.bootstrap' AND a.outcome='success'
        AND a.actor_type='system' AND a.target_type='user' AND a.target_id=u.id::text
        AND a.occurred_at=b.completed_at AND a.details='{"via":"cli"}'::jsonb)))
-    OR (r.reason_code='invitation_accept' AND u.role='user' AND EXISTS (
+    OR (r.reason_code='invitation_accept' AND EXISTS (
      SELECT 1 FROM invitations i JOIN revocation_journal_records ij ON ij.invitation_id=i.id
-     WHERE i.accepted_user_id=u.id AND i.email=u.email AND i.accepted_at=c.recorded_at
+     WHERE i.accepted_user_id=u.id AND i.accepted_at=c.recorded_at
       AND i.acceptance_transaction_id=c.transaction_id AND i.closure_reason='invitation_accepted'
       AND ij.seq=sj.seq+1 AND ROW(ij.invitation_end_kind,ij.invitation_reason_code,ij.invitation_ended_at)
        IS NOT DISTINCT FROM ROW('accepted'::text,'invitation_accepted'::text,i.accepted_at)
@@ -108,7 +108,7 @@ BEGIN
     SELECT 1 FROM bootstrap_state b WHERE b.admin_user_id=u.id AND b.creation_transaction_id=txid_current()
      AND b.completed_at=NEW.recorded_at AND ras_auth_creation_current(b.xmin))) OR
    (NEW.reason_code='invitation_accept' AND u.role='user' AND EXISTS (
-    SELECT 1 FROM invitations i WHERE i.accepted_user_id=u.id AND i.acceptance_transaction_id=txid_current()
+    SELECT 1 FROM invitations i WHERE i.accepted_user_id=u.id AND i.email=u.email AND i.acceptance_transaction_id=txid_current()
      AND i.accepted_at=NEW.recorded_at AND i.closure_reason='invitation_accepted' AND ras_auth_creation_current(i.xmin))))) THEN
   RAISE EXCEPTION 'initial receipt requires live account creation parent' USING ERRCODE='check_violation'; END IF;
  RETURN NEW;

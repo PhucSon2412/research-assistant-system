@@ -143,6 +143,24 @@ def test_upgrade_preserves_bytes_but_consumers_deny_old_forgery(old_install):
         operator.dispose()
 
 
+@pytest.mark.parametrize("kind",["bootstrap","invitation"])
+def test_durable_creation_proof_survives_current_profile_changes(old_install,kind):
+    w=old_install;upgrade(w.engine.url)
+    uid=w.uid if kind=="bootstrap" else w.invitee
+    with w.engine.begin() as db:  # privileged profile-change fixture, never new account creation
+        before=db.execute(text("SELECT credential_operation_id,status_operation_id FROM users WHERE id=:u"),{"u":uid}).one()
+        db.execute(text("UPDATE users SET email=:e,display_name='current profile',role=:role WHERE id=:u"),
+                   {"u":uid,"e":f"new-{uid.hex}@example.test","role":"user" if kind=="bootstrap" else "admin"})
+    with Session(w.runtime) as db:
+        assert auth_safety.account_live(db,uid) and _initial_status_verified(db,uid)
+        assert tuple(db.execute(text("SELECT credential_operation_id,status_operation_id FROM users WHERE id=:u"),{"u":uid}).one())==tuple(before)
+    # The creation-time role/email were proved by the protected parent writer;
+    # current profile/role must still be reloaded by each authorization consumer.
+    report=recovery.recover(w.engine,SimpleNamespace(),w.settings,NOW)
+    assert report.reconciliation_complete and not report.safety_ready
+    with Session(w.runtime) as db:assert auth_safety.account_live(db,uid)
+
+
 def test_two_dump_restore_rounds_keep_valid_provenance_and_restrict_forgery(old_install, admin_engine, tmp_path):
     w = old_install; upgrade(w.engine.url)
     name = os.environ["RAS_C3_TEST_CONTAINER"]
