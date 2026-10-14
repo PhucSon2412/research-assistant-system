@@ -552,7 +552,8 @@ def _common(conn, *, state="pending", key="common-copy", checksum="1" * 64):
 
 
 def test_schema_binds_rights_to_exact_common_file_and_approved_request(api):
-    with api.engine.begin() as conn:
+    # Privileged malformed schema fixtures; these accounts never authenticate.
+    with api.setup_engine.begin() as conn:
         ids = _fixture_rows(conn)
         rr = _open_request(conn, ids)
     admin, a = ids["admin"], ids["a"]
@@ -562,7 +563,7 @@ def test_schema_binds_rights_to_exact_common_file_and_approved_request(api):
                 "note": "evidence", "reviewer": admin, "fulltext": True, "processing": False} | overrides
 
     def fails(build, message: str | None = None):
-        with pytest.raises(IntegrityError) as caught, api.engine.begin() as conn:
+        with pytest.raises(IntegrityError) as caught, api.setup_engine.begin() as conn:
             build(conn)
         if message:
             assert message in str(caught.value)
@@ -603,7 +604,7 @@ def test_schema_binds_rights_to_exact_common_file_and_approved_request(api):
     fails(rights_without_approval, "approved")
 
     fails(full, "needs its revocation journal record")  # complete, but the close is not journaled (0028)
-    with api.engine.begin() as conn:
+    with api.setup_engine.begin() as conn:
         common = full(conn)
         journal_sql_close(conn, rr)
 

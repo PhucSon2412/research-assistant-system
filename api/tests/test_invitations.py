@@ -184,12 +184,13 @@ ADMIN_CALLS = [
 @pytest.mark.parametrize(("method", "path", "body"), ADMIN_CALLS)
 def test_admin_routes_are_closed_to_users_and_guests(h: Harness, method: str, path: str, body) -> None:
     h.create_user("plain@example.org")
+    before = h.scalar("SELECT count(*) FROM invitations")
     user = h.user_browser("plain@example.org")
     guest = h.browser()
     for who, expected in ((user, (403, {"error": "forbidden"})), (guest, (401, {"error": "not_authenticated"}))):
         r = who.get(path) if method == "GET" else who.post(path, body)
         assert (r.status_code, r.json()) == expected, (path, r.text)
-    assert h.scalar("SELECT count(*) FROM invitations") == 0
+    assert h.scalar("SELECT count(*) FROM invitations") == before
 
 
 def test_dev_outbox_readable_by_admin_and_drops_expired(h: Harness) -> None:

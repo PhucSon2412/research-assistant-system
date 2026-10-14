@@ -159,11 +159,15 @@ def test_intent_expiry_session_binding_csrf_origin_and_mismatch(upload_api):
     assert a.client.post("/uploads/intents", json={}, headers={"origin": WEB_ORIGIN}).status_code == 403
     bad_origin = a.client.post("/uploads/intents", json={}, headers={"origin": "https://evil.test", "x-csrf-token": a.csrf()})
     assert bad_origin.status_code == 403
-    no_origin = a.client.post("/uploads/intents", json={
-        "acknowledged": True, "notice_version": a.get("/uploads/notice").json()["version"],
-        "file_kind": "markdown", "filename": "paper.md", "byte_size": len(data),
-        "sha256": hashlib.sha256(data).hexdigest(),
-    }, headers={"x-csrf-token": a.csrf()})
+    saved_origin = a.client.headers.pop("origin")
+    try:
+        no_origin = a.client.post("/uploads/intents", json={
+            "acknowledged": True, "notice_version": a.get("/uploads/notice").json()["version"],
+            "file_kind": "markdown", "filename": "paper.md", "byte_size": len(data),
+            "sha256": hashlib.sha256(data).hexdigest(),
+        }, headers={"x-csrf-token": a.csrf()})
+    finally:
+        a.client.headers["origin"] = saved_origin
     assert no_origin.status_code == 403
     created = intent(a, data)
     token = created.json()["intent_token"]

@@ -61,7 +61,8 @@ def test_reset_changes_password_and_revokes_every_session(h: Harness) -> None:
 
     for b in (laptop, phone):
         assert b.get("/auth/session").status_code == 401
-    assert h.scalar("SELECT count(*) FROM sessions WHERE revoked_at IS NULL") == 0
+    assert h.scalar("SELECT count(*) FROM sessions s JOIN users u ON u.id=s.user_id"
+                    " WHERE u.email=:e AND s.revoked_at IS NULL", e=EMAIL) == 0
     assert h.scalar("SELECT count(*) FROM sessions WHERE revoked_reason = 'password_reset'") == 2
     assert h.browser().login(EMAIL, USER_PASSWORD).status_code == 401
     assert h.browser().login(EMAIL, NEW_PASSWORD).status_code == 200
@@ -173,7 +174,8 @@ def test_login_racing_a_reset_cannot_keep_an_old_password_session(h: Harness) ->
         login_mod.verify_password = real_verify
 
     assert result == ["refused"]
-    assert h.scalar("SELECT count(*) FROM sessions WHERE revoked_at IS NULL") == 0
+    assert h.scalar("SELECT count(*) FROM sessions s JOIN users u ON u.id=s.user_id"
+                    " WHERE u.email=:e AND s.revoked_at IS NULL", e=EMAIL) == 0
 
 
 def test_raw_reset_token_is_not_stored(h: Harness) -> None:
