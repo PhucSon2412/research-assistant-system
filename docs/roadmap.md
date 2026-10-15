@@ -1,5 +1,7 @@
 # Roadmap đề xuất
 
+**B1 đã triển khai và kiểm (2026-10-15, chưa merge):** source **0050**, [handoff](pre-c4-auth-receipts-regression.md) · [inventory](pre-c4-test-inventory.json). Provenance và hồi quy được đối chiếu trước gói C4 tích hợp đầy đủ; **safety pending tới C4**. Giữ forecast/checklist MVP, không suy readiness hoặc pricing từ kiểm tầng dưới. Các mốc giao/review dưới đây giữ lịch sử.
+
 **Trạng thái hiện hành (2026-10-13):** PR #59 đã merge `041f77ef`, source **0049**; head `035cef0` là ancestor, tree khớp, chưa rerun tại merge. [C3 operator recovery](c3-operator-auth-recovery.md) đã qua review trong scope C3; tiếp [B1 — initial receipt và hồi quy trước C4](tasks/pre-c4-auth-receipts-and-regression.md), mới giao/chưa triển khai hoặc kiểm, rồi C4 tích hợp theo [kế hoạch MVP](mvp-delivery-plan.md). **Safety pending tới C4**; provider thật/pricing và nghiệm thu MVP còn riêng. Các mốc OPEN bên dưới là lịch sử.
 
 **Mốc giao C2d-6 (lịch sử):** PR #56 đã merge `808337dc`, source `0046`; task search/query/rerank lúc đó chưa triển khai. Các mốc giao và trạng thái OPEN dưới đây giữ lịch sử, không là trạng thái hiện hành hoặc pass mới tại merge.

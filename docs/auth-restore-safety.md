@@ -1,5 +1,7 @@
 # Chống rollback credential và trạng thái tài khoản (M6c-2b2c0)
 
+**B1 đã triển khai và kiểm (2026-10-15, chưa merge):** source **0050**, [handoff](pre-c4-auth-receipts-regression.md) · [inventory](pre-c4-test-inventory.json). Initial receipt có parent/cặp sự kiện đúng luồng; account/session/reset/enable/operator dùng provenance chung. Dữ liệu cũ thiếu provenance chỉ bị hạn chế, không backfill quyền hoặc sửa journal/receipt. Hợp đồng C3 giữ nguyên. **Safety pending tới C4**; tiếp readiness và hai vòng DB/object restore đầy đủ không patch.
+
 **C3 đã merge PR #59 (2026-10-13):** `041f77ef`, source **0049**, tree khớp head review `035cef0`; chưa rerun tại merge. [CLI operator](c3-operator-auth-recovery.md) dùng maintenance hold, case một lần và status riêng không mở disabled. Các mục C3 đề xuất bên dưới giữ lịch sử thiết kế.
 
 **Trạng thái hiện hành (2026-10-13):** C2 runtime và C3 đã merge; giao [B1 — initial receipt và hồi quy trước C4](tasks/pre-c4-auth-receipts-and-regression.md), mới giao/chưa triển khai hoặc kiểm. B1 đóng provenance writer/consumer của initial receipt và đối chiếu debt/toàn inventory; C4 tiếp tích hợp readiness và HTTP/browser không patch. **Safety pending tới C4**, không suy revision DB dev, ủy quyền người thật hoặc storage production. [Kế hoạch MVP](mvp-delivery-plan.md) giữ trạng thái/checklist; các mốc C1/C2 dưới đây là lịch sử.
