@@ -1,6 +1,6 @@
 """Runtime PostgreSQL/MinIO/journal original GET boundaries and ownership.
 
-Only business fixture cutover is scoped. Auth accounts use bootstrap/invite/
+Shared business setup uses the real C4 contract. Auth accounts use bootstrap/invite/
 login, resources use privileged setup, corruption/faults never alter grants.
 """
 import asyncio
@@ -34,7 +34,7 @@ from app.storage import get_storage
 from tests.resource_fixtures import source, common_copy, runtime_approve, BODY, SHA
 from tests.test_auth_safety_foundation import NOW
 from tests.test_c2c1_bootstrap import installation
-from tests.test_c2c2_invitations import world, issue, accept, PASSWORD, EMAIL
+from tests.test_c2c2_invitations import operational_world as world, issue, accept, PASSWORD, EMAIL
 from tests.test_c2d1_final_caller import browser, mutate, wait_for
 from tests.test_c2d2b_review_publication_reads import request as review_request
 from tests.test_review_requests import close_journaled, journal_sql_close
@@ -240,7 +240,6 @@ def test_integrity_io_faults_no_bytes_original_retained_slot_reusable(downloads,
     denied(b.client.get(b.path(branch)),409 if integrity else 503,branch+'_file_integrity_failed' if integrity else 'file_unavailable')
     assert ids.key in {k for k,_ in b.storage.orphan_keys('')} or fault=='missing'
     monkeypatch.undo()  # fixture monkeypatches are needed below: restore explicit storage/cutover
-    monkeypatch.setattr(auth_safety,'cutover',lambda db:'ready')
     from app.main import app
     app.dependency_overrides[uploads._storage]=lambda:b.storage;app.dependency_overrides[reviews._storage]=lambda:b.storage
     b.storage.put(ids.key,io.BytesIO(BODY),'text/markdown')
@@ -263,7 +262,7 @@ def test_current_caller_real_heads_receipts_binding_after_slow_work(downloads,mo
             if len(a)>5:mutate(b,change)
             return real_proof(*a,**kw)
         monkeypatch.setattr(boundary,'proof',proof)
-    expected=503 if change in ('hold','ahead','unconfirmed') else 401
+    expected=503 if change in ('hold','ahead','unconfirmed','receipt_credential','receipt_status','wrong_receipt','head','latest_credential','latest_status') else 401
     denied(b.client.get(b.path(branch)),expected,'service_recovering' if expected==503 else 'session_expired')
 
 

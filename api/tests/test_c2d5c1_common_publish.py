@@ -1,6 +1,6 @@
 """Publish through real runtime PostgreSQL, MinIO, identity and journal.
 
-Only the business cutover fixture is scoped. Replica writes are explicitly
+Shared business setup uses the real C4 contract. Replica writes are explicitly
 labelled corruption/setup; revoke uses runtime, cleanup remains system code.
 """
 import asyncio
@@ -32,7 +32,7 @@ from app.storage import get_storage
 from tests.resource_fixtures import BODY, SHA
 from tests.test_auth_safety_foundation import NOW, SECRET
 from tests.test_c2c1_bootstrap import installation  # noqa: F401
-from tests.test_c2c2_invitations import world, issue, accept, PASSWORD  # noqa: F401
+from tests.test_c2c2_invitations import operational_world as world, issue, accept, PASSWORD  # noqa: F401
 from tests.test_c2d1_final_caller import browser  # noqa: F401
 from tests.test_c2d5a_review_writes import writers, opened, wait_for  # noqa: F401
 from tests.test_c2d5b_review_approval import Originals, approve, body as approval_body
@@ -313,7 +313,7 @@ def test_current_actor_head_receipt_csrf_and_gate_at_every_boundary(publishes, m
             return real(*a, **kw)
         monkeypatch.setattr(boundary, 'respond', respond)
     r = publish(b)
-    expected = 503 if case == 'hold' else 403 if case in ('role', 'csrf') else 401
+    expected = 503 if case in ('hold','receipt','head') else 403 if case in ('role', 'csrf') else 401
     assert r.status_code == expected, r.text
     assert 'item' not in r.json() and listed(b) == (phase == 'response')
     if r.status_code == 401:
@@ -414,7 +414,7 @@ def test_storage_denial_requires_fresh_caller_gate_and_resource_proof(publishes,
             b.raw_storage.put(key, io.BytesIO(b'x' * len(BODY)), 'text/markdown')
     b.storage.hook = changed
     r = publish(b)
-    expected = 503 if case == 'hold' else 409 if case == 'common_revoke' else (
+    expected = 503 if case in ('hold','receipt','head') else 409 if case == 'common_revoke' else (
         403 if case in ('role', 'csrf') else 401)
     assert r.status_code == expected and r.json().get('error') != 'common_file_integrity_failed', r.text
     if case == 'common_revoke':
@@ -781,7 +781,7 @@ def test_snapshot_restore_with_current_journal_never_replays_missing_positive_pu
         assert b.client.get(f'/files/{b.copy.file}/original').status_code == 404
         assert b.copy.item.hex not in b.client.get('/library/items?scope=common').text.replace('-', '')
         report = recovery.recover(snap.engine, b.raw_storage, settings, NOW)
-        assert report.reconciliation_complete and not report.safety_ready
+        assert report.reconciliation_complete and report.safety_ready
     assert b.approval_storage.objects[b.own.key] == BODY
 
 

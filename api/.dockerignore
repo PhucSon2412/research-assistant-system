@@ -1,5 +1,11 @@
-__pycache__/
-*.egg-info/
-.pytest_cache/
-tests/
-build/
+**
+!Dockerfile
+!pyproject.toml
+!alembic.ini
+!app/
+!app/**
+!migrations/
+!migrations/**
+**/__pycache__/
+**/*.pyc
+**/.env*

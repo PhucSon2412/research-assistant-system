@@ -1,6 +1,6 @@
 """Installed Chrome -> Next start proxy -> socket API -> runtime PG/real MinIO.
 
-Business cutover/clock are scoped fixtures, never production gate overrides.
+The C4 business contract is real; the clock is a test fixture.
 No Compose API image is claimed: socket Uvicorn serves the working tree.
 """
 import json
@@ -24,7 +24,7 @@ from tests.test_c2d5c1_common_publish import publishes, pending, scalar, SHA  # 
 from tests.test_c2d5a_review_writes import writers  # noqa: F401
 from tests.test_c2d1_final_caller import browser  # noqa: F401
 from tests.test_c2c1_bootstrap import installation  # noqa: F401
-from tests.test_c2c2_invitations import world  # noqa: F401
+from tests.test_c2c2_invitations import operational_world as world  # noqa: F401
 
 API, WEB = 58486, 53486
 

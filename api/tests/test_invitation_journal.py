@@ -130,11 +130,11 @@ def test_restore_twice_blocks_both_endpoints_without_recreating_account(world, a
             recovery.hold(snap.engine, get_settings(), w.h.clock.now)
             app_env(snap.url)
             assert inspect(w, old.token).status_code == accept(w, old.token).status_code == 503
-            assert recover(w, snap.engine).gate == "ready"
+            assert recover(w, snap.engine).gate == "open"
             for _ in range(2):
                 assert inspect(w, old.token).json() == accept(w, old.token).json() == {"error": "invalid_token"}
                 assert inspect(w, valid.token).status_code == 200
-                assert recover(w, snap.engine).gate == "ready"
+                assert recover(w, snap.engine).gate == "open"
             with snap.engine.connect() as conn:
                 row = conn.execute(text("SELECT accepted_at,accepted_user_id,closed_by_recovery_at,expires_at"
                                         " FROM invitations WHERE id=:i"), {"i": old.id}).one()
@@ -290,7 +290,7 @@ def test_append_faults_close_atomically_but_do_not_report_success(world, monkeyp
     if shape != "fsync":
         with pytest.raises(recovery.RecoveryError, match="journal_behind_db"):
             recover(w)
-    assert recover(w, confirm_db_current=shape != "fsync").gate == "ready"
+    assert recover(w, confirm_db_current=shape != "fsync").gate == "open"
     assert inspect(w, old.token).status_code == accept(w, old.token).status_code == 400
 
 
@@ -349,7 +349,7 @@ def test_multi_invitation_batch_prefix_with_rollback(world, monkeypatch, shape):
         ids = [r.id for r in rows]
         commit_auth(db)
     fix_write(); fix_commit()
-    assert recover(w).gate == "ready"
+    assert recover(w).gate == "open"
     ended = {uuid.UUID(r.body["invitation_id"]) for r in records()}
     assert ended == (set(ids) if shape == "fsync" else {ids[0]} if shape == "prefix" else set())
     assert w.h.scalar("SELECT count(*) FROM invitations WHERE closed_by_recovery_at IS NOT NULL") == len(ended)
@@ -365,7 +365,7 @@ def test_failed_replay_stays_gated(world, monkeypatch):
     assert accept(w, old.token).json() == {"error": "auth_outcome_uncertain"}
     assert gate(w.h.engine) == "db_behind_journal"
     monkeypatch.setattr(recovery, "replay_record", real); fix()
-    assert recover(w).gate == "ready"
+    assert recover(w).gate == "open"
     assert accept(w, old.token).status_code == 400
     assert w.h.scalar("SELECT count(*) FROM users WHERE email=:e", e=EMAIL) == 0
 
@@ -378,7 +378,7 @@ def test_recover_postcondition_even_if_mirror_exists(world, admin_engine, app_en
     with backup(w.h, admin_engine) as snap:
         assert w.admin.post(f"/admin/invitations/{old.id}/revoke").status_code == 204
         if mirrored:
-            assert recover(w, snap.engine).gate == "ready"
+            assert recover(w, snap.engine).gate == "open"
         # A superuser bypass represents a corrupt snapshot; normal SQL is fenced.
         with snap.engine.begin() as conn:
             conn.execute(text("ALTER TABLE invitations DISABLE TRIGGER USER"))
@@ -391,7 +391,7 @@ def test_recover_postcondition_even_if_mirror_exists(world, admin_engine, app_en
             conn.execute(text("ALTER TABLE invitations ENABLE TRIGGER USER"))
         app_env(snap.url)
         if change == "open" and not mirrored:
-            assert recover(w, snap.engine).gate == "ready"  # expected replay of an open snapshot
+            assert recover(w, snap.engine).gate == "open"  # expected replay of an open snapshot
         else:
             with pytest.raises(recovery.RecoveryError, match="invitation_not_ended|invitation_closure_conflict"):
                 recover(w, snap.engine)
@@ -644,7 +644,7 @@ def test_0031_history_backfill_hold_before_migrate_and_downgrade_fence(empty_db_
     assert gate(eng) == "invitations_not_journaled"
     # No revoked objects in this database; storage is never used by cleanup.
     report = recovery.recover(eng, None, settings, now)
-    assert report.gate == "ready" and report.invitations_imported == 2
+    assert report.gate == "open" and report.invitations_imported == 2
     assert {r.body["reason_code"] for r in records()} == {"legacy_accepted", "legacy_revoked"}
     assert recovery.recover(eng, None, settings, now).invitations_imported == 0
     with eng.connect() as conn:

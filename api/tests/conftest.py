@@ -26,7 +26,7 @@ from app import db as app_db
 
 API_DIR = Path(__file__).resolve().parents[1]
 # Latest Alembic revision; bump when a migration is added.
-HEAD_REVISION = "0050"
+HEAD_REVISION = "0051"
 REPO_DIR = API_DIR.parent
 
 
@@ -180,16 +180,17 @@ def api(app_env, migrated_db_url: URL, monkeypatch: pytest.MonkeyPatch, engine: 
     from app.main import app
     from tests.helpers import DEV_ENV, FakeClock, Harness
     from tests.test_auth_safety_foundation import runtime_engine
-    from app import auth_safety
+    from app import recovery
+    from app.config import get_settings
+    from app.storage import get_storage
+    from app.clock import utcnow
 
     for key, value in DEV_ENV.items():
         monkeypatch.setenv(key, value)
     app_env(migrated_db_url)
     runtime = runtime_engine(SimpleNamespace(engine=engine))
     app_env(runtime.url)
-    # Scoped business seam only. Independent pending HTTP fixtures do not use
-    # this seam; integrity, hold, SQL, receipts, role and ACL remain real.
-    monkeypatch.setattr(auth_safety, "cutover", lambda db: "ready")
+    recovery.recover(engine, get_storage(get_settings()), get_settings(), utcnow())
     get_delivery.cache_clear()
     clock = FakeClock()
     app.dependency_overrides[get_now] = lambda: clock.now

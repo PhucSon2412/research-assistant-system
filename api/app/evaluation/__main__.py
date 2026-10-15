@@ -41,7 +41,7 @@ def _run(args) -> int:
     from app.evaluation.report import render_markdown
     from app.evaluation.runner import run
 
-    data = run(args.root, modes=tuple(args.modes), keep=args.keep)
+    data = run(args.root, context=args.context, modes=tuple(args.modes), keep=args.keep)
     args.output.mkdir(parents=True, exist_ok=True)
     stem = args.output / f"rag-eval-{data['generated_at'][:10]}"
     stem.with_suffix(".json").write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n",
@@ -78,6 +78,7 @@ def main(argv: list[str] | None = None) -> int:
     build.add_argument("--check", action="store_true", help="compare with the manifest without writing")
     build.set_defaults(func=_build_pdfs)
     runner = commands.add_parser("run", help="run retrieval/RAG capture on a throw-away DB (needs Compose db+minio)")
+    runner.add_argument("--context", type=Path, help="explicit external synthetic context JSON")
     runner.add_argument("--output", type=Path, required=True, help="directory for the JSON and Markdown report")
     runner.add_argument("--modes", nargs="+", choices=["keyword", "hybrid"], default=["keyword", "hybrid"])
     runner.add_argument("--keep", action="store_true", help="keep the temporary database and bucket for debugging")

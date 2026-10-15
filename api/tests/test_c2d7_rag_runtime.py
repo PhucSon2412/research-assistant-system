@@ -44,7 +44,7 @@ def generated(ready):
     def action(request, payload):
         if 'messages' not in payload:
             return None
-        assert b.http_engine.pool.checkedout() == 0
+        b.provider_released()
         assert not payload['stream']
         if b.gen_action:
             changed = b.gen_action(request, payload)
@@ -179,13 +179,19 @@ def test_exact_scope_and_caller_at_each_external_boundary(generated, monkeypatch
             return result
         monkeypatch.setattr(rag,'checkpoint',changed)
         response=ask(b,**body)
-    assert response.status_code==(401 if change in ('logout','disable','reset','session_generation','head') else 409),response.text
+    expected = 503 if change == 'head' else (401 if change in ('logout','disable','reset','session_generation') else 409)
+    assert response.status_code == expected,response.text
     assert 'measured' not in response.text and 'claims' not in response.text
     assert len(b.calls)==(0 if stage in ('after_admission','before_retrieval') else 1)
     if stage=='before_retrieval':
         assert proof(b) is None
     else:
-        assert proof(b).status==('reserved' if stage=='after_admission' else 'completed')
+        # Corrupt global auth projection closes the accounting writer too;
+        # retain the reservation ceiling for recovery rather than infer a charge.
+        unsettled = stage=='after_admission' or (stage=='provider' and change=='head')
+        assert proof(b).status==('reserved' if unsettled else 'completed')
+        if unsettled:
+            assert proof(b).cost_usd is None and proof(b).reserved_usd > 0
 
 
 @pytest.mark.parametrize('phase,question,pricing', [('response','the and',True),('response','absenttoken',True),

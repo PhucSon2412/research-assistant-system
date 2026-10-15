@@ -210,7 +210,7 @@ def test_dev_outbox_absent_and_invites_refused_without_delivery(
     from app.delivery import get_delivery
 
     monkeypatch.setenv("RAS_DELIVERY__MODE", "disabled")
-    app_env(migrated_db_url)
+    app_env(api.engine.url)  # retain runtime identity when refreshing settings
     get_delivery.cache_clear()
     api.bootstrap_admin()
     admin = api.admin_browser()
@@ -222,7 +222,7 @@ def test_dev_outbox_absent_and_invites_refused_without_delivery(
 
 def test_invitation_ttl_comes_from_config(api: Harness, monkeypatch: pytest.MonkeyPatch, app_env, migrated_db_url) -> None:
     monkeypatch.setenv("RAS_AUTH__INVITE", "PT1H")
-    app_env(migrated_db_url)
+    app_env(api.engine.url)
     api.bootstrap_admin()
     api.admin_browser().post("/admin/invitations", {"email": INVITEE})
     created, expires = api.scalar("SELECT ARRAY[created_at, expires_at] FROM invitations")

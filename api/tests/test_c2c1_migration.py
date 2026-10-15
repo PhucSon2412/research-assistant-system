@@ -35,6 +35,7 @@ def test_0036_upgrade_preserves_legacy_singleton_history_and_grants(empty_db_url
             rows = {t: conn.execute(text(f"SELECT row_to_json(r) FROM {t} r")).scalars().all()
                     for t in ("users", "bootstrap_state", "auth_change_receipts", "auth_safety_heads", "revocation_journal_records")}
         upgrade(empty_db_url)
+        runtime_engine(w).dispose()  # C4 upgrade requires explicit reprovisioning.
         with eng.connect() as conn:
             assert conn.scalar(text("SELECT version_num FROM alembic_version")) == HEAD_REVISION
             for table, values in rows.items():
@@ -59,7 +60,7 @@ def test_0036_upgrade_preserves_legacy_singleton_history_and_grants(empty_db_url
             assert not conn.scalar(text("SELECT EXISTS(SELECT 1 FROM pg_proc p CROSS JOIN LATERAL aclexplode(p.proacl) a"
                                        " WHERE p.oid=to_regprocedure(:fn) AND a.grantee=0 AND a.privilege_type='EXECUTE')"), {"fn": signature})
             assert conn.scalar(text("SELECT ras_auth_account_live(:uid)"), {"uid": uid})
-        assert recovery.evaluate(w.settings, rt).reason == "auth_safety_pending"
+        assert recovery.evaluate(w.settings, rt).reason == "open"
         with pytest.raises(DBAPIError, match="auth safety history prevents downgrade"):
             command.downgrade(alembic_config(empty_db_url), "0036")
     finally:
@@ -127,6 +128,7 @@ def test_0037_to_0038_preserves_accounts_binding_owner_and_acl(
                                       {"fn": signature}).one()
             before = {t: conn.execute(text(f"SELECT row_to_json(r) FROM {t} r")).scalars().all() for t in tables}
         upgrade(empty_db_url)
+        runtime_engine(w).dispose()  # C4 upgrade requires explicit reprovisioning.
         with eng.connect() as conn:
             assert conn.execute(text("SELECT proowner,proacl::text,proconfig FROM pg_proc WHERE oid=to_regprocedure(:fn)"),
                                 {"fn": signature}).one() == acl_before
@@ -148,7 +150,7 @@ def test_0037_to_0038_preserves_accounts_binding_owner_and_acl(
             with pytest.raises(DBAPIError, match="auth safety history prevents downgrade"):
                 command.downgrade(alembic_config(empty_db_url), target)
         monkeypatch.setattr(auth_safety, "cutover", original_cutover)
-        assert recovery.evaluate(w.settings, rt).reason == "auth_safety_pending"
+        assert recovery.evaluate(w.settings, rt).reason == "open"
     finally:
         if rt is not None: rt.dispose()
         eng.dispose()

@@ -1,5 +1,9 @@
 # Chống rollback credential và trạng thái tài khoản (M6c-2b2c0)
 
+**C4 đã kiểm cô lập, source `0051`, chờ review:** [Handoff/runbook C4](c4-integrated-runtime-cutover.md) bổ sung operational checkpoint và identity theo entrypoint. DB thiếu hậu điều kiện vẫn 503; không tự mở account hoặc phục hồi credential từ journal. Các trạng thái pending bên dưới giữ theo source lịch sử; chưa cutover dev/production.
+
+**Hiện hành sau merge B1, 2026-10-15:** PR #60 đã merge `44633b99`, source **0050**; giao [C4 tích hợp](tasks/m6c2b2c4-integrated-cutover.md), mới giao/chưa triển khai hoặc kiểm. C4 kết thúc placeholder pending bằng operational contract có hậu điều kiện trên project cô lập, giữ integrity/hold/provenance/role/final checks; không bypass hoặc cutover dev. New-install rỗng đã xác minh có đường tới bootstrap hợp lệ; held/quarantined/disabled vẫn đóng theo account. Các mốc giao C1–B1 bên dưới là lịch sử, không là kết quả C4.
+
 **B1 đã triển khai và kiểm (2026-10-15, chưa merge):** source **0050**, [handoff](pre-c4-auth-receipts-regression.md) · [inventory](pre-c4-test-inventory.json). Initial receipt có parent/cặp sự kiện đúng luồng; account/session/reset/enable/operator dùng provenance chung. Dữ liệu cũ thiếu provenance chỉ bị hạn chế, không backfill quyền hoặc sửa journal/receipt. Hợp đồng C3 giữ nguyên. **Safety pending tới C4**; tiếp readiness và hai vòng DB/object restore đầy đủ không patch.
 
 **C3 đã merge PR #59 (2026-10-13):** `041f77ef`, source **0049**, tree khớp head review `035cef0`; chưa rerun tại merge. [CLI operator](c3-operator-auth-recovery.md) dùng maintenance hold, case một lần và status riêng không mở disabled. Các mục C3 đề xuất bên dưới giữ lịch sử thiết kế.

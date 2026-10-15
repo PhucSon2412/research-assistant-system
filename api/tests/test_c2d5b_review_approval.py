@@ -1,7 +1,7 @@
 """C2d-5b runtime approve/copy: proofs, unlocked copy, coupled journal, outcomes.
 
 Accounts/session/head/receipt come from real identity (bootstrap, invitation,
-login, runtime role). Only business cutover is scoped; resource corruption,
+login, runtime role). Shared business setup uses the real C4 contract; resource corruption,
 storage faults and restore setup use the separate test owner or fakes.
 """
 import asyncio
@@ -1207,7 +1207,7 @@ def test_append_fault_known_approval_commit_mirror_false_gate_closed(approvals, 
         with open(b.w.path, 'r+b') as f:
             f.truncate(st.size)
     report = recover(b, confirm_db_current=fault != 'full_fsync')
-    assert report.gate == 'ready' and gate(b).open
+    assert report.gate == "open" and gate(b).open
     assert state(b).requests[0][1] == 'approved' and len(state(b).common) == 1
     as_admin(b)
     assert b.client.get(old_url(b)).status_code == 404

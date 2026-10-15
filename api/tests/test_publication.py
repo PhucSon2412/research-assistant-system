@@ -13,6 +13,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from threading import Barrier, Thread
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import text
@@ -746,6 +747,8 @@ def test_restored_backup_is_gated_until_recover_replays_the_journal(upload_api, 
     with admin_engine.connect() as conn:
         conn.execute(text(f'CREATE DATABASE "{snapshot_url.database}" TEMPLATE "{live_url.database}"'))
     snapshot = app_db.make_engine(snapshot_url)
+    from tests.test_auth_safety_foundation import runtime_engine
+    cloned_runtime = runtime_engine(SimpleNamespace(engine=snapshot)); cloned_runtime.dispose()
     try:
         assert revoke(admin, copy, "rights_withdrawn").status_code == 200
         assert publication.operator_cleanup_revoked(api.setup_engine, storage, api.clock.now, 50) == {"deleted": 1}
@@ -777,8 +780,8 @@ def test_restored_backup_is_gated_until_recover_replays_the_journal(upload_api, 
         # both replay passes validate it, alongside the missing revoke.
         assert report.replayed == {"present": 2 * existing_records,
                                    "recovery_begin": 1, "revoked": 1, "recovery_end": 1}
-        assert report.cleanup == {"deleted": 1} and report.gate == "ready"
-        assert report.reconciliation_complete and not report.safety_ready  # scoped business cutover only
+        assert report.cleanup == {"deleted": 1} and report.gate == "open"
+        assert report.reconciliation_complete and report.safety_ready  # real C4 reconciliation
         assert copy not in listed_ids(b) and b.get(f"/library/items/{copy}").json() == MISSING
         with snapshot.connect() as conn:
             row = conn.execute(text("SELECT i.publication_state, i.rights_epoch, r.revocation_reason_code,"

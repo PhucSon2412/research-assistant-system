@@ -1,6 +1,6 @@
 """C2d-5e2 manual orphan original reconcile: actual runtime login, PostgreSQL, MinIO and journal.
 
-Only business cutover is scoped (``world``); a separate test keeps the real
+Shared business setup uses the real C4 contract; a separate test keeps the real
 pending gate. Owner-engine statements are labelled setup, corruption or
 adversary. Storage faults are injections over real local MinIO, not crashes.
 The environment is quiescent by construction: no upload/approval runs while
@@ -26,14 +26,14 @@ from app.ingest import orphans, runtime
 from app.storage import ListedObject, get_storage
 from tests.test_auth_safety_foundation import NOW
 from tests.test_c2c1_bootstrap import installation  # noqa: F401
-from tests.test_c2c2_invitations import world  # noqa: F401
+from tests.test_c2c2_invitations import operational_world as world  # noqa: F401
 from tests.test_c2d1_final_caller import browser  # noqa: F401
 from tests.test_c2d5a_review_writes import writers, wait_for  # noqa: F401
 from tests.resource_fixtures import BODY
 
 FENCE = 'ras_auth_orphan_fence(uuid,text,bigint,timestamptz,timestamptz,timestamptz)'
 COMPLETE = 'ras_auth_orphan_complete(uuid,text,uuid,text,timestamptz)'
-REAL_CUTOVER = auth_safety.cutover  # captured at import, before any scoped fixture patch
+REAL_CUTOVER = auth_safety.cutover  # captured before named unit fault injections
 GRACE = timedelta(hours=24)
 BUSINESS = ('library_items', 'paper_versions', 'source_files', 'access_rights', 'ingestion_jobs', 'embedding_calls',
             'deletion_tombstones', 'object_delete_fences', 'common_publications', 'review_requests', 'upload_intents')
@@ -316,7 +316,8 @@ def test_entry_probe_or_release_fault_stops_before_storage(orphan, monkeypatch, 
 
 def close_gate(b, gate, monkeypatch):
     if gate == 'pending':
-        monkeypatch.setattr(auth_safety, 'cutover', REAL_CUTOVER)  # the real production answer
+        with b.w.engine.begin() as conn:  # trusted setup: no completed C4 checkpoint
+            conn.execute(text('DELETE FROM auth_operational_state'))
     elif gate == 'missing':
         b.w.path.unlink()
     elif gate == 'hold':
@@ -974,7 +975,7 @@ def test_resume_prepared_fence_even_when_listing_no_longer_shows_it(orphan, monk
     assert run(b) == {'listed': 1, 'halted:recovery_gate_closed': 1}
     assert len(fences(b)) == 1 and present(b, key) and 'delete' not in b.watch.names()
     monkeypatch.setattr(orphans, 'prepare', real)
-    monkeypatch.setattr(auth_safety, 'cutover', lambda db: 'ready')
+    monkeypatch.setattr(auth_safety, 'cutover', REAL_CUTOVER)
     monkeypatch.setattr(b.raw, 'list_originals', lambda **kw: ([], False))  # the key is not listed any more
     assert run(b) == {'deleted': 1, 'listed': 0}
     assert not present(b, key) and completions(b) == [(key, 'deleted')]
@@ -998,7 +999,7 @@ def test_gate_closing_after_admission_never_finalises_or_moves_on(orphan, monkey
     assert not present(b, key) and present(b, later)  # an admitted delete completes; the next candidate waits
     assert completions(b) == [] and len(fences(b)) == 1 and audits(b) == 0
     b.watch.hooks.clear()
-    monkeypatch.setattr(auth_safety, 'cutover', lambda db: 'ready')
+    monkeypatch.setattr(auth_safety, 'cutover', REAL_CUTOVER)
     assert run(b) == {'already_absent': 1, 'listed': 1, 'deleted': 1}
 
 

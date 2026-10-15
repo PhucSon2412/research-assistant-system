@@ -45,6 +45,7 @@ def main():
     runtime=runtime_engine_for(SRC)
     try:seed_accounts(runtime,emails,password)
     finally:runtime.dispose()
+    verifier = scalar(source, "SELECT password_verifier FROM users WHERE email=:e", e=emails["a"])
     admin = Person(SRC, email=emails["admin"], password=password)
     a = [Person(SRC, email=emails["a"], password=password) for _ in range(3)]
     b = Person(SRC, email=emails["b"], password=password)

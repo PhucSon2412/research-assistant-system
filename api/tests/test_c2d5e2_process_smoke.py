@@ -1,7 +1,7 @@
 """Linux CLI process smoke: ``python -m app.cli.reconcile_originals --apply`` in a container
 on the isolated PG/MinIO network, with the provisioned runtime login.
 
-The mounted sitecustomize is TEST ONLY: it scopes cutover, blocks egress,
+The mounted sitecustomize is TEST ONLY: it uses the real C4 gate, blocks egress,
 shifts the reconcile clock past the grace (the environment is quiescent by
 construction: no writer runs, so the shift only avoids waiting 24 h and
 proves nothing about settling), and in the first process parks the first
@@ -19,7 +19,7 @@ from sqlalchemy import text
 
 from tests.conftest import REPO_DIR
 from tests.test_c2c1_bootstrap import installation  # noqa: F401
-from tests.test_c2c2_invitations import world  # noqa: F401
+from tests.test_c2c2_invitations import operational_world as world  # noqa: F401
 from tests.test_c2d1_final_caller import browser  # noqa: F401
 from tests.test_c2d5a_review_writes import writers  # noqa: F401
 from tests.test_c2d5e2_orphan_reconcile import orphan, put, present, body, refer, business  # noqa: F401
@@ -39,7 +39,7 @@ socket.socket.connect = connect
 if os.environ.get('SMOKE_ROLE') == 'reconcile':
     from datetime import UTC, datetime, timedelta
     from app import auth_safety
-    auth_safety.cutover = lambda db: 'ready'
+
     from app.ingest import orphans, runtime
     orphans.utcnow = lambda: datetime.now(UTC) + timedelta(days=2)
     if os.environ.get('SMOKE_PARK') == '1':
@@ -87,7 +87,7 @@ def test_real_cli_process_kill_between_fence_and_delete_then_resume(orphan):
     env_file = evidence / 'runtime.env'
     env_file.write_text('\n'.join(k + '=' + v for k, v in values.items()) + '\n', encoding='utf-8')
     mounts = []
-    for source, target, mode in ((REPO_DIR / 'api' / 'app', '/srv/api/app', ':ro'), (evidence / 'harness', '/harness', ':ro'),
+    for source, target, mode in ((evidence / 'harness', '/harness', ':ro'),
                                  (evidence, '/evidence', ''), (b.w.path.parent, '/journal', '')):
         mounts += ['-v', str(source).replace('\\', '/') + ':' + target + mode]
     name = c['project'] + '-reconcile-' + uuid.uuid4().hex[:8]

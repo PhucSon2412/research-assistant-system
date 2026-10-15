@@ -55,15 +55,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "api"))
 sys.path.insert(0, str(ROOT / "scripts"))
 BASE_ENV = dict(os.environ)  # for subprocesses: taken before the RAS_* variables below are set for host code
-SRC, DST, FOREIGN = "ras-drill-src", "ras-drill-restore", "ras-drill-foreign"
-PORTS = {
-    SRC: {"POSTGRES_HOST_PORT": "45432", "API_HOST_PORT": "48000", "WEB_HOST_PORT": "43000",
-          "MINIO_API_HOST_PORT": "49000", "MINIO_CONSOLE_HOST_PORT": "49001"},
-    FOREIGN: {"POSTGRES_HOST_PORT": "47432", "API_HOST_PORT": "47800", "WEB_HOST_PORT": "47300",
-              "MINIO_API_HOST_PORT": "47900", "MINIO_CONSOLE_HOST_PORT": "47901"},
-    DST: {"POSTGRES_HOST_PORT": "46432", "API_HOST_PORT": "46800", "WEB_HOST_PORT": "46300",
-          "MINIO_API_HOST_PORT": "46900", "MINIO_CONSOLE_HOST_PORT": "46901"},
-}
+# Task-owned project names and fresh loopback bindings; never historical projects.
+from c4_isolation import free_port
+DRILL_ID = "rasc4drill" + uuid.uuid4().hex[:8]
+SRC, DST, FOREIGN = (DRILL_ID + suffix for suffix in ("src", "restore", "foreign"))
+PORTS = {project: {key:str(free_port()) for key in ("POSTGRES_HOST_PORT","API_HOST_PORT",
+    "WEB_HOST_PORT","MINIO_API_HOST_PORT","MINIO_CONSOLE_HOST_PORT")} for project in (SRC,DST,FOREIGN)}
 WORK = Path(os.environ.get("DRILL_WORK_DIR", ""))
 if not WORK.is_absolute() or WORK.resolve() == ROOT or ROOT in WORK.resolve().parents:
     raise SystemExit("set DRILL_WORK_DIR to an absolute directory outside the repository")
@@ -75,6 +72,8 @@ PREFIX = "m6c2a-drill-"
 WRITERS = ("api", "web", "worker", "beat")
 
 import ras_backup  # noqa: E402
+import c4_fake_provider  # test-only controlled HTTP transport, no auth/gate patches
+from c4_isolation import write_override
 
 if not all(os.environ.get(name) for name in ras_backup.ALLOWED):
     raise SystemExit("supply synthetic POSTGRES/MINIO variables explicitly; this drill never reads .env")
@@ -107,7 +106,7 @@ get_settings.cache_clear()
 BASE = get_settings()
 assert BASE.embedding.api_key is None or not BASE.embedding.api_key.get_secret_value()
 FAKE = BASE.model_copy(deep=True)
-FAKE.embedding.api_key = SecretStr("synthetic-fake-key")
+FAKE.embedding.api_key = SecretStr("c4-synthetic-controlled-provider")
 FAKE.embedding.pricing_verified = True  # fake transport below; nothing reaches a provider
 SCOPE = {"audience": "instance_users", "original_download": True, "fulltext_search": True,
          "external_processing": True, "conditions": None}
@@ -126,15 +125,35 @@ def step(name: str, ok) -> None:
 
 
 def project_env(project: str) -> dict:
+    if project not in PORTS:
+        raise RuntimeError('unknown task project')
+    override=WORK / 'compose' / project / 'isolation.json'
+    if not override.exists():
+        write_override(override.parent,PORTS[project])
     return {**BASE_ENV, **PORTS[project], "OPENROUTER_API_KEY": "", "RAS_DISCOVERY__ENABLED": "false",
-            "RAS_JOURNAL_SOURCE": str(JOURNAL_SOURCE[project])}
+            "RAS_JOURNAL_SOURCE": str(JOURNAL_SOURCE[project]), "RAS_COMPOSE_OVERRIDE_FILE":str(override),
+            "RAS_COMPOSE_PORTS_FILE":str(override.parent/'ports.yaml')}
 
 
 def dc(project: str, *args: str, check: bool = True, **kwargs) -> subprocess.CompletedProcess:
     kwargs.setdefault("capture_output", True)
     kwargs.setdefault("encoding", "utf-8")
     kwargs.setdefault("errors", "replace")  # container logs are UTF-8; the Windows default codec is not
-    result = subprocess.run(["docker", "compose", "--env-file",str(EXPLICIT_ENV),"-p", project, *args], cwd=ROOT, env=kwargs.pop("env",project_env(project)),
+    environment=kwargs.pop("env",project_env(project))
+    if environment.get('RAS_DRILL_PREBUILT_IMAGES')=='true':
+        if args[0]=='build':
+            # Every service/restore CLI uses the already verified C4 image;
+            # rebuilding per project would change an attestation/tag mid-drill.
+            for key in ('RAS_API_IMAGE','RAS_WEB_IMAGE'):
+                image=environment.get(key,'')
+                if not image.startswith('rasc4'):raise RuntimeError('task-owned prebuilt image required')
+                subprocess.run(['docker','image','inspect',image,'--format','{{.Id}}'],check=True,capture_output=True)
+            return subprocess.CompletedProcess(args,0,stdout='prebuilt C4 images verified',stderr='')
+        if args[0]=='up':
+            args=tuple(x for x in args if x!='--build')+('--no-build',)
+    result = subprocess.run(["docker", "compose", "--env-file",str(EXPLICIT_ENV),"-p", project,
+                            '-f',str(ROOT/'docker-compose.yml'),'-f',environment['RAS_COMPOSE_OVERRIDE_FILE'],
+                            '-f',environment['RAS_COMPOSE_PORTS_FILE'],*args], cwd=ROOT, env=environment,
                             **kwargs)
     if check and result.returncode != 0:
         raise RuntimeError(f"docker compose -p {project} {args[0]} failed ({result.returncode})")
@@ -145,6 +164,9 @@ def tool(project: str, *args: str) -> tuple[int, dict | None, str]:
     """Run scripts/ras_backup.py as an operator would; returns exit code, the JSON line, stderr."""
     result = subprocess.run([sys.executable, str(ROOT / "scripts" / "ras_backup.py"), *args], cwd=ROOT,
                             env=project_env(project), capture_output=True, encoding="utf-8", errors="replace")
+    with (WORK/'tool-outcomes.jsonl').open('a',encoding='utf-8') as evidence:
+        evidence.write(json.dumps({'project':project,'action':args[0],'exit':result.returncode,
+            'stdout':result.stdout,'stderr':result.stderr})+'\n')
     lines = [line for line in result.stdout.splitlines() if line.startswith("{")]
     return result.returncode, json.loads(lines[-1]) if lines else None, result.stderr.strip()
 
@@ -192,7 +214,8 @@ def url(project: str, kind: str) -> str:
 
 def fake_embed(value: str, selected):
     CALLS.append(value)
-    return EmbeddingResult([0.1, 0.2, 0.3], selected.embedding.model_id, len(value.split()))
+    from app.ingest.embedding import embed
+    return embed(value, selected)
 
 
 class Person:
@@ -235,7 +258,7 @@ class Person:
         return sent.json()
 
 
-def wait_state(engine, job_id: uuid.UUID, wanted: str, seconds: int = 180) -> None:
+def wait_state(engine, job_id: uuid.UUID, wanted: str, seconds: int = 600) -> None:
     started = time.monotonic()
     while time.monotonic() - started < seconds:
         if scalar(engine, "SELECT state FROM ingestion_jobs WHERE id=:j", j=job_id) == wanted:
@@ -282,6 +305,8 @@ def start_app(project: str) -> None:
     is created without starting, then started with ``docker start``.
     """
     dc(project, "up", "-d", "--no-deps", "redis", "api", "worker", "beat")
+    if not wait_http(url(project, "api") + "/healthz", 200, seconds=120):
+        raise RuntimeError("API did not become live before workflow requests")
     dc(project, "up", "--no-start", "--no-deps", "web")
     subprocess.run(["docker", "start", dc(project, "ps", "-aq", "web").stdout.strip()], check=True,
                    capture_output=True)
@@ -440,7 +465,9 @@ def main() -> None:
     step("restore refuses a damaged artifact, a missing journal copy, the dev or source project, touching nothing",
          all(outcomes[n][0] == 1 and code_ in outcomes[n][2] for n, (_, code_) in refusals.items())
          and not volumes(DST))
-    shutil.rmtree(WORK / "damaged")
+    damaged_target=(WORK / "damaged").resolve()
+    if damaged_target.parent != WORK:raise RuntimeError("damaged artifact cleanup escaped task work")
+    shutil.rmtree(damaged_target)
 
     # A project this tool did not create (only its db, no marker) is refused and left exactly as it was.
     dc(FOREIGN, "up", "-d", "--wait", "db")
@@ -455,12 +482,14 @@ def main() -> None:
     code, _, err = tool(DST, "restore", *restore_foreign)
     step("restore refuses a running project without the marker (target_not_restore_owned) and leaves its"
          " containers exactly as they were (same set, state, start time)",
-         code == 1 and "target_not_restore_owned" in err and foreign_state() == before and len(before) == 1)
+         code == 1 and "target_not_restore_owned" in err and foreign_state() == before
+         and {row[0] for row in before} == {f'/{FOREIGN}-db-1',f'/{FOREIGN}-exposure-1'})
     dc(FOREIGN, "stop", "db")
     before = foreign_state()
     code, _, err = tool(DST, "restore", *restore_foreign)
     step("with its db stopped: refused (target_db_not_running), nothing started or created",
-         code == 1 and "target_db_not_running" in err and foreign_state() == before and before[0][1] == "exited")
+         code == 1 and "target_db_not_running" in err and foreign_state() == before
+         and next(row[1] for row in before if row[0]==f'/{FOREIGN}-db-1') == "exited")
     dc(FOREIGN, "down", "-v")
 
     # 5. Restore into the isolated project; before recover nothing is served or processed.

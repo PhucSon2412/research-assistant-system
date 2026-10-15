@@ -22,7 +22,7 @@ from app.models import Collection, CollectionItem, LibraryItem, UserSession
 from app.models.enums import RevocationReason
 from tests.test_c2d1_final_caller import browser, mutate, close, wait_for
 from tests.test_c2c1_bootstrap import installation
-from tests.test_c2c2_invitations import world, issue, accept
+from tests.test_c2c2_invitations import operational_world as world, issue, accept
 from tests.test_auth_safety_foundation import NOW
 from tests.resource_fixtures import source, common_copy, resource_api, resource_world
 
@@ -124,7 +124,7 @@ def test_after_dependency_auth_changes_rollback_all_business(writes, key, change
         else: mutate(b, change)
     b.after_dependency = alter
     r = request(b, key)
-    expected = 503 if change in ('hold', 'ahead', 'unconfirmed') else 403 if change == 'csrf' else 401
+    expected = 503 if change in ('hold', 'ahead', 'unconfirmed', 'receipt_credential', 'receipt_status', 'wrong_receipt', 'head', 'latest_credential', 'latest_status') else 403 if change == 'csrf' else 401
     assert r.status_code == expected, r.text
     assert business(b) == before and audits(b) == audit
     assert not any(marker in r.text for marker in ('NEW-TITLE', 'NEW-NAME', str(b.ids.item)))
@@ -324,7 +324,7 @@ def test_final_guard_after_flush_real_predicates(writes, monkeypatch, key, chang
     monkeypatch.setattr(library if key=='item' else collections,'resource_write',boundary)
     monkeypatch.setattr(Session,'flush',flushed)
     r = request(b,key)
-    expected = 503 if change in ('hold','bad_journal') else 403 if change == 'csrf' else 401
+    expected = 503 if change in ('hold','bad_journal','receipt_status') else 403 if change == 'csrf' else 401
     assert r.status_code == expected, r.text
     assert business(b) == before and audits(b) == audit
     api_pool_clean()

@@ -27,7 +27,7 @@ from app.models.enums import RevocationReason, RevokedMetadataField, RightsAudie
 from app.review_closing import commit_close
 from tests.resource_fixtures import source, common_copy, runtime_approve, MemoryOriginals as BaseMemoryOriginals, SHA
 from tests.test_c2c1_bootstrap import installation
-from tests.test_c2c2_invitations import world, issue, accept, PASSWORD, EMAIL
+from tests.test_c2c2_invitations import operational_world as world, issue, accept, PASSWORD, EMAIL
 from tests.test_c2d1_final_caller import browser, mutate, close, wait_for
 from tests.test_auth_safety_foundation import NOW
 from tests.test_review_requests import close_journaled
@@ -113,7 +113,7 @@ def test_auth_after_real_dependency(reads, key, change):
     b = reads
     b.after_dependency = lambda db, ctx: mutate(b, change)
     r = b.client.get(b.path(key))
-    expected = 503 if change in ("hold", "ahead", "unconfirmed") else 401
+    expected = 503 if change in ("hold", "ahead", "unconfirmed", "receipt_credential", "receipt_status", "wrong_receipt", "head", "latest_credential", "latest_status") else 401
     assert r.status_code == expected, r.text
     assert r.json() == {"error": "service_recovering" if expected == 503 else "session_expired"}
     if expected == 401:

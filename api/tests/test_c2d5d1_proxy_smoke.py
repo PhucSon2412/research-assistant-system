@@ -1,6 +1,6 @@
 """Installed Chrome -> Next production proxy -> working-tree socket API, index request.
 
-Real isolated runtime PG/MinIO; only business cutover/clock are scoped. The
+Real isolated runtime PG/MinIO/C4 contract; only the test clock is scoped. The
 lost-response case holds the API response past the normal 15 s proxy budget
 with an in-process barrier (the API keeps running); it is not a network fault.
 This does not claim a Compose API image or production safety cutover.
@@ -26,7 +26,7 @@ from tests.test_c2d5c1_common_publish import scalar, change
 from tests.test_c2d5a_review_writes import writers  # noqa: F401
 from tests.test_c2d1_final_caller import browser  # noqa: F401
 from tests.test_c2c1_bootstrap import installation  # noqa: F401
-from tests.test_c2c2_invitations import world  # noqa: F401
+from tests.test_c2c2_invitations import operational_world as world  # noqa: F401
 
 API_PORT, WEB_PORT = 58589, 53589
 

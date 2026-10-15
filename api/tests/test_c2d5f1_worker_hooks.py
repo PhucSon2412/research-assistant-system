@@ -1,6 +1,6 @@
 """C2d-5f1 hooks with the real worker: extraction/discovery/backfill/revoke/cleanup lock graph.
 
-Real runtime PG, MinIO and journal; only business cutover is scoped. The
+Real runtime PG, MinIO, journal and the C4 operational contract. The
 worker is ``process_job`` (C2d-5d2a) with its own item -> job locks; the hook
 is paused at a named point so the test can observe real lock waits. Discovery
 pages are synthetic OAI XML through ``_write_page`` (no network).
@@ -24,7 +24,7 @@ from app.models import DiscoverySource
 from tests.resource_fixtures import runtime_revoke, source
 from tests.test_auth_safety_foundation import NOW
 from tests.test_c2c1_bootstrap import installation  # noqa: F401
-from tests.test_c2c2_invitations import world  # noqa: F401
+from tests.test_c2c2_invitations import operational_world as world  # noqa: F401
 from tests.test_c2d1_final_caller import browser  # noqa: F401
 from tests.test_c2d5a_review_writes import writers  # noqa: F401
 from tests.test_c2d5d1_common_index_request import indexes  # noqa: F401

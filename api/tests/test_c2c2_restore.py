@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app import auth_safety,journal,recovery
 from app.models import Invitation,User
 from tests.conftest import create_empty_database,drop_database
-from tests.test_c2c2_invitations import world,issue,accept,EMAIL
+from tests.test_c2c2_invitations import operational_world as world,issue,accept,EMAIL
 from tests.test_c2c1_bootstrap import installation
 from tests.test_auth_safety_foundation import NOW
 
@@ -35,9 +35,12 @@ def test_dump_restore_pre_accept_twice_current_journal(world,admin_engine,tmp_pa
     source=w.path.read_bytes()
     for iteration in range(2):
         url=create_empty_database(admin_engine)
-        rc=rt=None
+        rc=rt=owner=None
         try:
             subprocess.run(['docker','exec','-i',name,'pg_restore','-U',admin_engine.url.username,'-d',url.database],input=dump,check=True,capture_output=True,timeout=60)
+            owner=create_engine(url,hide_parameters=True)
+            from app.db_roles import provision
+            provision(owner,runtime='c1_runtime',recovery='c1_recovery',definer='c1_definer')
             rc=create_engine(url.set(username='c1_recovery',password=os.environ['RAS_C1_RECOVERY_PASSWORD']),hide_parameters=True)
             rt=create_engine(url.set(username='c1_runtime',password=os.environ['RAS_C1_RUNTIME_PASSWORD']),hide_parameters=True)
             copy=tmp_path/f'restore-{iteration}'/'journal.jsonl';copy.parent.mkdir();copy.write_bytes(source)
@@ -46,7 +49,7 @@ def test_dump_restore_pre_accept_twice_current_journal(world,admin_engine,tmp_pa
             assert not recovery.evaluate_integrity(settings,rt).open
             for _ in range(2):
                 report=recovery.recover(rc,SimpleNamespace(),settings,NOW)
-                assert report.reconciliation_complete and not report.safety_ready
+                assert report.reconciliation_complete and report.safety_ready
                 with Session(rt) as db:
                     inv=db.get(Invitation,created._binding.invitation_id)
                     assert inv.closed_by_recovery_at and inv.accepted_at is inv.accepted_user_id is None
@@ -57,11 +60,12 @@ def test_dump_restore_pre_accept_twice_current_journal(world,admin_engine,tmp_pa
                     assert db.scalar(text('SELECT count(*) FROM users WHERE email=:email'),{'email':EMAIL})==0
                     assert db.scalar(text('SELECT count(*) FROM invitations WHERE id=:id AND accepted_at IS NULL AND revoked_at IS NULL AND closed_by_recovery_at IS NULL'),{'id':inv.id})==0
             assert w.path.read_bytes()==source
-            with monkeypatch.context() as patch:
-                # The final production pending boundary remains closed.
-                patch.setattr(auth_safety,'cutover',lambda db:'auth_safety_pending')
-                assert recovery.evaluate(settings,rt).reason=='auth_safety_pending'
+            assert recovery.evaluate(settings,rt).open
+            with owner.begin() as conn:  # trusted setup: completion checkpoint absent
+                conn.execute(text('DELETE FROM auth_operational_state'))
+            assert recovery.evaluate(settings,rt).reason=='auth_safety_pending'
         finally:
             if rt:rt.dispose()
             if rc:rc.dispose()
+            if owner:owner.dispose()
             drop_database(admin_engine,url)

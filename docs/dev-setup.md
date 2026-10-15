@@ -1,4 +1,6 @@
-# Môi trường phát triển và schema (M1a–C2d-5f1 đã merge)
+# Môi trường phát triển và schema
+
+**C4 đã kiểm cô lập, source `0051`, chờ review:** [Runbook C4](c4-integrated-runtime-cutover.md) chốt migrate/provision/init mới, hold trước upgrade/restore và kiểm runtime readiness. Compose cần credentials runtime/recovery riêng, cùng image cho các Python service. Không áp các lệnh này lên dev trong task; các lệnh/kết quả phía dưới giữ lịch sử theo source đã ghi. Pricing thật vẫn tắt.
 
 **Discovery runtime C2d-5f2, source `0046`, chờ review:** [handoff/inventory](c2d5f2-discovery-runtime.md) giữ lệnh thực chạy và kết quả. Entrypoint `python -m app.cli.sync_arxiv` dùng runtime từ `RAS_DB__*`, không endpoint tùy ý. `--force` chỉ bỏ lịch poll thành công, không bỏ lease/pacing/backoff/Retry-After/gate. Exit 0 completed/bound/disabled, 1 error/halted, 2 config thiếu, 3 busy. Direct và `ras.discovery.sync` cùng boundary; demo owner M5a đã retired. Migration/provision chỉ trên môi trường được giao, không tự nâng dev. Safety pending tới C4; CLI production pending vẫn đóng.
 

@@ -17,7 +17,7 @@ from app.main import app
 from tests.test_c2d5a_review_writes import writers
 from tests.test_c2d1_final_caller import browser
 from tests.test_c2c1_bootstrap import installation
-from tests.test_c2c2_invitations import world, issue, accept
+from tests.test_c2c2_invitations import operational_world as world, issue, accept
 
 
 def test_real_proxy_chrome_consent_submit_withdraw_reject_thin_response(writers,tmp_path,monkeypatch):

@@ -16,10 +16,14 @@ def test_readyz_requires_migrated_database(app_env, empty_db_url: str) -> None:
     assert response.json() == {"status": "unavailable"}
 
 
-def test_readyz_ok_after_migration(app_env, migrated_db_url: str) -> None:
-    app_env(migrated_db_url)
+def test_readyz_ok_after_migration(api) -> None:
     response = TestClient(app).get("/readyz")
     assert response.status_code == 200
+
+
+def test_readyz_migrated_registered_without_reconciliation_is_unavailable(app_env, migrated_db_url):
+    app_env(migrated_db_url)
+    assert TestClient(app).get('/readyz').status_code == 503
 
 
 def test_m5a_discovery_routes_registered() -> None:

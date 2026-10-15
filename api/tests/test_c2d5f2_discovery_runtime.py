@@ -1,6 +1,6 @@
 """Discovery against real PostgreSQL runtime LOGIN, integrity and journal.
 
-Only cutover readiness is scoped. Owner SQL below is labelled setup/adversary.
+C4 cutover readiness is real. Owner SQL below is labelled setup/adversary.
 Synthetic feeds never contact arXiv/providers; HTTP transport tests use loopback.
 """
 import asyncio
@@ -26,7 +26,9 @@ REAL_CUTOVER = auth_safety.cutover
 @pytest.fixture
 def disc(installation, monkeypatch):
     w = installation
-    monkeypatch.setattr(auth_safety, 'cutover', lambda db: 'ready')
+    from types import SimpleNamespace
+    from app.clock import utcnow
+    recovery.recover(w.engine,SimpleNamespace(),w.settings,utcnow())
     yield w
     assert w.runtime.pool.checkedout() == 0
 
@@ -106,7 +108,7 @@ def test_real_gate_at_entry_and_after_http(disc, monkeypatch, gate, midpass):
     w = disc
     def close():
         if gate == 'pending':
-            monkeypatch.setattr(auth_safety, 'cutover', REAL_CUTOVER)
+            q(w, 'DELETE FROM auth_operational_state')  # trusted negative setup
         elif gate == 'hold':
             recovery.hold(w.engine, get_settings(), datetime.now(UTC))
         elif gate == 'missing':

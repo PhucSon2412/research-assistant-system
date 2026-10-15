@@ -58,7 +58,7 @@ def test_0034_populated_provisioned_upgrade_preserves_history_and_permissions(em
             assert not conn.scalar(text("SELECT has_table_privilege(current_user,'sessions','UPDATE')"))
             for row in conn.execute(text("SELECT p.proowner=r.oid, p.proconfig, r.rolcanlogin FROM pg_proc p JOIN pg_roles r ON r.rolname='c1_definer' WHERE p.proname IN ('ras_auth_session_activity','ras_auth_session_close','ras_auth_closure_mirror')")):
                 assert row[0] and 'search_path=pg_catalog, public, pg_temp' in row[1] and not row[2]
-        assert recovery.evaluate(w.settings,eng).reason=='auth_safety_pending'
+        assert recovery.evaluate(w.settings,eng).reason=='worker_runtime_required'
         with rt.begin() as conn,pytest.raises(DBAPIError):conn.execute(text('UPDATE sessions SET last_activity_at=now()'))
         with pytest.raises(DBAPIError,match='auth safety history prevents downgrade'):
             command.downgrade(alembic_config(empty_db_url),'0034')

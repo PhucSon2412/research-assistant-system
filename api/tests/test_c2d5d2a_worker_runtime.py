@@ -1,4 +1,4 @@
-"""Real runtime PG, MinIO, journal, clocks/locks. Only cutover is scoped."""
+"""Real runtime PG, MinIO, journal, clocks/locks. Shared setup uses the real C4 contract."""
 import hashlib
 import io
 import threading
@@ -456,7 +456,7 @@ def test_private_status_requires_latest_head_and_receipt(work,corrupt):
         elif corrupt=='head':conn.execute(text('UPDATE auth_safety_heads SET status_generation=:g WHERE user_id=:i'),{'i':b.uid,'g':uuid.uuid4()})
         else:conn.execute(text("DELETE FROM auth_change_receipts WHERE user_id=:i AND domain='status'"),{'i':b.uid})
         conn.execute(text(f'ALTER TABLE {table} ENABLE TRIGGER ALL'))
-    assert run(b)=='owner_status_paused' and not b.opened
+    assert run(b)==('owner_status_paused' if corrupt=='held' else 'recovery_gate_closed') and not b.opened
     assert sql(b,'SELECT attempt_count FROM ingestion_jobs WHERE id=:i',i=b.job)==0
 
 

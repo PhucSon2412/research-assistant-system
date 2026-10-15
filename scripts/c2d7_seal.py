@@ -13,8 +13,13 @@ REPO=Path(__file__).resolve().parents[1]
 
 def sources():
     names=subprocess.check_output(['git','ls-files','--cached','--others','--exclude-standard','api','scripts','web'],cwd=REPO,text=True).splitlines()
-    return {n:hashlib.sha256((REPO/n).read_bytes()).hexdigest() for n in sorted(set(names))
+    manifest={n:hashlib.sha256((REPO/n).read_bytes()).hexdigest() for n in sorted(set(names))
         if (REPO/n).is_file() and not any(part.startswith('.env') for part in Path(n).parts)}
+    # C4 topology/default pricing are code inputs too. Only this exact public
+    # placeholder is whitelisted; never enumerate or read deployment .env files.
+    for name in ('docker-compose.yml','.env.example'):
+        manifest[name]=hashlib.sha256((REPO/name).read_bytes()).hexdigest()
+    return manifest
 
 
 def collected(path):

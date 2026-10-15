@@ -160,7 +160,7 @@ def test_batch_valid_receipts_pending_and_secrets(foundation,caplog):
     u=user(w)
     assert (u.credential_state,u.status_safety)==("usable","proven")
     report=run_recover(w)
-    assert report.reconciliation_complete and not report.safety_ready and report.gate=="auth_safety_pending"
+    assert report.reconciliation_complete and report.safety_ready and report.gate=="open"
     assert not recovery.evaluate(w.settings,w.engine).open
     assert recovery.evaluate_integrity(w.settings,w.engine).open
     with Session(w.engine) as db:
@@ -216,7 +216,7 @@ def test_fault_matrix(foundation,monkeypatch,shape,outcome):
                     "prefix": ("quarantined", "proven"), "full": ("quarantined", "held")}[shape]
         assert (u.credential_state,u.status_safety)==expected
         with Session(w.engine) as db:assert len(db.scalars(select(AuthChangeReceipt.operation_id)).all())==2
-    assert recovery.evaluate(w.settings,w.engine).reason=="auth_safety_pending"
+    assert recovery.evaluate(w.settings,w.engine).reason=="worker_runtime_required"
     before=w.path.read_bytes();run_recover(w)
     assert user(w).credential_state==u.credential_state
     seqs=[r.seq for r in journal.read(w.path).records]
@@ -559,7 +559,7 @@ def test_recovery_login_role_restricts_without_receipts(foundation,runtime):
     eng=create_engine(w.engine.url.set(username="c1_recovery",password=os.environ["RAS_C1_RECOVERY_PASSWORD"]),hide_parameters=True)
     try:
         r=recovery.recover(eng,SimpleNamespace(),w.settings,NOW)
-        assert r.reconciliation_complete and r.gate=="auth_safety_pending"
+        assert r.reconciliation_complete and r.safety_ready and r.gate=="open"
         with Session(eng) as db:
             assert db.get(User,w.uid).credential_state=="quarantined"
             assert db.scalar(select(AuthChangeReceipt.operation_id)) is None
@@ -687,7 +687,7 @@ def test_0034_upgrade_preserves_auth_history_roles_and_pending(empty_db_url, jou
                 db.rollback()  # Keep the one-open-token-per-User contract for the next purpose.
         with pytest.raises(DBAPIError, match="auth safety history prevents downgrade"):
             command.downgrade(alembic_config(empty_db_url), "0033")
-        assert recovery.evaluate(settings, owner).reason == "auth_safety_pending"
+        assert recovery.evaluate(settings, owner).reason == "worker_runtime_required"
     finally:
         rt.dispose()
         owner.dispose()

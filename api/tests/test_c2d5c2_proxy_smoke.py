@@ -1,6 +1,6 @@
 """Installed Chrome -> Next production proxy -> working-tree socket API.
 
-Real isolated runtime PG/MinIO; only business cutover/clock are scoped.
+Real isolated runtime PG/MinIO/C4 contract; only the test clock is scoped.
 This does not claim a Compose API image or production safety cutover.
 """
 import json
@@ -23,7 +23,7 @@ from tests.test_c2d5c1_common_publish import publishes, pending, publish, scalar
 from tests.test_c2d5a_review_writes import writers  # noqa: F401
 from tests.test_c2d1_final_caller import browser  # noqa: F401
 from tests.test_c2c1_bootstrap import installation  # noqa: F401
-from tests.test_c2c2_invitations import world  # noqa: F401
+from tests.test_c2c2_invitations import operational_world as world  # noqa: F401
 
 
 def test_chrome_revoke_busy_old_link_unknown_no_repost_cookie(publishes, tmp_path, monkeypatch):

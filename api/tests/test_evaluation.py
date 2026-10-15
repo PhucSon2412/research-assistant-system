@@ -1,6 +1,7 @@
 """M4c evaluation tooling: dataset schema, gold locators, metrics, review scoring and ACL."""
 import json
 import math
+from pathlib import Path
 from unittest import mock
 
 import httpx
@@ -269,6 +270,34 @@ def test_instrumented_run_blocks_real_outbound_http():
             httpx.Client().get("https://openrouter.ai/api/v1/models")
     assert capture.blocked_hosts == ["openrouter.ai"]
     assert httpx.HTTPTransport.handle_request is original
+
+
+def test_runner_renews_expired_idle_session_through_real_login(api):
+    from app.evaluation.runner import _login
+    from tests.helpers import ADMIN_EMAIL, ADMIN_PASSWORD
+    uid=api.bootstrap_admin()
+    get_settings().http.allowed_origins.append(ORIGIN)
+    identity=_login(ADMIN_EMAIL,ADMIN_PASSWORD,'admin',uid,'admin')
+    first=identity.client.get('/auth/session').json()['session']['id']
+    api.clock.advance(minutes=31)
+    assert identity.client.get('/auth/session').status_code==401
+    identity.ensure_session()
+    fresh=identity.client.get('/auth/session')
+    assert fresh.status_code==200 and fresh.json()['session']['id']!=first
+    assert ADMIN_PASSWORD not in repr(identity)
+
+
+def test_runner_refuses_missing_context_before_database_or_dotenv(monkeypatch):
+    import psycopg  # preload driver metadata before the global filesystem tripwire
+    from app.evaluation import runner
+    monkeypatch.delenv('RAS_EVALUATION_CONTEXT',raising=False)
+    def forbidden(*args,**kwargs):
+        raise AssertionError('no database or file fallback without an explicit context')
+    monkeypatch.setattr(runner,'create_engine',forbidden)
+    monkeypatch.setattr(Path,'read_text',forbidden)
+    with pytest.raises(SystemExit,match='explicit external evaluation context required'):
+        with runner.environment():
+            raise AssertionError('missing context was accepted')
 
 
 def _review_rows(qset, citations_per_claim=(2,)):

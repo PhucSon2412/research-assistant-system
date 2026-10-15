@@ -53,7 +53,8 @@ def journal_file():
 
 
 def gate(engine) -> str:
-    status=recovery.evaluate(get_settings(),engine)
+    # Operational inspection by the migrator; HTTP still requires runtime.
+    status=recovery.evaluate(get_settings(),engine,administrative=True)
     return 'open' if status.open else status.reason
 
 
@@ -117,7 +118,10 @@ def backup(api, admin_engine):
     # clone before using runtime workers; recovery itself uses the owner engine.
     engine = app_db.make_engine(admin_engine.url.set(database=url.database))
     from tests.test_auth_safety_foundation import runtime_engine
-    if live.username=="c1_runtime":
+    # Historical migration tests snapshot schemas before the auth role topology.
+    with engine.connect() as conn:
+        supports_auth_roles = conn.scalar(text("SELECT to_regclass('auth_change_receipts') IS NOT NULL"))
+    if supports_auth_roles:
         runtime = runtime_engine(SimpleNamespace(engine=engine)); runtime.dispose()
     try:
         yield SimpleNamespace(url=url, engine=engine)
@@ -337,7 +341,7 @@ def test_journal_write_failure_still_closes_the_copy_and_keeps_the_gate_shut_unt
     with pytest.raises(RecoveryError, match="journal_behind_db"):
         do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
     report = do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True)
-    assert report.journal_repaired == 1 and report.gate == "ready"
+    assert report.journal_repaired == 1 and report.gate == "open"
     assert [(r.seq, r.kind, r.hash, r.line) for r in records()] == mirror(w.api.engine)
     assert records("revocation")[0].body["item_id"] == w.copy
     assert w.b.get(f"/library/items/{w.copy}").json() == MISSING
@@ -396,7 +400,7 @@ def test_complete_line_whose_fsync_fails_keeps_the_gate_shut_until_recover_confi
     assert unconfirmed(w.api.engine) == [rec.seq] and gate(w.api.engine) == "journal_unconfirmed"
     # Once the file syncs, recover confirms the record (no --confirm-db-is-current: the line is in the file).
     report = do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
-    assert report.journal_confirmed == 1 and report.journal_repaired == 0 and report.gate == "ready"
+    assert report.journal_confirmed == 1 and report.journal_repaired == 0 and report.gate == "open"
     assert unconfirmed(w.api.engine) == []
     assert w.b.get(f"/library/items/{w.copy}").json() == MISSING
 
@@ -435,7 +439,7 @@ def test_torn_journal_line_is_moved_aside_and_the_record_restored_from_the_datab
         do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
     assert list(journal_file().parent.glob("revocations.jsonl.torn-*"))
     assert gate(w.api.engine) == "journal_behind_db"
-    assert do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True).gate == "ready"
+    assert do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True).gate == "open"
     assert [(r.seq, r.hash) for r in records()] == [(m[0], m[2]) for m in mirror(w.api.engine)]
 
 
@@ -446,7 +450,7 @@ def test_torn_tail_of_an_append_that_never_committed_is_dropped_without_confirma
     assert gate(w.api.engine) == "journal_torn"
     assert_recovering(w.browsers, [("GET", "/library/items")])
     report = do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
-    assert report.torn_tail_dropped and report.gate == "ready"
+    assert report.torn_tail_dropped and report.gate == "open"
     assert state(w.api, w.copy) == "listed" and w.copy in listed_ids(w.b)
 
 
@@ -512,7 +516,7 @@ def test_runtime_commit_exception_never_invokes_replay_and_gate_stays_shut(uploa
     assert state(w.api, w.copy) == "listed" and gate(w.api.engine) == "db_behind_journal"
     assert_recovering(w.browsers, [("GET", "/library/items"), ("GET", f"/library/items/{w.copy}")])
     report = do_recover(w.api.setup_engine, w.storage, w.api.clock.now)  # journal -> DB needs no confirmation
-    assert report.replayed["revoked"] == 1 and report.gate == "ready"
+    assert report.replayed["revoked"] == 1 and report.gate == "open"
     assert state(w.api, w.copy) == "revoked" and w.copy not in listed_ids(w.b)
 
 
@@ -609,7 +613,7 @@ def test_lost_older_or_corrupt_journal_closes_the_gate_and_is_rebuilt_only_on_co
     with pytest.raises(RecoveryError, match="journal_missing"):
         do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
     report = do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True)
-    assert report.journal_rebuilt == len(good.splitlines()) and report.gate == "ready"
+    assert report.journal_rebuilt == len(good.splitlines()) and report.gate == "open"
     assert path.read_bytes().startswith(good)  # the same lines, then this recovery's begin/end
 
     older = path.read_bytes().splitlines()
@@ -692,7 +696,7 @@ def test_restore_from_before_a_revocation_serves_and_processes_nothing_until_rec
 
         report = do_recover(snap.engine, storage, api.clock.now)
         assert replayed_decisions(report) == {"recovery_begin": 1, "revoked": 1, "recovery_end": 1}
-        assert report.cleanup == {"deleted": 2} and report.gate == "ready"  # this copy and the one revoked earlier
+        assert report.cleanup == {"deleted": 2} and report.gate == "open"  # this copy and the one revoked earlier
         with snap.engine.connect() as conn:
             assert conn.scalar(text("SELECT ras_common_copy_derived_left(:i)"), {"i": uuid.UUID(w.ok)}) == []
             assert conn.scalar(text("SELECT count(*) FROM chunks WHERE item_id=:i"), {"i": uuid.UUID(w.ok)}) == 0
@@ -739,7 +743,7 @@ def test_restore_replays_revocations_of_copies_the_snapshot_never_had(upload_api
         # The later copy's approval closed a request the snapshot never had: only its mirror row is added.
         assert replayed_decisions(report) == {"recovery_begin": 1, "revoked": 1, "recorded_item_absent": 1, "recovery_end": 1,
                                    "recorded_request_absent": 1}
-        assert report.gate == "ready"
+        assert report.gate == "open"
         with snap.engine.connect() as conn:
             assert conn.scalar(text("SELECT count(*) FROM library_items WHERE id=:i"), {"i": uuid.UUID(later)}) == 0
             tomb = conn.execute(text("SELECT purged_at IS NOT NULL, object_outcome FROM deletion_tombstones"
@@ -765,9 +769,15 @@ def test_adopts_a_database_older_than_its_registration(upload_api, monkeypatch, 
         old = app_db.get_engine()
         assert gate(old) == "not_registered"
         assert_recovering(w.browsers, [("GET", "/library/items")])
+        from tests.test_auth_safety_foundation import runtime_engine
+        runtime = runtime_engine(SimpleNamespace(engine=old))
+        app_env(runtime.url)
         report = do_recover(old, w.storage, w.api.clock.now)
-        assert report.adopted and report.gate == "ready"
-        for kind,count in {"genesis":1,"recorded_item_absent":1,"recovery_begin":1,"recovery_end":1,"recorded_request_absent":1}.items():
+        assert report.adopted and report.gate == "open"
+        assert report.safety_ready and recovery.evaluate(get_settings(), runtime).open
+        runtime.dispose()
+        # Replays both the fixture's real new-install recovery and this adoption.
+        for kind,count in {"genesis":1,"recorded_item_absent":1,"recovery_begin":2,"recovery_end":2,"recorded_request_absent":1}.items():
             assert report.replayed[kind]==count
         assert report.replayed["credential_transition"]==report.replayed["account_status_decision"]==3
         assert report.replayed["recorded_invitation_absent"]==2
@@ -783,6 +793,7 @@ def test_adopts_a_database_older_than_its_registration(upload_api, monkeypatch, 
 def test_cleanup_failure_during_recovery_keeps_the_gate_shut_until_a_rerun_succeeds(upload_api, monkeypatch,
                                                                                     admin_engine, app_env):
     w = listed(upload_api, monkeypatch)
+    initial_kinds = [r.kind for r in records() if r.kind not in (*journal.AUTH_KINDS,journal.INVITATION_CLOSURE)]
     key = common_key(w.api, w.copy)
     with backup(w.api, admin_engine) as snap:
         assert revoke(w.admin, w.copy).status_code == 200
@@ -799,9 +810,9 @@ def test_cleanup_failure_during_recovery_keeps_the_gate_shut_until_a_rerun_succe
         assert_recovering(w.browsers, [("GET", "/library/items"), ("GET", f"/files/{w.ids_a['file_id']}/original")])
         monkeypatch.setattr(w.storage, "delete", real_delete)
         report = do_recover(snap.engine, w.storage, w.api.clock.now)
-        assert report.gate == "ready" and not key_present(w.storage, key)
+        assert report.gate == "open" and not key_present(w.storage, key)
         kinds = [r.kind for r in records()]
-        assert [kind for kind in kinds if kind not in (*journal.AUTH_KINDS,journal.INVITATION_CLOSURE)] == ["genesis", "review_closure", "revocation", "recovery_begin",
+        assert [kind for kind in kinds if kind not in (*journal.AUTH_KINDS,journal.INVITATION_CLOSURE)] == initial_kinds + ["revocation", "recovery_begin",
                          "recovery_end"]  # the rerun closed the same run
         # And again: idempotent, a fresh begin/end pair, nothing replayed.
         assert replayed_decisions(do_recover(snap.engine, w.storage, w.api.clock.now)) == {"recovery_begin": 1,
@@ -884,5 +895,5 @@ def test_objects_restored_from_an_older_object_backup_are_removed_by_recover(upl
     assert w.a.get(f"/files/{common_file(w.api, w.copy)}/original").json() == MISSING
     # ...so the runbook runs `recover` after any restore, and its sweep removes it.
     report = do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
-    assert report.objects_removed == 1 and report.gate == "ready" and not key_present(w.storage, key)
+    assert report.objects_removed == 1 and report.gate == "open" and not key_present(w.storage, key)
     assert w.a.get(f"/files/{w.ids_a['file_id']}/original").content == A_BODY

@@ -252,8 +252,8 @@ def test_real_operator_set_credential_commits_receipt_and_new_login(world, monke
     raw = w.path.read_text(encoding="ascii")
     assert NEW not in raw and after.password_verifier not in raw and "example.test" not in raw
     no_leak(w.operator)
-    recover(w)  # close the hold; safety stays pending
-    assert recovery.evaluate(w.settings, w.runtime).reason == "auth_safety_pending"
+    recover(w)  # C4 verifies the operational contract before closing the hold
+    assert recovery.evaluate(w.settings, w.runtime).reason == "open"
     with pytest.raises(InvalidCredentials):
         sign_in(w, uid, SECRET, monkeypatch)
     issued = sign_in(w, uid, NEW, monkeypatch)
@@ -1061,7 +1061,7 @@ def test_two_dump_restore_rounds_never_reuse_case_or_rebuild_credential(world, a
             lost.append(result)
             used.append(fresh)
             recovery.recover(owner, SimpleNamespace(), settings, NOW)
-            assert recovery.evaluate(settings, owner).reason == "auth_safety_pending"
+            assert recovery.evaluate(settings, owner).reason == "worker_runtime_required"
             current = copy.read_bytes()
         finally:
             op_engine.dispose()

@@ -20,7 +20,7 @@ from app.models import Collection, CollectionItem, DiscoverySource, LibraryItem,
 from app.models.enums import RevocationReason
 from tests.test_c2d1_final_caller import browser, mutate, wait_for, close
 from tests.test_c2c1_bootstrap import installation
-from tests.test_c2c2_invitations import world, issue, accept, PASSWORD, EMAIL
+from tests.test_c2c2_invitations import operational_world as world, issue, accept, PASSWORD, EMAIL
 from tests.test_auth_safety_foundation import NOW
 from tests.resource_fixtures import source, derived, common_copy
 from tests.test_citations import oai_page
@@ -85,7 +85,7 @@ def test_auth_changes_after_real_dependency(resources,key,change):
     b=resources
     b.after_dependency=lambda db,ctx: mutate(b,change)
     response=b.client.get(b.path(key))
-    expected=503 if change in ("hold","ahead","unconfirmed") else 401
+    expected=503 if change in ("hold","ahead","unconfirmed","receipt_credential","receipt_status","wrong_receipt","head","latest_credential","latest_status") else 401
     assert response.status_code==expected,response.text
     assert response.json()=={"error":"service_recovering" if expected==503 else "session_expired"}
     if expected==401: assert "Max-Age=0" in response.headers["set-cookie"]

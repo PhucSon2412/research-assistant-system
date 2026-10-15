@@ -25,7 +25,6 @@ from unittest import mock
 import httpx
 from alembic import command
 from alembic.config import Config
-from dotenv import dotenv_values
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from sqlalchemy import Engine, create_engine, text
@@ -140,65 +139,92 @@ class Environment:
 
 
 @contextmanager
-def environment(repo_dir: Path = REPO_DIR, keep: bool = False) -> Iterator[Environment]:
-    """Fresh migrated database and bucket on the Compose PostgreSQL/MinIO, removed afterwards."""
-    values = {k: (v or "") for k, v in dotenv_values(repo_dir / ".env").items()}
-    for key in ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB", "MINIO_ROOT_USER", "MINIO_ROOT_PASSWORD"):
-        if not values.get(key):
-            raise SystemExit(f"{key} missing in .env; see docs/dev-setup.md")
-    admin_url = URL.create("postgresql+psycopg", username=values["POSTGRES_USER"],
-                           password=values["POSTGRES_PASSWORD"], host="127.0.0.1",
-                           port=int(values.get("POSTGRES_HOST_PORT") or 5432), database=values["POSTGRES_DB"])
-    admin = create_engine(admin_url, isolation_level="AUTOCOMMIT", hide_parameters=True)
+def environment(context: Path | None = None, keep: bool = False) -> Iterator[Environment]:
+    """Explicit isolated context, fresh DB, real runtime roles and C4 reconciliation."""
+    from urllib.parse import urlsplit
+    import ipaddress
+    import psycopg
+    from psycopg import sql
+    from app.db_roles import provision
+    from app import recovery
+    path = context or (Path(os.environ['RAS_EVALUATION_CONTEXT']) if os.environ.get('RAS_EVALUATION_CONTEXT') else None)
+    if path is None or not path.is_absolute() or REPO_DIR == path.resolve() or REPO_DIR in path.resolve().parents:
+        raise SystemExit('explicit external evaluation context required; .env is never read')
+    values = json.loads(path.read_text(encoding='utf-8'))
+    required = ('db_host','db_port','db_user','db_password','db_name','storage_endpoint','storage_access_key','storage_secret_key','journal_directory')
+    if any(not values.get(k) for k in required):
+        raise SystemExit('evaluation context incomplete')
+    storage_url = urlsplit(values['storage_endpoint'])
+    if (not ipaddress.ip_address(values['db_host']).is_loopback or int(values['db_port']) in (5432, 0)
+            or not ipaddress.ip_address(storage_url.hostname).is_loopback or storage_url.port in (None,9000)):
+        raise SystemExit('isolated explicit loopback ports required')
+    journal_dir = Path(values['journal_directory']).resolve()
+    if not journal_dir.is_absolute() or journal_dir == REPO_DIR or REPO_DIR in journal_dir.parents:
+        raise SystemExit('external evaluation journal directory required')
+    admin_url = URL.create('postgresql+psycopg', username=values['db_user'], password=values['db_password'],
+                           host=values['db_host'], port=int(values['db_port']), database=values['db_name'])
+    admin = create_engine(admin_url, isolation_level='AUTOCOMMIT', hide_parameters=True)
     name = f"ras_eval_{uuid.uuid4().hex[:12]}"
-    url = admin_url.set(database=name)
-    env = {"RAS_DB__HOST": url.host, "RAS_DB__PORT": str(url.port), "RAS_DB__USER": url.username,
-           "RAS_DB__PASSWORD": url.password, "RAS_DB__NAME": name,
-           "RAS_STORAGE__ENDPOINT_URL": f"http://127.0.0.1:{values.get('MINIO_API_HOST_PORT') or '9000'}",
-           "RAS_STORAGE__ACCESS_KEY": values["MINIO_ROOT_USER"],
-           "RAS_STORAGE__SECRET_KEY": values["MINIO_ROOT_PASSWORD"],
-           "RAS_STORAGE__BUCKET": f"ras-eval-{uuid.uuid4().hex[:16]}",
-           "RAS_ENVIRONMENT": "development", "RAS_HTTP__COOKIE_SECURE": "false",
-           "RAS_HTTP__ALLOWED_ORIGINS": json.dumps([ORIGIN]), "RAS_DELIVERY__MODE": "disabled"}
-    saved = {key: os.environ.get(key) for key in (*env, "RAS_DATABASE_URL")}
+    owner_url = admin_url.set(database=name)
+    names = [name + '_' + suffix for suffix in ('runtime','recovery','definer')]
+    passwords = [secrets.token_urlsafe(32), secrets.token_urlsafe(32)]
+    url = owner_url.set(username=names[0], password=passwords[0])
+    env = {'RAS_DB__HOST':url.host, 'RAS_DB__PORT':str(url.port), 'RAS_DB__USER':url.username,
+           'RAS_DB__PASSWORD':url.password, 'RAS_DB__NAME':name,
+           'RAS_RECOVERY__JOURNAL_PATH':str(journal_dir / name / 'revocations.jsonl'),
+           'RAS_STORAGE__ENDPOINT_URL':values['storage_endpoint'], 'RAS_STORAGE__ACCESS_KEY':values['storage_access_key'],
+           'RAS_STORAGE__SECRET_KEY':values['storage_secret_key'], 'RAS_STORAGE__BUCKET':name.replace('_','-'),
+           'RAS_ENVIRONMENT':'development', 'RAS_HTTP__COOKIE_SECURE':'false',
+           'RAS_HTTP__ALLOWED_ORIGINS':json.dumps([ORIGIN]), 'RAS_DELIVERY__MODE':'disabled',
+           'RAS_EMBEDDING__API_KEY':'', 'RAS_EMBEDDING__PRICING_VERIFIED':'false',
+           'RAS_RERANK__PRICING_VERIFIED':'false', 'RAS_GENERATION__PRICING_VERIFIED':'false'}
+    saved = {key: os.environ.get(key) for key in (*env, 'RAS_DATABASE_URL')}
+    storage = setup = runtime = None
     with admin.connect() as conn:
         conn.execute(text(f'CREATE DATABASE "{name}" TEMPLATE template0'))
-    storage = None
     try:
-        os.environ.pop("RAS_DATABASE_URL", None)
+        os.environ.pop('RAS_DATABASE_URL',None)
         os.environ.update(env)
         app_config.get_settings.cache_clear()
         app_db.get_engine.cache_clear()
-        cfg = Config(str(API_DIR / "alembic.ini"))
-        cfg.set_main_option("script_location", str(API_DIR / "migrations"))
-        cfg.attributes["database_url"] = url
-        cfg.attributes["configure_logger"] = False
-        command.upgrade(cfg, "head")
+        cfg = Config(str(API_DIR / 'alembic.ini'))
+        cfg.set_main_option('script_location',str(API_DIR / 'migrations'))
+        cfg.attributes.update(database_url=owner_url, configure_logger=False)
+        command.upgrade(cfg,'head')
+        setup = app_db.make_engine(owner_url)
+        with psycopg.connect(admin_url.render_as_string(hide_password=False).replace('postgresql+psycopg://','postgresql://')) as conn:
+            for role, password in zip(names,passwords):
+                conn.execute(sql.SQL('CREATE ROLE {} LOGIN PASSWORD {} NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS').format(sql.Identifier(role),sql.Literal(password)))
+        provision(setup,runtime=names[0],recovery=names[1],definer=names[2])
         base = get_settings()
-        configured = {"embedding": base.embedding.pricing_verified, "rerank": base.rerank.pricing_verified,
-                      "generation": base.generation.pricing_verified}
+        configured = {'embedding':base.embedding.pricing_verified, 'rerank':base.rerank.pricing_verified,
+                      'generation':base.generation.pricing_verified}
         settings = eval_settings(base)
         storage = OriginalStorage(settings)
         storage.ensure_bucket()
+        recovery.init_new(setup,base,utcnow())
+        recovery.recover(setup,storage,base,utcnow())
+        runtime = app_db.get_engine()
+        if not recovery.evaluate(base,runtime).open:
+            raise RuntimeError('evaluation runtime readiness incomplete')
         app.dependency_overrides[get_settings] = lambda: settings
-        yield Environment(app_db.get_engine(), storage, settings, configured)
+        yield Environment(runtime,storage,settings,configured,setup_engine=setup)
     finally:
-        app.dependency_overrides.pop(get_settings, None)
-        app_db.get_engine().dispose()
+        app.dependency_overrides.pop(get_settings,None)
+        if runtime is not None: runtime.dispose()
+        if setup is not None: setup.dispose()
         if storage is not None and not keep:
-            for key, _ in storage.orphan_keys(""):
-                storage.delete(key)
+            for key, _ in storage.orphan_keys(''): storage.delete(key)
             storage.client.delete_bucket(Bucket=storage.bucket)
-        for key, value in saved.items():
-            if value is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = value
+        for key,value in saved.items():
+            if value is None: os.environ.pop(key,None)
+            else: os.environ[key]=value
         app_config.get_settings.cache_clear()
         app_db.get_engine.cache_clear()
         if not keep:
             with admin.connect() as conn:
                 conn.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
+                for role in names: conn.execute(text(f'DROP ROLE IF EXISTS "{role}"'))
         admin.dispose()
 
 
@@ -210,6 +236,17 @@ class Identity:
     user_id: uuid.UUID
     role: str
     client: TestClient
+    renew: Callable[[], None] | None = field(default=None, repr=False)
+
+    def ensure_session(self):
+        """A long local run may outlive idle TTL. Sign in normally before work;
+        never retry a business mutation or lengthen the product's session policy.
+        """
+        response = self.client.get('/auth/session')
+        if response.status_code == 401 and self.renew is not None:
+            self.renew()
+        elif response.status_code != 200:
+            raise RuntimeError('evaluation session unavailable')
 
     def headers(self) -> dict[str, str]:
         return {"X-CSRF-Token": self.client.cookies["ras_csrf"], "origin": ORIGIN}
@@ -237,12 +274,15 @@ class Seeded:
 
 def _login(email: str, password: str, key: str, user_id: uuid.UUID, role: str) -> Identity:
     client = TestClient(app, base_url="http://testserver")
-    client.get("/auth/csrf")
-    response = client.post("/auth/login", json={"email": email, "password": password},
-                           headers={"X-CSRF-Token": client.cookies["ras_csrf"], "origin": ORIGIN})
-    if response.status_code != 200:
-        raise RuntimeError(f"login failed for {key}: {response.status_code}")
-    return Identity(key, user_id, role, client)
+    def renew():
+        client.cookies.clear()
+        client.get("/auth/csrf")
+        response = client.post("/auth/login", json={"email": email, "password": password},
+                               headers={"X-CSRF-Token": client.cookies["ras_csrf"], "origin": ORIGIN})
+        if response.status_code != 200:
+            raise RuntimeError(f"login failed for {key}: {response.status_code}")
+    renew()
+    return Identity(key, user_id, role, client, renew)
 
 
 def seed(env: Environment, manifest: Manifest, root: Path) -> Seeded:
@@ -377,6 +417,7 @@ def evaluate(env: Environment, manifest: Manifest, qset: QuestionSet, seeded: Se
     records = []
     for question in qset.questions:
         who = seeded.identities[question.identity]
+        who.ensure_session()
         for mode in modes:
             response = who.post("/search", {"query": question.question, "mode": mode, "rerank": False,
                                             **_scope_body(question, seeded, rag=False)})
@@ -446,6 +487,8 @@ def check_viewer(seeded: Seeded, records: list[dict]) -> dict:
         for chunk_id, hit in zip(record.get("chunk_ids", []), record["hits"]):
             chunks[chunk_id] = seeded.owners.get(hit[0], "unknown")
     checks, violations = 0, []
+    for identity in seeded.identities.values():
+        identity.ensure_session()
     for chunk_id, owner in sorted(chunks.items()):
         for key, identity in seeded.identities.items():
             status = identity.client.get(f"/search/chunks/{chunk_id}").status_code
@@ -496,14 +539,14 @@ def git_state(repo_dir: Path = REPO_DIR) -> dict:
     return {"commit": run("rev-parse", "HEAD"), "dirty": bool(run("status", "--porcelain"))}
 
 
-def run(root: Path, *, modes: tuple[str, ...] = MODES, keep: bool = False) -> dict:
+def run(root: Path, *, context: Path | None = None, modes: tuple[str, ...] = MODES, keep: bool = False) -> dict:
     errors = validate(root)
     if errors:
         raise SystemExit("dataset is invalid; run `python -m app.evaluation validate`:\n" + "\n".join(errors))
     manifest, qset = load(root)
     capture = Capture()
     started = datetime.now(timezone.utc)
-    with environment(keep=keep) as env, instrumented(capture):
+    with environment(context=context, keep=keep) as env, instrumented(capture):
         seeded = seed(env, manifest, root)
         index = {key: indexed_hits(env, seeded, key) for key in seeded.ingest}
         records = evaluate(env, manifest, qset, seeded, capture, modes)

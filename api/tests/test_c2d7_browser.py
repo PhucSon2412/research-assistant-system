@@ -1,7 +1,7 @@
 """Installed Chrome, actual Next proxy and uvicorn; disposable fixture only.
 
-The app's pending result is patched only by upload_api. The final check restores
-the real gate. Copies tracked web source (never .env) to an external directory.
+Shared business setup uses the real C4 contract. The last check injects pending
+as a separate historical fault case. Copies tracked web source (never .env) to an external directory.
 """
 import json
 import os
@@ -79,6 +79,10 @@ def test_chrome_proxy_business_and_pending(generated,tmp_path,monkeypatch):
             context=chrome.new_context()
             context.route('**/*',lambda route: route.continue_() if route.request.url.startswith(origin+'/') else route.abort())
             page=context.new_page();requests=[]
+            responses=[]
+            page.on('response',lambda r: responses.append({'url':r.url,'status':r.status,'body':r.text()})
+                    if '/api/rag/ask' in r.url else None)
+            page.on('requestfailed',lambda r: responses.append({'url':r.url,'failure':r.failure}))
             page.on('request',lambda r:requests.append(r.url) if r.url.endswith('/api/rag/ask') else None)
             def login(email,password):
                 page.goto(origin+'/login');page.get_by_label('Email',exact=True).fill(email)
@@ -138,7 +142,7 @@ def test_chrome_proxy_business_and_pending(generated,tmp_path,monkeypatch):
             page.goto(origin+'/items/'+common)
             expect(page.get_by_text('Không tìm thấy',exact=False)).to_be_visible(timeout=60000)
             monkeypatch.setattr(auth_safety,'cutover',lambda db:'auth_safety_pending')
-            # Real HTTP pending is separately asserted after the scoped business checks.
+            # A separate pending fault is asserted after the real C4 business checks.
             result=context.request.get(f'http://127.0.0.1:{api_port}/search/chunks/'+chunk_path.rsplit('/',1)[1])
             assert result.status==503
             assert context.request.get(f'http://127.0.0.1:{api_port}/healthz').status==200
@@ -150,6 +154,8 @@ def test_chrome_proxy_business_and_pending(generated,tmp_path,monkeypatch):
         root=Path(os.environ['RAS_C2D7_CONTEXT'])
         (root/'chrome-smoke.json').write_text(json.dumps(facts,indent=2),encoding='utf-8')
     finally:
+        root=Path(os.environ['RAS_C2D7_CONTEXT'])
+        (root/'chrome-attempt-responses.json').write_text(json.dumps({'responses':locals().get('responses',[]),'provider_checks':b.provider_checks},indent=2),encoding='utf-8')
         server.should_exit=True;thread.join(15)
         subprocess.run(['taskkill','/PID',str(process.pid),'/T','/F'],capture_output=True)
         process.wait(timeout=15);log.close()

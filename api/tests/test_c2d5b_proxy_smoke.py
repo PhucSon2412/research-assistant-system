@@ -19,7 +19,7 @@ from tests.test_c2d5b_review_approval import approvals, Originals, body, opened,
 from tests.test_c2d5a_review_writes import writers  # noqa: F401
 from tests.test_c2d1_final_caller import browser  # noqa: F401
 from tests.test_c2c1_bootstrap import installation  # noqa: F401
-from tests.test_c2c2_invitations import world  # noqa: F401
+from tests.test_c2c2_invitations import operational_world as world  # noqa: F401
 
 API, WEB = 58476, 53476
 

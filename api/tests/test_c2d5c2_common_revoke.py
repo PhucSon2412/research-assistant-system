@@ -1,6 +1,6 @@
 """One runtime revoke POST, real PG/roles/journal and synthetic MinIO originals.
 
-Only business cutover is scoped. Privileged replica writes below are explicitly
+Shared business setup uses the real C4 contract. Privileged replica writes below are explicitly
 corruption/adversary setup, never the runtime mutation under test.
 """
 import asyncio
@@ -23,7 +23,7 @@ from app.config import get_settings
 from app.db import get_engine
 from tests.test_auth_safety_foundation import NOW
 from tests.test_c2c1_bootstrap import installation  # noqa: F401
-from tests.test_c2c2_invitations import world  # noqa: F401
+from tests.test_c2c2_invitations import operational_world as world  # noqa: F401
 from tests.test_c2d1_final_caller import browser  # noqa: F401
 from tests.test_c2d5a_review_writes import writers, wait_for  # noqa: F401
 from tests.test_c2d5c1_common_publish import publishes, pending, publish, replica, scalar  # noqa: F401
@@ -242,7 +242,7 @@ def test_current_actor_and_gate_not_dependency_snapshot(publishes, monkeypatch, 
         def respond(*a): change(b, case); return real(*a)
         monkeypatch.setattr(boundary, 'respond', respond)
     r = revoke(b)
-    assert r.status_code == (503 if case == 'hold' else 403 if case in ('role', 'csrf') else 401), r.text
+    assert r.status_code == (503 if case in ('hold','receipt','head') else 403 if case in ('role', 'csrf') else 401), r.text
     assert 'item' not in r.json() and state(b) == ('revoked' if phase == 'response' else 'pending')
 
 
@@ -586,7 +586,7 @@ def test_restore_current_intent_retention_cleanup_private_intact_idempotent(publ
         assert not recovery.evaluate_integrity(settings,snap.engine).open
         recovery.hold(snap.engine,settings,NOW)
         report = recovery.recover(snap.engine,b.raw_storage,settings,NOW)
-        assert report.reconciliation_complete and not report.safety_ready
+        assert report.reconciliation_complete and report.safety_ready
         assert recovery.evaluate_integrity(settings,snap.engine).open
         with snap.engine.connect() as c:
             tomb = c.execute(text('SELECT rights_epoch,reason_code,storage_key,purged_at FROM deletion_tombstones WHERE item_id=:i'),{'i':b.copy.item}).one()
@@ -606,7 +606,7 @@ def test_restore_current_intent_retention_cleanup_private_intact_idempotent(publ
                 assert c.scalar(text('SELECT count(*) FROM ingestion_jobs WHERE id=:j'),{'j':job})==0
             assert c.scalar(text('SELECT count(*) FROM chunks WHERE item_id=:i'),{'i':b.copy.item})==0
         report = recovery.recover(snap.engine,b.raw_storage,settings,NOW)
-        assert report.reconciliation_complete and not report.safety_ready
+        assert report.reconciliation_complete and report.safety_ready
     assert b.approval_storage.objects[b.own.key]==BODY
 
 

@@ -14,7 +14,7 @@ from app.models import (Chunk, LibraryItem, MetadataCandidate, PaperVersion, Pdf
                         ReferenceEntry, ReviewRequest, Section, SourceFile)
 from tests.helpers import (Harness, Browser, FakeClock, USER_PASSWORD, WEB_ORIGIN, DEV_ENV)
 from tests.test_c2c1_bootstrap import installation
-from tests.test_c2c2_invitations import world as resource_world, issue
+from tests.test_c2c2_invitations import operational_world as resource_world, issue
 from tests.test_auth_safety_foundation import NOW
 from app.config import get_settings
 from app.main import app

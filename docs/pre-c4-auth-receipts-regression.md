@@ -1,5 +1,7 @@
 # B1 — provenance initial receipt và hồi quy trước C4
 
+**Sau merge, 2026-10-15:** PR #60 đã merge `44633b99`, tree khớp head review `c6f200e`; source `0050`, chưa rerun tại merge. [Review độc lập](reviews/pr60-pre-c4-auth-receipts-regression.md) giữ kết quả/giới hạn trước merge. Đã giao [C4 tích hợp](tasks/m6c2b2c4-integrated-cutover.md), mới giao/chưa triển khai hoặc kiểm; mã hiện vẫn pending. Các kết quả B1 dưới đây giữ đúng source/lượt chạy, không là readiness C4 hoặc trạng thái DB dev.
+
 [Task](tasks/pre-c4-auth-receipts-and-regression.md) · [Inventory](pre-c4-test-inventory.json) · [Kế hoạch MVP](mvp-delivery-plan.md)
 
 **Đã triển khai và kiểm ngày 2026-10-15 trên nhánh `fix/pre-c4-auth-receipts-regression`, base merge PR #59 `041f77ef1c12b6277e7a5f46aaf32155b3673063`. Safety pending tới C4.** Docs orchestrator/reviewer có sẵn được giữ trong commit `1e7a0c0`. Chỉ Conda ras, PostgreSQL/MinIO/Redis/journal/hồ sơ tổng hợp trên project cô lập; không đọc `.env`, thao tác stack dev, provider thật hoặc pricing.

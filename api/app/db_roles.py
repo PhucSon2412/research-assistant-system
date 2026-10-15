@@ -15,7 +15,7 @@ RUNTIME_ROUTINES = {"ras_auth_review_closure_mirror", "ras_auth_review_closure_c
                     "ras_auth_invitation_prepare", "ras_auth_invitation_compensate", "ras_auth_invitation_recover",
                     "ras_auth_cleanup_fence", "ras_auth_orphan_fence", "ras_auth_orphan_complete",
                     "ras_auth_initial_pair", "ras_auth_initial_status_verified", "ras_auth_receipt_provenance", "ras_auth_creation_current", "ras_auth_operator_receipt_provenance"}
-RECOVERY_ROUTINES = {"ras_auth_mirror", "ras_auth_confirm", "ras_auth_project", "ras_auth_restrict", "ras_auth_progress", "ras_auth_lock_users",
+RECOVERY_ROUTINES = {"ras_auth_complete_contract", "ras_auth_mirror", "ras_auth_confirm", "ras_auth_project", "ras_auth_restrict", "ras_auth_progress", "ras_auth_lock_users",
                      "ras_auth_account_live", "ras_auth_session_live", "ras_auth_session_lock",
                      "ras_auth_session_close", "ras_auth_closure_mirror", "ras_auth_status_live", "ras_auth_reset_eligible",
                      "ras_auth_reset_token_live", "ras_auth_token_lock", "ras_auth_token_close",
@@ -26,7 +26,7 @@ OPERATOR_ROUTINES = {"ras_auth_operator_whoami", "ras_auth_operator_gate", "ras_
                      "ras_auth_operator_case", "ras_auth_operator_snapshot", "ras_auth_operator_stage",
                      "ras_auth_operator_confirm", "ras_auth_operator_outcome"}
 PROTECTED = {"users", "invitations", "bootstrap_state", "sessions", "password_reset_tokens", "auth_change_receipts", "auth_safety_heads", "auth_safety_state", "auth_hash_policies", "revocation_journal_records", "object_delete_fences", "orphan_object_fences", "orphan_object_completions",
-             "auth_recovery_operators", "auth_recovery_cases"}
+             "auth_recovery_operators", "auth_recovery_cases", "auth_operational_state", "recovery_registrations"}
 
 
 def _identifier(name):
@@ -43,7 +43,7 @@ def provision(engine, *, runtime: str, recovery: str, definer: str):
     rt, rc, df = identifiers
     with engine.begin() as conn:
         for name in (runtime, recovery):
-            row = conn.execute(text("SELECT rolsuper,rolcreaterole,rolcreatedb,rolbypassrls FROM pg_roles WHERE rolname=:n"), {"n": name}).first()
+            row = conn.execute(text("SELECT NOT rolcanlogin,rolsuper,rolcreaterole,rolcreatedb,rolbypassrls,rolreplication FROM pg_roles WHERE rolname=:n"), {"n": name}).first()
             if row is None or any(row):
                 raise ValueError("login role missing or privileged")
             if conn.execute(text("SELECT count(*) FROM pg_auth_members WHERE member=(SELECT oid FROM pg_roles WHERE rolname=:n)"), {"n": name}).scalar():
@@ -53,7 +53,7 @@ def provision(engine, *, runtime: str, recovery: str, definer: str):
                 OR EXISTS(SELECT 1 FROM pg_proc WHERE proowner=(SELECT oid FROM pg_roles WHERE rolname=:n))
                 OR EXISTS(SELECT 1 FROM pg_database WHERE datname=current_database() AND datdba=(SELECT oid FROM pg_roles WHERE rolname=:n))"""), {"n":name}).scalar():
                 raise ValueError("login role owns database objects")
-        existing = conn.execute(text("SELECT rolcanlogin,rolsuper,rolcreaterole,rolcreatedb,rolbypassrls FROM pg_roles WHERE rolname=:n"), {"n":definer}).first()
+        existing = conn.execute(text("SELECT rolcanlogin,rolsuper,rolcreaterole,rolcreatedb,rolbypassrls,rolreplication FROM pg_roles WHERE rolname=:n"), {"n":definer}).first()
         if existing is None:
             conn.execute(text(f"CREATE ROLE {df} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS"))
         elif any(existing):
@@ -72,6 +72,13 @@ def provision(engine, *, runtime: str, recovery: str, definer: str):
             # Older revisions are provisioned by migration tests before the fence table exists (0044).
             if conn.scalar(text("SELECT to_regclass(:t) IS NOT NULL"), {"t": table}):
                 conn.execute(text(f"REVOKE ALL ON {_identifier(table)} FROM PUBLIC"))
+                # Table REVOKE does not remove independent column ACLs. Strip
+                # those too before rebuilding this deployment's protected ACLs.
+                columns = conn.execute(text("SELECT attname FROM pg_attribute WHERE attrelid=to_regclass(:t)"
+                    " AND attnum>0 AND NOT attisdropped ORDER BY attnum"), {"t": table}).scalars()
+                column_list = ','.join(conn.dialect.identifier_preparer.quote(name) for name in columns)
+                if column_list:
+                    conn.execute(text(f"REVOKE ALL ({column_list}) ON {_identifier(table)} FROM PUBLIC, {rt}, {rc}, {df}"))
         conn.execute(text(f"REVOKE ALL ON ALL TABLES IN SCHEMA public FROM {rt}, {rc}, {df}"))
         conn.execute(text(f"REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM {rt}, {rc}, {df}"))
         conn.execute(text(f"GRANT USAGE ON SCHEMA public TO {rt}, {rc}, {df}"))
@@ -84,11 +91,14 @@ def provision(engine, *, runtime: str, recovery: str, definer: str):
         # Recovery writes old closure/mirror data, but cannot create receipts or write User auth state.
         for table in ("sessions", "password_reset_tokens", "revocation_journal_records"):
             conn.execute(text(f"GRANT INSERT,UPDATE ON {_identifier(table)} TO {rc}"))
+        conn.execute(text(f"GRANT INSERT ON recovery_registrations TO {rc}"))
         conn.execute(text(f"GRANT SELECT ON users,sessions,password_reset_tokens,auth_change_receipts,auth_safety_heads,auth_safety_state,auth_hash_policies,revocation_journal_records TO {df}"))
         conn.execute(text(f"GRANT INSERT ON auth_change_receipts,auth_safety_heads,sessions,password_reset_tokens,revocation_journal_records TO {df}"))
         conn.execute(text(f"GRANT UPDATE ON users,sessions,password_reset_tokens,auth_safety_heads,auth_safety_state,revocation_journal_records TO {df}"))
         conn.execute(text(f"GRANT SELECT,INSERT ON bootstrap_state TO {df}"))
         conn.execute(text(f"GRANT SELECT ON recovery_registrations TO {df}"))
+        if conn.scalar(text("SELECT to_regclass('auth_operational_state') IS NOT NULL")):
+            conn.execute(text(f"GRANT SELECT,INSERT,UPDATE ON auth_operational_state TO {df}"))
         conn.execute(text(f"GRANT INSERT ON users,audit_events TO {df}"))
         conn.execute(text(f"GRANT SELECT,INSERT,UPDATE ON invitations TO {df}"))
         conn.execute(text(f"GRANT SELECT ON review_requests TO {df}"))
