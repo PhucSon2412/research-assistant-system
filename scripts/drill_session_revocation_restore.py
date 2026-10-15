@@ -40,11 +40,11 @@ def main():
          and httpx.get(url(SRC, "api") + "/readyz").status_code == 200)
     password, tag = secrets.token_urlsafe(24), uuid.uuid4().hex[:8]
     emails = {who: f"session-drill-{tag}-{who}@example.org" for who in ("admin", "a", "b")}
-    verifier = hash_password(password)  # outside the transaction
-    with source.begin() as conn:
-        for who, role in (("admin", "admin"), ("a", "user"), ("b", "user")):
-            conn.execute(text("INSERT INTO users(email,password_verifier,role) VALUES(:e,:p,:r)"),
-                         {"e": emails[who], "p": verifier, "r": role})
+    from drill_backup_restore import runtime_engine_for
+    from drill_accounts import seed_accounts
+    runtime=runtime_engine_for(SRC)
+    try:seed_accounts(runtime,emails,password)
+    finally:runtime.dispose()
     admin = Person(SRC, email=emails["admin"], password=password)
     a = [Person(SRC, email=emails["a"], password=password) for _ in range(3)]
     b = Person(SRC, email=emails["b"], password=password)

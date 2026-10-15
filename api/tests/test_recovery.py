@@ -71,6 +71,15 @@ def do_recover(engine, storage, now, **kwargs):
     return recovery.recover(engine, storage, get_settings(), now, **kwargs)
 
 
+def replayed_decisions(report):
+    """C1 rechecks present mirrors; retain exact assertions for every decision.
+
+    Full mirror/chain equality and recovery postconditions are checked alongside
+    these counts. The additional 'present' bookkeeping is not a new decision.
+    """
+    return {kind:count for kind,count in report.replayed.items() if kind!="present"}
+
+
 def assert_recovering(browsers, requests) -> None:
     for who, browser in browsers.items():
         for method, path, *body in requests:
@@ -104,7 +113,12 @@ def backup(api, admin_engine):
     url = live.set(database=f"ras_test_{uuid.uuid4().hex[:12]}")
     with admin_engine.connect() as conn:
         conn.execute(text(f'CREATE DATABASE "{url.database}" TEMPLATE "{live.database}"'))
-    engine = app_db.make_engine(url)
+    # TEMPLATE copies table ACLs, not database ACLs. Re-provision the disposable
+    # clone before using runtime workers; recovery itself uses the owner engine.
+    engine = app_db.make_engine(admin_engine.url.set(database=url.database))
+    from tests.test_auth_safety_foundation import runtime_engine
+    if live.username=="c1_runtime":
+        runtime = runtime_engine(SimpleNamespace(engine=engine)); runtime.dispose()
     try:
         yield SimpleNamespace(url=url, engine=engine)
     finally:
@@ -152,8 +166,11 @@ def celery_tasks(monkeypatch):
 
     def refuse(*args, **kwargs):
         raise AssertionError("a task ran while the recovery gate was closed")
-    for name in ("run_sync", "reconcile_pending", "cleanup_revoked", "due_job_ids"):
-        monkeypatch.setattr(module, name, refuse)
+    # These public boundaries now own their gates; replacing them would remove
+    # the very guard under test. Deny downstream object I/O instead.
+    from app.storage import OriginalStorage
+    for name in ("open", "put", "delete", "orphan_keys"):
+        monkeypatch.setattr(OriginalStorage,name,refuse)
     return module
 
 
@@ -279,7 +296,7 @@ def test_db_refuses_tombstones_without_journal_record_and_edits_to_the_mirror(ap
     for statement in ("UPDATE revocation_journal_records SET result='x'", "DELETE FROM revocation_journal_records",
                       "UPDATE recovery_registrations SET mode='adopted'", "DELETE FROM recovery_registrations",
                       "TRUNCATE revocation_journal_records"):
-        with pytest.raises(IntegrityError, match="append-only"), api.engine.begin() as conn:
+        with pytest.raises(IntegrityError, match="append-only"), api.setup_engine.begin() as conn:
             conn.execute(text(statement))
     assert gate(api.engine) == "open"
 
@@ -390,13 +407,13 @@ def test_only_confirmation_may_change_a_journal_record(api):
                   "UPDATE revocation_journal_records SET journal_confirmed=true, result='x'",
                   "UPDATE revocation_journal_records SET result='x'")
     for statement in statements:
-        with pytest.raises(IntegrityError, match="append-only"), api.engine.begin() as conn:
+        with pytest.raises(IntegrityError, match="append-only"), api.setup_engine.begin() as conn:
             conn.execute(text(statement))
-    with api.engine.begin() as conn:  # an unconfirmed row may be confirmed, and nothing else
+    with api.setup_engine.begin() as conn:  # privileged corruption fixture; no runtime grant
         conn.execute(text("SET LOCAL session_replication_role = replica"))
         conn.execute(text("UPDATE revocation_journal_records SET journal_confirmed=false"))
     assert gate(api.engine) == "journal_unconfirmed"
-    with api.engine.begin() as conn:
+    with api.setup_engine.begin() as conn:
         conn.execute(text("UPDATE revocation_journal_records SET journal_confirmed=true"))
     assert gate(api.engine) == "open"
 
@@ -418,7 +435,7 @@ def test_torn_journal_line_is_moved_aside_and_the_record_restored_from_the_datab
         do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
     assert list(journal_file().parent.glob("revocations.jsonl.torn-*"))
     assert gate(w.api.engine) == "journal_behind_db"
-    assert do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True).gate == "open"
+    assert do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True).gate == "ready"
     assert [(r.seq, r.hash) for r in records()] == [(m[0], m[2]) for m in mirror(w.api.engine)]
 
 
@@ -520,6 +537,7 @@ def test_when_neither_journal_nor_database_take_the_revocation_nothing_changes(u
 
 def test_revocation_while_the_journal_is_ahead_writes_nothing(upload_api, monkeypatch):
     w = listed(upload_api, monkeypatch)
+    initial_count=len(records())
     state_before = journal.read(journal_file())
     journal.append(journal_file(), state_before, [journal.next_record(state_before.head, journal.RECOVERY_BEGIN, {
         "recovery_id": str(uuid.uuid4()), "started_at": utcnow().isoformat(), "db_head_seq": 1})])
@@ -529,7 +547,7 @@ def test_revocation_while_the_journal_is_ahead_writes_nothing(upload_api, monkey
         publication.revoke(db, admin_principal(w.api), uuid.UUID(w.copy), RevocationReason.OTHER, w.api.clock.now,
                            timedelta(hours=24))
     assert (caught.value.status_code, caught.value.code) == (503, "service_recovering")
-    assert state(w.api, w.copy) == "listed" and len(mirror(w.api.engine)) == 2 and len(records()) == 3
+    assert state(w.api, w.copy) == "listed" and len(mirror(w.api.engine)) == initial_count and len(records()) == initial_count+1
 
 
 def test_concurrent_revocations_get_consecutive_journal_records(upload_api, monkeypatch):
@@ -591,20 +609,21 @@ def test_lost_older_or_corrupt_journal_closes_the_gate_and_is_rebuilt_only_on_co
     with pytest.raises(RecoveryError, match="journal_missing"):
         do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
     report = do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True)
-    assert report.journal_rebuilt == 3 and report.gate == "ready"  # genesis, approval, revocation
+    assert report.journal_rebuilt == len(good.splitlines()) and report.gate == "ready"
     assert path.read_bytes().startswith(good)  # the same lines, then this recovery's begin/end
 
-    older = path.read_bytes().split(b"\n")
+    older = path.read_bytes().splitlines()
     path.write_bytes(b"\n".join(older[:1]) + b"\n")  # truncated to the genesis (an older copy of the file)
     assert gate(w.api.engine) == "journal_behind_db"
     assert_recovering(w.browsers, routes)
     with pytest.raises(RecoveryError, match="journal_behind_db"):
         do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
-    assert do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True).journal_repaired == 4
+    assert do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True).journal_repaired == len(older)-1
 
     current = path.read_bytes()
     lines = current.split(b"\n")
-    lines[2] = lines[2].replace(b'"rights_withdrawn"', b'"rights_expired"').replace(  # the revocation record
+    index=next(i for i,line in enumerate(lines) if b'"kind":"revocation"' in line)
+    lines[index] = lines[index].replace(b'"rights_withdrawn"', b'"rights_expired"').replace(
         b'"rights_recorded_in_error"', b'"rights_expired"')
     path.write_bytes(b"\n".join(lines))  # edited in place
     assert gate(w.api.engine) == "journal_corrupt"
@@ -662,14 +681,17 @@ def test_restore_from_before_a_revocation_serves_and_processes_nothing_until_rec
         monkeypatch.setattr("app.ingest.indexer.embed", lambda value, settings: sent.append(value))
         assert process_job(job, w.settings, storage) == "recovery_gate_closed"
         assert process_job(uuid.UUID(w.b_same["job_id"]), w.settings, storage) == "recovery_gate_closed"
-        tasks = celery_tasks(monkeypatch)
-        assert tasks.discover() == 0
-        for task in (tasks.sync_arxiv, tasks.reconcile_citation_links, tasks.cleanup_revoked_copies):
-            assert task() == {"skipped": "recovery_gate_closed"}
+        with monkeypatch.context() as pending:
+            tasks = celery_tasks(pending)
+            assert tasks.discover() == 0
+            sync=tasks.sync_arxiv()
+            assert sync["requests"]==sync["pages"]==sync["records"]==0 and sync["halted:recovery_gate_closed"]==1
+            for task in (tasks.reconcile_citation_links, tasks.cleanup_revoked_copies):
+                assert task() == {"skipped": "recovery_gate_closed"}
         assert sent == []
 
         report = do_recover(snap.engine, storage, api.clock.now)
-        assert report.replayed == {"recovery_begin": 1, "revoked": 1, "recovery_end": 1}
+        assert replayed_decisions(report) == {"recovery_begin": 1, "revoked": 1, "recovery_end": 1}
         assert report.cleanup == {"deleted": 2} and report.gate == "ready"  # this copy and the one revoked earlier
         with snap.engine.connect() as conn:
             assert conn.scalar(text("SELECT ras_common_copy_derived_left(:i)"), {"i": uuid.UUID(w.ok)}) == []
@@ -715,7 +737,7 @@ def test_restore_replays_revocations_of_copies_the_snapshot_never_had(upload_api
         assert gate(snap.engine) == "db_behind_journal"
         report = do_recover(snap.engine, w.storage, w.api.clock.now)
         # The later copy's approval closed a request the snapshot never had: only its mirror row is added.
-        assert report.replayed == {"recovery_begin": 1, "revoked": 1, "recorded_item_absent": 1, "recovery_end": 1,
+        assert replayed_decisions(report) == {"recovery_begin": 1, "revoked": 1, "recorded_item_absent": 1, "recovery_end": 1,
                                    "recorded_request_absent": 1}
         assert report.gate == "ready"
         with snap.engine.connect() as conn:
@@ -745,8 +767,12 @@ def test_adopts_a_database_older_than_its_registration(upload_api, monkeypatch, 
         assert_recovering(w.browsers, [("GET", "/library/items")])
         report = do_recover(old, w.storage, w.api.clock.now)
         assert report.adopted and report.gate == "ready"
-        assert report.replayed == {"genesis": 1, "recorded_item_absent": 1, "recovery_begin": 1, "recovery_end": 1,
-                                   "recorded_request_absent": 1}
+        for kind,count in {"genesis":1,"recorded_item_absent":1,"recovery_begin":1,"recovery_end":1,"recorded_request_absent":1}.items():
+            assert report.replayed[kind]==count
+        assert report.replayed["credential_transition"]==report.replayed["account_status_decision"]==3
+        assert report.replayed["recorded_invitation_absent"]==2
+        with old.connect() as conn:
+            assert conn.scalar(text("SELECT count(*) FROM users"))==0
         assert mirror(old) == [(r.seq, r.kind, r.hash, r.line) for r in records()]
     finally:
         app_db.get_engine().dispose()
@@ -775,10 +801,10 @@ def test_cleanup_failure_during_recovery_keeps_the_gate_shut_until_a_rerun_succe
         report = do_recover(snap.engine, w.storage, w.api.clock.now)
         assert report.gate == "ready" and not key_present(w.storage, key)
         kinds = [r.kind for r in records()]
-        assert kinds == ["genesis", "review_closure", "revocation", "recovery_begin",
+        assert [kind for kind in kinds if kind not in (*journal.AUTH_KINDS,journal.INVITATION_CLOSURE)] == ["genesis", "review_closure", "revocation", "recovery_begin",
                          "recovery_end"]  # the rerun closed the same run
         # And again: idempotent, a fresh begin/end pair, nothing replayed.
-        assert do_recover(snap.engine, w.storage, w.api.clock.now).replayed == {"recovery_begin": 1,
+        assert replayed_decisions(do_recover(snap.engine, w.storage, w.api.clock.now)) == {"recovery_begin": 1,
                                                                                  "recovery_end": 1}
         assert recovery.apply_record(Session(snap.engine), records("revocation")[0], utcnow()) == ("present", 0)
 
@@ -829,15 +855,17 @@ def test_indexer_checks_the_gate_right_before_each_embedding_call(upload_api, mo
     job = uuid.UUID(ids["job_id"])
     assert process_job(job, storage=storage) == "awaiting_index"
     calls = fake_provider(monkeypatch)
-    real = recovery.gate_open
-    # Open when the job starts; closes (as after a journal failure elsewhere) before the first call leaves.
-    monkeypatch.setattr(recovery, "gate_open", lambda settings, engine, where: where != "indexer"
-                        and real(settings, engine, where))
+    from app.ingest import document_index
+    real=document_index.pre_send
+    def hold_before_send(*args,**kwargs):
+        recovery.hold(api.setup_engine,get_settings(),api.clock.now)
+        return real(*args,**kwargs)
+    monkeypatch.setattr(document_index,"pre_send",hold_before_send)
     assert process_job(job, settings_with_fake_key(), storage) == "recovery_gate_closed"
     assert calls == []
-    row = api.scalar("SELECT state || ':' || last_error_code FROM ingestion_jobs WHERE id=:j", j=job)
-    assert row == "retryable_failed:recovery_gate_closed"
-    assert api.scalar("SELECT count(*) FROM embedding_calls WHERE status IN ('reserved', 'completed')") == 0
+    assert api.scalar("SELECT state FROM ingestion_jobs WHERE id=:j", j=job)=="indexing"  # no job mutation behind hold
+    assert api.scalar("SELECT count(*) FROM embedding_calls WHERE status='reserved'")==1  # durable admission ceiling, no transport
+    assert api.scalar("SELECT count(*) FROM embedding_calls WHERE status='completed'")==0
     assert api.scalar("SELECT count(*) FROM index_entries") == 0
 
 

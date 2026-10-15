@@ -124,6 +124,8 @@ def tricky_role_db(admin_engine: Engine) -> Iterator[URL]:
     with admin_engine.connect() as conn:
         literal = password.replace("'", "''")
         conn.execute(text(f"CREATE ROLE \"{role}\" LOGIN PASSWORD '{literal}'"))
+        for suffix in ("_rt", "_rc"):
+            conn.execute(text(f"CREATE ROLE \"{role+suffix}\" LOGIN PASSWORD '{literal}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS"))
     db_url = create_empty_database(admin_engine, owner=role)
     # CREATE EXTENSION needs privileges the role lacks; pre-create it so the
     # migration's IF NOT EXISTS is a no-op.
@@ -136,6 +138,8 @@ def tricky_role_db(admin_engine: Engine) -> Iterator[URL]:
 
     drop_database(admin_engine, db_url)
     with admin_engine.connect() as conn:
+        for suffix in ("_rt", "_rc", "_df"):
+            conn.execute(text(f'DROP ROLE IF EXISTS "{role+suffix}"'))
         conn.execute(text(f'DROP ROLE IF EXISTS "{role}"'))
 
 
@@ -155,7 +159,7 @@ def _run(args: list[str], url: URL, stdin: str = "",
 
 
 def test_special_password_works_for_migration_api_and_bootstrap(tricky_role_db: URL, app_env,
-                                                                  journal_path) -> None:
+                                                                  journal_path, admin_engine, monkeypatch) -> None:
     password = tricky_role_db.password
     assert "@" in password and ":" in password and "/" in password
 
@@ -169,15 +173,28 @@ def test_special_password_works_for_migration_api_and_bootstrap(tricky_role_db: 
     assert init.returncode == 0 and "Registered a new install" in init.stdout, \
         init.stderr[-2000:].replace(password, "<pw>")
 
-    # 2. API readiness through RAS_DB__* settings.
-    app_env(tricky_role_db)
+    # 2. Provision real runtime/recovery roles. Migration and runtime both use
+    # the delimiter-heavy password; neither relies on owner fallback.
+    from app import auth_safety
+    from app.db_roles import provision
+    owner = create_engine(admin_engine.url.set(database=tricky_role_db.database), hide_parameters=True)
+    name = tricky_role_db.username
+    provision(owner, runtime=name+"_rt", recovery=name+"_rc", definer=name+"_df")
+    owner.dispose()
+    runtime_url = tricky_role_db.set(username=name+"_rt")
+    app_env(runtime_url)
+    monkeypatch.setattr(auth_safety,"cutover",lambda db:"ready")  # connection test seam only
     assert TestClient(app).get("/readyz").status_code == 200
 
     # 3. Bootstrap CLI in a separate process: first succeeds, second refused.
     admin_pw = secrets.token_urlsafe(18)
-    cmd = ["-m", "app.cli.bootstrap_admin", "--email", "admin@example.org", "--password-stdin"]
-    first = _run(cmd, tricky_role_db, admin_pw + "\n")
-    second = _run(cmd, tricky_role_db, admin_pw + "\n")
+    # A child-process test shim changes only pending cutover, just like the
+    # in-process connection check. Production CLI has no bypass switch.
+    code = "from app import auth_safety; auth_safety.cutover=lambda db:'ready'; from app.cli.bootstrap_admin import main; raise SystemExit(main())"
+    cmd = ["-c",code,"--email", "admin@example.org", "--password-stdin"]
+    extra={"RAS_RECOVERY__JOURNAL_PATH":str(journal_path)}
+    first = _run(cmd, runtime_url, admin_pw + "\n", extra=extra)
+    second = _run(cmd, runtime_url, admin_pw + "\n", extra=extra)
     assert first.returncode == 0, first.stderr.replace(password, "<pw>")
     assert second.returncode == 3
 

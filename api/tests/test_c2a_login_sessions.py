@@ -25,13 +25,13 @@ from app.identity.tokens import digest_matches
 from app.models import User, UserSession, AuthChangeReceipt, AuthSafetyHead, RevocationJournalRecord
 from app.models.enums import SessionRevokeReason, AuditOutcome, AuditActorType
 from app.audit import record_event
-from tests.test_auth_safety_foundation import foundation, runtime, append_changes, changes, user, run_recover, NOW, SECRET
+from tests.test_auth_safety_foundation import foundation, runtime, append_changes, changes, user, run_recover, prove_initial, NOW, SECRET, LEGACY_SECRET
 
 
 @pytest.fixture
 def world(foundation, runtime, monkeypatch, app_env):
     w = foundation
-    append_changes(w, engine=runtime)
+    prove_initial(w, engine=runtime)
     run_recover(w)
     app_env(runtime.url)
     w.settings = get_settings()
@@ -129,10 +129,10 @@ def test_stale_snapshot_head_rejects_even_before_account_restriction(world,domai
 def add_other(w,role='user'):
     uid=uuid.uuid4()
     with Session(w.engine) as db:
-        db.add(User(id=uid,email=f'{uid.hex}@example.test',role=role,password_verifier=hash_password(SECRET),password_changed_at=NOW))
+        db.add(User(id=uid,email=f'{uid.hex}@example.test',role=role,password_verifier=hash_password(LEGACY_SECRET),password_changed_at=NOW))
         db.commit()
     other=SimpleNamespace(**vars(w));other.uid=uid
-    append_changes(other,engine=w.runtime)
+    prove_initial(other,engine=w.runtime)
     return other
 
 

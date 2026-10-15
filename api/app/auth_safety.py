@@ -173,6 +173,11 @@ def verify(db: Session, records) -> None:
             raise RecoveryError("auth_projection_corrupt")
     for u in db.scalars(select(User)):
         h = db.get(AuthSafetyHead, u.id)
+        for domain, effective in (("credential", u.credential_state == "usable"),
+                                  ("status", u.status_safety == "proven" and u.status == "active")):
+            if effective and not db.scalar(text("SELECT ras_auth_receipt_provenance(:op)"),
+                                           {"op": getattr(u, f"{domain}_operation_id")}):
+                raise RecoveryError("auth_initial_provenance_not_restricted")
         if u.credential_state == "usable" and (h is None or (u.credential_operation_id,u.credential_generation) != (h.credential_operation_id,h.credential_generation)):
             raise RecoveryError("auth_credential_not_restricted")
         if u.status_safety == "proven" and (h is None or (u.status_generation,u.status) != (h.status_generation,h.status_decision)):

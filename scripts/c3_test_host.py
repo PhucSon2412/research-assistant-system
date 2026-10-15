@@ -105,7 +105,7 @@ def main():
         'RAS_STORAGE__ACCESS_KEY':'task_minio','RAS_STORAGE__SECRET_KEY':c['minio'],
         'RAS_REDIS_HOST':'127.0.0.1','RAS_REDIS_PORT':str(c['redis_port']), 'RAS_REDIS_PASSWORD':c['redis'],
         'RAS_EMBEDDING__API_KEY':'','RAS_EMBEDDING__PRICING_VERIFIED':'false',
-        'RAS_C2D5D2A_CONTEXT':str(root), 'RAS_C2D5D2B_CONTEXT':str(root), 'RAS_C2D5E1_CONTEXT':str(root), 'RAS_C2D5E2_CONTEXT':str(root), 'RAS_C2D5F1_CONTEXT':str(root), 'RAS_C2D5F2_CONTEXT':str(root), 'RAS_C2D7_CONTEXT':str(root), 'RAS_C3_CONTEXT':str(root),
+        'RAS_C2D5D2A_CONTEXT':str(root), 'RAS_C2D5D2B_CONTEXT':str(root), 'RAS_C2D5E1_CONTEXT':str(root), 'RAS_C2D5E2_CONTEXT':str(root), 'RAS_C2D5F1_CONTEXT':str(root), 'RAS_C2D5F2_CONTEXT':str(root), 'RAS_C2D7_CONTEXT':str(root), 'RAS_C3_CONTEXT':str(root), 'RAS_C2D6_CONTEXT':str(root),
         'PYTHONPATH':str(REPO/'api'), 'PYTHONUTF8':'1', 'PYTHONUNBUFFERED':'1'})
     # A dedicated bootstrap module blocks outbound httpx in pytest AND its children.
     code = """import httpx, ipaddress, pytest, sys

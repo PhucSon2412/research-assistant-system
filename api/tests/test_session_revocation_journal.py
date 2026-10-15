@@ -35,6 +35,15 @@ EMAIL = "session.a@example.org"
 NEW_PASSWORD = "new-Password-session-987"
 
 
+def legacy_session(engine,uid,now,lifetimes):
+    """Honest 0029 snapshot data, before generation/routines existed."""
+    sid=uuid.uuid4()
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO sessions(id,user_id,token_hash,csrf_token_hash,created_at,last_activity_at,absolute_expires_at) VALUES(:s,:u,:t,:c,:at,:at,:end)"),
+                     {"s":sid,"u":uid,"t":"a"*64,"c":"b"*64,"at":now,"end":now+lifetimes.session_absolute})
+    return SimpleNamespace(session_id=sid)
+
+
 @pytest.fixture
 def world(upload_api):
     h, storage = upload_api
@@ -105,7 +114,7 @@ def test_restore_keeps_every_revocation_reason_and_saved_cookie_csrf_blocked(wor
             for row in conn.execute(text("SELECT last_activity_at, absolute_expires_at FROM sessions")):
                 assert w.h.clock.now < row.last_activity_at + get_settings().auth.session_idle
                 assert w.h.clock.now < row.absolute_expires_at
-        assert recovery.recover(snap.engine, w.storage, get_settings(), w.h.clock.now).gate == "open"
+        assert recovery.recover(snap.engine, w.storage, get_settings(), w.h.clock.now).gate == "ready"
         for sid, cookies in zip(w.ids, w.saved):
             expected = 401 if sid in ended else 200
             assert browser(cookies).get("/auth/session").status_code == expected
@@ -114,11 +123,11 @@ def test_restore_keeps_every_revocation_reason_and_saved_cookie_csrf_blocked(wor
             if post:
                 assert (post.status_code, post.json()) == (401, {"error": "session_expired"})
         assert browser(w.b_saved).get("/auth/session").status_code == 200
-        assert recovery.recover(snap.engine, w.storage, get_settings(), w.h.clock.now).gate == "open"
+        assert recovery.recover(snap.engine, w.storage, get_settings(), w.h.clock.now).gate == "ready"
         with snap.engine.connect() as conn:
             assert set(conn.scalars(text("SELECT id FROM sessions WHERE revoked_at IS NOT NULL"))) == ended
-            # Replay never reproduces the password/status changes.
-            assert conn.scalar(text("SELECT status FROM users WHERE id=:u"), {"u": w.uid}) == "active"
+            # C1 replays the status restriction; it never reconstructs a verifier.
+            assert conn.scalar(text("SELECT status FROM users WHERE id=:u"), {"u": w.uid}) == ("disabled" if how=="disable" else "active")
 
 
 def test_sessions_and_users_created_then_revoked_after_backup_stay_absent(world, admin_engine, app_env):
@@ -130,8 +139,8 @@ def test_sessions_and_users_created_then_revoked_after_backup_stay_absent(world,
         sid = newer.get("/auth/session").json()["session"]["id"]
         assert newer.post("/auth/logout").status_code == 204
         app_env(snap.url)
-        assert recovery.recover(snap.engine, w.storage, get_settings(), w.h.clock.now).gate == "open"
-        assert recovery.recover(snap.engine, w.storage, get_settings(), w.h.clock.now).gate == "open"
+        assert recovery.recover(snap.engine, w.storage, get_settings(), w.h.clock.now).gate == "ready"
+        assert recovery.recover(snap.engine, w.storage, get_settings(), w.h.clock.now).gate == "ready"
         with snap.engine.connect() as conn:
             assert conn.scalar(text("SELECT count(*) FROM users WHERE email='after.backup@example.org'")) == 0
             assert conn.scalar(text("SELECT count(*) FROM sessions WHERE id=:s"), {"s": sid}) == 0
@@ -160,11 +169,11 @@ def test_reader_and_db_refuse_missing_null_session_fields_at_insert(world, field
         journal.next_record(state.head, journal.SESSION_REVOCATION, body)
     # Intentionally bypass the app reader to test the DB check independently.
     line = json.dumps({"body": body, "kind": journal.SESSION_REVOCATION})
-    with Session(w.h.engine) as db, pytest.raises(IntegrityError):
-        db.add(recovery._mirror(SimpleNamespace(seq=2, kind=journal.SESSION_REVOCATION, hash="f"*64, line=line),
+    with Session(w.h.setup_engine) as db, pytest.raises(IntegrityError):
+        db.add(recovery._mirror(SimpleNamespace(seq=state.head.seq+1, kind=journal.SESSION_REVOCATION, hash="f"*64, line=line),
               "revoke", "session_revoked", None, confirmed=False, session_id=w.ids[0], session_user_id=w.uid))
         db.flush()  # before append, not merely at commit
-    assert journal.read(get_settings().recovery.journal_path).head.seq == 1
+    assert journal.read(get_settings().recovery.journal_path).head == state.head
 
 
 @pytest.mark.parametrize("bad", ["session", "user", "mirror_null_session", "mirror_null_user", "other_owner"])
@@ -175,7 +184,7 @@ def test_wrong_mirror_identity_is_rejected_before_append(world, bad):
                        {"user_id": str(uuid.uuid4())} if bad in ("user", "other_owner") else {}))
     record = journal.next_record(state.head, journal.SESSION_REVOCATION, body)
     owner = uuid.UUID(body["user_id"]) if bad == "other_owner" else w.uid
-    with Session(w.h.engine) as db, pytest.raises(IntegrityError):
+    with Session(w.h.setup_engine) as db, pytest.raises(IntegrityError):
         db.add(recovery._mirror(record, "revoke", "session_revoked", None, confirmed=False,
                 session_id=None if bad == "mirror_null_session" else w.ids[0],
                 session_user_id=None if bad == "mirror_null_user" else owner))
@@ -184,15 +193,15 @@ def test_wrong_mirror_identity_is_rejected_before_append(world, bad):
 
 def test_db_refuses_unjournaled_revoke_reopen_or_changed_session_identity(world):
     w = world
-    with pytest.raises(IntegrityError), w.h.engine.begin() as conn:
+    with pytest.raises(IntegrityError), w.h.setup_engine.begin() as conn:
         conn.execute(text("UPDATE sessions SET revoked_at=:t, revoked_reason='logout' WHERE id=:s"),
                      {"s": w.ids[0], "t": w.h.clock.now})
     assert w.a[0].post("/auth/logout").status_code == 204
     for sql in ("revoked_at=NULL, revoked_reason=NULL", "user_id=:u", "id=:u",
                 "revoked_reason='replaced'", "token_hash=repeat('d',64)"):
-        with pytest.raises(IntegrityError), w.h.engine.begin() as conn:
+        with pytest.raises(IntegrityError), w.h.setup_engine.begin() as conn:
             conn.execute(text(f"UPDATE sessions SET {sql} WHERE id=:s"), {"s": w.ids[0], "u": w.bid})
-    assert recovery.replay_record(w.h.engine, revocations()[0], w.h.clock.now) == ("present", 0)
+    assert recovery.replay_record(w.h.setup_engine, revocations()[0], w.h.clock.now) == ("present", 0)
 
 
 def test_replay_rejects_a_session_bound_to_another_user(world):
@@ -201,7 +210,7 @@ def test_replay_rejects_a_session_bound_to_another_user(world):
     record = journal.next_record(state.head, journal.SESSION_REVOCATION, sample(w, user_id=str(w.bid)))
     journal.append(get_settings().recovery.journal_path, state, [record])
     with pytest.raises(recovery.RecoveryError, match="record_names_another_session_user"):
-        recovery.recover(w.h.engine, w.storage, get_settings(), w.h.clock.now)
+        recovery.recover(w.h.setup_engine, w.storage, get_settings(), w.h.clock.now)
     assert gate(w.h.engine) == "db_behind_journal"
     assert w.h.scalar("SELECT count(*) FROM sessions WHERE revoked_at IS NOT NULL") == 0
 
@@ -235,10 +244,10 @@ def test_interrupted_bulk_write_commits_all_revocations_unconfirmed_until_recove
     fix()
     if shape != "fsync":
         with pytest.raises(recovery.RecoveryError, match="journal_behind_db"):
-            recovery.recover(w.h.engine, w.storage, get_settings(), w.h.clock.now)
-    assert recovery.recover(w.h.engine, w.storage, get_settings(), w.h.clock.now,
-                            confirm_db_current=shape != "fsync").gate == "open"
-    assert recovery.recover(w.h.engine, w.storage, get_settings(), w.h.clock.now).gate == "open"
+            recovery.recover(w.h.setup_engine, w.storage, get_settings(), w.h.clock.now)
+    assert recovery.recover(w.h.setup_engine, w.storage, get_settings(), w.h.clock.now,
+                            confirm_db_current=shape != "fsync").gate == "ready"
+    assert recovery.recover(w.h.setup_engine, w.storage, get_settings(), w.h.clock.now).gate == "ready"
     assert w.a[0].get("/auth/session").status_code == w.b.get("/auth/session").status_code == 200
     for cookies in w.saved[1:]:
         assert browser(cookies).get("/auth/session").status_code == 401
@@ -268,18 +277,24 @@ def failing_commit(monkeypatch, lands):
 @pytest.mark.parametrize("how", ["others", "reset", "disable", "replace"])
 def test_commit_failure_or_unknown_outcome_replays_sessions_but_never_claims_auth_success(world, monkeypatch, lands, how):
     w = world
-    failing_commit(monkeypatch, lands)
+    fix=failing_commit(monkeypatch, lands)
     response, ended, _ = perform(w, how)
     assert response.status_code == 503
-    assert gate(w.h.engine) == "open"
-    assert w.h.scalar("SELECT count(*) FROM sessions WHERE revoked_at IS NOT NULL") == len(ended)
+    auth_change=how in ("reset","disable")
+    assert gate(w.h.engine) == ("db_behind_journal" if auth_change and not lands else "open")
+    assert w.h.scalar("SELECT count(*) FROM sessions WHERE revoked_at IS NOT NULL") == (0 if auth_change and not lands else len(ended))
     if how == "disable":
         assert w.h.scalar("SELECT status FROM users WHERE id=:u", u=w.uid) == ("disabled" if lands else "active")
     if how == "reset":
-        assert w.h.scalar("SELECT count(*) FROM password_reset_tokens WHERE used_at IS NOT NULL") == 1
-        assert w.h.browser().login(EMAIL, NEW_PASSWORD if lands else USER_PASSWORD).status_code == 200
+        assert w.h.scalar("SELECT count(*) FROM password_reset_tokens WHERE used_at IS NOT NULL") == int(lands)
     if how == "replace":
         assert not any(h.startswith("ras_session=") for h in response.headers.get_list("set-cookie"))
+    fix()
+    recovery.recover(w.h.setup_engine,w.storage,get_settings(),w.h.clock.now)
+    if how=="reset":
+        assert w.h.browser().login(EMAIL,NEW_PASSWORD if lands else USER_PASSWORD).status_code==(200 if lands else 401)
+    if how=="disable":
+        assert w.h.scalar("SELECT status FROM users WHERE id=:u",u=w.uid)=="disabled"
 
 
 def test_failed_commit_and_failed_replay_keep_gate_closed(world, monkeypatch):
@@ -291,7 +306,7 @@ def test_failed_commit_and_failed_replay_keep_gate_closed(world, monkeypatch):
     assert response.json() == {"error": "session_revocation_pending_recovery"}
     assert gate(w.h.engine) == "db_behind_journal"
     monkeypatch.setattr(recovery, "replay_record", real)
-    assert recovery.recover(w.h.engine, w.storage, get_settings(), w.h.clock.now).gate == "open"
+    assert recovery.recover(w.h.setup_engine, w.storage, get_settings(), w.h.clock.now).gate == "ready"
 
 
 def test_partial_bulk_journal_and_rollback_replays_prefix_then_retry_finishes_rest(world, monkeypatch):
@@ -302,7 +317,7 @@ def test_partial_bulk_journal_and_rollback_replays_prefix_then_retry_finishes_re
     assert response.status_code == 503
     assert w.h.scalar("SELECT count(*) FROM sessions WHERE revoked_at IS NOT NULL") == 0
     fix()
-    assert recovery.recover(w.h.engine, w.storage, get_settings(), w.h.clock.now).gate == "open"
+    assert recovery.recover(w.h.setup_engine, w.storage, get_settings(), w.h.clock.now).gate == "ready"
     assert w.h.scalar("SELECT count(*) FROM sessions WHERE revoked_at IS NOT NULL") == 1
     # The injected commit error was consumed; retry journals only the remaining session.
     fix_commit()
@@ -325,9 +340,7 @@ def test_legacy_revoked_sessions_backfill_and_hold_on_unmigrated_snapshot(empty_
                      {"h": genesis.hash, "l": genesis.line})
         uid = conn.scalar(text("INSERT INTO users(email,password_verifier) VALUES('legacy@example.org',"
                                "'$argon2id$legacy-fixture') RETURNING id"))
-    with Session(eng) as db:
-        issued = issue_session(db, user_id=uid, now=now, lifetimes=get_settings().auth)
-        db.commit()
+    issued=legacy_session(eng,uid,now,get_settings().auth)
     # Backup while still live under 0029, then revoke under the old code.
     h = SimpleNamespace(engine=eng)
     with backup(h, admin_engine) as snap:
@@ -340,7 +353,7 @@ def test_legacy_revoked_sessions_backfill_and_hold_on_unmigrated_snapshot(empty_
         assert recovery.recover(eng, None, get_settings(), now).sessions_imported == 1
         recovery.hold(snap.engine, get_settings(), now)  # seq/hash only, before 0030
         upgrade(snap.url)
-        assert recovery.recover(snap.engine, None, get_settings(), now).gate == "open"
+        assert recovery.recover(snap.engine, None, get_settings(), now).reconciliation_complete
         with snap.engine.connect() as conn:
             assert conn.scalar(text("SELECT revoked_reason FROM sessions WHERE id=:s"),
                                {"s": issued.session_id}) == "logout"
@@ -352,14 +365,14 @@ def test_db_checks_exact_reason_and_time_and_prevents_reinsert_of_journaled_live
     head = journal.read(get_settings().recovery.journal_path).head
     for changed in ({"reason_code": "replaced"}, {"revoked_at": "2000-01-01T00:00:00+00:00"}):
         record = journal.next_record(head, journal.SESSION_REVOCATION, sample(w, **changed))
-        with Session(w.h.engine) as db, pytest.raises(IntegrityError):
+        with Session(w.h.setup_engine) as db, pytest.raises(IntegrityError):
             db.add(recovery._mirror(record, "revoke", "session_revoked", None, confirmed=False,
                                    session_id=w.ids[0], session_user_id=w.uid))
             db.execute(text("UPDATE sessions SET revoked_at=:t,revoked_reason='logout' WHERE id=:s"),
                        {"t": w.h.clock.now, "s": w.ids[0]})
             db.commit()
     assert w.a[0].post("/auth/logout").status_code == 204
-    with pytest.raises(IntegrityError), w.h.engine.begin() as conn:
+    with pytest.raises(IntegrityError), w.h.setup_engine.begin() as conn:
         # Mimic a deleted/pruned session reappearing with the old cookie hash.
         conn.execute(text("DELETE FROM sessions WHERE id=:s"), {"s": w.ids[0]})
         conn.execute(text("INSERT INTO sessions(id,user_id,token_hash,csrf_token_hash,created_at,last_activity_at,"
@@ -374,7 +387,7 @@ def test_fsync_failure_preserves_whole_auth_transaction_but_reports_error(world,
     w = world
     fix = fsync_fails(monkeypatch)
     response, _, _ = perform(w, how)
-    assert response.json() == {"error": "auth_journal_unavailable" if how == "reset" else "session_journal_unavailable"}
+    assert response.json() == {"error": "auth_journal_unavailable"}
     assert w.h.scalar("SELECT count(*) FROM sessions WHERE revoked_at IS NOT NULL") == 3
     if how == "reset":
         assert w.h.scalar("SELECT count(*) FROM password_reset_tokens WHERE used_at IS NOT NULL") == 1
@@ -382,7 +395,7 @@ def test_fsync_failure_preserves_whole_auth_transaction_but_reports_error(world,
         assert w.h.scalar("SELECT status FROM users WHERE id=:u", u=w.uid) == "disabled"
     assert gate(w.h.engine) == "journal_unconfirmed"
     fix()
-    assert recovery.recover(w.h.engine, w.storage, get_settings(), w.h.clock.now).gate == "open"
+    assert recovery.recover(w.h.setup_engine, w.storage, get_settings(), w.h.clock.now).gate == "ready"
 
 
 def test_neither_journal_nor_commit_takes_batch_no_success_and_retry_is_safe(world, monkeypatch):
@@ -406,18 +419,17 @@ def test_register_existing_imports_pre_migration_revocations(empty_db_url, journ
     with eng.begin() as conn:
         uid = conn.scalar(text("INSERT INTO users(email,password_verifier)"
                                " VALUES('legacy@example.org','$argon2id$fixture') RETURNING id"))
-    with Session(eng) as db:
-        sid = issue_session(db, user_id=uid, now=now, lifetimes=get_settings().auth).session_id
-        db.commit()
+    sid=legacy_session(eng,uid,now,get_settings().auth).session_id
     with eng.begin() as conn:
         conn.execute(text("UPDATE sessions SET revoked_at=:t,revoked_reason='logout' WHERE id=:s"), {"t": now, "s": sid})
     upgrade(empty_db_url)
     with pytest.raises(recovery.RecoveryError, match="database_not_new"):
         recovery.init_new(eng, get_settings(), now)  # auth-only DB is not an empty install
     _, count = recovery.register_existing(eng, get_settings(), now)
-    assert count == 1 and recovery.evaluate(get_settings(), eng).open
+    assert count == 1 and recovery.evaluate_integrity(get_settings(), eng).open
+    assert recovery.evaluate(get_settings(), eng).reason=="auth_safety_pending"
     assert recovery.status(eng, get_settings())["unjournaled_sessions"] == 0
-    with pytest.raises(Exception, match="registered with a revocation journal"):
+    with pytest.raises(Exception, match="auth safety history prevents downgrade"):
         command.downgrade(alembic_config(empty_db_url), "0029")
     eng.dispose()
 
@@ -429,7 +441,9 @@ def test_login_committing_first_is_caught_by_waiting_reset_disable_or_bulk_revok
     results = {}
     with Session(w.h.engine) as db:
         reset = password_reset.request_reset(db, email=EMAIL, now=w.h.clock.now,
-                                              lifetime=get_settings().auth.password_reset)
+                                              lifetime=get_settings().auth.password_reset,clock=lambda:w.h.clock.now)
+    admin_sid=uuid.UUID(w.admin.get("/auth/session").json()["session"]["id"])
+    admin_csrf=w.admin.client.cookies.get("ras_csrf")
     real_commit = login_mod.commit_auth
     def pause_login(db):
         issued.set()
@@ -438,14 +452,14 @@ def test_login_committing_first_is_caught_by_waiting_reset_disable_or_bulk_revok
     monkeypatch.setattr(login_mod, "commit_auth", pause_login)
     import threading
     def observe(conn, cursor, sql, params, context, many):
-        if threading.current_thread().name == "auth-decider" and "FOR NO KEY UPDATE" in sql and "FROM users" in sql:
+        if threading.current_thread().name == "auth-decider" and "ras_auth_lock_users" in sql:
             waiting.set()
     event.listen(w.h.engine, "before_cursor_execute", observe)
     def login_now():
         try:
             with Session(w.h.engine) as db:
                 _, result = login_mod.login(db, email=EMAIL, password=USER_PASSWORD, now=w.h.clock.now,
-                                             settings=get_settings())
+                                             settings=get_settings(),clock=lambda:w.h.clock.now)
                 results["session"] = result.session_id
         except Exception as exc:
             results["login_error"] = type(exc).__name__
@@ -455,10 +469,11 @@ def test_login_committing_first_is_caught_by_waiting_reset_disable_or_bulk_revok
                 db.execute(text("SET LOCAL lock_timeout = '10s'"))
                 if action == "reset":
                     password_reset.confirm_reset(db, raw_token=reset.token, new_password=NEW_PASSWORD,
-                                                 now=w.h.clock.now, policy=PasswordPolicy())
+                                                 now=w.h.clock.now, policy=PasswordPolicy(),clock=lambda:w.h.clock.now)
                 elif action == "disable":
                     users.set_user_status(db, user_id=w.uid, actor_id=w.admin_id,
-                                          status=UserStatus.DISABLED, now=w.h.clock.now)
+                                          status=UserStatus.DISABLED, now=w.h.clock.now,
+                                          actor_session_id=admin_sid,csrf_token=admin_csrf,clock=lambda:w.h.clock.now)
                 else:
                     revoke_user_sessions(db, user_id=w.uid, reason=SessionRevokeReason.USER_REVOKED,
                                          now=w.h.clock.now, keep_session_id=w.ids[0])
@@ -536,7 +551,7 @@ def test_opposite_account_replacements_lock_users_in_same_order_without_deadlock
             with Session(w.h.engine) as db:
                 db.execute(text("SET LOCAL lock_timeout='10s'"))
                 _, issued = login_mod.login(db, email=email, password=USER_PASSWORD, now=w.h.clock.now,
-                                             settings=get_settings(), previous_token=previous)
+                                             settings=get_settings(), previous_token=previous,clock=lambda:w.h.clock.now)
                 results.append(issued.session_id)
         except Exception as exc:
             results.append(type(exc).__name__)

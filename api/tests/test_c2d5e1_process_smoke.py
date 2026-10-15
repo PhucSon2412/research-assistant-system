@@ -22,7 +22,7 @@ from tests.test_c2d5a_review_writes import writers  # noqa: F401
 from tests.test_c2d5d1_common_index_request import indexes  # noqa: F401
 from tests.resource_fixtures import runtime_revoke
 
-IMAGE = 'rasc2d5e1-worker:20261010'
+IMAGE = os.environ.get('RAS_TEST_PROCESS_IMAGE', 'rasc2d5e1-worker:20261010')
 
 
 def test_real_worker_beat_cleanup_kill_between_fence_and_delete(indexes):

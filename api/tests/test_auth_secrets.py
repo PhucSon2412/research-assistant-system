@@ -35,7 +35,7 @@ def test_full_auth_flow_leaks_no_secret(api: Harness, caplog) -> None:
     finally:
         logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
-    assert "INSERT INTO sessions" in caplog.text  # SQL logging really was on
+    assert "SELECT ras_auth_session_create" in caplog.text  # SQL logging really was on through the runtime routine
     secrets = {
         "admin password": ADMIN_PASSWORD,
         "first password": FIRST_PW,

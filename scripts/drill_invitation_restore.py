@@ -30,6 +30,7 @@ from sqlalchemy.engine import URL
 from sqlalchemy.orm import Session
 
 import ras_backup
+from drill_accounts import seed_accounts,runtime_url,current_revision
 from app.identity import invitations
 from app.identity.passwords import hash_password
 
@@ -51,6 +52,7 @@ def main():
     work = ras_backup.outside_repo(args.work, "work_inside_repo")
     if work.exists() and any(work.iterdir()):
         raise SystemExit("work must be absent or empty")
+    runtime_url(URL.create("postgresql+psycopg",username="invdrill"))  # fail before any mutation
     # Ownership inventory before ANY mutation. Never reuse an unknown project.
     for project in (SRC, DST):
         for kind in ("container", "volume"):
@@ -79,9 +81,9 @@ def main():
     measured = {}
     def env(project):
         return base_env | PORTS[project] | dict(RAS_JOURNAL_SOURCE=str(source_journal if project == SRC else copied))
-    def dc(project, *argv):
+    def dc(project, *argv,runenv=None):
         r = subprocess.run(["docker", "compose", "--env-file", str(env_file), "-p", project, *argv], cwd=ROOT,
-                           env=env(project), capture_output=True, encoding="utf-8", errors="replace")
+                           env=runenv or env(project), capture_output=True, encoding="utf-8", errors="replace")
         if r.returncode:
             raise RuntimeError(f"isolated compose {argv[0]} failed; code={r.returncode}")
         return r
@@ -98,7 +100,9 @@ def main():
             raise RuntimeError(f"backup tool {argv[0]} failed; code={r.returncode}; {r.stderr.strip()[-200:]}")
         return json.loads(lines[-1])
     def cli(project, *argv):
-        return dc(project, "run", "--rm", "--no-deps", "api", "python", "-m", "app.cli.recovery", *argv).stdout
+        return dc(project, "run", "--rm", "--no-deps", "-e","RAS_DB__USER","-e","RAS_DB__PASSWORD",
+                  "api", "python", "-m", "app.cli.recovery", *argv,
+                  runenv=env(project)|{"RAS_DB__USER":credentials["POSTGRES_USER"],"RAS_DB__PASSWORD":credentials["POSTGRES_PASSWORD"]}).stdout
     def engine(project):
         return create_engine(URL.create("postgresql+psycopg", username=credentials["POSTGRES_USER"],
             password=credentials["POSTGRES_PASSWORD"], host="127.0.0.1", port=int(PORTS[project]["POSTGRES_HOST_PORT"]),
@@ -131,16 +135,17 @@ def main():
                 "origin": f"http://127.0.0.1:{PORTS[self.project]['WEB_HOST_PORT']}"})
     dc(SRC, "build", "api", "web", "worker", "beat", "migrate", "recovery-init")
     for service in ("api","worker","beat","migrate","recovery-init"):
-        step(f"source {service} image head 0032", "0032 (head)" in dc(SRC, "run", "--rm", "--no-deps", service, "alembic", "heads").stdout)
+        step(f"source {service} image head {current_revision()}", current_revision()+" (head)" in dc(SRC, "run", "--rm", "--no-deps", service, "alembic", "heads").stdout)
     dc(SRC, "up", "-d", "--wait")
     source = engine(SRC)
     password = secrets.token_urlsafe(24)
     tag = uuid.uuid4().hex[:8]
     emails = {name: f"inv-{tag}-{name}@example.org" for name in ("admin", "existing", "accept", "revoke", "replace", "delivery", "valid")}
-    with source.begin() as conn:
-        admin_id = conn.scalar(text("INSERT INTO users(email,password_verifier,role) VALUES(:e,:v,'admin') RETURNING id"),
-                               dict(e=emails["admin"], v=hash_password(password)))
-        conn.execute(text("INSERT INTO users(email,password_verifier) VALUES(:e,:v)"), dict(e=emails["existing"], v=hash_password(password)))
+    runtime=create_engine(runtime_url(source.url),hide_parameters=True)
+    try:
+        seeded=seed_accounts(runtime,{name:emails[name] for name in ("admin","existing")},password)
+        admin_id=seeded["admin"]
+    finally:runtime.dispose()
     admin, public, existing = Person(SRC), Person(SRC), Person(SRC)
     assert admin.post("/auth/login", dict(email=emails["admin"], password=password)).status_code == 200
     assert existing.post("/auth/login", dict(email=emails["existing"], password=password)).status_code == 200
@@ -211,7 +216,7 @@ def main():
         # compose run materializes declared volumes even with --no-deps, which would
         # correctly make target_is_fresh refuse a not-yet-owned restore target.
         heads = subprocess.check_output(["docker","run","--rm","--entrypoint","alembic",f"{DST}-{service}","heads"], text=True)
-        step(f"restore {service} image head 0032", heads.strip() == "0032 (head)")
+        step(f"restore {service} image head 0032", heads.strip() == current_revision()+" (head)")
     for iteration in (1,2):
         restored = tool(DST, "restore", "--artifact", str(artifact), "--project", DST, "--journal-dir", str(copied))
         measured[f"restore_{iteration}"] = restored

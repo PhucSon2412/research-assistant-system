@@ -22,13 +22,13 @@ from tests.test_auth_safety_foundation import NOW
 def test_dump_restore_pre_accept_twice_current_journal(world,admin_engine,tmp_path,monkeypatch):
     w=world
     # The host runner sets these explicit identifiers after its ownership check.
-    name=os.environ['RAS_C2C2_TEST_CONTAINER']
+    name=os.environ['RAS_C3_TEST_CONTAINER']
     details=json.loads(subprocess.run(['docker','inspect',name],check=True,capture_output=True,text=True).stdout)[0]
-    assert details['Config']['Labels'].get('ras.task')=='c2c2-20261004'
-    assert admin_engine.url.host=='127.0.0.1' and admin_engine.url.port==58442
-    assert details['NetworkSettings']['Ports']['5432/tcp']==[{'HostIp':'127.0.0.1','HostPort':'58442'}]
+    assert details['Config']['Labels'].get('ras.task')==os.environ['RAS_C3_TEST_PROJECT']
+    assert admin_engine.url.host=='127.0.0.1'
+    assert details['NetworkSettings']['Ports']['5432/tcp']==[{'HostIp':'127.0.0.1','HostPort':str(admin_engine.url.port)}]
     created=issue(w)
-    dump=subprocess.run(['docker','exec',name,'pg_dump','-U','c2c2_admin','-Fc','-d',w.engine.url.database],check=True,capture_output=True).stdout
+    dump=subprocess.run(['docker','exec',name,'pg_dump','-U',admin_engine.url.username,'-Fc','-d',w.engine.url.database],check=True,capture_output=True,timeout=60).stdout
     assert dump.startswith(b'PGDMP')
     (tmp_path/'pre-accept.dump').write_bytes(dump)
     accepted=accept(w,created)
@@ -37,7 +37,7 @@ def test_dump_restore_pre_accept_twice_current_journal(world,admin_engine,tmp_pa
         url=create_empty_database(admin_engine)
         rc=rt=None
         try:
-            subprocess.run(['docker','exec','-i',name,'pg_restore','-U','c2c2_admin','-d',url.database],input=dump,check=True,capture_output=True)
+            subprocess.run(['docker','exec','-i',name,'pg_restore','-U',admin_engine.url.username,'-d',url.database],input=dump,check=True,capture_output=True,timeout=60)
             rc=create_engine(url.set(username='c1_recovery',password=os.environ['RAS_C1_RECOVERY_PASSWORD']),hide_parameters=True)
             rt=create_engine(url.set(username='c1_runtime',password=os.environ['RAS_C1_RUNTIME_PASSWORD']),hide_parameters=True)
             copy=tmp_path/f'restore-{iteration}'/'journal.jsonl';copy.parent.mkdir();copy.write_bytes(source)

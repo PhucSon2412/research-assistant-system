@@ -354,25 +354,23 @@ def test_two_requests_same_intent_only_one_consumes_and_loser_deletes_own_key(up
 def test_worker_advance_and_intent_expiry_before_response_keep_receipt(upload,monkeypatch):
     b=upload; token=b.make(); real=original.receipt
     from app.ingest import worker
+    from tests.test_private_index import fake_provider, settings_with_fake_key
     monkeypatch.setattr(worker,'utcnow',b.clock)
+    calls=fake_provider(monkeypatch); settings=settings_with_fake_key()
     def receipt(*a):
         accepted=a[2]
-        with Session(b.w.runtime) as db:
-            lease=worker.claim_job(db,accepted.job_id,get_settings(),NOW)
-            worker._begin(db,accepted.job_id,lease,'validate')
-            def save(db,job,item,version,source):
-                item.active_version_id=version.id
-                item.content_status='indexed'  # synthetic legal progression, no index/provider claim
-                return 'extracting'
-            worker._finish(db,accepted.job_id,lease,'validate',save)
+        assert worker.process_job(accepted.job_id,settings,b.storage)=='awaiting_index'
+        assert worker.process_job(accepted.job_id,settings,b.storage)=='ready'
+        assert calls
         b.at=NOW+timedelta(minutes=3)
         return real(*a)
     monkeypatch.setattr(original,'receipt',receipt)
     r=send(b,token)
     assert r.status_code==201 and r.json()['state']=='received'
     with b.w.runtime.connect() as c:
-        assert c.scalar(text('SELECT state FROM ingestion_jobs'))=='extracting'
+        assert c.scalar(text('SELECT state FROM ingestion_jobs'))=='ready'
         assert c.scalar(text('SELECT content_status FROM library_items'))=='indexed'
+        assert c.scalar(text('SELECT count(*) FROM index_entries'))>0
 
 
 @pytest.mark.parametrize('phase',['body','parser','put','readback'])

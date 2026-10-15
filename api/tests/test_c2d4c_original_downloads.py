@@ -445,25 +445,34 @@ def test_blocked_storage_releases_connection_locks_and_holds_shared_pool(downloa
 @pytest.mark.parametrize('branch',('common','review'))
 def test_audit_resource_locks_queue_writer_response_proof_sees_winner(downloads,monkeypatch,branch):
     b=downloads;real=boundary._audit;writer=None
+    if branch=='common':
+        # A separate invited User downloads while the Admin revokes. The
+        # resource row, rather than their shared User row, must queue the writer.
+        from tests.test_c2c2_invitations import EMAIL, PASSWORD
+        with Session(b.w.runtime) as db:
+            actor=login(db,email=EMAIL,password=PASSWORD,now=NOW,settings=b.w.settings,clock=b.clock)[1]
+        b.client.cookies.set('ras_session',actor.token)
     with ThreadPoolExecutor(1) as pool:
         def audit(db,p,target,outcome,**kw):
             nonlocal writer
             value=real(db,p,target,outcome,**kw)
             if outcome==AuditOutcome.SUCCESS:
                 writer=pool.submit(end_grant,b,branch)
-                wait_for_resource_writer(b.w)
+                wait_for_resource_writer(b.w,branch)
             return value
         monkeypatch.setattr(boundary,'_audit',audit)
         r=b.client.get(b.path(branch));writer.result(10)
         denied(r,404,'not_found')
 
 
-def wait_for_resource_writer(w):
+def wait_for_resource_writer(w,branch):
     deadline=time.monotonic()+10
     with w.engine.connect() as observer:
         while time.monotonic()<deadline:
             waiting=observer.scalar(text("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() "
-                "AND wait_event='transactionid' AND usename=:name)"),{'name':w.engine.url.username})
+                "AND wait_event='transactionid' AND usename=:name AND query LIKE :table)"),
+                {'name':w.runtime.url.username if branch=='common' else w.engine.url.username,
+                 'table':'%library_items%' if branch=='common' else '%review_requests%'})
             observer.rollback()
             if waiting:return
             threading.Event().wait(.005)

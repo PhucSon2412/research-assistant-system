@@ -1,5 +1,11 @@
 # Tài liệu dự án
 
+**B1 đã triển khai và kiểm (2026-10-15, chưa merge):** [handoff](pre-c4-auth-receipts-regression.md) · [inventory theo node](pre-c4-test-inventory.json), source **0050**, base merge PR #59 `041f77ef`. Writer và consumer cùng kiểm initial provenance; fixture hợp lệ có bootstrap/invitation hoặc case C3 thật. C4 tiếp tích hợp cùng image/roles, readiness và HTTP/browser/restore không seam. **Safety pending tới C4**; các kết quả bên dưới giữ source lịch sử.
+
+**Hiện hành sau merge PR #59, 2026-10-13:** C3 đã merge `041f77ef`, tree khớp head review `035cef0`, source **0049**; chưa rerun tại merge. Đã giao [B1 — initial receipt và hồi quy trước C4](tasks/pre-c4-auth-receipts-and-regression.md), mới giao/chưa triển khai hoặc kiểm. Tiếp một gói C4 tích hợp theo [kế hoạch MVP](mvp-delivery-plan.md). **Safety pending tới C4**; không mở pricing hoặc thao tác dev. Các mốc review/OPEN dưới đây giữ lịch sử; docs reviewer/task chưa commit được đưa vào PR kế tiếp.
+
+**Review lại PR #59 tại `035cef0`:** hai P2/Ctrl-C release đã qua kiểm, không phát hiện điểm chặn merge mới trong scope C3. [Report độc lập và giới hạn](reviews/pr59-c3-operator-auth-recovery.md): reviewer 106 repo + 4 ca ngoài repo pass, agent/artifact giữ riêng; source `0049`, PR OPEN/chưa merge, **safety pending tới C4**. Tiếp debt/hồi quy và C4 sau merge; các mốc P2 dưới đây là lịch sử. Giữ docs reviewer modified cho PR kế tiếp.
+
 **Sửa review lại PR #59 tại `d2d56f3` (2026-10-12, chờ review lại, chưa merge):** Ctrl-C khi trả connection giờ là outcome theo `Attempt` (không còn “nothing was changed” sau commit), connection luôn invalidate/close. Agent: nhóm C3 106/106 có niêm hash, đối chứng 9/9, smoke API/proxy 28/28; [handoff](c3-operator-auth-recovery.md#review-lại-tại-6465dc0-ctrl-c-khi-trả-connection). **Safety pending tới C4.**
 
 **Review lại PR #59 tại `6465dc0`:** còn nhánh P2-2 Ctrl-C trong release sau known commit làm CLI báo chưa thay đổi; [report và giới hạn](reviews/pr59-c3-operator-auth-recovery.md) · [prompt sửa hẹp cùng PR](tasks/fix-pr59-c3-final-authority-and-release.md). Reviewer 95 repo + 11 ca ngoài repo pass, một ca interruption fail và đã xác nhận lại. P2-1/release lỗi thông thường đã qua kiểm. Source `0049`, PR OPEN/chưa merge, **safety pending tới C4**; các mốc dưới đây giữ lịch sử.

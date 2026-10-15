@@ -13,12 +13,14 @@ RUNTIME_ROUTINES = {"ras_auth_review_closure_mirror", "ras_auth_review_closure_c
                     "ras_auth_reset_token_live", "ras_auth_token_lock", "ras_auth_token_close", "ras_auth_bootstrap_prepare",
                     "ras_auth_invitation_lock", "ras_auth_invitation_create", "ras_auth_invitation_revoke",
                     "ras_auth_invitation_prepare", "ras_auth_invitation_compensate", "ras_auth_invitation_recover",
-                    "ras_auth_cleanup_fence", "ras_auth_orphan_fence", "ras_auth_orphan_complete"}
+                    "ras_auth_cleanup_fence", "ras_auth_orphan_fence", "ras_auth_orphan_complete",
+                    "ras_auth_initial_pair", "ras_auth_initial_status_verified", "ras_auth_receipt_provenance", "ras_auth_creation_current", "ras_auth_operator_receipt_provenance"}
 RECOVERY_ROUTINES = {"ras_auth_mirror", "ras_auth_confirm", "ras_auth_project", "ras_auth_restrict", "ras_auth_progress", "ras_auth_lock_users",
                      "ras_auth_account_live", "ras_auth_session_live", "ras_auth_session_lock",
                      "ras_auth_session_close", "ras_auth_closure_mirror", "ras_auth_status_live", "ras_auth_reset_eligible",
                      "ras_auth_reset_token_live", "ras_auth_token_lock", "ras_auth_token_close",
-                     "ras_auth_invitation_lock", "ras_auth_invitation_recover"}
+                     "ras_auth_invitation_lock", "ras_auth_invitation_recover",
+                     "ras_auth_initial_pair", "ras_auth_initial_status_verified", "ras_auth_receipt_provenance", "ras_auth_creation_current", "ras_auth_operator_receipt_provenance"}
 # C3: operator logins get these and nothing else; identity is resolved from session_user in SQL.
 OPERATOR_ROUTINES = {"ras_auth_operator_whoami", "ras_auth_operator_gate", "ras_auth_operator_inspect",
                      "ras_auth_operator_case", "ras_auth_operator_snapshot", "ras_auth_operator_stage",
@@ -109,10 +111,14 @@ def provision(engine, *, runtime: str, recovery: str, definer: str):
         if conn.scalar(text("SELECT to_regprocedure('ras_auth_invitation_before_journal()') IS NOT NULL")):
             conn.execute(text(f"GRANT EXECUTE ON FUNCTION ras_auth_invitation_before_journal(),ras_auth_invitation_actor(uuid,uuid,text,timestamptz,interval) TO {df}"))
         # Triggers execute under the caller; SELECT is already granted. Trigger functions don't expose mutation.
-        functions = conn.execute(text("SELECT oid::regprocedure::text signature,proname FROM pg_proc WHERE pronamespace='public'::regnamespace AND (prosecdef OR proname IN ('ras_auth_account_live','ras_auth_session_live','ras_auth_status_live','ras_auth_reset_eligible','ras_auth_reset_token_live')) AND proname LIKE 'ras_auth_%'"))
+        functions = conn.execute(text("SELECT oid::regprocedure::text signature,proname FROM pg_proc WHERE pronamespace='public'::regnamespace AND (prosecdef OR proname IN ('ras_auth_account_live','ras_auth_session_live','ras_auth_status_live','ras_auth_reset_eligible','ras_auth_reset_token_live','ras_auth_initial_pair','ras_auth_initial_status_verified','ras_auth_receipt_provenance','ras_auth_creation_current','ras_auth_operator_receipt_provenance')) AND proname LIKE 'ras_auth_%'"))
         for signature, name in functions:
             conn.execute(text(f"ALTER FUNCTION {signature} OWNER TO {df}"))
             conn.execute(text(f"REVOKE ALL ON FUNCTION {signature} FROM PUBLIC"))
+            # REVOKE ALL above also revokes an existing owner's ordinary
+            # EXECUTE ACL. ALTER OWNER to the same role does not restore it.
+            # Definer-to-helper calls must keep working after reprovision.
+            conn.execute(text(f"GRANT EXECUTE ON FUNCTION {signature} TO {df}"))
             for role, names in ((rt,RUNTIME_ROUTINES),(rc,RECOVERY_ROUTINES)):
                 if name in names:
                     conn.execute(text(f"GRANT EXECUTE ON FUNCTION {signature} TO {role}"))

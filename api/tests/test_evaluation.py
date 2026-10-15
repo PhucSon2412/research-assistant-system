@@ -383,7 +383,8 @@ def test_acl_same_doi_hash_matrix_through_runner(upload_api, monkeypatch, datase
     subset_q = qset.model_copy(update={"questions": questions})
     capture = Capture()
     with instrumented(capture):
-        seeded = seed(Environment(api.engine, storage, settings, {}), subset, DEFAULT_ROOT)
+        seeded = seed(Environment(api.engine, storage, settings, {},
+                                  clock=lambda: api.clock.now, setup_engine=api.setup_engine), subset, DEFAULT_ROOT)
         assert seeded.ingest["A/P11"]["job_state"] == seeded.ingest["B/P11"]["job_state"] == "ready"
         records = evaluate(Environment(api.engine, storage, settings, {}), subset, subset_q, seeded, capture)
         viewer = check_viewer(seeded, records)

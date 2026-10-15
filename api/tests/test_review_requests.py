@@ -32,7 +32,12 @@ def write(browser, method: str, path: str, body=None, *, origin: str | None = WE
         headers["origin"] = origin
     if csrf:
         headers["x-csrf-token"] = browser.csrf()
-    return browser.client.request(method, path, json=body, headers=headers)
+    saved = browser.client.headers.pop("origin", None) if origin is None else None
+    try:
+        return browser.client.request(method, path, json=body, headers=headers)
+    finally:
+        if saved is not None:
+            browser.client.headers["origin"] = saved
 
 
 def request_body(browser, item_id, version_id, file_id, **overrides) -> dict:
@@ -415,7 +420,8 @@ INSERT = text("""INSERT INTO review_requests(item_id,version_id,source_file_id,r
 
 
 def test_schema_binds_item_version_file_owner_and_final_states(api):
-    with api.engine.begin() as conn:
+    # Privileged malformed schema fixtures; these accounts never authenticate.
+    with api.setup_engine.begin() as conn:
         ids = _fixture_rows(conn)
     a, b = ids["a"], ids["b"]
     good = {"item": a["item"], "version": a["v1"], "file": a["f1"], "user": a["user"], "status": "open",
@@ -429,13 +435,13 @@ def test_schema_binds_item_version_file_owner_and_final_states(api):
                 good | {"item": ids["common"]},                   # common items have no owner
                 good | {"status": "rejected"}]                    # requests are born open
     for row in bad_rows:
-        with pytest.raises(IntegrityError), api.engine.begin() as conn:
+        with pytest.raises(IntegrityError), api.setup_engine.begin() as conn:
             conn.execute(INSERT, row)
-    with api.engine.begin() as conn:
+    with api.setup_engine.begin() as conn:
         first = conn.scalar(INSERT, good)
-    with pytest.raises(IntegrityError), api.engine.begin() as conn:
+    with pytest.raises(IntegrityError), api.setup_engine.begin() as conn:
         conn.execute(INSERT, good)                                # second open request for that file
-    with api.engine.begin() as conn:                              # another version of the same item is fine
+    with api.setup_engine.begin() as conn:                              # another version of the same item is fine
         conn.scalar(INSERT, good | {"version": a["v2"], "file": a["f2"], "hash": a["h2"]})
 
     close = "UPDATE review_requests SET status=:s, closed_at=now(), closed_by_user_id=:by, close_reason_code=:c"
@@ -444,25 +450,25 @@ def test_schema_binds_item_version_file_owner_and_final_states(api):
                           ({"s": "rejected", "by": ids["admin"], "c": "withdrawn_by_requester"}, ""),
                           ({"s": "withdrawn", "by": a["user"], "c": "withdrawn_by_requester"},
                            ", rejection_note='x'")):
-        with pytest.raises(IntegrityError), api.engine.begin() as conn:
+        with pytest.raises(IntegrityError), api.setup_engine.begin() as conn:
             conn.execute(text(close + extra + " WHERE id=:r"), params | {"r": first})
-    with pytest.raises(IntegrityError), api.engine.begin() as conn:
+    with pytest.raises(IntegrityError), api.setup_engine.begin() as conn:
         conn.execute(text("UPDATE review_requests SET source_file_id=:f WHERE id=:r"), {"f": a["f2"], "r": first})
-    with pytest.raises(IntegrityError), api.engine.begin() as conn:
+    with pytest.raises(IntegrityError), api.setup_engine.begin() as conn:
         conn.execute(text("UPDATE review_requests SET declared_rights='changed' WHERE id=:r"), {"r": first})
-    with pytest.raises(IntegrityError, match="needs its revocation journal record"), api.engine.begin() as conn:
+    with pytest.raises(IntegrityError, match="needs its revocation journal record"), api.setup_engine.begin() as conn:
         # Valid, but not journaled (0028).
         conn.execute(text(close + ", rejection_note='Thiếu giấy phép' WHERE id=:r"),
                      {"s": "rejected", "by": ids["admin"], "c": "rights_not_established", "r": first})
-    with api.engine.begin() as conn:
+    with api.setup_engine.begin() as conn:
         conn.execute(text(close + ", rejection_note='Thiếu giấy phép' WHERE id=:r"),
                      {"s": "rejected", "by": ids["admin"], "c": "rights_not_established", "r": first})
         journal_sql_close(conn, first)
     for statement in ("UPDATE review_requests SET status='open', closed_at=NULL, closed_by_user_id=NULL,"
                       " close_reason_code=NULL, rejection_note=NULL WHERE id=:r",
                       "UPDATE review_requests SET rejection_note='edited' WHERE id=:r"):
-        with pytest.raises(IntegrityError), api.engine.begin() as conn:
+        with pytest.raises(IntegrityError), api.setup_engine.begin() as conn:
             conn.execute(text(statement), {"r": first})
-    with api.engine.begin() as conn:                              # resubmission after close is allowed
+    with api.setup_engine.begin() as conn:                              # resubmission after close is allowed
         conn.scalar(INSERT, good)
     assert api.scalar("SELECT count(*) FROM review_requests WHERE status='open'") == 2

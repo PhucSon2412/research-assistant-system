@@ -363,7 +363,8 @@ def test_rate_limit_retry_and_a_new_job_reuse_completed_embeddings_and_extractio
     rows = {t: rows_of(w.api, other)[t] for t in ("sections", "chunks", "metadata_candidates", "reference_entries")}
     second = started(w, other)
     assert second != first and [KEY.match(j[2]) is not None for j in jobs_of(w, other)] == [True, True]
-    assert jobs_of(w, other)[1][2].endswith(":2")
+    # Both jobs share the fixture clock; created_at does not order them.
+    assert next(j[2] for j in jobs_of(w, other) if j[0] == second).endswith(":2")
     calls = fake_provider(w.monkeypatch)
     assert process_job(second, storage=w.storage) == "awaiting_index"
     assert process_job(second, w.settings, w.storage) == "ready"

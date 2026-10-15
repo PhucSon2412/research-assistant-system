@@ -29,7 +29,7 @@ def test_0034_populated_provisioned_upgrade_preserves_history_and_permissions(em
         with rt.begin() as conn:
             conn.execute(text('SELECT ras_auth_session_create(:sid,:uid,:gen,:token,:csrf,:at,:end)'),
                          {'sid':sid,'uid':uid,'gen':before.credential_generation,'token':'a'*64,'csrf':'b'*64,'at':NOW,'end':NOW+timedelta(hours=8)})
-        recovery.recover(eng,SimpleNamespace(),w.settings,NOW)
+        recovery.hold(eng,w.settings,NOW)  # current recovery must follow migrate, not read an old schema
         with eng.connect() as conn:
             heads=conn.execute(text('SELECT row_to_json(h) FROM auth_safety_heads h')).scalars().all()
             progress=conn.execute(text('SELECT row_to_json(s) FROM auth_safety_state s')).scalars().all()
@@ -42,8 +42,17 @@ def test_0034_populated_provisioned_upgrade_preserves_history_and_permissions(em
             assert conn.execute(text('SELECT row_to_json(s) FROM auth_safety_state s')).scalars().all()==progress
             assert conn.execute(text('SELECT row_to_json(r) FROM auth_change_receipts r ORDER BY operation_id')).scalars().all()==receipts
         assert journal_path.read_bytes()==journal_bytes
+        recovery.recover(eng,SimpleNamespace(),w.settings,NOW)
+        from tests.test_c3_operator_recovery import operator_initial_status
+        operator_initial_status(w,uid)  # old admin_enable alone is not initial authority
         with rt.begin() as conn:
             assert conn.scalar(text('SELECT ras_auth_account_live(:uid)'),{'uid':uid})
+            assert not conn.scalar(text('SELECT ras_auth_session_live(:sid,:uid,:at,:idle)'),{'sid':sid,'uid':uid,'at':NOW,'idle':timedelta(minutes=30)})
+            # The C3 decision intentionally closes pre-verification sessions.
+            # Issue a fresh session with the preserved credential generation.
+            sid=uuid.uuid4()
+            conn.execute(text('SELECT ras_auth_session_create(:sid,:uid,:gen,:token,:csrf,:at,:end)'),
+                         {'sid':sid,'uid':uid,'gen':before.credential_generation,'token':'c'*64,'csrf':'d'*64,'at':NOW,'end':NOW+timedelta(hours=8)})
             assert conn.scalar(text('SELECT ras_auth_session_live(:sid,:uid,:at,:idle)'),{'sid':sid,'uid':uid,'at':NOW,'idle':timedelta(minutes=30)})
             assert conn.scalar(text('SELECT ras_auth_session_activity(:sid,:uid,:at,:idle,NULL)'),{'sid':sid,'uid':uid,'at':NOW,'idle':timedelta(minutes=30)})
             assert not conn.scalar(text("SELECT has_table_privilege(current_user,'sessions','UPDATE')"))

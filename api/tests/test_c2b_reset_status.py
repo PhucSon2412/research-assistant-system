@@ -20,7 +20,8 @@ from app.identity.sessions import session_is_live, revoke_session
 from app.identity.session_commit import commit_auth
 from app.models import User, PasswordResetToken, UserSession, AuthChangeReceipt, AuthSafetyHead
 from app.models.enums import UserStatus, SessionRevokeReason
-from tests.test_auth_safety_foundation import foundation, runtime, append_changes, changes, user, run_recover, NOW, SECRET
+from tests.test_auth_safety_foundation import foundation, runtime, append_changes, changes, user, run_recover, prove_initial, NOW, SECRET, LEGACY_SECRET
+from tests.test_c2c1_bootstrap import installation
 from tests.test_c2a_login_sessions import sign_in, transition
 
 NEW = "C2b-new-private-password-marker-456!"
@@ -29,10 +30,7 @@ NEW = "C2b-new-private-password-marker-456!"
 @pytest.fixture
 def world(foundation, runtime, monkeypatch, app_env):
     w = foundation
-    values = changes(w)
-    # Initial status evidence from a generic runtime reason; verified_initial_status needs a C3 case.
-    values[-1] = replace(values[-1], reason_code="invitation_accept")
-    append_changes(w, values, engine=runtime)
+    prove_initial(w, engine=runtime)
     run_recover(w)
     app_env(runtime.url)
     w.settings = get_settings()
@@ -43,23 +41,18 @@ def world(foundation, runtime, monkeypatch, app_env):
     return w
 
 
-def add_other(w, role="user", *, initial_reason="invitation_accept"):
+def add_other(w, role="user", *, initial_reason="verified_initial_status"):
     from app.identity.passwords import hash_password
     uid = uuid.uuid4()
     with Session(w.engine) as db:
         db.add(User(id=uid, email=f"{uid.hex}@example.test", role=role,
-                    password_verifier=hash_password(SECRET), password_changed_at=NOW))
+                    password_verifier=hash_password(LEGACY_SECRET if initial_reason else SECRET), password_changed_at=NOW))
         db.commit()
     other = SimpleNamespace(**vars(w)); other.uid = uid
-    operator = initial_reason == "verified_initial_status"
-    values = changes(other, decision="active" if initial_reason and not operator else None)
-    if initial_reason and not operator:
-        values[-1] = replace(values[-1], reason_code=initial_reason)
-    append_changes(other, values, engine=w.runtime)
-    if operator:
-        # Only a real C3 operator case can mint this reason (0049); recover closes the hold afterwards.
-        from tests.test_c3_operator_recovery import operator_initial_status
-        operator_initial_status(w, uid)
+    if initial_reason:
+        prove_initial(other,engine=w.runtime)
+    else:
+        append_changes(other, changes(other, decision=None), engine=w.runtime)  # credential-only negative fixture
     return other
 
 
@@ -71,7 +64,14 @@ def test_disable_cannot_supply_initial_status_proof(world, history):
         change = auth_safety.Change(target.uid, "status",
             "invitation_accept" if history == "uncommitted_initial" else "admin_enable",
             NOW, decision="active")
-        append_changes(target, [change], engine=w.runtime, rollback=history == "uncommitted_initial")
+        if history == "uncommitted_initial":
+            # Adversarial journal intent without a DB receipt/creation parent.
+            state = journal.read(w.path)
+            body = {"user_id": str(target.uid), "operation_id": str(uuid.uuid4()), "generation": str(uuid.uuid4()),
+                    "reason_code": change.reason_code, "recorded_at": NOW.isoformat(), "decision": "active"}
+            journal.append(w.path, state, [journal.next_record(state.head, journal.ACCOUNT_STATUS_DECISION, body)])
+        else:
+            append_changes(target, [change], engine=w.runtime)
         run_recover(w)
     before = user(target)
     assert before.credential_state == "usable"
@@ -100,13 +100,37 @@ def test_disable_cannot_supply_initial_status_proof(world, history):
 
 
 @pytest.mark.parametrize("initial_reason", ["bootstrap", "invitation_accept", "verified_initial_status"])
-def test_verified_initial_status_survives_disable_enable(world, initial_reason):
-    w = world; actor = sign_in(w); target = add_other(w, initial_reason=initial_reason)
+def test_verified_initial_status_survives_disable_enable(installation, monkeypatch, initial_reason):
+    from app.identity.bootstrap import bootstrap_admin
+    from app.identity.invitations import create_invitation, accept_invitation
+    w = installation; w.clock = lambda: NOW
+    monkeypatch.setattr(auth_safety, "cutover", lambda db: "ready")
+    w.uid = bootstrap_admin(w.runtime, email="c1@example.test", password=SECRET,
+                            policy=w.settings.password, clock=w.clock).user_id
+    if initial_reason == "bootstrap":
+        target = SimpleNamespace(**vars(w))
+        other_admin = add_other(w, "admin", initial_reason="verified_initial_status")
+        actor = sign_in(other_admin, email=f"{other_admin.uid.hex}@example.test")
+        w = other_admin
+    elif initial_reason == "invitation_accept":
+        actor = sign_in(w)
+        with Session(w.runtime) as db:
+            created = create_invitation(db, inviter_id=w.uid, actor_session_id=actor.session_id,
+                csrf_token=actor.csrf_token, email="real-invite@example.test", display_name=None,
+                now=NOW, lifetime=w.settings.auth.invite, clock=w.clock)
+        with Session(w.runtime) as db:
+            uid = accept_invitation(db, raw_token=created.token, password=SECRET, display_name=None,
+                now=NOW, policy=w.settings.password, clock=w.clock).id
+        target = SimpleNamespace(**vars(w)); target.uid = uid
+    else:
+        actor = sign_in(w); target = add_other(w, initial_reason=initial_reason)
     status(w, target, actor, UserStatus.DISABLED)
     status(w, target, actor, UserStatus.ACTIVE)
     # Historical initial receipt is sufficient even when latest reason is admin_enable.
     assert user(target).status == "active"
-    assert sign_in(target, email=f"{target.uid.hex}@example.test").session_id
+    with Session(w.runtime) as db:
+        email = db.get(User, target.uid).email
+    assert sign_in(target, email=email).session_id
 
 
 def issue(w, *, clock=None, quarantine=False):

@@ -22,7 +22,7 @@ def test_0035_populated_upgrade_preserves_history_roles_and_pending(empty_db_url
         db.add(User(id=uid,email="c1@example.test",password_verifier=hash_password(SECRET),password_changed_at=NOW));db.commit()
     rt=runtime_engine(w)
     try:
-        append_changes(w,engine=rt);recovery.recover(eng,SimpleNamespace(),w.settings,NOW)
+        append_changes(w,engine=rt);recovery.hold(eng,w.settings,NOW)
         before=journal_path.read_bytes()
         with eng.connect() as conn:
             rows={t:conn.execute(text(f"SELECT row_to_json(r) FROM {t} r")).scalars().all()
@@ -30,8 +30,17 @@ def test_0035_populated_upgrade_preserves_history_roles_and_pending(empty_db_url
         upgrade(empty_db_url)
         with eng.connect() as conn:
             assert conn.scalar(text("SELECT version_num FROM alembic_version"))==HEAD_REVISION
-            for t,values in rows.items():assert conn.execute(text(f"SELECT row_to_json(r) FROM {t} r")).scalars().all()==values
+            for t,values in rows.items():
+                after=conn.execute(text(f"SELECT row_to_json(r) FROM {t} r")).scalars().all()
+                if t=="revocation_journal_records":
+                    for row in after:
+                        for col in ("case_id","case_operator_id","case_user_id","case_action","case_operation_id","case_recorded_at"):
+                            assert row.pop(col) is None
+                assert after==values
         assert journal_path.read_bytes()==before
+        recovery.recover(eng,SimpleNamespace(),w.settings,NOW)
+        from tests.test_c3_operator_recovery import operator_initial_status
+        operator_initial_status(w,uid)
         with rt.begin() as conn:
             assert conn.scalar(text("SELECT ras_auth_status_live(:uid)"),{"uid":uid})
             assert conn.scalar(text("SELECT ras_auth_reset_eligible(:uid,(SELECT credential_operation_id FROM users WHERE id=:uid),'normal')"),{"uid":uid})

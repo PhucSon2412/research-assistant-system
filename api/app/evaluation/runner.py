@@ -15,7 +15,7 @@ import os
 import secrets
 import subprocess
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -35,6 +35,7 @@ from sqlalchemy.orm import Session
 from app import config as app_config
 from app import db as app_db
 from app.authz import Principal
+from app.clock import utcnow
 from app.config import EmbeddingPolicy, GenerationPolicy, PasswordPolicy, RerankPolicy, Settings, get_settings
 from app.evaluation import local_embedding
 from app.evaluation.corpus import sha256_bytes
@@ -44,7 +45,8 @@ from app.evaluation.report import build
 from app.evaluation.schema import Manifest, Question, QuestionSet, allowed_items, load
 from app.evaluation.validate import validate
 from app.identity.bootstrap import bootstrap_admin
-from app.identity.passwords import hash_password
+from app.identity.invitations import accept_invitation, create_invitation
+from app.identity.login import login
 from app.ingest.worker import process_job
 from app.main import app
 from app.rag import GenerationResult, is_comparison
@@ -133,6 +135,8 @@ class Environment:
     storage: OriginalStorage
     settings: Settings
     configured_pricing: dict[str, bool]
+    clock: Callable[[], datetime] = utcnow
+    setup_engine: Engine | None = None
 
 
 @contextmanager
@@ -244,12 +248,19 @@ def _login(email: str, password: str, key: str, user_id: uuid.UUID, role: str) -
 def seed(env: Environment, manifest: Manifest, root: Path) -> Seeded:
     passwords = {key: secrets.token_urlsafe(24) for key in EMAILS}  # never printed or stored
     admin_id = bootstrap_admin(env.engine, email=EMAILS["admin"], password=passwords["admin"],
-                               policy=PasswordPolicy()).user_id
+                               policy=env.settings.password, clock=env.clock).user_id
     ids = {"admin": admin_id}
-    with env.engine.begin() as conn:
-        for key in ("user_a", "user_b"):
-            ids[key] = conn.scalar(text("INSERT INTO users (email, password_verifier) VALUES (:e, :v) RETURNING id"),
-                                   {"e": EMAILS[key], "v": hash_password(passwords[key])})
+    with Session(env.engine) as db:
+        actor = login(db, email=EMAILS["admin"], password=passwords["admin"],
+                      now=env.clock(), settings=env.settings, clock=env.clock)[1]
+    for key in ("user_a", "user_b"):
+        with Session(env.engine) as db:
+            invitation = create_invitation(db, inviter_id=admin_id, actor_session_id=actor.session_id,
+                csrf_token=actor.csrf_token, email=EMAILS[key], display_name=None, now=env.clock(),
+                lifetime=env.settings.auth.invite, clock=env.clock)
+        with Session(env.engine) as db:
+            ids[key] = accept_invitation(db, raw_token=invitation.token, password=passwords[key],
+                display_name=None, now=env.clock(), policy=env.settings.password, clock=env.clock).id
     identities = {key: _login(EMAILS[key], passwords[key], key, ids[key], "admin" if key == "admin" else "user")
                   for key in EMAILS}
     papers = {paper.id: paper for paper in manifest.papers}
@@ -257,7 +268,7 @@ def seed(env: Environment, manifest: Manifest, root: Path) -> Seeded:
     ingest: dict[str, dict] = {}
     for entry in manifest.items:
         if entry.owner == "common":
-            with env.engine.begin() as conn:
+            with (env.setup_engine or env.engine).begin() as conn:  # synthetic metadata setup only
                 item_id = conn.scalar(text("INSERT INTO library_items (visibility, publication_state, title) VALUES ('common', 'listed', :t)"
                                            " RETURNING id"), {"t": entry.title})
                 conn.execute(text("INSERT INTO paper_versions (item_id, version_label) VALUES (:i, 'v1')"),

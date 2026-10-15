@@ -202,22 +202,22 @@ def test_scope_before_keyword_vector_topk_and_rerank_payload(upload_api, monkeyp
     assert "outside collection" not in str(sent) and "B secret" not in str(sent)
     # Remove membership immediately after the rerank reservation commits.
     # The fresh gate must stop the provider call even though earlier ranks existed.
-    from app import search as search_module
-    original_reserve = search_module.reserve
-    def revoke_at_reservation(db, principal, cfg, task, amount):
-        usage_id = original_reserve(db, principal, cfg, task, amount)
-        if task == "rerank":
-            with api.engine.begin() as conn:
-                conn.execute(text("DELETE FROM collection_items WHERE collection_id=:c AND item_id=:i"),
-                             {"c": uuid.UUID(collection), "i": uuid.UUID(wanted["item_id"])})
-        return usage_id
-    monkeypatch.setattr("app.search.reserve", revoke_at_reservation)
+    from app import search_boundary
+    original_checkpoint = search_boundary.checkpoint
+    def revoke_at_reservation(engine, phase, operation, **kwargs):
+        result = original_checkpoint(engine, phase, operation, **kwargs)
+        if phase == "reservation" and result.task_type == "rerank":
+            assert engine.pool.checkedout() == 0
+            removed = a._unsafe("DELETE", f'/collections/{collection}/items/{wanted["item_id"]}')
+            assert removed.status_code == 204, removed.text
+        return result
+    monkeypatch.setattr(search_boundary, "checkpoint", revoke_at_reservation)
     sent_before = len(sent)
     changed = a.post("/search", {"query": "Targetword", "mode": "keyword",
                                   "rerank": True, "collection_id": collection})
     assert changed.status_code == 409 and changed.json() == {"error": "search_scope_changed"}
     assert len(sent) == sent_before
-    monkeypatch.setattr("app.search.reserve", original_reserve)
+    monkeypatch.setattr(search_boundary, "checkpoint", original_checkpoint)
     assert _add(a, collection, wanted["item_id"]).status_code == 201
     assert a.post("/search", {"query": "Targetword", "mode": "keyword", "item_id": wanted["item_id"],
                               "collection_id": collection}).status_code == 422

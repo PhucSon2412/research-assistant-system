@@ -94,13 +94,16 @@ def test_operator_cannot_register_its_own_case_but_provisioner_can(world):
     uid = account(w)
     hold(w)
     c = real_case(w, uid, ops.SET_CREDENTIAL, register=False)
+    before=scalar(w,"SELECT count(*) FROM auth_recovery_cases")  # verified fixture already has two used cases
     env = cli_env(w, w.operator_url)
     command = [sys.executable, "-m", "app.cli.provision_auth_operator", "register-case", "--case-file", str(case_path(w, c))]
     denied = subprocess.run(command, capture_output=True, text=True, cwd=API_DIR, env=env, timeout=60)
-    assert denied.returncode != 0 and scalar(w, "SELECT count(*) FROM auth_recovery_cases") == 0
+    assert denied.returncode != 0 and scalar(w, "SELECT count(*) FROM auth_recovery_cases") == before
+    assert scalar(w,"SELECT count(*) FROM auth_recovery_cases WHERE case_id=:id",id=c.case_id)==0
     owner = subprocess.run(command, capture_output=True, text=True, cwd=API_DIR, env=cli_env(w, w.engine.url), timeout=60)
     assert owner.returncode == 0, owner.stderr
-    assert scalar(w, "SELECT count(*) FROM auth_recovery_cases") == 1
+    assert scalar(w, "SELECT count(*) FROM auth_recovery_cases") == before+1
+    assert scalar(w,"SELECT count(*) FROM auth_recovery_cases WHERE case_id=:id",id=c.case_id)==1
 
 
 @pytest.mark.parametrize("fake", ["eof", "interrupt", "getpass_warning"])

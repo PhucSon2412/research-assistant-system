@@ -1,5 +1,17 @@
 # Nhật ký quyết định
 
+## B1: provenance ban đầu và ranh giới C4 (2026-10-14)
+
+Theo [task đã giao](tasks/pre-c4-auth-receipts-and-regression.md), migration `0050` kiểm parent mới theo transaction sống và cặp sự kiện bền cho cả credential/status. Không dùng `xmin` lịch sử qua restore; role/email hiện hành không thay bằng chứng tạo account. Predicate chung phủ mọi consumer, dữ liệu cũ thiếu provenance bị quarantine/held thay vì tự dựng bằng chứng. Reprovision cấp lại EXECUTE cho đúng NOLOGIN definer trên các routine đã chọn, giữ runtime không có quyền ghi auth thô.
+
+Fixture positive dùng luồng thật, corruption dùng setup privileged riêng. Inventory nối từng node và giữ từng lượt lỗi; pending readiness không đổi kỳ vọng. [Handoff B1](pre-c4-auth-receipts-regression.md) bàn giao C4 cùng image/revision/roles, cutover có hậu điều kiện, new install/upgrade và hai vòng restore/HTTP/browser không seam. **Safety vẫn pending tới C4**; không đổi yêu cầu sản phẩm, provider/pricing hoặc tác động dev. Các quyết định giao trước dưới đây giữ lịch sử.
+
+## Giao B1 sau merge PR #59 (2026-10-13)
+
+PR #59 đã merge `041f77ef`, tree khớp head review `035cef0`, source `0049`; chưa rerun tại merge. Theo ủy quyền chọn cách hoàn thành MVP, orchestrator giao [một PR B1](tasks/pre-c4-auth-receipts-and-regression.md) để đóng provenance initial receipt và xử lý nợ hồi quy trước C4. Guard phải bảo vệ cả writer và consumer `bootstrap`/`invitation_accept`, không cho reason generic chứng minh initial status; receipt lịch sử không có provenance không được tự hợp thức hóa. Giữ bootstrap/invitation hợp lệ và operator C3 đúng trust boundary.
+
+B1 đối chiếu toàn inventory, sửa fixture theo hợp đồng thật và lỗi tích hợp; không miễn lỗi quyền/nghiệp vụ bằng nhãn baseline, không biến expectation nghiệp vụ thành 503. HTTP pending kiểm thật riêng; ca chỉ thực thi được bằng C4 không patch phải giữ expectation và có danh sách bàn giao cụ thể. **Mới giao tài liệu, chưa triển khai/kiểm; safety pending tới C4.** Không mở pricing/cutover, tác động dev hoặc mở scope ngoài checklist MVP.
+
 ## Review lại PR #59: ngắt khi trả connection (2026-10-12)
 
 Cleanup mỗi pha hấp thụ cả ngắt (`BaseException`) để luôn invalidate/close và báo `connection_release_interrupted`; outcome phân loại theo `Attempt`, không đổi known commit thành hủy. Ctrl-C trong lúc nhập mật khẩu trước mutation vẫn là hủy an toàn. Không migration/grant; safety pending tới C4.
