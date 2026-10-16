@@ -9,9 +9,18 @@ name: ras
 x-db-env: &db-env
   RAS_DB__HOST: db
   RAS_DB__PORT: "5432"
-  RAS_DB__USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
-  RAS_DB__PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+  RAS_DB__USER: ${RAS_RUNTIME_DB_USER:?set a dedicated runtime LOGIN}
+  RAS_DB__PASSWORD: ${RAS_RUNTIME_DB_PASSWORD:?set runtime password}
   RAS_DB__NAME: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+x-migrator-env: &migrator-env
+  RAS_DB__HOST: db
+  RAS_DB__PORT: "5432"
+  RAS_DB__USER: ${POSTGRES_USER:?set POSTGRES_USER}
+  RAS_DB__PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+  RAS_DB__NAME: ${POSTGRES_DB:?set POSTGRES_DB}
+x-api-image: &api-image
+  image: ${RAS_API_IMAGE:-ras-api:local}
+  pull_policy: never
 
 # M6c-1 revocation journal: kept OUT of the db-data and minio-data volumes (and
 # out of their backups), so restoring those does not roll it back. A separate
@@ -79,13 +88,29 @@ services:
 
   migrate:
     # One-shot: applies Alembic migrations, then exits. `api` waits for it.
+    <<: *api-image
     build: ./api
     command: ["alembic", "upgrade", "head"]
     environment:
-      <<: *db-env
+      <<: *migrator-env
     depends_on:
       db:
         condition: service_healthy
+    restart: "no"
+
+  provision:
+    <<: *api-image
+    command: ["python", "-m", "app.cli.provision_auth_roles", "--create-logins",
+              "--runtime", "${RAS_RUNTIME_DB_USER:?set runtime LOGIN}",
+              "--recovery", "${RAS_RECOVERY_DB_USER:?set recovery LOGIN}",
+              "--definer", "${RAS_DEFINER_DB_ROLE:?set NOLOGIN definer}"]
+    environment:
+      <<: *migrator-env
+      RAS_PROVISION_RUNTIME_PASSWORD: ${RAS_RUNTIME_DB_PASSWORD:?set runtime password}
+      RAS_PROVISION_RECOVERY_PASSWORD: ${RAS_RECOVERY_DB_PASSWORD:?set recovery password}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     restart: "no"
 
   recovery-init:
@@ -95,21 +120,29 @@ services:
     # taken for a new install. Until the database and the journal agree, the
     # API serves only /healthz (/readyz is 503) and workers process nothing;
     # see docs/dev-setup.md ("Cleanup và restore").
-    build: ./api
-    command: ["python", "-m", "app.cli.recovery", "init", "--if-new"]
+    <<: *api-image
+    command: ["python", "-m", "app.cli.initialize_installation"]
     environment:
-      <<: [*db-env, *journal-env]
+      <<: [*migrator-env, *journal-env]
+      RAS_STORAGE__ENDPOINT_URL: http://minio:9000
+      RAS_STORAGE__ACCESS_KEY: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
+      RAS_STORAGE__SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+      RAS_STORAGE__BUCKET: ras-originals
     volumes:
       - *journal-volume
     depends_on:
-      migrate:
+      provision:
         condition: service_completed_successfully
+      minio:
+        condition: service_healthy
     restart: "no"
 
   api:
-    build: ./api
+    <<: *api-image
     environment:
       <<: [*db-env, *journal-env]
+      RAS_REDIS_HOST: redis
+      RAS_REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
       # Development only: plain HTTP, non-Secure cookies and the in-memory dev
       # outbox are hardcoded here on purpose. This file is not a deployment
       # config and cannot be turned into one by setting variables; see
@@ -170,7 +203,7 @@ services:
       start_period: 10s
 
   worker:
-    build: ./api
+    <<: *api-image
     command: ["celery", "-A", "app.ingest.celery_app:celery_app", "worker", "--loglevel=WARNING", "--concurrency=2"]
     environment:
       <<: [*db-env, *journal-env]
@@ -212,7 +245,7 @@ services:
     restart: unless-stopped
 
   beat:
-    build: ./api
+    <<: *api-image
     command: ["celery", "-A", "app.ingest.celery_app:celery_app", "beat", "--loglevel=WARNING", "--schedule=/tmp/celerybeat-schedule"]
     environment:
       <<: [*db-env, *journal-env]
@@ -239,6 +272,8 @@ services:
 
   web:
     build: ./web
+    image: ${RAS_WEB_IMAGE:-ras-web:local}
+    pull_policy: never
     environment:
       # Server-side only; the browser never talks to the DB or holds secrets.
       API_INTERNAL_URL: http://api:8000

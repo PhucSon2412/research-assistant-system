@@ -1,6 +1,6 @@
 """C2d-5e1 runtime cleanup: actual runtime login, PostgreSQL, MinIO and journal.
 
-Only business cutover is scoped (``world``). Owner-engine statements are
+Shared business setup uses the real C4 contract. Owner-engine statements are
 labelled setup, corruption or adversary; ``operator_cleanup_revoked`` appears
 only in labelled recovery/operator checks. The copy is indexed by the real
 runtime document pipeline with a fake transport; no provider or arXiv call.
@@ -24,7 +24,7 @@ from app.db import get_engine
 from app.ingest import cleanup as boundary, runtime, worker as w
 from tests.test_auth_safety_foundation import NOW
 from tests.test_c2c1_bootstrap import installation  # noqa: F401
-from tests.test_c2c2_invitations import world  # noqa: F401
+from tests.test_c2c2_invitations import operational_world as world  # noqa: F401
 from tests.test_c2d1_final_caller import browser  # noqa: F401
 from tests.test_c2d5a_review_writes import writers, wait_for  # noqa: F401
 from tests.test_c2d5d1_common_index_request import indexes, live_job  # noqa: F401
@@ -33,7 +33,7 @@ from tests.test_c2d5d2b_common_runtime import doc, run  # noqa: F401
 from tests.resource_fixtures import BODY, derived, runtime_revoke, source
 
 ROUTINE = 'ras_auth_cleanup_fence(uuid,uuid,uuid,text,bigint)'
-REAL_CUTOVER = auth_safety.cutover  # captured at import, before any scoped fixture patch
+REAL_CUTOVER = auth_safety.cutover  # captured before named unit fault injections
 ITEM_TABLES = ('sections', 'chunks', 'pdf_pages', 'reference_entries', 'metadata_candidates', 'index_generations')
 
 
@@ -339,7 +339,7 @@ def test_gate_closing_between_checkpoints(gone, monkeypatch, moment):
     assert present(b, b.copy.key) is not deleted  # an admitted delete completes; nothing recreates it
     monkeypatch.setattr(boundary, 'prepare', real)  # a later independent tick with the gate open again
     b.watch.hooks.clear()
-    monkeypatch.setattr(auth_safety, 'cutover', lambda db: 'ready')
+    monkeypatch.setattr(auth_safety, 'cutover', REAL_CUTOVER)
     assert clean(b) == {('already_absent' if deleted else 'deleted'): 1}
     assert tomb(b).purged_at == NOW and len(fences(b)) == 1
 
@@ -842,10 +842,10 @@ def test_recover_uses_operator_path_and_sweeps_restored_object(gone, monkeypatch
     real = publication.operator_cleanup_revoked
     monkeypatch.setattr(publication, 'operator_cleanup_revoked', lambda *a: used.append(a[0].url.username) or real(*a))
     monkeypatch.setattr(boundary, 'cleanup_revoked', lambda *a, **k: pytest.fail('runtime path inside recover'))
-    monkeypatch.setattr(auth_safety, 'cutover', REAL_CUTOVER)  # recover never makes safety ready
+    # Real recovery now completes the C4 operational contract.
     report = recovery.recover(b.w.recovery, b.raw_storage, get_settings(), NOW)
     assert used and set(used) == {'c1_recovery'} and report.cleanup == {'deleted': 1}
-    assert report.gate == 'auth_safety_pending' and report.reconciliation_complete
+    assert report.gate == 'open' and report.reconciliation_complete
     assert tomb(b).purged_at == NOW and not present(b, b.copy.key)
     # The object store came back from an older backup: a purged tombstone's object is swept again.
     b.raw_storage.put(b.copy.key, io.BytesIO(BODY), 'text/markdown')
@@ -853,7 +853,7 @@ def test_recover_uses_operator_path_and_sweeps_restored_object(gone, monkeypatch
     again = recovery.recover(b.w.recovery, b.raw_storage, get_settings(), NOW)
     assert again.objects_removed == 1 and not present(b, b.copy.key)
     third = recovery.recover(b.w.recovery, b.raw_storage, get_settings(), NOW)
-    assert third.objects_removed == 0 and third.gate == 'auth_safety_pending'
+    assert third.objects_removed == 0 and third.gate == 'open'
     assert present(b, b.own.key)
 
 
@@ -875,7 +875,7 @@ def assert_operator_untouched(b, rows):
 @pytest.mark.parametrize('profile', ['temp', 'protected_write', 'missing_grant', 'recovery_mimic'])
 def test_operator_refuses_misprovisioned_runtime_with_real_pending_gate(gone, monkeypatch, profile):
     b = gone
-    monkeypatch.setattr(auth_safety, 'cutover', REAL_CUTOVER)  # production pending gate, not scoped ready
+    q(b, 'DELETE FROM auth_operational_state')  # trusted pending setup
     rows = snapshot(b)
     database = q(b, 'SELECT current_database()')
     grant = {  # labelled owner corruption of THIS test DB's runtime grants
@@ -924,7 +924,7 @@ def test_operator_identity_faults_refuse_before_any_mutation(gone, monkeypatch, 
 @pytest.mark.parametrize('login', ['owner', 'recovery'])
 def test_operator_control_owner_and_recovery_clean_with_pending_gate(gone, monkeypatch, login):
     b = gone
-    monkeypatch.setattr(auth_safety, 'cutover', REAL_CUTOVER)
+    q(b, 'DELETE FROM auth_operational_state')  # trusted pending setup
     assert clean(b) == {'halted:recovery_gate_closed': 1}
     engine = b.w.engine if login == 'owner' else b.w.recovery
     assert publication.operator_cleanup_revoked(engine, b.watch, NOW, 10) == {'deleted': 1}

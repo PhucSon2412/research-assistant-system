@@ -25,6 +25,7 @@ from app.models import User
 from app.models.enums import UserStatus
 from tests.conftest import upgrade, register_new_install, alembic_config, create_empty_database, drop_database
 from tests.test_c3_operator_recovery import ensure_login
+REAL_CUTOVER = auth_safety.cutover
 from app.identity.users import _initial_status_verified
 from tests.test_auth_safety_foundation import (
     foundation, runtime, append_changes, changes, run_recover, user, runtime_engine, NOW, SECRET,
@@ -144,8 +145,10 @@ def test_upgrade_preserves_bytes_but_consumers_deny_old_forgery(old_install):
 
 
 @pytest.mark.parametrize("kind",["bootstrap","invitation"])
-def test_durable_creation_proof_survives_current_profile_changes(old_install,kind):
+def test_durable_creation_proof_survives_current_profile_changes(old_install,kind,monkeypatch):
     w=old_install;upgrade(w.engine.url)
+    provision(w.engine,runtime='c1_runtime',recovery='c1_recovery',definer='c1_definer')
+    monkeypatch.setattr(auth_safety,'cutover',REAL_CUTOVER)
     uid=w.uid if kind=="bootstrap" else w.invitee
     with w.engine.begin() as db:  # privileged profile-change fixture, never new account creation
         before=db.execute(text("SELECT credential_operation_id,status_operation_id FROM users WHERE id=:u"),{"u":uid}).one()
@@ -157,12 +160,13 @@ def test_durable_creation_proof_survives_current_profile_changes(old_install,kin
     # The creation-time role/email were proved by the protected parent writer;
     # current profile/role must still be reloaded by each authorization consumer.
     report=recovery.recover(w.engine,SimpleNamespace(),w.settings,NOW)
-    assert report.reconciliation_complete and not report.safety_ready
+    assert report.reconciliation_complete and report.safety_ready
     with Session(w.runtime) as db:assert auth_safety.account_live(db,uid)
 
 
-def test_two_dump_restore_rounds_keep_valid_provenance_and_restrict_forgery(old_install, admin_engine, tmp_path):
+def test_two_dump_restore_rounds_keep_valid_provenance_and_restrict_forgery(old_install, admin_engine, tmp_path,monkeypatch):
     w = old_install; upgrade(w.engine.url)
+    monkeypatch.setattr(auth_safety,'cutover',REAL_CUTOVER)
     name = os.environ["RAS_C3_TEST_CONTAINER"]
     facts = json.loads(subprocess.run(["docker", "inspect", name], check=True, capture_output=True, text=True, timeout=30).stdout)[0]
     assert facts["Config"]["Labels"]["ras.task"] == os.environ["RAS_C3_TEST_PROJECT"]
@@ -185,7 +189,7 @@ def test_two_dump_restore_rounds_keep_valid_provenance_and_restrict_forgery(old_
             recovery.hold(restored, settings, NOW)
             for _ in range(2):
                 report = recovery.recover(restored, SimpleNamespace(), settings, NOW)
-                assert report.reconciliation_complete and not report.safety_ready
+                assert report.reconciliation_complete and report.safety_ready
                 with Session(runtime_restored) as db:
                     from app.ingest.runtime import require_runtime
                     require_runtime(db)

@@ -1,7 +1,7 @@
 """Installed Chrome, actual Next proxy and uvicorn; disposable fixture only.
 
-The app's pending result is patched only by upload_api. The final check restores
-the real gate. Copies tracked web source (never .env) to an external directory.
+Shared business setup uses the real C4 contract. The final check injects
+pending as a separate historical fault case. Copies tracked web source (never .env) to an external directory.
 """
 import json
 import os
@@ -117,7 +117,7 @@ def test_chrome_proxy_business_and_pending(ready,tmp_path,monkeypatch):
                 expect(page.get_by_text('Không tìm thấy',exact=False)).to_be_visible(timeout=60000)
                 assert 'A measured result.' not in page.locator('body').inner_text()
             monkeypatch.setattr(auth_safety,'cutover',lambda db:'auth_safety_pending')
-            # Real HTTP pending is separately asserted after the scoped business checks.
+            # A separate pending fault is asserted after the real C4 business checks.
             result=context.request.get(f'http://127.0.0.1:{api_port}/search/chunks/'+chunk_path.rsplit('/',1)[1])
             assert result.status==503
             assert context.request.get(f'http://127.0.0.1:{api_port}/healthz').status==200

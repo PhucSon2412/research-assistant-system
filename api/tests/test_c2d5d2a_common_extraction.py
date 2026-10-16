@@ -17,7 +17,7 @@ from app.identity.session_commit import commit_auth
 from app.ingest import worker, checkpoints, runtime
 from app.models.enums import SessionRevokeReason
 from tests.test_c2c1_bootstrap import installation  # noqa: F401
-from tests.test_c2c2_invitations import world  # noqa: F401
+from tests.test_c2c2_invitations import operational_world as world  # noqa: F401
 from tests.test_c2d1_final_caller import browser  # noqa: F401
 from tests.test_c2d5a_review_writes import writers, wait_for  # noqa: F401
 from tests.test_c2d5d1_common_index_request import indexes, index, jobs

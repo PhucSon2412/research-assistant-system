@@ -1,6 +1,6 @@
 """Linux Celery worker+beat on the actual runtime Compose override, isolated Redis.
 
-The mounted sitecustomize is TEST ONLY: it scopes cutover, schedule and egress.
+The mounted sitecustomize is TEST ONLY: it controls schedule and egress; the C4 gate is real.
 No production switch, operator credential, provider or dev service is involved.
 """
 import json
@@ -17,7 +17,7 @@ from app.config import get_settings
 from app.models import IngestionJob, SourceFile
 from tests.conftest import REPO_DIR
 from tests.test_c2c1_bootstrap import installation  # noqa: F401
-from tests.test_c2c2_invitations import world  # noqa: F401
+from tests.test_c2c2_invitations import operational_world as world  # noqa: F401
 from tests.test_c2d1_final_caller import browser  # noqa: F401
 from tests.test_c2d5a_review_writes import writers  # noqa: F401
 from tests.test_c2d5d1_common_index_request import indexes, index, jobs
@@ -75,6 +75,9 @@ def test_real_worker_beat_fake_provider_restart_and_three_indexes(indexes):
         'POSTGRES_DB':b.w.runtime.url.database,'MINIO_ROOT_USER':'task_minio','MINIO_ROOT_PASSWORD':c['minio'],
         'REDIS_PASSWORD':c['redis'],'RAS_WORKER_RUNTIME_USER':b.w.runtime.url.username,
         'RAS_WORKER_RUNTIME_PASSWORD':c['runtime'],'RAS_JOURNAL_SOURCE':str(b.w.path.parent).replace('\\','/')}
+    values.update(RAS_RUNTIME_DB_USER='c1_runtime',RAS_RUNTIME_DB_PASSWORD=c['runtime'],
+        RAS_RECOVERY_DB_USER='c1_recovery',RAS_RECOVERY_DB_PASSWORD=c['recovery'],
+        RAS_DEFINER_DB_ROLE='c1_definer',RAS_API_IMAGE=os.environ.get('RAS_TEST_PROCESS_IMAGE','rasc4-process:local'))
     env_file=evidence/'runtime.env'
     env_file.write_text('\n'.join(k+'='+v for k,v in values.items())+'\n',encoding='utf-8')
     harness=evidence/'harness';harness.mkdir()
@@ -91,7 +94,7 @@ def connect(self,address):
 socket.socket.connect=connect
 if sys.argv[0].endswith('celery'):
  from app import auth_safety
- auth_safety.cutover=lambda db:'ready'
+
  from app.ingest.celery_app import celery_app
  celery_app.conf.beat_schedule={'document-test-only':{'task':'ras.ingest.discover','schedule':1.0}}
  import httpx
@@ -147,8 +150,7 @@ if sys.argv[0].endswith('celery'):
         extra['services'][name]={'image':os.environ.get('RAS_TEST_PROCESS_IMAGE','rasc2d5d2b-worker:20261010'), 'build':str(REPO_DIR/'api'),
             'labels':{'ras.task':c['project']},'environment':{'PYTHONPATH':'/harness:/srv/api',
                 'RAS_REDIS_PORT':'6379'},
-            'volumes':[str(REPO_DIR/'api'/'app').replace('\\','/')+':/srv/api/app:ro',
-                str(harness).replace('\\','/')+':/harness:ro',str(evidence).replace('\\','/')+':/evidence']}
+            'volumes':[str(harness).replace('\\','/')+':/harness:ro',str(evidence).replace('\\','/')+':/evidence']}
     extra['services']['worker']['environment']['RAS_STORAGE__BUCKET']=b.raw_storage.bucket
     extra['services']['beat']['command']=['celery','-A','app.ingest.celery_app:celery_app','beat','--loglevel=WARNING','--schedule=/tmp/beat']
     override=evidence/'smoke.json';override.write_text(json.dumps(extra),encoding='utf-8')

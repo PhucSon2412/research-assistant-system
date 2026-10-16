@@ -28,15 +28,14 @@ from tests.test_auth_safety_foundation import NOW
 
 @pytest.fixture
 def upload_api(installation, monkeypatch):
-    # Scoped business cutover only; real runtime bootstrap/invite/login/receipts.
-    from app import auth_safety
+    # Shared business fixture completes the real C4 contract; no cutover seam.
+    from app import recovery
     from app.api.deps import get_clock, get_now
     from app.identity.bootstrap import bootstrap_admin
     from app.identity.invitations import create_invitation, accept_invitation
     from app.identity.login import login
     from app.delivery import get_delivery
     get_delivery.cache_clear()
-    monkeypatch.setattr(auth_safety, 'cutover', lambda db: 'ready')
     for key,value in DEV_ENV.items(): monkeypatch.setenv(key,value)
     clock=FakeClock();clock.now=NOW
     app.dependency_overrides[get_clock]=lambda:lambda:clock.now
@@ -77,6 +76,7 @@ def upload_api(installation, monkeypatch):
     app_config.get_settings.cache_clear()
     storage = get_storage(app_config.get_settings())
     storage.ensure_bucket()
+    recovery.recover(installation.engine,storage,app_config.get_settings(),utcnow())
     yield api, storage
     app.dependency_overrides.pop(_storage, None)
     try:

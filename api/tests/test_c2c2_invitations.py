@@ -33,8 +33,18 @@ PASSWORD = 'C2c2-private-password-789!'
 
 @pytest.fixture
 def world(installation, monkeypatch):
-    w = installation
     monkeypatch.setattr(auth_safety, 'cutover', lambda db: 'ready')
+    yield from _seed_world(installation)
+
+
+@pytest.fixture
+def operational_world(installation):
+    """C4 business/process setup; C2c historical fault isolation keeps world above."""
+    recovery.recover(installation.engine,SimpleNamespace(),installation.settings,NOW)
+    yield from _seed_world(installation)
+
+
+def _seed_world(w):
     w.clock = lambda: NOW
     w.uid = bootstrap_admin(w.runtime, email='admin@example.test', password=SECRET,
                             policy=w.settings.password, clock=w.clock).user_id

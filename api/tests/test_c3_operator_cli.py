@@ -193,7 +193,7 @@ def test_conpty_hidden_prompt_twice(world, mode):
 
 
 def test_pending_http_unpatched_during_hold_and_after_recover(world):
-    """No product bypass: health lives, readiness and protected routes stay 503 throughout."""
+    """No bypass: hold closes HTTP; real recover completes the C4 contract."""
     from app.main import app
     w = world
     uid = account(w)
@@ -212,5 +212,9 @@ def test_pending_http_unpatched_during_hold_and_after_recover(world):
                    read_password=lambda: NEW).account_live
     check()
     recover(w)
-    assert recovery.evaluate(w.settings, w.runtime).reason == "auth_safety_pending"
-    check()
+    assert recovery.evaluate(w.settings, w.runtime).open
+    with TestClient(app) as client:
+        assert client.get('/healthz').status_code == 200
+        assert client.get('/readyz').status_code == 200
+        assert client.get('/auth/csrf').status_code == 200
+        assert client.get('/library/items').status_code == 401

@@ -1,6 +1,6 @@
 """One runtime index-request POST: real PG/roles/journal, MinIO originals via runtime publish.
 
-Only business cutover is scoped. Owner-engine writes below are labelled
+Shared business setup uses the real C4 contract. Owner-engine writes below are labelled
 setup/corruption or legacy worker simulation, never the mutation under test.
 The endpoint queues a durable job only: no storage, broker or provider.
 """
@@ -23,7 +23,7 @@ from app.ingest import worker
 from app.storage import get_storage
 from tests.test_auth_safety_foundation import NOW
 from tests.test_c2c1_bootstrap import installation  # noqa: F401
-from tests.test_c2c2_invitations import world  # noqa: F401
+from tests.test_c2c2_invitations import operational_world as world  # noqa: F401
 from tests.test_c2d1_final_caller import browser  # noqa: F401
 from tests.test_c2d5a_review_writes import writers, wait_for  # noqa: F401
 from tests.test_c2d5b_review_approval import Originals
@@ -364,7 +364,7 @@ def test_current_actor_and_gate_not_dependency_snapshot(indexes, monkeypatch, pa
         def respond(*a): change(b, case); return real(*a)
         monkeypatch.setattr(boundary, 'respond', respond)
     r = index(b)
-    assert r.status_code == (503 if case == 'hold' else 403 if case in ('role', 'csrf') else 401), r.text
+    assert r.status_code == (503 if case in ('hold','receipt','head') else 403 if case in ('role', 'csrf') else 401), r.text
     assert 'job' not in r.json()
     assert len(jobs(b)) == (1 if path == 'reuse' or phase == 'response' else 0)
 

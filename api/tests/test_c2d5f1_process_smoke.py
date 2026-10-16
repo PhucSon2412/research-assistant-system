@@ -1,7 +1,7 @@
 """Linux process smoke for the citation reconcile runtime: CLI container and Celery worker+beat.
 
 Both run on the isolated PG/Redis network with the provisioned runtime login.
-The mounted sitecustomize is TEST ONLY: it scopes cutover, blocks egress,
+The mounted sitecustomize is TEST ONLY: it uses the real C4 gate, blocks egress,
 narrows the beat schedule to ``ras.citations.reconcile`` and, until the host
 creates ``/evidence/allow-resume``, parks the SECOND batch of a process just
 before its citation lock (the first batch is committed), so the host can
@@ -42,11 +42,13 @@ socket.socket.connect = connect
 role = os.environ.get('SMOKE_ROLE')
 if role in ('cli', 'worker', 'beat'):
     from app import auth_safety
-    auth_safety.cutover = lambda db: 'ready'
+
 if role == 'beat':
     from app.ingest.celery_app import celery_app
     celery_app.conf.beat_schedule = {'citations-test-only': {'task': 'ras.citations.reconcile', 'schedule': 1.0}}
 if role in ('cli', 'worker'):
+    assert not os.environ.get('POSTGRES_PASSWORD')
+    assert not os.environ.get('RAS_RECOVERY_DB_PASSWORD')
     from app import citations
     real = citations._lock
     calls = {'n': 0}
@@ -126,7 +128,7 @@ def test_real_cli_process_kill_between_batches_then_resume_and_idempotent(cit):
     env_file = evidence / 'runtime.env'
     env_file.write_text('\n'.join(k + '=' + v for k, v in values.items()) + '\n', encoding='utf-8')
     mounts = []
-    for src, target, mode in ((REPO_DIR / 'api' / 'app', '/srv/api/app', ':ro'), (evidence / 'harness', '/harness', ':ro'),
+    for src, target, mode in ((evidence / 'harness', '/harness', ':ro'),
                               (evidence, '/evidence', ''), (h.w.path.parent, '/journal', '')):
         mounts += ['-v', str(src).replace('\\', '/') + ':' + target + mode]
     name = c['project'] + '-citations-' + uuid.uuid4().hex[:8]
@@ -172,6 +174,9 @@ def test_real_celery_worker_beat_kill_between_batches_then_resume(cit):
               'POSTGRES_DB': h.w.runtime.url.database, 'MINIO_ROOT_USER': 'task_minio', 'MINIO_ROOT_PASSWORD': c['minio'],
               'REDIS_PASSWORD': c['redis'], 'RAS_WORKER_RUNTIME_USER': h.w.runtime.url.username,
               'RAS_WORKER_RUNTIME_PASSWORD': c['runtime'], 'RAS_JOURNAL_SOURCE': str(h.w.path.parent).replace('\\', '/')}
+    values.update(RAS_RUNTIME_DB_USER='c1_runtime',RAS_RUNTIME_DB_PASSWORD=c['runtime'],
+        RAS_RECOVERY_DB_USER='c1_recovery',RAS_RECOVERY_DB_PASSWORD=c['recovery'],
+        RAS_DEFINER_DB_ROLE='c1_definer',RAS_API_IMAGE=os.environ.get('RAS_TEST_PROCESS_IMAGE','rasc4-process:local'))
     env_file = evidence / 'runtime.env'
     env_file.write_text('\n'.join(k + '=' + v for k, v in values.items()) + '\n', encoding='utf-8')
     extra = {'services': {}, 'networks': {'default': {'external': True, 'name': c['project'] + '_default'}}}
@@ -180,8 +185,7 @@ def test_real_celery_worker_beat_kill_between_batches_then_resume(cit):
             'labels': {'ras.task': c['project']},
             'environment': {'PYTHONPATH': '/harness:/srv/api', 'RAS_REDIS_PORT': '6379', 'SMOKE_ROLE': role,
                             'RAS_CITATIONS__RECONCILE_BATCH_SIZE': '2'},
-            'volumes': [str(REPO_DIR / 'api' / 'app').replace('\\', '/') + ':/srv/api/app:ro',
-                        str(evidence / 'harness').replace('\\', '/') + ':/harness:ro',
+            'volumes': [str(evidence / 'harness').replace('\\', '/') + ':/harness:ro',
                         str(evidence).replace('\\', '/') + ':/evidence']}
     extra['services']['worker']['command'] = ['celery', '-A', 'app.ingest.celery_app:celery_app', 'worker',
                                               '--loglevel=WARNING', '--concurrency=1']

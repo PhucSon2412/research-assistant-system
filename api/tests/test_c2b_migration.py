@@ -52,7 +52,7 @@ def test_0035_populated_upgrade_preserves_history_roles_and_pending(empty_db_url
                 assert not conn.scalar(text("SELECT EXISTS(SELECT 1 FROM pg_proc p CROSS JOIN LATERAL aclexplode(p.proacl) a WHERE p.oid=to_regprocedure(:fn) AND a.grantee=0 AND a.privilege_type='EXECUTE')"),{"fn":signature})
             result=conn.execute(text("SELECT r.rolcanlogin,p.proconfig FROM pg_proc p JOIN pg_roles r ON p.proowner=r.oid WHERE p.proname='ras_auth_token_close'")).one()
             assert not result[0] and "search_path=pg_catalog, public, pg_temp" in result[1]
-        assert recovery.evaluate(w.settings,eng).reason=="auth_safety_pending"
+        assert recovery.evaluate(w.settings,eng).reason=="worker_runtime_required"
         with pytest.raises(DBAPIError,match="auth safety history prevents downgrade"):
             command.downgrade(alembic_config(empty_db_url),"0035")
     finally:rt.dispose();eng.dispose()

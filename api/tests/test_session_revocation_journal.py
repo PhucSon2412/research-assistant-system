@@ -114,7 +114,7 @@ def test_restore_keeps_every_revocation_reason_and_saved_cookie_csrf_blocked(wor
             for row in conn.execute(text("SELECT last_activity_at, absolute_expires_at FROM sessions")):
                 assert w.h.clock.now < row.last_activity_at + get_settings().auth.session_idle
                 assert w.h.clock.now < row.absolute_expires_at
-        assert recovery.recover(snap.engine, w.storage, get_settings(), w.h.clock.now).gate == "ready"
+        assert recovery.recover(snap.engine, w.storage, get_settings(), w.h.clock.now).gate == "open"
         for sid, cookies in zip(w.ids, w.saved):
             expected = 401 if sid in ended else 200
             assert browser(cookies).get("/auth/session").status_code == expected
@@ -123,7 +123,7 @@ def test_restore_keeps_every_revocation_reason_and_saved_cookie_csrf_blocked(wor
             if post:
                 assert (post.status_code, post.json()) == (401, {"error": "session_expired"})
         assert browser(w.b_saved).get("/auth/session").status_code == 200
-        assert recovery.recover(snap.engine, w.storage, get_settings(), w.h.clock.now).gate == "ready"
+        assert recovery.recover(snap.engine, w.storage, get_settings(), w.h.clock.now).gate == "open"
         with snap.engine.connect() as conn:
             assert set(conn.scalars(text("SELECT id FROM sessions WHERE revoked_at IS NOT NULL"))) == ended
             # C1 replays the status restriction; it never reconstructs a verifier.
@@ -139,8 +139,8 @@ def test_sessions_and_users_created_then_revoked_after_backup_stay_absent(world,
         sid = newer.get("/auth/session").json()["session"]["id"]
         assert newer.post("/auth/logout").status_code == 204
         app_env(snap.url)
-        assert recovery.recover(snap.engine, w.storage, get_settings(), w.h.clock.now).gate == "ready"
-        assert recovery.recover(snap.engine, w.storage, get_settings(), w.h.clock.now).gate == "ready"
+        assert recovery.recover(snap.engine, w.storage, get_settings(), w.h.clock.now).gate == "open"
+        assert recovery.recover(snap.engine, w.storage, get_settings(), w.h.clock.now).gate == "open"
         with snap.engine.connect() as conn:
             assert conn.scalar(text("SELECT count(*) FROM users WHERE email='after.backup@example.org'")) == 0
             assert conn.scalar(text("SELECT count(*) FROM sessions WHERE id=:s"), {"s": sid}) == 0
@@ -246,8 +246,8 @@ def test_interrupted_bulk_write_commits_all_revocations_unconfirmed_until_recove
         with pytest.raises(recovery.RecoveryError, match="journal_behind_db"):
             recovery.recover(w.h.setup_engine, w.storage, get_settings(), w.h.clock.now)
     assert recovery.recover(w.h.setup_engine, w.storage, get_settings(), w.h.clock.now,
-                            confirm_db_current=shape != "fsync").gate == "ready"
-    assert recovery.recover(w.h.setup_engine, w.storage, get_settings(), w.h.clock.now).gate == "ready"
+                            confirm_db_current=shape != "fsync").gate == "open"
+    assert recovery.recover(w.h.setup_engine, w.storage, get_settings(), w.h.clock.now).gate == "open"
     assert w.a[0].get("/auth/session").status_code == w.b.get("/auth/session").status_code == 200
     for cookies in w.saved[1:]:
         assert browser(cookies).get("/auth/session").status_code == 401
@@ -306,7 +306,7 @@ def test_failed_commit_and_failed_replay_keep_gate_closed(world, monkeypatch):
     assert response.json() == {"error": "session_revocation_pending_recovery"}
     assert gate(w.h.engine) == "db_behind_journal"
     monkeypatch.setattr(recovery, "replay_record", real)
-    assert recovery.recover(w.h.setup_engine, w.storage, get_settings(), w.h.clock.now).gate == "ready"
+    assert recovery.recover(w.h.setup_engine, w.storage, get_settings(), w.h.clock.now).gate == "open"
 
 
 def test_partial_bulk_journal_and_rollback_replays_prefix_then_retry_finishes_rest(world, monkeypatch):
@@ -317,7 +317,7 @@ def test_partial_bulk_journal_and_rollback_replays_prefix_then_retry_finishes_re
     assert response.status_code == 503
     assert w.h.scalar("SELECT count(*) FROM sessions WHERE revoked_at IS NOT NULL") == 0
     fix()
-    assert recovery.recover(w.h.setup_engine, w.storage, get_settings(), w.h.clock.now).gate == "ready"
+    assert recovery.recover(w.h.setup_engine, w.storage, get_settings(), w.h.clock.now).gate == "open"
     assert w.h.scalar("SELECT count(*) FROM sessions WHERE revoked_at IS NOT NULL") == 1
     # The injected commit error was consumed; retry journals only the remaining session.
     fix_commit()
@@ -395,7 +395,7 @@ def test_fsync_failure_preserves_whole_auth_transaction_but_reports_error(world,
         assert w.h.scalar("SELECT status FROM users WHERE id=:u", u=w.uid) == "disabled"
     assert gate(w.h.engine) == "journal_unconfirmed"
     fix()
-    assert recovery.recover(w.h.setup_engine, w.storage, get_settings(), w.h.clock.now).gate == "ready"
+    assert recovery.recover(w.h.setup_engine, w.storage, get_settings(), w.h.clock.now).gate == "open"
 
 
 def test_neither_journal_nor_commit_takes_batch_no_success_and_retry_is_safe(world, monkeypatch):
@@ -427,7 +427,7 @@ def test_register_existing_imports_pre_migration_revocations(empty_db_url, journ
         recovery.init_new(eng, get_settings(), now)  # auth-only DB is not an empty install
     _, count = recovery.register_existing(eng, get_settings(), now)
     assert count == 1 and recovery.evaluate_integrity(get_settings(), eng).open
-    assert recovery.evaluate(get_settings(), eng).reason=="auth_safety_pending"
+    assert recovery.evaluate(get_settings(), eng, administrative=True).reason=="auth_safety_pending"
     assert recovery.status(eng, get_settings())["unjournaled_sessions"] == 0
     with pytest.raises(Exception, match="auth safety history prevents downgrade"):
         command.downgrade(alembic_config(empty_db_url), "0029")

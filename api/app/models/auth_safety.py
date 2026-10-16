@@ -66,6 +66,20 @@ class AuthSafetyState(Base):
     backfill_complete: Mapped[bool] = mapped_column(Boolean)
 
 
+class AuthOperationalState(Base):
+    """Verified C4 checkpoint; normal durable journal confirmations advance it."""
+    __tablename__ = "auth_operational_state"
+    __table_args__ = (CheckConstraint("id=1", name="singleton"),
+                      CheckConstraint("contract_version=1", name="contract_version"),
+                      CheckConstraint("verified_seq>0", name="verified_seq_positive"))
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=False)
+    contract_version: Mapped[int] = mapped_column(SmallInteger)
+    journal_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    genesis_hash: Mapped[str] = mapped_column(Text)
+    verified_seq: Mapped[int] = mapped_column(BigInteger)
+    verified_hash: Mapped[str] = mapped_column(Text)
+
+
 class AuthRecoveryOperator(Base):
     """C3: trusted provisioning maps one real LOGIN role to one operator UUID.
 

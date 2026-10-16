@@ -441,7 +441,8 @@ def test_owner_paused_before_claim(indexed,change):
             con.execute(text('DELETE FROM auth_safety_heads WHERE user_id=:i'),{'i':b.uid})
             con.execute(text('ALTER TABLE auth_safety_heads ENABLE TRIGGER USER'))
     before=sql(b,'SELECT attempt_count FROM ingestion_jobs WHERE id=:i',i=b.job)
-    assert run(b)=='owner_status_paused' and not b.calls and not b.opened
+    expected = 'recovery_gate_closed' if change == 'head' else 'owner_status_paused'
+    assert run(b)==expected and not b.calls and not b.opened
     assert sql(b,'SELECT attempt_count FROM ingestion_jobs WHERE id=:i',i=b.job)==before
 
 

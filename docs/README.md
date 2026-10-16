@@ -1,5 +1,11 @@
 # Tài liệu dự án
 
+**C4 đã triển khai và kiểm cô lập (source `0051`, chờ review/chưa merge):** [Handoff/runbook C4](c4-integrated-runtime-cutover.md) ghi checkpoint, image/roles và phạm vi kiểm cô lập. Không cutover dev hoặc bật provider/pricing thật. Inventory cuối đối chiếu đủ 5.163 node API đều pass, giữ 298 debt; năm full drill và CLI evaluation đã chạy. Các mốc bên dưới giữ lịch sử theo source riêng.
+
+**Hiện hành sau merge PR #60, 2026-10-15:** B1 đã merge `44633b99`, tree khớp `c6f200e`, source **0050**, chưa rerun tại merge. Đã giao [C4 — bản chạy tích hợp, readiness và restore](tasks/m6c2b2c4-integrated-cutover.md), mới giao/chưa triển khai hoặc kiểm. Mã hiện vẫn pending; C4 kiểm operational readiness có điều kiện trên project cô lập, không cutover dev hoặc mở provider thật. [Review B1](reviews/pr60-pre-c4-auth-receipts-regression.md) giữ chứng cứ/giới hạn trước merge; các mốc OPEN bên dưới là lịch sử.
+
+**Review PR #60 tại `c6f200e` (2026-10-15):** [không phát hiện điểm chặn merge mới trong scope B1](reviews/pr60-pre-c4-auth-receipts-regression.md); reviewer 148 repo + 3 ca ngoài repo pass, artifact agent giữ riêng. Source **0050**, PR OPEN/chưa merge, **safety pending tới C4**. Năm full drill, readiness và CLI evaluation còn bàn giao tích hợp; một discovery failure cũ chưa rõ nguyên nhân không được coi là đã giải thích bằng rerun. Giữ docs review chưa commit cho PR kế tiếp.
+
 **B1 đã triển khai và kiểm (2026-10-15, chưa merge):** [handoff](pre-c4-auth-receipts-regression.md) · [inventory theo node](pre-c4-test-inventory.json), source **0050**, base merge PR #59 `041f77ef`. Writer và consumer cùng kiểm initial provenance; fixture hợp lệ có bootstrap/invitation hoặc case C3 thật. C4 tiếp tích hợp cùng image/roles, readiness và HTTP/browser/restore không seam. **Safety pending tới C4**; các kết quả bên dưới giữ source lịch sử.
 
 **Hiện hành sau merge PR #59, 2026-10-13:** C3 đã merge `041f77ef`, tree khớp head review `035cef0`, source **0049**; chưa rerun tại merge. Đã giao [B1 — initial receipt và hồi quy trước C4](tasks/pre-c4-auth-receipts-and-regression.md), mới giao/chưa triển khai hoặc kiểm. Tiếp một gói C4 tích hợp theo [kế hoạch MVP](mvp-delivery-plan.md). **Safety pending tới C4**; không mở pricing hoặc thao tác dev. Các mốc review/OPEN dưới đây giữ lịch sử; docs reviewer/task chưa commit được đưa vào PR kế tiếp.

@@ -1,5 +1,22 @@
 # Nhật ký quyết định
 
+## C4: checkpoint sau reconciliation và topology runtime (2026-10-15)
+
+Revision `0051` thêm checkpoint contract riêng, được hoàn tất bởi recovery sau các hậu điều kiện thật. Runtime không tự tạo/sửa checkpoint. Trigger chỉ tiến checkpoint đã tồn tại qua record confirmed liên tục; foundation progress không vượt `recovery_begin` chỉ nhờ mirror, vì C3 cần chứng cứ đã reconcile hold. Gate đọc current journal dưới khóa hiện có và kiểm binding/provenance. Corruption của receipt/projection có thể đóng service bằng 503 trước kiểm caller; account bị hạn chế vẫn bị từ chối riêng.
+
+Identity theo entrypoint tách khỏi operational contract: API/worker/business CLI phải là LOGIN runtime hợp lệ, kể cả quyền replication hiện hành; migrator/recovery/operator dùng đường quản trị đã provision. Compose dùng cùng image cho các Python service, không đưa secret quản trị vào runtime. DB mới rỗng có thể reconcile trước bootstrap một lần; installation đã có không tự adopt/recover khi startup. Upgrade/restore phải hold trước migrate, reprovision và recover với journal hiện hành. Không sửa migration đã merge, không tự mở account cũ.
+
+CLI evaluation chỉ nhận context external tường minh, cấp DB/roles/bucket/journal synthetic riêng; không dotenv hoặc mặc định dev. Lượt dài login bình thường lại trước công việc nếu session endpoint trả 401; không kéo dài TTL hay retry mutation. Provider giả/capture chỉ thuộc test, pricing sản phẩm vẫn false. [Handoff/runbook C4](c4-integrated-runtime-cutover.md) giữ kết quả, lỗi chuẩn bị và giới hạn tập trung; chưa triển khai dev/production.
+
+
+## Giao C4 sau merge PR #60 (2026-10-15)
+
+PR #60 merge `44633b99`, tree khớp head review `c6f200e`, source `0050`; chưa rerun tại merge. Theo ủy quyền hoàn thành MVP, orchestrator giao [một PR C4 tích hợp](tasks/m6c2b2c4-integrated-cutover.md): contract readiness có hậu điều kiện, topology image/roles, HTTP/browser, năm full drill và CLI evaluation. Mới giao/chưa triển khai hoặc kiểm. Cho phép triển khai operational readiness hợp lệ trên môi trường cô lập, không cutover dev hoặc cấp readiness bằng cờ bypass.
+
+Cài mới đã chứng minh `new_install` rỗng và provision/reconcile hoàn chỉnh có thể đạt operational contract trước bootstrap runtime một lần, tránh vòng lặp đòi Admin có trước readiness. Readiness là điều kiện service, không tự mở account held/quarantined/disabled; upgrade/restore giữ maintenance tới khi hoàn tất recovery/operator cần thiết. Journal/hold, latest head/receipt/provenance và role/final boundary vẫn kiểm thật sau các mutation tiếp theo.
+
+Provider mặc định vẫn tắt trả phí. Chỉ context test synthetic được dùng key/cấu hình paid giả với outbound bị chặn và transport/provider giả, để kiểm đường index/hybrid/rerank/RAG thật; không thay auth/accounting/gate và không coi đó là xác minh giá. Storage production, ủy quyền người thật và triển khai thật giữ milestone riêng, không chặn việc coding/kiểm C4 cô lập. Giữ mọi docs review/task có sẵn trong PR.
+
 ## B1: provenance ban đầu và ranh giới C4 (2026-10-14)
 
 Theo [task đã giao](tasks/pre-c4-auth-receipts-and-regression.md), migration `0050` kiểm parent mới theo transaction sống và cặp sự kiện bền cho cả credential/status. Không dùng `xmin` lịch sử qua restore; role/email hiện hành không thay bằng chứng tạo account. Predicate chung phủ mọi consumer, dữ liệu cũ thiếu provenance bị quarantine/held thay vì tự dựng bằng chứng. Reprovision cấp lại EXECUTE cho đúng NOLOGIN definer trên các routine đã chọn, giữ runtime không có quyền ghi auth thô.

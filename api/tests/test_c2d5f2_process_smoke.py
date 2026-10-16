@@ -1,6 +1,6 @@
 """Linux CLI and Celery/Redis: SIGKILL during second real loopback-fixture HTTP GET.
 
-Mounted sitecustomize scopes cutover and OAI endpoint in TEST ONLY, and denies
+Mounted sitecustomize uses the real C4 gate and a controlled OAI endpoint in TEST ONLY, and denies
 egress except isolated db/redis/feed. The production transport/boundary runs
 unchanged. No dev Compose, provider, live arXiv or operator credentials.
 """
@@ -34,7 +34,7 @@ if os.environ.get('SMOKE_ROLE') in ('cli','worker','sender'):
         return original(self,address)
     socket.socket.connect = connect
     from app import auth_safety, discovery
-    auth_safety.cutover = lambda db: 'ready'
+
     discovery.OAI_URL = 'http://feed:8080/oai'
     from app.db import get_engine
     from app.ingest import runtime
@@ -118,7 +118,7 @@ def test_linux_kill_fetch_resume_idempotent_runtime(disc, entry):
         assert not check or result.returncode == 0, label + ': see external evidence'
         return result
     base = ['docker','run','--label','ras.task='+c['project'],'--network',c['project']+'_default',
-            '--env-file',str(env_file), '-v',str(REPO_DIR/'api'/'app')+':/srv/api/app:ro',
+            '--env-file',str(env_file),
             '-v',str(harness)+':/harness:ro','-v',str(evidence)+':/evidence',
             '-v',str(w.path.parent)+':/journal']
     def state():

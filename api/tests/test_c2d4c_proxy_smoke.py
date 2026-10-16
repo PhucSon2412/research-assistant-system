@@ -25,7 +25,7 @@ from tests.resource_fixtures import source, BODY, SHA
 from tests.test_c2d4c_original_downloads import downloads
 from tests.test_c2d1_final_caller import browser
 from tests.test_c2c1_bootstrap import installation
-from tests.test_c2c2_invitations import world, issue, accept, EMAIL, PASSWORD
+from tests.test_c2c2_invitations import operational_world as world, issue, accept, EMAIL, PASSWORD
 from tests.test_auth_safety_foundation import NOW
 
 

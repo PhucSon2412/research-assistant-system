@@ -21,7 +21,7 @@ def require_runtime(db):
     try:
         forbidden = db.scalar(text("""
             SELECT current_user <> session_user OR r.rolsuper OR r.rolcreaterole
-              OR r.rolcreatedb OR r.rolbypassrls OR NOT r.rolcanlogin
+              OR r.rolcreatedb OR r.rolbypassrls OR r.rolreplication OR NOT r.rolcanlogin
               OR EXISTS (SELECT 1 FROM pg_auth_members WHERE member=r.oid)
               OR EXISTS (SELECT 1 FROM pg_class WHERE relowner=r.oid)
               OR EXISTS (SELECT 1 FROM pg_namespace WHERE nspowner=r.oid)
@@ -35,10 +35,16 @@ def require_runtime(db):
               OR EXISTS (SELECT 1 FROM unnest(ARRAY['users','invitations','bootstrap_state','sessions',
                  'password_reset_tokens','auth_change_receipts','auth_safety_heads','auth_safety_state',
                  'auth_hash_policies','revocation_journal_records','object_delete_fences',
-                 'orphan_object_fences','orphan_object_completions']) AS t(name)
-                 WHERE has_table_privilege(t.name,'INSERT,UPDATE,DELETE,TRUNCATE,TRIGGER')
-                   OR has_any_column_privilege(t.name,'INSERT,UPDATE,REFERENCES'))
+                 'orphan_object_fences','orphan_object_completions','recovery_registrations',
+                 'auth_operational_state','auth_recovery_operators','auth_recovery_cases']) AS t(name)
+                 WHERE (to_regclass(t.name) IS NULL AND to_regclass('auth_operational_state') IS NOT NULL)
+                   OR COALESCE(has_table_privilege(to_regclass(t.name),'INSERT,UPDATE,DELETE,TRUNCATE,TRIGGER'),false)
+                   OR COALESCE(has_any_column_privilege(to_regclass(t.name),'INSERT,UPDATE,REFERENCES'),false))
               OR NOT has_function_privilege('ras_auth_lock_users(uuid[])','EXECUTE')
+              OR has_function_privilege('ras_auth_restrict(uuid)','EXECUTE')
+              OR COALESCE(has_function_privilege(to_regprocedure('ras_auth_operator_whoami()'),'EXECUTE'),false)
+              OR COALESCE(has_function_privilege(to_regprocedure('ras_auth_complete_contract(bigint,text)'),'EXECUTE'),false)
+              OR COALESCE(has_table_privilege(to_regclass('auth_operational_state'),'INSERT,UPDATE,DELETE,TRUNCATE,TRIGGER'),false)
               OR NOT has_function_privilege('ras_auth_status_live(uuid)','EXECUTE')
               OR NOT has_function_privilege('ras_auth_session_create(uuid,uuid,uuid,text,text,timestamp with time zone,timestamp with time zone)','EXECUTE')
               OR NOT has_table_privilege('ingestion_jobs','UPDATE')

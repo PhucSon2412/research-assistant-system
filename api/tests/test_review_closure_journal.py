@@ -209,7 +209,7 @@ def test_restore_of_a_backup_with_the_request_open_does_not_give_the_grant_back(
         assert TestClient(app).get("/readyz").status_code == 503
 
         report = do_recover(snap.engine, w.storage, w.api.clock.now)
-        assert replayed_decisions(report) == {"recovery_begin": 1, "closed": 1, "recovery_end": 1} and report.gate == "ready"
+        assert replayed_decisions(report) == {"recovery_begin": 1, "closed": 1, "recovery_end": 1} and report.gate == "open"
         assert status_in(snap.engine, w.rid) == ("closed_by_recovery", CODES[how], True, None)
         assert_grant_closed_for_admin(w)
         # The owner sees the original decision's code; the request is not an approval.
@@ -275,7 +275,7 @@ def test_restoring_the_same_backup_twice_ends_the_same_way(upload_api, monkeypat
                 recovery.hold(engine, get_settings(), utcnow())
                 assert gate(engine) == "db_behind_journal"
                 report = do_recover(engine, w.storage, w.api.clock.now)
-                assert report.replayed["closed"] == 2 and report.gate == "ready"
+                assert report.replayed["closed"] == 2 and report.gate == "open"
                 ends.append((status_in(engine, w.rid), status_in(engine, w.rid_b)))
                 assert_grant_closed_for_admin(w)
                 assert w.admin.get(original_url(w.rid_b, w.ids_b["file_id"])).json() == MISSING
@@ -422,7 +422,7 @@ def test_a_request_journaled_after_the_backup_stays_absent_and_its_record_is_val
         recovery.hold(snap.engine, get_settings(), utcnow())
         report = do_recover(snap.engine, w.storage, w.api.clock.now)
         assert replayed_decisions(report) == {"recovery_begin": 1, "closed": 1, "recorded_request_absent": 1,
-                                   "recovery_end": 1} and report.gate == "ready"
+                                   "recovery_end": 1} and report.gate == "open"
         with snap.engine.connect() as conn:
             assert conn.scalar(text("SELECT count(*) FROM review_requests WHERE id=:r"), {"r": uuid.UUID(later)}) == 0
             filed = conn.execute(text("SELECT review_request_id::text, line::jsonb #>> '{body,request_id}', result"
@@ -483,7 +483,7 @@ def test_journal_write_failure_still_ends_the_grant_and_shuts_the_gate_until_rep
     assert_recovering(w.browsers, [("GET", w.file_url), ("GET", w.detail_url)])
     with pytest.raises(RecoveryError, match="journal_behind_db"):
         do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
-    assert do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True).gate == "ready"
+    assert do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True).gate == "open"
     assert [r.body["request_id"] for r in closures()] == [w.rid]
     assert_grant_closed_for_admin(w)
 
@@ -504,7 +504,7 @@ def test_complete_closure_line_whose_fsync_fails_keeps_the_gate_shut_until_recov
     assert (caught.value.status_code, caught.value.code) == (503, "service_recovering")
     assert status_in(w.api.engine, w.rid_b)[0] == "open"
     report = do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
-    assert report.journal_confirmed == 1 and report.gate == "ready"
+    assert report.journal_confirmed == 1 and report.gate == "open"
     assert_grant_closed_for_admin(w)
 
 
@@ -520,7 +520,7 @@ def test_torn_closure_line_shuts_the_gate_and_needs_the_database_confirmed(uploa
     assert status_in(w.api.engine, w.rid)[0] == "withdrawn" and gate(w.api.engine) == "journal_torn"
     with pytest.raises(RecoveryError, match="journal_behind_db"):
         do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
-    assert do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True).gate == "ready"
+    assert do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True).gate == "open"
     assert_grant_closed_for_admin(w)
 
 
@@ -585,7 +585,7 @@ def test_journaled_close_whose_commit_and_replay_fail_keeps_the_gate_shut(upload
     assert status_in(w.api.engine, w.rid)[0] == "open" and gate(w.api.engine) == "db_behind_journal"
     assert_recovering(w.browsers, [("GET", w.file_url), ("GET", w.detail_url)])
     report = do_recover(w.api.setup_engine, w.storage, w.api.clock.now)
-    assert report.replayed["closed"] == 1 and report.gate == "ready"
+    assert report.replayed["closed"] == 1 and report.gate == "open"
     assert status_in(w.api.engine, w.rid)[0] == "closed_by_recovery"
     assert_grant_closed_for_admin(w)
 
@@ -655,7 +655,7 @@ def test_close_during_a_recovery_writes_nothing_and_works_after_it(upload_api, m
         t.start()
     for t in threads:
         t.join()
-    assert ("recover", "ready") in results
+    assert ("recover", "open") in results
     if ("close", 200) not in results:
         close_journaled(w.api.setup_engine, w.rid)
     assert status_in(w.api.engine, w.rid)[0] == "withdrawn" and len(closures()) == 1
@@ -759,7 +759,7 @@ def test_upgrade_from_0027_journals_old_closes_before_the_gate_opens_and_protect
         with pytest.raises(Exception, match="auth safety history prevents downgrade"):
             command.downgrade(alembic_config(empty_db_url), "0027")
         report = recovery.recover(live, None, settings, utcnow())  # no --confirm-db-is-current needed
-        assert report.closures_imported == 2 and report.gate == "ready"
+        assert report.closures_imported == 2 and report.gate == "open"
         imported = {r.body["request_id"]: r.body for r in journal.read(path).records if r.kind == "review_closure"}
         assert {k: (v["status"], v["reason_code"]) for k, v in imported.items()} == {
             str(withdrawn): ("withdrawn", "withdrawn_by_requester"), str(rejected): ("rejected", "other")}
@@ -775,7 +775,7 @@ def test_upgrade_from_0027_journals_old_closes_before_the_gate_opens_and_protect
         assert recovery.evaluate(settings, old_engine).reason in ("db_behind_journal", "db_not_migrated")
         upgrade(old)
         assert recovery.evaluate(settings, old_engine).reason == "db_behind_journal"
-        assert recovery.recover(old_engine, None, settings, utcnow()).gate == "ready"
+        assert recovery.recover(old_engine, None, settings, utcnow()).gate == "open"
         with old_engine.connect() as conn:
             assert conn.execute(text("SELECT status, close_reason_code FROM review_requests ORDER BY close_reason_code"
                                      )).all() == [("closed_by_recovery", "other"),
@@ -788,7 +788,7 @@ def test_upgrade_from_0027_journals_old_closes_before_the_gate_opens_and_protect
         old2_engine = create_engine(old2)
         recovery.hold(old2_engine, older, utcnow())
         upgrade(old2)
-        assert recovery.recover(old2_engine, None, older, utcnow()).gate == "ready"
+        assert recovery.recover(old2_engine, None, older, utcnow()).gate == "open"
         with old2_engine.connect() as conn:
             assert conn.scalar(text("SELECT count(*) FROM review_requests WHERE status='open'")) == 2
         old2_engine.dispose()
@@ -812,7 +812,7 @@ def test_register_existing_journals_closed_requests_too(empty_db_url, tmp_path):
     settings = _settings(tmp_path / "revocations.jsonl")
     _, imported = recovery.register_existing(eng, settings, utcnow())
     assert imported == 1 and recovery.evaluate_integrity(settings,eng).open
-    assert recovery.evaluate(settings, eng).reason == "auth_safety_pending"
+    assert recovery.evaluate(settings, eng, administrative=True).reason == "auth_safety_pending"
     (record,) = [r for r in journal.read(settings.recovery.journal_path).records if r.kind == "review_closure"]
     assert record.body["request_id"] == str(w0["requests"][0]) and record.body["status"] == "withdrawn"
     eng.dispose()

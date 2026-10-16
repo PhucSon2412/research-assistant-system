@@ -1,5 +1,11 @@
 # Kế hoạch hoàn thành MVP
 
+**C4 đã triển khai và kiểm cô lập (source `0051`, chờ review/chưa merge):** [Handoff/runbook C4](c4-integrated-runtime-cutover.md) ghi checkpoint, image/roles và phạm vi kiểm cô lập. Không cutover dev hoặc bật provider/pricing thật. Inventory cuối đối chiếu đủ 5.163 node API đều pass, giữ 298 debt; năm full drill và CLI evaluation đã chạy. Các mốc bên dưới giữ lịch sử theo source riêng.
+
+**Sau merge B1, 2026-10-15:** PR #60 đã merge `44633b99`, tree khớp `c6f200e`, source **0050**; chưa rerun tại merge. Giao [một PR C4 tích hợp](tasks/m6c2b2c4-integrated-cutover.md), mới giao/chưa triển khai hoặc kiểm: operational readiness có hậu điều kiện, cùng image/roles, HTTP/browser không seam, năm full drill và CLI evaluation. Mã hiện vẫn pending, dev/provider thật chưa được mở. Giữ forecast/checklist tới khi có chứng cứ C4; các mốc review dưới đây là lịch sử.
+
+**Review B1, 2026-10-15:** PR #60 tại `c6f200e` không có điểm chặn merge mới trong scope đã review; [report](reviews/pr60-pre-c4-auth-receipts-regression.md) giữ kiểm reviewer, artifact agent và giới hạn riêng. PR còn OPEN, source **0050**, **safety pending tới C4**. Sau merge chuyển một gói C4 tích hợp đầy đủ, gồm năm drill và CLI evaluation chưa chứng nhận; giữ checklist/forecast và hiện tượng discovery chưa rõ nguyên nhân, không coi B1 pass là end-to-end readiness. Docs review được giữ cho PR kế tiếp.
+
 **B1 đã triển khai và kiểm (2026-10-15, chưa merge):** source **0050**, base merge PR #59 `041f77ef`. [Handoff](pre-c4-auth-receipts-regression.md) và [inventory](pre-c4-test-inventory.json) tập trung provenance, hồi quy/debt và gói C4. **Safety pending tới C4**. C4 phải ghép cùng image/revision/roles, cutover có hậu điều kiện và HTTP/browser/restore không seam; không giảm forecast/checklist chỉ bằng kiểm tầng dưới. Các mốc bên dưới giữ lịch sử.
 
 **Sau merge C3, 2026-10-13:** PR #59 đã merge `041f77ef`, tree khớp `035cef0`, source **0049**; chưa rerun tại merge. Gói B tiếp [B1 — initial receipt và hồi quy trước C4](tasks/pre-c4-auth-receipts-and-regression.md) trong một PR, rồi C4 tích hợp. B1 mới giao tài liệu, chưa triển khai/kiểm; **safety pending tới C4**. Giữ forecast/giả định và checklist, không coi merge là nghiệm thu. Các mốc review dưới đây là lịch sử.
@@ -24,12 +30,12 @@ Ngày chốt **2026-10-11**. Chủ dự án giao orchestrator chọn phạm vi v
 
 ## Trạng thái hiện tại
 
-- PR #59 đã merge tại `041f77ef1c12b6277e7a5f46aaf32155b3673063`; head review `035cef0` là ancestor, tree khớp. Source migration **0049**; không suy revision DB dev hoặc cộng pass mới tại merge.
-- Các chức năng chính đã có, nhưng đợt chuyển auth/runtime chưa kết thúc. **Safety vẫn pending tới C4**; không coi Compose dev đang lỗi readiness/restart là một bản sẵn dùng.
+- PR #60 đã merge tại `44633b99f8407c5b15a8afb967afcd3c4d135018`; head review `c6f200e` là ancestor, tree khớp. Source migration **0050**; không suy revision DB dev hoặc cộng pass mới tại merge.
+- C4 source `0051` đã hoàn tất code/kiểm cô lập và chờ review: operational readiness có hậu điều kiện, image/roles đồng bộ, HTTP/browser/năm full restore drill/CLI evaluation đã thực chạy. DB chưa đủ hậu điều kiện vẫn 503; chưa cutover dev hoặc mở provider/pricing thật.
 - Citation reconcile và [discovery harvesting](c2d5f2-discovery-runtime.md) đã chuyển runtime. [Review PR #56](reviews/pr56-c2d5f2-discovery-runtime.md) giữ kết quả trước merge; chưa rerun tại merge. Docs orchestrator bị sót đã được đưa vào commit của PR #57.
 - [C2d-6 search/query embedding/rerank](c2d6-search-query-rerank-runtime.md) đã merge; [review độc lập](reviews/pr57-c2d6-search-query-rerank-runtime.md) giữ chứng cứ trước merge, chưa rerun tại merge. Không suy kết quả này thành RAG runtime hoặc cutover.
 - [C2d-7 RAG/generation runtime](c2d7-rag-generation-runtime.md) đã merge PR #58, source **0048**; [review độc lập](reviews/pr58-c2d7-rag-generation-runtime.md) và [inventory](c2d7-test-inventory.json) giữ chứng cứ trước merge, chưa rerun tại merge. Gói A hoàn tất chuyển runtime trong scope đã review, chưa cutover/nghiệm thu end-to-end. C3 đã merge PR #59; tiếp B1 hồi quy/debt và tích hợp C4. Private deletion/restore, provider thật và vận hành triển khai cần nghiệm thu riêng. Giữ và đưa docs review/task mới chưa commit vào PR kế tiếp.
-- [C3 operator auth recovery](c3-operator-auth-recovery.md) đã merge PR #59, source **0049**: login operator riêng, case bind installation/User UUID/action/role/heads dùng một lần theo journal, TTY ẩn, maintenance hold, credential/status tách riêng; không mở disabled/ready. Kết quả trước merge theo [inventory](c3-test-inventory.json) và [review](reviews/pr59-c3-operator-auth-recovery.md); chưa có inventory/ủy quyền người thật. B1 đã triển khai trên nhánh source `0050`; [handoff/inventory](pre-c4-auth-receipts-regression.md) giữ kết quả theo node và giới hạn. Tiếp C4 tích hợp không seam, chưa mở safety.
+- [C3 operator auth recovery](c3-operator-auth-recovery.md) đã merge PR #59, source **0049**: login operator riêng, case bind installation/User UUID/action/role/heads dùng một lần theo journal, TTY ẩn, maintenance hold, credential/status tách riêng; không mở disabled/ready. Kết quả trước merge theo [inventory](c3-test-inventory.json) và [review](reviews/pr59-c3-operator-auth-recovery.md); chưa có inventory/ủy quyền người thật. B1 đã merge PR #60, source `0050`; [handoff](pre-c4-auth-receipts-regression.md) và [review](reviews/pr60-pre-c4-auth-receipts-regression.md) giữ kết quả/giới hạn. C4 đã triển khai và kiểm cô lập tại source `0051`, chờ review; xem handoff/inventory C4. Dev/provider thật chưa được mở.
 - Nhãn đánh giá RAG hiện còn `pending_human_review`. Charge thật chưa đối soát; không bật `pricing_verified` bằng kết quả provider giả.
 
 ## Các gói công việc còn lại
@@ -39,26 +45,28 @@ Ngày chốt **2026-10-11**. Chủ dự án giao orchestrator chọn phạm vi v
 | Gói | Phạm vi và đầu ra | Ước lượng | Trạng thái |
 | --- | --- | --- | --- |
 | A — hoàn tất runtime | Search + query embedding + rerank; RAG + generation. Giữ quyền trước retrieval/provider và kế toán hiện hành | Đã merge | PR #57/#58 đã merge; chưa cutover/nghiệm thu end-to-end |
-| B — recovery và bản chạy đầy đủ | C3 CLI operator tối thiểu; xử lý debt hồi quy; C4 Compose/image/role/journal, readiness thật, HTTP/browser không patch pending, hai vòng restore/recover | 5–8 ngày | C3 đã merge PR #59; B1 đã triển khai/kiểm trên nhánh; gói C4 tích hợp đã bàn giao, chưa thực chạy không seam |
+| B — recovery và bản chạy đầy đủ | C3 CLI operator tối thiểu; xử lý debt hồi quy; C4 Compose/image/role/journal, readiness thật, HTTP/browser không patch pending, hai vòng restore/recover | Chờ review | C3/B1 đã merge PR #59/#60; C4 hoàn tất code/kiểm cô lập, chờ review/merge theo handoff |
 | C — đóng yêu cầu sản phẩm còn thiếu | Xóa item private + chống xuất hiện lại sau restore; nghiệm thu duplicate/retry hiện hành, chỉ bổ sung chỗ thiếu để luồng dùng được | 2–4 ngày | Chưa giao |
 | D — provider và chất lượng | Smoke tổng hợp có trần chi phí, đối soát charge, routing/retention; sau đó thử paper được phép xử lý, người đọc kiểm câu trả lời/citation/abstention | 2–4 ngày | Chưa giao; chưa mở trả phí |
 | E — triển khai nhóm thử | HTTPS/cookie Secure, kênh invite/reset dùng được, rate limit, CI, journal độc lập, backup/retention/alert tối thiểu và nghiệm thu browser | 3–5 ngày | Chưa giao |
 
-**Dự kiến:** khoảng **2–3 tuần** để hoàn tất runtime/recovery và có bản end-to-end; khoảng **4–6 tuần tổng cộng từ mốc kế hoạch này** để nghiệm thu MVP cho nhóm nhỏ. Đây là khoảng lập kế hoạch, không phải cam kết ngày giao hay SLO. Cập nhật sau gói A và sau lần C4 đầu; nếu vượt khoảng, nêu rõ việc phát sinh và ảnh hưởng trước khi mở thêm scope.
+**Dự kiến tại mốc kế hoạch gốc:** khoảng **2–3 tuần** để hoàn tất runtime/recovery và có bản end-to-end; khoảng **4–6 tuần tổng cộng từ mốc kế hoạch này** để nghiệm thu MVP cho nhóm nhỏ. Đây là khoảng lập kế hoạch, không phải cam kết ngày giao hay SLO. Cập nhật sau gói A và sau lần C4 đầu; nếu vượt khoảng, nêu rõ việc phát sinh và ảnh hưởng trước khi mở thêm scope.
 
 **Cập nhật sau merge PR #56, 2026-10-11:** tổng còn lại khoảng **16–27 ngày làm việc** theo bảng, có thể chồng một phần. Giữ dự báo thực tế **4–6 tuần**, vì discovery mới giảm một phần của gói A; lỗi tích hợp, debt, restore và nghiệm thu provider/triển khai vẫn chưa được đo đầy đủ. M6 kéo dài do phạm vi đã mở sang chống rollback auth sau restore và chuyển runtime toàn hệ thống, kèm nhiều PR theo endpoint. Hai gói runtime còn lại được gom theo luồng; không thêm tính năng ngoài checklist để kéo dài đích MVP. Usage limit hoặc chờ hạ tầng/charge có thể khiến lịch vượt khoảng, khi đó báo nguyên nhân cụ thể.
+
+**Cập nhật C4, 2026-10-16:** gói B đã hoàn tất code/kiểm cô lập, chờ review/merge. Gói C–E giữ giả định 7–13 ngày coding theo bảng, cộng review và thời gian chờ người vận hành/provider/hạ tầng; chưa xác lập ngày phát hành. Private deletion/restore, chất lượng/charge và vận hành production vẫn chưa đạt bằng các phép thử giả lập.
 
 ## Checklist nghiệm thu cố định
 
 Mỗi mục cần một chứng cứ có commit/image, cách chạy và kết quả. Không đánh dấu đạt bằng build xanh, provider giả hoặc toàn bộ request bị 503.
 
-- [ ] **Bản cài chạy được:** cài mới và nâng cấp có dữ liệu trên project cô lập; image đúng revision, runtime dùng đúng DB role; health/readiness và worker/beat ổn định sau C4. Runbook không yêu cầu người dùng tự đoán các bước pending.
-- [ ] **Luồng web chính:** bootstrap một lần, invite/accept/login/reset/logout; upload PDF/Markdown có xác nhận, trạng thái xử lý/coverage, tải original, collection, search keyword/hybrid, hỏi theo ba scope và mở citation; review/approve/publish/revoke. Có kiểm A/B/Admin qua proxy và trình duyệt thật.
+- [x] **Bản cài chạy được trong scope C4 cô lập:** cài mới và nâng cấp có dữ liệu trên project cô lập; image đúng revision, runtime dùng đúng DB role; health/readiness và worker/beat ổn định sau C4. Runbook không yêu cầu người dùng tự đoán các bước pending.
+- [x] **Luồng web chính với provider giả được kiểm soát:** bootstrap một lần, invite/accept/login/reset/logout; upload PDF/Markdown có xác nhận, trạng thái xử lý/coverage, tải original, collection, search keyword/hybrid, hỏi theo ba scope và mở citation; review/approve/publish/revoke. Có kiểm A/B/Admin qua proxy và trình duyệt thật.
 - [ ] **Quyền và restore:** request mới sau revoke/xóa bị chặn; không lộ private giữa owner/Admin; worker/provider không công bố dữ liệu mất quyền; restore không hồi sinh common đã revoke, review grant đã đóng, auth đã thu hồi hoặc item private đã xóa trong phạm vi journal được bảo vệ. Ghi rõ giới hạn bytes đã gửi và yêu cầu journal hiện hành độc lập.
 - [ ] **Tìm kiếm và trả lời có ích:** đo retrieval trên corpus hiện có; duyệt nhãn và chấm câu trả lời bằng người đọc; thử thêm một bộ paper thật có quyền sử dụng với câu một paper, so sánh, thiếu đáp án, partial và injection. Sai nguồn, lộ dữ liệu hoặc khẳng định không có chứng cứ phải được xử lý; các ngưỡng chất lượng đề xuất không tự thành gate số học.
 - [ ] **Chi phí được kiểm chứng:** route/model/dimension và routing/retention được kiểm; charge thực được đối soát trên key; giới hạn User/ứng dụng, concurrent calls và uncertain reservations hoạt động. Chỉ bật từng cấu hình trả phí sau chứng cứ tương ứng, không bật toàn bộ bằng một smoke.
 - [ ] **Vận hành nhóm thử:** HTTPS, cookie Secure, delivery ngoài dev outbox, rate limit login/reset, CI cho gate kiểm chính, backup có kiểm checksum, lịch/retention và diễn tập restore; journal lưu độc lập và hiện hành, có người chịu trách nhiệm recovery và alert lỗi/cleanup quá hạn. Không tuyên bố chịu mất điện bằng fault injection.
-- [ ] **Đóng nợ phát hành:** inventory toàn bộ test không thiếu/trùng, debt đã phân loại và xử lý; không còn lỗi nghiệp vụ/quyền đã biết nằm dưới nhãn “baseline”. Chạy hồi quy tổng sau tích hợp, không cần chạy toàn bộ mỗi PR.
+- [x] **Đóng nợ inventory API của source C4:** inventory toàn bộ test không thiếu/trùng, debt đã phân loại và xử lý; không còn lỗi nghiệp vụ/quyền đã biết nằm dưới nhãn “baseline”. Chạy hồi quy tổng sau tích hợp, không cần chạy toàn bộ mỗi PR.
 
 ## Cách tổ chức để kết thúc
 

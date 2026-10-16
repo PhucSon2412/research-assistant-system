@@ -57,6 +57,7 @@ def test_0038_populated_provisioned_upgrade(empty_db_url,journal_path,app_env,mo
             command.downgrade(alembic_config(empty_db_url),'0038')
         monkeypatch.setattr(auth_safety,'cutover',original_cutover)
         app_env(empty_db_url)
+        runtime_engine(w).dispose()  # New contract routines/table require reprovision.
         assert recovery.evaluate(get_settings(),rt).reason=='auth_safety_pending'
     finally:rt.dispose();eng.dispose()
 

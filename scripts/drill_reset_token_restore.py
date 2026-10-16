@@ -49,6 +49,7 @@ def main():
     runtime=runtime_engine_for(SRC)
     try:ids=seed_accounts(runtime,emails,password)
     finally:runtime.dispose()
+    verifier = scalar(source, "SELECT password_verifier FROM users WHERE id=:u", u=ids['a'])
     admin = Person(SRC, email=emails["admin"], password=password)
     a = [Person(SRC, email=emails["a"], password=password) for _ in range(3)]
     b = Person(SRC, email=emails["b"], password=password)
@@ -139,10 +140,11 @@ def main():
             for cookies in saved:
                 r = Person(DST, cookies=cookies).get("/api/auth/session", direct)
                 step(f"{label} {'API' if direct else 'web'}: old session rejected", r.status_code == 401)
-        step(f"{label}: B session and MinIO original intact; replay did not disable D/change A verifier",
+        step(f"{label}: B control and original intact; disable replayed, lost A credential stays quarantined",
              Person(DST, cookies=b_saved).get("/api/auth/session").status_code == 200
              and sha(Person(DST, cookies=b_saved).get(f"/api/files/{paper['file_id']}/original").content) == sha(original)
-             and scalar(target, "SELECT status FROM users WHERE id=:u", u=ids["d"]) == "active"
+             and scalar(target, "SELECT status FROM users WHERE id=:u", u=ids["d"]) == "disabled"
+             and scalar(target, "SELECT credential_state FROM users WHERE id=:u", u=ids["a"]) == "quarantined"
              and scalar(target, "SELECT password_verifier FROM users WHERE id=:u", u=ids["a"]) == verifier)
         target.dispose()
         dc(DST, "stop", *WRITERS)

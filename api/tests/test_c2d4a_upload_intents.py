@@ -1,6 +1,6 @@
 """Two JSON routes, runtime PostgreSQL/journal and real auth lifecycle.
 
-Only business fixture cutover is scoped; pending HTTP has no patch. Faults
+Shared business setup uses the real C4 contract; pending HTTP has no patch. Faults
 and corruption are synthetic and retain real SQL/head/receipt/clock guards.
 """
 from concurrent.futures import ThreadPoolExecutor
@@ -27,7 +27,7 @@ from app.main import app
 from app.models import UploadIntent, ProcessingAcknowledgement
 from tests.test_auth_safety_foundation import NOW
 from tests.test_c2c1_bootstrap import installation
-from tests.test_c2c2_invitations import world, issue, accept, EMAIL, PASSWORD
+from tests.test_c2c2_invitations import operational_world as world, issue, accept, EMAIL, PASSWORD
 from tests.test_c2d1_final_caller import browser, mutate, close, wait_for
 
 NOTICE = '/uploads/notice'
@@ -183,7 +183,7 @@ def test_origin_missing_wrong_duplicate(consent,headers):
 def test_real_changes_after_dependency(consent,route,change):
     b=consent; b.after_dependency=lambda db,ctx: alter(b,change)
     r=b.client.get(route) if route==NOTICE else request(b)
-    assert r.status_code==(503 if change in ('hold','ahead','unconfirmed') else 401), r.text
+    assert r.status_code==(503 if change in ('hold','ahead','unconfirmed','receipt_credential','receipt_status','wrong_receipt','head','latest_credential','latest_status') else 401), r.text
     assert 'intent_token' not in r.text and 'text' not in r.json() and not any(state(b).values())
     if r.status_code==401: assert 'Max-Age=0' in r.headers['set-cookie']
     clean()
@@ -279,7 +279,7 @@ def test_final_actor_guard_real_after_flush_or_commit(consent,monkeypatch,phase,
         return real(db,**kw)
     monkeypatch.setattr(auth_safety,'require_final',gate)
     r=request(b)
-    expected=503 if change in ('hold','bad_journal') else 403 if change in ('role','csrf') else 401
+    expected=503 if change in ('hold','bad_journal','receipt_status','head') else 403 if change in ('role','csrf') else 401
     assert r.status_code==expected and 'intent_token' not in r.text
     assert len(state(b)['upload_intents'])==(0 if phase=='pre' else 1)
     clean()

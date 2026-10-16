@@ -282,7 +282,7 @@ def test_restore_with_a_missing_or_foreign_journal_serves_nothing_and_recover_re
         path.write_bytes(current)  # the right, current journal
         bk.check_journal_for_backup(journal.read(path), manifest)
         assert gate(snap.engine) == "db_behind_journal"
-        assert do_recover(snap.engine, w.storage, w.api.clock.now).gate == "ready"
+        assert do_recover(snap.engine, w.storage, w.api.clock.now).gate == "open"
         assert not key_present(w.storage, common_key(w.api, w.copy))
         for browser in w.browsers.values():
             assert browser.get(f"/library/items/{w.copy}").json() == MISSING
@@ -312,7 +312,7 @@ def test_hold_shuts_the_gate_after_a_restore_even_with_nothing_revoked_since_the
         assert path.read_bytes() == lines
 
         report = do_recover(snap.engine, w.storage, w.api.clock.now)
-        assert replayed_decisions(report) == {"recovery_begin": 1, "recovery_end": 1} and report.gate == "ready"
+        assert replayed_decisions(report) == {"recovery_begin": 1, "recovery_end": 1} and report.gate == "open"
         assert journal.read(path).open_recovery is None
         assert w.b.get(f"/library/items/{w.copy}").status_code == 200  # nothing was revoked: still listed
 
@@ -326,7 +326,7 @@ def test_hold_refuses_a_journal_behind_the_database_rather_than_diverging_it(upl
     with pytest.raises(RecoveryError, match="journal_behind_db"):
         recovery.hold(w.api.engine, settings, w.api.clock.now)
     assert gate(w.api.engine) == "journal_behind_db"  # still repairable with --confirm-db-is-current
-    assert do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True).gate == "ready"
+    assert do_recover(w.api.setup_engine, w.storage, w.api.clock.now, confirm_db_current=True).gate == "open"
 
 
 @contextmanager
@@ -372,9 +372,9 @@ def test_restore_and_recover_run_again_safely(upload_api, monkeypatch, admin_eng
                 recovery.hold(engine, settings, w.api.clock.now)
                 assert gate(engine) == "db_behind_journal"
                 assert_recovering(w.browsers, routes(w))
-                assert do_recover(engine, w.storage, w.api.clock.now).gate == "ready"
+                assert do_recover(engine, w.storage, w.api.clock.now).gate == "open"
                 again = do_recover(engine, w.storage, w.api.clock.now)  # recover again right away: no change
-                assert again.gate == "ready" and again.cleanup == {} and again.objects_removed == 0
+                assert again.gate == "open" and again.cleanup == {} and again.objects_removed == 0
                 assert replayed_decisions(again) == {"recovery_begin": 1, "recovery_end": 1}
                 assert not key_present(w.storage, key)
                 for browser in w.browsers.values():
@@ -489,7 +489,7 @@ def test_restore_refuses_an_object_read_back_with_other_bytes_of_the_same_size_a
 
         monkeypatch.setattr(w.storage, "put", real_put)  # rerun once the store behaves
         assert bk.restore_objects(w.storage, artifact, manifest)["put"] == 1
-        assert do_recover(snap.engine, w.storage, w.api.clock.now).gate == "ready"
+        assert do_recover(snap.engine, w.storage, w.api.clock.now).gate == "open"
         assert w.a.get(f"/files/{w.ids_a['file_id']}/original").content == A_BODY
         for browser in w.browsers.values():
             assert browser.get(f"/library/items/{w.copy}").json() == MISSING

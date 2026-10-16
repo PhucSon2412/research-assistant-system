@@ -192,17 +192,31 @@ def evaluate_integrity(settings: Settings, engine: Engine) -> GateStatus:
 _last_logged: list[str] = []
 
 
-def evaluate(settings: Settings, engine: Engine) -> GateStatus:
+def evaluate(settings: Settings, engine: Engine, *, administrative: bool = False) -> GateStatus:
     integrity = evaluate_integrity(settings, engine)
     if not integrity.open:
         return integrity
     try:
         from app.auth_safety import cutover
         with Session(engine) as db:
+            db.info['auth_safety_settings'] = settings
+            db.execute(text(f"SET LOCAL lock_timeout = {int(settings.recovery.gate_lock_timeout_ms)}"))
+            db.execute(text("SELECT pg_advisory_xact_lock_shared(:k)"), {"k": JOURNAL_LOCK})
+            # Re-read under the same lock as the contract; the earlier integrity
+            # transaction may have preceded a hold or a normal journal mutation.
+            current = compare(journal.read(settings.recovery.journal_path), _db_view(db))
+            if not current.open:
+                return current
+            if not administrative:
+                from app.ingest.runtime import require_runtime, Halt
+                try:
+                    require_runtime(db)
+                except Halt as exc:
+                    return GateStatus(False, exc.code, current.journal_seq, current.db_seq)
             reason = cutover(db)
     except Exception:
         return GateStatus(False, "auth_safety_version_missing", integrity.journal_seq, integrity.db_seq)
-    return GateStatus(reason == "ready", reason, integrity.journal_seq, integrity.db_seq)
+    return GateStatus(reason == "ready", "open" if reason == "ready" else reason, current.journal_seq, current.db_seq)
 
 
 def log_if_changed(status: GateStatus, where: str) -> None:
@@ -1378,14 +1392,20 @@ def recover(engine: Engine, storage, settings: Settings, now: datetime, *,
             with Session(engine) as db:
                 _lock_journal(db)
                 db.execute(text("SELECT ras_auth_progress(:seq)"), {"seq": journal.read(path).head.seq})
+                from app.auth_safety import contract_provisioned
+                if (not hold_for_operator and db.scalar(text("SELECT to_regclass('auth_operational_state') IS NOT NULL"))
+                        and contract_provisioned(db)):
+                    head = journal.read(path).head
+                    db.execute(text("SELECT ras_auth_complete_contract(:seq,:hash)"), {"seq": head.seq, "hash": head.hash})
                 db.commit()
             report.reconciliation_complete = not hold_for_operator
             report.held_for_operator = hold_for_operator
         finally:
             mutex.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": RECOVER_LOCK})
             mutex.commit()
-    status = evaluate(settings, engine)
+    status = evaluate(settings, engine, administrative=True)
     report.gate = status.reason
+    report.safety_ready = status.open
     expected = "recovery_in_progress" if hold_for_operator else "auth_safety_pending"
     if not status.open and status.reason != expected:
         raise RecoveryError(f"gate_still_closed_{status.reason}"[:64])
@@ -1394,7 +1414,7 @@ def recover(engine: Engine, storage, settings: Settings, now: datetime, *,
 
 def status(engine: Engine, settings: Settings) -> dict:
     """Gate reason and counts for operators: seqs, unpurged and unjournaled tombstones. No content."""
-    gate = evaluate(settings, engine)
+    gate = evaluate(settings, engine, administrative=True)
     out = {"gate": gate.reason, "journal_seq": gate.journal_seq, "db_seq": gate.db_seq}
     try:
         with Session(engine) as db:

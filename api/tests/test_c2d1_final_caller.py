@@ -1,6 +1,6 @@
 """Final caller reads with runtime LOGIN, real receipts and independent journal.
 
-Only pending cutover is scoped. Privileged corruptions below are test setup,
+Shared business setup uses the real C4 contract. Privileged corruptions below are test setup,
 never runtime grants; dependency wrappers always authenticate/touch for real.
 """
 import threading
@@ -31,7 +31,7 @@ from app.models.enums import SessionRevokeReason
 from app.main import app
 from tests.helpers import DEV_ENV
 from tests.test_c2c1_bootstrap import installation
-from tests.test_c2c2_invitations import world, issue, accept, PASSWORD, EMAIL
+from tests.test_c2c2_invitations import operational_world as world, issue, accept, PASSWORD, EMAIL
 from tests.test_auth_safety_foundation import NOW, event
 
 PATHS = ['/auth/session', '/admin/users', '/admin/dev-outbox']
@@ -165,7 +165,7 @@ def test_changes_after_dependency_block_payload(browser, path, change):
     b = browser
     b.after_dependency = lambda db, ctx: mutate(b, change)
     response = b.client.get(path)
-    expected = 503 if change in ('hold', 'ahead', 'unconfirmed') else 401
+    expected = 503 if change in ('hold', 'ahead', 'unconfirmed', 'receipt_credential', 'receipt_status', 'wrong_receipt', 'head', 'latest_credential', 'latest_status') else 401
     assert response.status_code == expected, response.text
     assert response.json() == {'error': 'service_recovering' if expected == 503 else 'session_expired'}
     if expected == 401:
@@ -216,7 +216,8 @@ def test_profile_expiry_reload_and_no_final_touch(browser):
     assert response.json()['user'] == {'id': str(b.w.uid), 'email': 'new@example.test', 'display_name': 'new profile', 'role': 'user'}
     assert response.json()['session']['idle_expires_at'] == (expected+timedelta(minutes=30)).isoformat()
     assert response.json()['session']['absolute_expires_at'] == (NOW+timedelta(hours=7)).isoformat()
-    assert b.stale_user.email == 'admin@example.test'
+    # C4 verifies fresh User bindings; session activity still must not be touched.
+    assert b.stale_user.email == 'new@example.test'
     assert b.stale_session.last_activity_at == NOW
     with Session(b.w.runtime) as db:
         assert db.get(UserSession, b.w.actor.session_id).last_activity_at == expected
@@ -284,7 +285,7 @@ def test_outbox_after_audit_commit_rechecks(browser, monkeypatch, change):
         else: mutate(b, change)
     monkeypatch.setattr(admin_routes, 'commit_activity', commit)
     response = b.client.get('/admin/dev-outbox')
-    assert response.status_code == (403 if change == 'role' else 503 if change in ('hold','ahead','unconfirmed') else 401), response.text
+    assert response.status_code == (403 if change == 'role' else 503 if change in ('hold','ahead','unconfirmed','receipt_credential','receipt_status','wrong_receipt','head','latest_credential','latest_status') else 401), response.text
     assert not b.reads and LINK not in response.text
     with Session(b.w.runtime) as db:
         assert db.scalar(text("SELECT count(*) FROM audit_events WHERE action='dev_outbox.read'")) == 1

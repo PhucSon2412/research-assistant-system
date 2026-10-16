@@ -9,12 +9,52 @@ from app import journal
 from app.models import AuthChangeReceipt, AuthSafetyHead, AuthSafetyState, User, RevocationJournalRecord
 
 
+def contract_provisioned(db: Session) -> bool:
+    return bool(db.scalar(text("""SELECT EXISTS (
+      SELECT 1 FROM pg_proc f JOIN pg_roles r ON r.oid=f.proowner
+      WHERE f.oid=to_regprocedure('ras_auth_complete_contract(bigint,text)') AND f.prosecdef
+        AND NOT (r.rolcanlogin OR r.rolsuper OR r.rolcreaterole OR r.rolcreatedb OR r.rolbypassrls OR r.rolreplication)
+        AND NOT EXISTS(SELECT 1 FROM pg_auth_members WHERE member=r.oid)
+        AND NOT EXISTS(SELECT 1 FROM pg_class WHERE relowner=r.oid)
+        AND NOT EXISTS(SELECT 1 FROM pg_namespace WHERE nspowner=r.oid)
+        AND NOT EXISTS(SELECT 1 FROM pg_database WHERE datname=current_database() AND datdba=r.oid)
+        AND f.proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp']
+        AND NOT EXISTS(SELECT 1 FROM aclexplode(COALESCE(f.proacl,acldefault('f',f.proowner))) a
+                       WHERE a.grantee=0 AND a.privilege_type='EXECUTE')
+        AND f.proowner=(SELECT proowner FROM pg_proc WHERE oid='ras_auth_session_create(uuid,uuid,uuid,text,text,timestamptz,timestamptz)'::regprocedure))""")))
+
+
 def cutover(db: Session) -> str:
-    state = db.get(AuthSafetyState, 1)
+    """C4 operational postconditions. Caller retains the journal lock to its boundary.
+
+    Identity is checked by the entrypoint, separately from this contract, so
+    administrative reconciliation never needs an owner fallback in business code.
+    No writes, cached startup decision or account-enabling side effects here.
+    """
+    state = db.get(AuthSafetyState, 1, populate_existing=True)
     if state is None or state.version != 1:
         return "auth_safety_version_missing"
-    # C4 will introduce the completed contract. C1 cannot set this ready.
-    return "auth_safety_pending"
+    if not db.scalar(text("SELECT to_regclass('auth_operational_state') IS NOT NULL")):
+        return "auth_safety_pending"  # historical binaries/snapshots cannot complete C4
+    checkpoint = db.execute(text("SELECT * FROM auth_operational_state WHERE id=1")).mappings().first()
+    if not checkpoint or checkpoint['contract_version'] != 1 or not state.backfill_complete:
+        return "auth_safety_pending"
+    if not contract_provisioned(db):
+        return "auth_safety_not_provisioned"
+    from app.config import get_settings
+    try:
+        settings = db.info.get('auth_safety_settings') or get_settings()
+        current = journal.read(settings.recovery.journal_path)
+        if current.torn is not None or current.open_recovery is not None:
+            return "auth_safety_journal_held"
+        if (checkpoint['journal_id'], checkpoint['genesis_hash'], checkpoint['verified_seq'],
+            checkpoint['verified_hash'], state.projection_seq) != (
+                current.journal_id, current.genesis_hash, current.head.seq, current.head.hash, current.head.seq):
+            return "auth_safety_progress_incomplete"
+        verify(db, current.records)
+    except Exception:
+        return "auth_safety_postcondition_failed"
+    return "ready"
 
 
 def require_writer(db: Session) -> None:
@@ -22,9 +62,7 @@ def require_writer(db: Session) -> None:
     from app.config import get_settings
     from app import recovery
     # Independent integrity check: C2 test-only pending patches cannot conceal a bad chain/hold.
-    if not recovery.evaluate_integrity(get_settings(), db.get_bind()).open:
-        raise ApiError(503, "service_recovering")
-    if cutover(db) != "ready":
+    if not recovery.evaluate(get_settings(), db.get_bind()).open:
         raise ApiError(503, "service_recovering")
 
 
@@ -133,7 +171,7 @@ def stage(db: Session, state, changes: list[Change]):
 def verify_snapshot(db: Session) -> None:
     """Validate historical receipt bindings before restrictions, without granting anything."""
     from app.recovery import RecoveryError
-    for u in db.scalars(select(User)):
+    for u in db.scalars(select(User).execution_options(populate_existing=True)):
         for domain in ("credential", "status"):
             operation = getattr(u, f"{domain}_operation_id")
             generation = getattr(u, f"{domain}_generation")
@@ -164,15 +202,15 @@ def verify(db: Session, records) -> None:
     if set(db.scalars(select(AuthSafetyHead.user_id))) != expected_users:
         raise RecoveryError("auth_projection_incomplete")
     for (uid, domain), r in latest.items():
-        h = db.get(AuthSafetyHead, uid)
+        h = db.get(AuthSafetyHead, uid, populate_existing=True)
         if (getattr(h, f"{domain}_seq"), str(getattr(h, f"{domain}_operation_id")), str(getattr(h, f"{domain}_generation")),
             getattr(h, f"{domain}_reason_code"), getattr(h, f"{domain}_recorded_at")) != (
             r.seq, r.body["operation_id"], r.body["generation"], r.body["reason_code"], datetime.fromisoformat(r.body["recorded_at"])):
             raise RecoveryError("auth_projection_corrupt")
         if domain == "status" and h.status_decision != r.body["decision"]:
             raise RecoveryError("auth_projection_corrupt")
-    for u in db.scalars(select(User)):
-        h = db.get(AuthSafetyHead, u.id)
+    for u in db.scalars(select(User).execution_options(populate_existing=True)):
+        h = db.get(AuthSafetyHead, u.id, populate_existing=True)
         for domain, effective in (("credential", u.credential_state == "usable"),
                                   ("status", u.status_safety == "proven" and u.status == "active")):
             if effective and not db.scalar(text("SELECT ras_auth_receipt_provenance(:op)"),

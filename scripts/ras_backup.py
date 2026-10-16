@@ -51,6 +51,7 @@ from app import backup, journal  # noqa: E402
 from app.backup import BackupError  # noqa: E402
 from app.journal import JournalError  # noqa: E402
 from app.storage import OriginalStorage  # noqa: E402
+from app.config import ObjectStorage
 
 ALLOWED = ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB", "MINIO_ROOT_USER", "MINIO_ROOT_PASSWORD")
 WRITERS = ("api", "web", "worker", "beat")
@@ -89,7 +90,11 @@ def outside_repo(path: Path, code: str) -> Path:
 def compose_prefix(project: str) -> list[str]:
     # Explicit isolated env file prevents Compose from reading the developer .env.
     env_file = os.environ.get("RAS_COMPOSE_ENV_FILE")
-    return ["docker", "compose", *(["--env-file", env_file] if env_file else []), "-p", project]
+    override=os.environ.get('RAS_COMPOSE_OVERRIDE_FILE')
+    ports=os.environ.get('RAS_COMPOSE_PORTS_FILE')
+    return ["docker", "compose", *(["--env-file", env_file] if env_file else []), "-p", project,
+            *(['-f',str(ROOT/'docker-compose.yml'),'-f',override] if override else []),
+            *(['-f',ports] if ports else [])]
 
 
 def compose(project: str, *args: str, extra_env: dict | None = None, check: bool = True, **kwargs):
@@ -115,11 +120,13 @@ def running(project: str) -> set[str]:
 
 def published(project: str, service: str, port: int) -> int | None:
     out = compose_text(project, "port", service, str(port)).strip()
+    if (not out or out.endswith(':0')) and os.environ.get('RAS_COMPOSE_OVERRIDE_FILE'):
+        out = compose_text(project, 'port', 'exposure', str(port)).strip()
     return int(out.rsplit(":", 1)[1]) if out else None
 
 
 def storage_at(port: int, env: dict) -> OriginalStorage:
-    settings = SimpleNamespace(storage=SimpleNamespace(
+    settings = SimpleNamespace(storage=ObjectStorage(
         bucket=BUCKET, endpoint_url=f"http://127.0.0.1:{port}", access_key=SecretStr(env["MINIO_ROOT_USER"]),
         secret_key=SecretStr(env["MINIO_ROOT_PASSWORD"])))
     return OriginalStorage(settings)
@@ -297,7 +304,7 @@ def do_restore(args, env: dict) -> int:
         db_port, minio_port = published(target, "db", 5432), published(target, "minio", 9000)
         if (db_port, minio_port) != (int(os.environ["POSTGRES_HOST_PORT"]), int(os.environ["MINIO_API_HOST_PORT"])):
             raise BackupError("target_ports_not_isolated", "published")
-        if minio_port in (published(source, "minio", 9000), published(DEV_PROJECT, "minio", 9000)):
+        if minio_port == published(source, "minio", 9000):
             raise BackupError("target_ports_not_isolated", "minio")
     backup_id = manifest["backup_id"]
     with timed(timings, "database"):
@@ -310,7 +317,7 @@ def do_restore(args, env: dict) -> int:
             """, extra)
         with open(artifact / backup.DUMP, "rb") as dump:
             loaded = compose(target, "exec", "-T", "db", "sh", "-c",
-                             'exec pg_restore --exit-on-error --single-transaction --no-owner'
+                             'exec pg_restore --exit-on-error --single-transaction --no-owner --no-privileges'
                              ' -U "$POSTGRES_USER" -d "$POSTGRES_DB"',
                              extra_env=extra, check=False, stdin=dump, capture_output=True)
         if loaded.returncode != 0:
@@ -327,6 +334,7 @@ def do_restore(args, env: dict) -> int:
         counts = backup.restore_objects(storage_at(minio_port, env), artifact, manifest)
     with timed(timings, "migrate"):
         compose(target, "run", "--rm", "migrate", extra_env=extra)
+        compose(target, "run", "--rm", "provision", extra_env=extra)
     status = compose(target, "run", "--rm", "--no-deps","-e","RAS_DB__USER","-e","RAS_DB__PASSWORD",
                      "api", "python", "-m", "app.cli.recovery", "status",
                      extra_env=recovery_env, check=False, encoding="utf-8", errors="replace")

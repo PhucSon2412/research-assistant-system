@@ -1,6 +1,8 @@
 # Roadmap đề xuất
 
-**B1 đã triển khai và kiểm (2026-10-15, chưa merge):** source **0050**, [handoff](pre-c4-auth-receipts-regression.md) · [inventory](pre-c4-test-inventory.json). Provenance và hồi quy được đối chiếu trước gói C4 tích hợp đầy đủ; **safety pending tới C4**. Giữ forecast/checklist MVP, không suy readiness hoặc pricing từ kiểm tầng dưới. Các mốc giao/review dưới đây giữ lịch sử.
+**C4 đã triển khai và kiểm cô lập (source `0051`, chờ review/chưa merge):** [Handoff/runbook C4](c4-integrated-runtime-cutover.md) ghi checkpoint, image/roles và phạm vi kiểm cô lập. Không cutover dev hoặc bật provider/pricing thật. Inventory cuối đối chiếu đủ 5.163 node API đều pass, giữ 298 debt; năm full drill và CLI evaluation đã chạy. Các mốc bên dưới giữ lịch sử theo source riêng.
+
+**Hiện hành sau merge PR #60 (2026-10-15):** B1 đã merge `44633b99`, tree khớp `c6f200e`, source **0050**; chưa rerun tại merge. [Handoff](pre-c4-auth-receipts-regression.md) · [review](reviews/pr60-pre-c4-auth-receipts-regression.md). Đã giao [một PR C4 tích hợp](tasks/m6c2b2c4-integrated-cutover.md), mới giao/chưa triển khai hoặc kiểm: image/roles, operational readiness có hậu điều kiện, HTTP/browser không seam, năm full drill và CLI evaluation. Mã hiện vẫn pending, không cutover dev/provider thật. Giữ forecast/checklist MVP; các mốc dưới đây là lịch sử.
 
 **Trạng thái hiện hành (2026-10-13):** PR #59 đã merge `041f77ef`, source **0049**; head `035cef0` là ancestor, tree khớp, chưa rerun tại merge. [C3 operator recovery](c3-operator-auth-recovery.md) đã qua review trong scope C3; tiếp [B1 — initial receipt và hồi quy trước C4](tasks/pre-c4-auth-receipts-and-regression.md), mới giao/chưa triển khai hoặc kiểm, rồi C4 tích hợp theo [kế hoạch MVP](mvp-delivery-plan.md). **Safety pending tới C4**; provider thật/pricing và nghiệm thu MVP còn riêng. Các mốc OPEN bên dưới là lịch sử.
 

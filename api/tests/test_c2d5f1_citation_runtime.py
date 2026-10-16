@@ -1,6 +1,6 @@
 """C2d-5f1 citation reconcile through the runtime: actual runtime login, PostgreSQL and journal.
 
-Only business cutover is scoped (``resource_world``); separate tests keep the
+Shared business setup uses the real C4 contract; separate tests keep the
 real pending gate. Owner-engine statements are labelled setup, corruption or
 adversary and never stand in for the reconcile under test. Discovery pages are
 synthetic OAI XML written by ``_write_page`` (no network). Faults are named
@@ -32,7 +32,7 @@ from tests.resource_fixtures import (resource_api, resource_world, installation,
 from tests.test_auth_safety_foundation import NOW
 from tests.test_citations import MD_REFS, SEED, LATE, oai_page
 
-REAL_CUTOVER = auth_safety.cutover  # captured at import, before any scoped fixture patch
+REAL_CUTOVER = auth_safety.cutover  # captured before named unit fault injections
 BUSINESS = ('library_items', 'paper_versions', 'source_files', 'access_rights', 'common_publications',
             'deletion_tombstones', 'reference_entries', 'ingestion_jobs', 'embedding_calls', 'index_generations',
             'chunks', 'sections', 'metadata_candidates', 'discovery_papers', 'discovery_deleted_records')
@@ -131,7 +131,8 @@ class Statements:
 
 def close_gate(h, gate, monkeypatch):
     if gate == 'pending':
-        monkeypatch.setattr(auth_safety, 'cutover', REAL_CUTOVER)  # the real production answer
+        with h.w.engine.begin() as conn:  # trusted setup: no completed C4 checkpoint
+            conn.execute(text('DELETE FROM auth_operational_state'))
     elif gate == 'missing':
         h.w.path.unlink()
     elif gate == 'hold':
@@ -342,7 +343,8 @@ def test_entry_requires_actual_runtime_login_before_private_read(cit, monkeypatc
             result = module.reconcile_citation_links()
     finally:
         seen.close()
-    assert result == {'halted:worker_runtime_required': 1}
+    expected = {'skipped': 'recovery_gate_closed'} if caller == 'celery-owner' else {'halted:worker_runtime_required': 1}
+    assert result == expected
     assert seen.private() == []  # refused before any private reference read or link write
     assert q(h, 'SELECT count(*) FROM reference_citation_links') == 0
 
@@ -369,16 +371,16 @@ def test_entry_probe_fault_and_release_fault_and_disabled(cit, monkeypatch):
     with monkeypatch.context() as m:
         m.setattr(citations, 'GRANTS', text('SELECT 1/0'))  # named probe fault
         assert run() == {'halted:worker_runtime_unavailable': 1}
-    real = Session.close
     calls = {'n': 0}
-
-    def close(self):
-        calls['n'] += 1
-        if calls['n'] == 1:
-            raise RuntimeError('named release fault')
-        return real(self)
+    class ReleaseFaultSession(Session):
+        def close(self):
+            calls['n'] += 1
+            if calls['n'] == 1:
+                raise RuntimeError('named release fault')
+            return super().close()
     with monkeypatch.context() as m:
-        m.setattr(Session, 'close', close)
+        # Target citation entry release after the real C4 gate's own Session.
+        m.setattr(citations, 'Session', ReleaseFaultSession)
         assert run() == {'halted:worker_release_unavailable': 1}  # entry release fault: no batch
     assert get_engine().pool.checkedout() == 0 and q(h, 'SELECT count(*) FROM reference_citation_links') == 0
     seen = Statements(get_engine())

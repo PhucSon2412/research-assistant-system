@@ -51,4 +51,4 @@ __all__ = [
     "UploadIntent",
 ]
 
-from app.models.auth_safety import AuthChangeReceipt, AuthSafetyHead, AuthSafetyState, AuthHashPolicy, AuthRecoveryCase, AuthRecoveryOperator
+from app.models.auth_safety import AuthChangeReceipt, AuthSafetyHead, AuthSafetyState, AuthHashPolicy, AuthRecoveryCase, AuthRecoveryOperator, AuthOperationalState

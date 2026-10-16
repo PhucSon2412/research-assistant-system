@@ -18,7 +18,7 @@ from app.identity import final_caller as callers
 from app.models import User, UserSession
 from tests.test_auth_safety_foundation import NOW
 from tests.test_c2c1_bootstrap import installation
-from tests.test_c2c2_invitations import world, issue, accept
+from tests.test_c2c2_invitations import operational_world as world, issue, accept
 from tests.test_c2d1_final_caller import browser, mutate
 from tests.test_c2d2a_resource_reads import resources
 from tests.test_c2d2b_review_publication_reads import reads
@@ -131,7 +131,8 @@ def test_direct_proof_post_sql_clock_no_touch_commit_or_new_locks(browser, monke
                 assert proof.checked_at == b.at == end + timedelta(microseconds=offset)
                 assert proof.idle_expires_at == end
                 assert proof.display_name == 'fresh clock profile'
-                assert stale_user.display_name != proof.display_name
+                # C4 verifies current User bindings and refreshes loaded ORM rows.
+                assert stale_user.display_name == proof.display_name
             assert db.get_transaction() is tx and tx.is_active
             assert not db.new and not db.dirty and not db.deleted
             assert not any('FOR UPDATE' in s.upper() or 'FOR SHARE' in s.upper() or 'UPDATE SESSIONS' in s.upper() for s in seen)
@@ -268,7 +269,8 @@ def test_writer_response_final_predicate_after_known_commit(writes, monkeypatch,
 def test_direct_integrity_bindings_still_closed(browser, change):
     b = browser
     mutate(b, change)
-    with Session(b.w.runtime) as db, pytest.raises(ApiError, match='session_expired'):
+    code = 'service_recovering' if change in ('receipt_credential', 'receipt_status', 'head') else 'session_expired'
+    with Session(b.w.runtime) as db, pytest.raises(ApiError, match=code):
         callers.final_caller(db, session_id=b.w.actor.session_id, user_id=b.w.uid,
                              clock=b.clock, idle=timedelta(minutes=30))
 

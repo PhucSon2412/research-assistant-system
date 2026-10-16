@@ -31,7 +31,7 @@ from app.models import ReviewRequest
 from app.models.enums import SessionRevokeReason
 from tests.resource_fixtures import source, SHA, MemoryOriginals
 from tests.test_c2c1_bootstrap import installation
-from tests.test_c2c2_invitations import world, issue, accept, PASSWORD, EMAIL
+from tests.test_c2c2_invitations import operational_world as world, issue, accept, PASSWORD, EMAIL
 from tests.test_c2d1_final_caller import browser, wait_for
 from tests.test_auth_safety_foundation import NOW
 
@@ -167,7 +167,7 @@ def test_current_actor_after_dependency_no_business_change(writers,action,case):
             elif case=='csrf':c.execute(text("UPDATE sessions SET csrf_token_hash=:h WHERE id=:s"),{'s':ctx.session_id,'h':'0'*64})
     b.after_dependency=after
     r=request(b,action)
-    expected=200 if action=='withdraw' and case=='role' else 403 if case in ('role','csrf') else 401
+    expected=200 if action=='withdraw' and case=='role' else 503 if case in ('receipt','head') else 403 if case in ('role','csrf') else 401
     assert r.status_code==expected,r.text
     if expected!=200:
         assert rows(b)==before and audit(b)==before_audit
@@ -244,7 +244,7 @@ def test_append_fault_commits_false_mirror_and_recover(writers,monkeypatch,actio
     assert not recovery.evaluate_integrity(get_settings(),b.w.runtime).open
     monkeypatch.setattr(journal,'append',real)
     report=recovery.recover(b.w.engine,SimpleNamespace(),get_settings(),NOW,confirm_db_current=fault!='full_fsync')
-    assert report.gate=='ready' and recovery.evaluate_integrity(get_settings(),b.w.runtime).open
+    assert report.gate == "open" and recovery.evaluate_integrity(get_settings(),b.w.runtime).open
 
 
 @pytest.mark.parametrize('action',ACTIONS)

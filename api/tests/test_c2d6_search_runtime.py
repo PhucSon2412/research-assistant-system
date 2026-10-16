@@ -1,6 +1,7 @@
 """Real runtime login, PostgreSQL/MinIO/journal; fake HTTP at transport only."""
 import json
 import uuid
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from decimal import Decimal
@@ -38,9 +39,27 @@ def ready(indexed, monkeypatch):
     b.action = None
     b.settings.rerank.pricing_verified = True  # in-memory fixture only, MockTransport below
     b.http_engine = get_engine()
+    held = {}
+    lock = threading.Lock()
+    b.provider_checks = []
+    def checked_out(connection, record, proxy):
+        with lock: held[id(record)] = threading.get_ident()
+    def checked_in(connection, record):
+        with lock: held.pop(id(record), None)
+    def provider_released():
+        with lock:
+            own = sum(owner == threading.get_ident() for owner in held.values())
+            b.provider_checks.append({'thread':threading.get_ident(),'own_connections':own,
+                                      'other_connections':len(held)-own})
+        assert own == 0, 'calling operation retained a connection during provider IO'
+    event.listen(b.http_engine.pool,'checkout',checked_out)
+    event.listen(b.http_engine.pool,'checkin',checked_in)
+    b.provider_released = provider_released
     client = httpx.Client
     def handle(request):
-        assert b.http_engine.pool.checkedout() == 0, 'connection retained during search provider IO'
+        # Browser resource requests may legitimately use this pool concurrently.
+        # The calling operation must release its own connections before HTTP.
+        b.provider_released()
         payload = json.loads(request.content)
         b.calls.append(payload)
         if b.action:
@@ -56,7 +75,11 @@ def ready(indexed, monkeypatch):
     # indexed already patched Client; unwrap by explicitly using a captured base class.
     base_client = httpx._client.Client
     monkeypatch.setattr(httpx, 'Client', lambda *a, **kw: base_client(*a, **(kw | {'transport': httpx.MockTransport(handle)})))
-    return b
+    try:
+        yield b
+    finally:
+        event.remove(b.http_engine.pool,'checkout',checked_out)
+        event.remove(b.http_engine.pool,'checkin',checked_in)
 
 
 def request(b, **body):

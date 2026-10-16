@@ -1,6 +1,6 @@
 """Runtime auth + PostgreSQL/MinIO/journal, with controlled fault boundaries.
 
-Only fixture cutover is scoped; production pending has a separate unpatched test.
+Shared setup uses the real C4 contract; pending has a separate unpatched test.
 All storage faults below are injections over real local MinIO, not crash tests.
 """
 import asyncio
@@ -31,7 +31,7 @@ from app.models import UploadIntent, SourceFile, LibraryItem, IngestionJob
 from app.storage import get_storage
 from tests.test_auth_safety_foundation import NOW
 from tests.test_c2c1_bootstrap import installation
-from tests.test_c2c2_invitations import world, issue, accept, EMAIL, PASSWORD
+from tests.test_c2c2_invitations import operational_world as world, issue, accept, EMAIL, PASSWORD
 from tests.test_c2d1_final_caller import browser, mutate, close, wait_for
 from tests.test_c2d4a_upload_intents import consent, request as create_intent, alter, clean
 from tests.test_uploads import pdf
@@ -171,7 +171,7 @@ def test_fresh_actor_through_io_and_response(upload, monkeypatch, phase, change)
         def receipt(*a): inject(); return real(*a)
         monkeypatch.setattr(original,'receipt',receipt)
     r=send(b,token,content() if phase=='body' else None)
-    assert injected and r.status_code==(503 if change=='hold' else 403 if change in ('role','csrf') else 401), r.text
+    assert injected and r.status_code==(503 if change in ('hold','receipt_credential','receipt_status','wrong_receipt','head','latest_credential','latest_status') else 403 if change in ('role','csrf') else 401), r.text
     assert 'item_id' not in r.text
     assert all(n==(1 if phase=='post' else 0) for n in rows(b).values())
     assert len(keys(b))==(1 if phase=='post' else 0)

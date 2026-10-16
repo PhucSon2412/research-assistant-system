@@ -102,8 +102,8 @@ def test_restore_endings_inside_ttl_twice_and_other_token_stays_valid(world, adm
             recovery.hold(snap.engine, get_settings(), w.h.clock.now)
             app_env(snap.url)
             assert confirm(w, old.token).status_code == 503
-            assert recover(w, snap.engine).gate == "ready"
-            assert recover(w, snap.engine).gate == "ready"
+            assert recover(w, snap.engine).gate == "open"
+            assert recover(w, snap.engine).gate == "open"
             with snap.engine.connect() as conn:
                 assert w.h.clock.now < conn.scalar(text("SELECT expires_at FROM password_reset_tokens WHERE id=:t"), {"t": tid})
                 assert conn.scalar(text("SELECT status FROM users WHERE id=:u"), {"u": w.uid}) == ("disabled" if how=="disabled" else "active")
@@ -126,7 +126,7 @@ def test_post_snapshot_token_and_user_remain_absent(world, admin_engine, app_env
         assert confirm(w, issued.token).status_code == 200
         app_env(snap.url)
         assert recover(w, snap.engine).replayed["recorded_reset_token_absent"] == 1
-        assert recover(w, snap.engine).gate == "ready"
+        assert recover(w, snap.engine).gate == "open"
         with snap.engine.connect() as conn:
             assert conn.scalar(text("SELECT count(*) FROM users WHERE id=:u"), {"u": new_uid}) == 0
             assert conn.scalar(text("SELECT count(*) FROM password_reset_tokens WHERE id=:t"), {"t": tid}) == 0
@@ -260,7 +260,7 @@ def test_failed_replay_keeps_gate_closed_and_token_error_has_no_session_claim(wo
     assert gate(w.h.engine) == "db_behind_journal"
     monkeypatch.setattr(recovery, "replay_record", original)
     fix_commit()
-    assert recover(w).gate == "ready"
+    assert recover(w).gate == "open"
     assert confirm(w, issued.token).status_code == 400
 
 
@@ -273,7 +273,7 @@ def test_recover_checks_conflicts_even_with_existing_mirror(world, admin_engine,
     with backup(w.h, admin_engine) as snap:
         assert confirm(w, issued.token).status_code == 200
         if mirrored:
-            assert recover(w, snap.engine).gate == "ready"
+            assert recover(w, snap.engine).gate == "open"
         # Simulate a corrupt restored snapshot via superuser; these writes must be impossible normally.
         with snap.engine.begin() as conn:
             conn.execute(text("ALTER TABLE password_reset_tokens DISABLE TRIGGER USER"))
@@ -304,7 +304,7 @@ def test_append_faults_atomic_token_and_session_batch(world, monkeypatch, shape,
     assert verify_password(w.h.scalar("SELECT password_verifier FROM users WHERE id=:u", u=w.uid), PASSWORD)
     assert gate(w.h.engine) != "open"
     fix()
-    assert recover(w, confirm_db_current=shape != "fsync").gate == "ready"
+    assert recover(w, confirm_db_current=shape != "fsync").gate == "open"
     assert confirm(w, issued.token).json() == {"error": "invalid_token"}
 
 
@@ -336,7 +336,7 @@ def test_commit_faults_never_claim_success_or_send_link(world, monkeypatch, land
     else:
         assert w.h.scalar("SELECT count(*) FROM password_reset_tokens WHERE used_at IS NULL AND revoked_at IS NULL") == int(lands)
     fix()
-    assert recover(w).gate == "ready"
+    assert recover(w).gate == "open"
 
 
 @pytest.mark.parametrize("shape", ["none", "torn", "prefix"])
@@ -352,7 +352,7 @@ def test_rollback_after_incomplete_append_only_complete_lines_replay(world, monk
     complete = len(records())
     fix_write()
     fix_commit()
-    assert recover(w).gate == "ready"
+    assert recover(w).gate == "open"
     assert w.h.scalar("SELECT count(*) FROM password_reset_tokens WHERE used_at IS NOT NULL") == complete
     assert w.h.scalar("SELECT count(*) FROM sessions WHERE revoked_at IS NOT NULL") == 0
     assert verify_password(w.h.scalar("SELECT password_verifier FROM users WHERE id=:u", u=w.uid), USER_PASSWORD)
@@ -373,7 +373,7 @@ def test_public_request_generic_on_internal_failure_then_gate_rejects_new_reques
         assert browser(w.public_cookies).post("/auth/password-reset/request", {"email": email}).status_code == 503
     assert EMAIL not in caplog.text
     fix()
-    assert recover(w, confirm_db_current=True).gate == "ready"
+    assert recover(w, confirm_db_current=True).gate == "open"
 
 
 @pytest.mark.parametrize("lands", [False, True])
@@ -492,8 +492,8 @@ def test_migrate_0030_backfill_hold_register_and_downgrade(empty_db_url, journal
         if registered:
             recovery.hold(snap.engine, get_settings(), now)  # Still schema 0030; seq/hash only.
         upgrade(snap.url)
-        assert recovery.recover(snap.engine, None, get_settings(), now).gate == "ready"
-        assert recovery.recover(snap.engine, None, get_settings(), now).gate == "ready"
+        assert recovery.recover(snap.engine, None, get_settings(), now).gate == "open"
+        assert recovery.recover(snap.engine, None, get_settings(), now).gate == "open"
         with pytest.raises(Exception, match="auth safety history prevents downgrade"):
             command.downgrade(alembic_config(empty_db_url), "0030")
     engine.dispose()
