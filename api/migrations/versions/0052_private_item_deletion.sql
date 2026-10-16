@@ -176,7 +176,8 @@ BEGIN
     RAISE EXCEPTION 'deleted job cannot restart' USING ERRCODE='check_violation'; END IF;
   ELSIF (to_jsonb(NEW)-ARRAY['source_identifier','source_url','version_label','coverage']) IS DISTINCT FROM
         (to_jsonb(OLD)-ARRAY['source_identifier','source_url','version_label','coverage'])
-    OR NEW.source_identifier IS NOT NULL OR NEW.source_url IS NOT NULL OR NEW.version_label IS NOT NULL THEN
+    OR NEW.source_identifier IS NOT NULL OR NEW.source_url IS NOT NULL OR NEW.version_label IS NOT NULL
+    OR NEW.coverage IS NOT NULL THEN
    RAISE EXCEPTION 'deleted version only permits scrub' USING ERRCODE='check_violation';
   END IF;
  END IF;

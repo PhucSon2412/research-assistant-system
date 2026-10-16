@@ -11,8 +11,11 @@ REPO=Path(__file__).resolve().parents[1]
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--context',type=Path,required=True);a=p.parse_args()
-    root=a.context.resolve()/'counterchecks';root.mkdir(exist_ok=False)
+    p=argparse.ArgumentParser();p.add_argument('--context',type=Path,required=True)
+    p.add_argument('--name',default='counterchecks');a=p.parse_args()
+    if not a.name or any(c not in 'abcdefghijklmnopqrstuvwxyz0123456789-_' for c in a.name):
+        raise SystemExit('simple lowercase evidence name required')
+    root=a.context.resolve()/a.name;root.mkdir(exist_ok=False)
     if REPO==root or REPO in root.parents:raise SystemExit('external context required')
     tests='api/tests/test_m6d_private_delete.py::'
     cases=[
@@ -29,7 +32,11 @@ def main():
             (b' IF EXISTS(SELECT 1 FROM source_files f LEFT JOIN library_items i ON i.id=f.item_id',
              b' IF false AND EXISTS(SELECT 1 FROM source_files f LEFT JOIN library_items i ON i.id=f.item_id')],
          tests+'test_multiversion_purge_scrubs_all_and_preserves_shared_key'),
+        ('coverage-rehydrate','api/migrations/versions/0052_private_item_deletion.sql',[
+            (b'    OR NEW.coverage IS NOT NULL THEN',b'    THEN')],
+         tests+'test_deleted_id_version_late_derived_and_key_cannot_reappear'),
         ('final-fsync-authority','api/app/api/private_delete.py',[
+
             (b'            _current(db,principal,csrf,clock,settings)\n        outcome.commit_started=True',
              b'        outcome.commit_started=True')],
          tests+'test_final_session_expiry_after_every_append_result_rolls_back_then_replay_only_restricts'),

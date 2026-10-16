@@ -18,6 +18,11 @@ và lease, signal cancel cả job đã xong, rút các request review còn mở,
 mirror và audit ID/count. Request đã approved giữ nguyên semantics; bản common,
 rights, publication và job common độc lập không bị thu hồi.
 
+Mọi kết quả append, kể cả fsync lỗi, đều kiểm lại binding/caller/clock trước commit.
+Session hết hạn sau append làm rollback DB; prefix journal chỉ thu hẹp quyền khi
+recover. Nếu caller/clock của receipt thất bại sau known commit, báo 503 chưa xác
+định với client, giữ nguyên quyết định đã commit.
+
 Receipt dùng transaction mới: `item_id`, `deleted=true`, `purge_due_at`,
 `cleanup_status=pending|completed`. Receipt không cấp nội dung và không khẳng định
 S3 đã xóa khi còn pending. Gửi lại thao tác đã biết là idempotent, kể cả sau purge;
@@ -29,7 +34,7 @@ không undo và common độc lập; success xóa nội dung đang hiển thị.
 | --- | --- |
 | Từ chối trước append | Rollback; không journal mutation |
 | Append thiếu/torn/prefix/full nhưng fsync lỗi; DB commit được | Commit restriction + toàn batch mirror false; 503 `deletion_journal_unavailable`; gate đóng |
-| Append đã bắt đầu, final proof/commit bị từ chối | Journal chỉ có thể replay hạn chế; không success |
+| Append đã bắt đầu, final binding/caller/clock bị từ chối | Rollback DB, 503 `deletion_pending_recovery`; journal chỉ có thể replay hạn chế |
 | COMMIT ném lỗi, dù landed hay rollback | 503 `deletion_outcome_uncertain`; không SELECT đoán, replay hoặc retry trong attempt |
 | Known commit, teardown/response/disconnect lỗi | Giữ commit; 503 `deletion_response_unavailable`; không hứa rollback |
 | Full line nhưng mirror false | Recover phải fsync; bytes khớp chưa đủ xác nhận |
@@ -47,6 +52,8 @@ từ hàng đang khóa và kiểm NULL-safe. SQL mirror/confirm bind transaction
 `private_object_fences` append-only theo key; runtime/recovery chỉ SELECT, definer
 ghi qua routine hẹp; fixed search_path, không PUBLIC EXECUTE. Reprovision cấp đúng
 routine/grants. Downgrade chỉ cho khi không có lịch sử deletion/fence; không xóa quyết định.
+Upgrade online và SQL offline đều chỉnh định nghĩa function ở PostgreSQL, giữ các
+check/property cũ; kiểm parity function sau áp SQL xuất từ `0051:0052`.
 
 | Caller | Gate/fence |
 | --- | --- |

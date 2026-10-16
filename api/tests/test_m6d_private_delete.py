@@ -171,6 +171,7 @@ def test_deleted_id_version_late_derived_and_key_cannot_reappear(deletion):
                 "UPDATE library_items SET title='resurrected' WHERE id=:i",
                 "INSERT INTO paper_versions(item_id) VALUES(:i)",
                 "UPDATE paper_versions SET source_url='https://resurrected.test' WHERE item_id=:i",
+                "UPDATE paper_versions SET coverage='complete' WHERE item_id=:i",
                 "UPDATE source_files SET original_filename='resurrected' WHERE item_id=:i",
                 "DELETE FROM private_item_deletions WHERE item_id=:i"]:
         with pytest.raises(DBAPIError),b.w.engine.begin() as c:c.execute(text(sql),{'i':b.own.item})
