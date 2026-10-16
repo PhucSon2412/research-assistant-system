@@ -44,7 +44,7 @@ def test_0036_upgrade_preserves_legacy_singleton_history_and_grants(empty_db_url
                     assert after[0].pop("creation_transaction_id") is None
                 if table == "revocation_journal_records":
                     for row in after:
-                        for col in ("case_id","case_operator_id","case_user_id","case_action","case_operation_id","case_recorded_at"):
+                        for col in ("case_id","case_operator_id","case_user_id","case_action","case_operation_id","case_recorded_at","private_deletion_id"):
                             assert row.pop(col) is None
                 assert after == values
         assert journal_path.read_bytes() == before
@@ -135,7 +135,7 @@ def test_0037_to_0038_preserves_accounts_binding_owner_and_acl(
             assert conn.scalar(text("SELECT has_table_privilege('c1_definer','recovery_registrations','SELECT')"))
             after = {t: conn.execute(text(f"SELECT row_to_json(r) FROM {t} r")).scalars().all() for t in tables}
             for row in after["revocation_journal_records"]:
-                for col in ("case_id","case_operator_id","case_user_id","case_action","case_operation_id","case_recorded_at"):
+                for col in ("case_id","case_operator_id","case_user_id","case_action","case_operation_id","case_recorded_at","private_deletion_id"):
                     assert row.pop(col) is None
             assert after == before
         assert journal_path.read_bytes() == before_bytes

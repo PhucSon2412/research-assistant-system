@@ -105,17 +105,35 @@ def old_install(empty_db_url, journal_path, app_env, monkeypatch):
         w.runtime.dispose(); owner.dispose()
 
 
-def test_upgrade_preserves_bytes_but_consumers_deny_old_forgery(old_install):
+def test_upgrade_preserves_bytes_but_consumers_deny_old_forgery(old_install, monkeypatch):
     w = old_install
+    tables = ("users", "auth_change_receipts", "revocation_journal_records")
     with w.engine.connect() as db:
-        before = {t: db.execute(text(f"SELECT row_to_json(r)::text FROM {t} r ORDER BY 1")).scalars().all()
-                  for t in ("users", "auth_change_receipts", "revocation_journal_records")}
+        columns = {table: list(db.execute(text(f"SELECT * FROM {table} LIMIT 0")).keys())
+                   for table in tables}
+    quote = w.engine.dialect.identifier_preparer.quote
+
+    def historical_rows(db):
+        # Compare every pre-upgrade column, in its original order. A new nullable
+        # binding column must not make unchanged historical values appear changed.
+        return {table: db.execute(text(
+            f"SELECT row_to_json(r)::text FROM (SELECT {','.join(map(quote, columns[table]))} "
+            f"FROM {table}) r ORDER BY 1")).scalars().all() for table in tables}
+
+    with w.engine.connect() as db:
+        before = historical_rows(db)
     raw = w.path.read_bytes()
     upgrade(w.engine.url)
     with w.engine.connect() as db:
-        assert before == {t: db.execute(text(f"SELECT row_to_json(r)::text FROM {t} r ORDER BY 1")).scalars().all()
-                          for t in before}
+        assert before == historical_rows(db)
+        assert db.scalar(text("SELECT count(*) FROM revocation_journal_records "
+                              "WHERE private_deletion_id IS NOT NULL")) == 0
     assert w.path.read_bytes() == raw  # migration does no journal I/O or evidence backfill
+    provision(w.engine, runtime="c1_runtime", recovery="c1_recovery", definer="c1_definer")
+    monkeypatch.setattr(auth_safety, "cutover", REAL_CUTOVER)
+    report = recovery.recover(w.engine, SimpleNamespace(), w.settings, NOW)
+    assert report.reconciliation_complete and report.safety_ready
+    assert recovery.evaluate(w.settings, w.runtime).open
     op_url = ensure_login(w, "c3_operator", "RAS_C3_OPERATOR_PASSWORD")
     provision_operator(w.engine, login="c3_operator", operator_id=uuid.uuid4())
     operator = create_engine(op_url, hide_parameters=True)
@@ -244,8 +262,15 @@ def test_runtime_cannot_reuse_a_committed_creation_parent(old_install,reason,dom
     assert w.path.read_bytes()==raw
 
 
-def test_old_forgery_cannot_enable_held_user_after_disable(old_install):
-    w=old_install;upgrade(w.engine.url);recovery.recover(w.engine,SimpleNamespace(),w.settings,NOW)
+def test_old_forgery_cannot_enable_held_user_after_disable(old_install, monkeypatch):
+    w=old_install;upgrade(w.engine.url)
+    # Upgrade introduces protected routines/tables: the real runtime must be
+    # reprovisioned before recovery and business writes, as in the C4 runbook.
+    provision(w.engine,runtime="c1_runtime",recovery="c1_recovery",definer="c1_definer")
+    monkeypatch.setattr(auth_safety,"cutover",REAL_CUTOVER)
+    report=recovery.recover(w.engine,SimpleNamespace(),w.settings,NOW)
+    assert report.reconciliation_complete and report.safety_ready
+    assert recovery.evaluate(w.settings,w.runtime).open
     uid=w.forged[1]
     with Session(w.runtime) as db:
         assert db.get(User,uid).status_safety=="held"

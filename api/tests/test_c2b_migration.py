@@ -34,10 +34,11 @@ def test_0035_populated_upgrade_preserves_history_roles_and_pending(empty_db_url
                 after=conn.execute(text(f"SELECT row_to_json(r) FROM {t} r")).scalars().all()
                 if t=="revocation_journal_records":
                     for row in after:
-                        for col in ("case_id","case_operator_id","case_user_id","case_action","case_operation_id","case_recorded_at"):
+                        for col in ("case_id","case_operator_id","case_user_id","case_action","case_operation_id","case_recorded_at","private_deletion_id"):
                             assert row.pop(col) is None
                 assert after==values
         assert journal_path.read_bytes()==before
+        runtime_engine(w).dispose()  # Reprovision the current protected contract after upgrade.
         recovery.recover(eng,SimpleNamespace(),w.settings,NOW)
         from tests.test_c3_operator_recovery import operator_initial_status
         operator_initial_status(w,uid)

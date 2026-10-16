@@ -34,8 +34,8 @@ def test_0038_populated_provisioned_upgrade(empty_db_url,journal_path,app_env,mo
         raw=journal_path.read_bytes()
         upgrade(empty_db_url)
         with eng.connect() as db:
-            # Columns added by later revisions (0049 case_*) are NULL on every existing row; compare the rest.
-            later=('case_id','case_operator_id','case_user_id','case_action','case_operation_id','case_recorded_at')
+            # Columns added by later revisions (0049 case_*, 0052 private binding) are NULL on every existing row; compare the rest.
+            later=('case_id','case_operator_id','case_user_id','case_action','case_operation_id','case_recorded_at','private_deletion_id')
             for t in tables:
                 after=[json.loads(v) for v in db.execute(text(f'SELECT row_to_json(r)::text FROM {t} r')).scalars().all()]
                 assert all(row.pop(k,None) is None for row in after for k in later)
