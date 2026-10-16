@@ -18,6 +18,7 @@ from app.models import Base
 from tests.conftest import HEAD_REVISION, alembic_config, upgrade
 
 EXPECTED_TABLES = {
+    "private_item_deletions", "private_object_fences",
     "auth_operational_state",
     "auth_change_receipts", "auth_safety_heads", "auth_safety_state", "auth_hash_policies",
     # C3 (0049)

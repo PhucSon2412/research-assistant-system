@@ -218,7 +218,7 @@ def settle(db: Session, usage_id: uuid.UUID, *, tokens: int | None = None,
     return status
 
 
-PRIVATE_OWNER = "i.visibility='private' AND i.owner_user_id=:owner"
+PRIVATE_OWNER = "i.visibility='private' AND i.owner_user_id=:owner AND i.deleted_at IS NULL"
 
 
 def _audience(include_common: bool) -> str:

@@ -104,9 +104,9 @@ class ReviewRequest(Base):
     # Any later revoke/delete that bumps the item's epoch ends the grant too.
     rights_epoch_at_submit: Mapped[int] = mapped_column(BigInteger)
     notice_version: Mapped[str] = mapped_column(Text)
-    declared_source: Mapped[str] = mapped_column(Text)
+    declared_source: Mapped[str | None] = mapped_column(Text)
     declared_source_url: Mapped[str | None] = mapped_column(Text)
-    declared_rights: Mapped[str] = mapped_column(Text)
+    declared_rights: Mapped[str | None] = mapped_column(Text)
     declared_license_url: Mapped[str | None] = mapped_column(Text)
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

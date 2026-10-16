@@ -1,0 +1,8 @@
+{
+  "task": "M6d private item deletion and restore",
+  "base": "fb96354c4f8dc8fb8f4f8a54f1516d9d2e13625e",
+  "source_migration": "0052",
+  "status": "verification_in_progress",
+  "evidence_root": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-m6d-20261016",
+  "note": "Preparation and mutant results are not a final-source full inventory. Final JUnit identities, image/source/artifact hashes and drill evidence will replace this provisional inventory before review. No dev or real provider certification."
+}

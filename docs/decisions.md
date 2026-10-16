@@ -1,5 +1,21 @@
 # Nhật ký quyết định
 
+## Quyết định triển khai M6d (2026-10-16)
+
+Theo task [owner delete/cleanup/restore](tasks/m6d-private-item-deletion-and-restore.md) đã được giao, chọn schema `0052`: marker private cuối, tombstone/manifest độc lập target và fence riêng theo key. Batch cùng journal hiện hành đặt review withdrawal trước private deletion; không biến approved thành withdrawn. SQL và parser kiểm manifest độc lập, giới hạn cấu hình tối đa 128 mỗi tập; không truncate. Cleanup giữ skeleton cho FK/đối soát và scrub private text/URL/filename/vector/hash; common đã approve độc lập giữ nguyên. Recover sweep cả tombstone đã purged và nhả connection/mutex trước private S3; phải lấy lại cùng open recovery trước complete. C4 readiness không đặt lại pending hoặc bypass. [Handoff và lựa chọn chi tiết](m6d-private-item-delete-restore.md) · [inventory đang kiểm](m6d-test-inventory.json).
+
+Giữ F07 là gap riêng: cảnh báo hiện chỉ xét file trước ở stored/extracting/chunking/awaiting_index, chưa xét ready/indexed, chưa canonical/reuse hay paper tương đương khác bytes. Xóa/retry an toàn không tự khép F07. Không thêm undo/trash/streaming, không tác động dev hoặc bật provider/pricing thật. Đây là lựa chọn triển khai trong phạm vi task, không nghiệm thu production.
+
+## Giao M6d sau merge C4 (2026-10-16)
+
+PR #61 đã merge `fb96354c4f8dc8fb8f4f8a54f1516d9d2e13625e`; head review `3f07901` là ancestor, tree khớp, source **0051**. Chưa rerun tại merge, không suy revision DB dev. Theo ủy quyền hoàn thành MVP, orchestrator giao [M6d](tasks/m6d-private-item-deletion-and-restore.md) thành một PR trọn luồng owner delete → denial ngay → cleanup → restore không hồi sinh. Mới giao tài liệu, chưa triển khai hoặc kiểm. C4 readiness hợp lệ tiếp tục dùng trên môi trường cô lập, không đặt lại pending/bypass hoặc cutover dev/provider thật.
+
+Chốt sản phẩm cho task: owner xóa toàn item private (mọi version/file), xác nhận boolean tường minh; logical delete có hiệu lực ở commit, physical purge theo thời hạn cấu hình. Repeat idempotent, outcome uncertain không báo thành công/auto retry. Xóa private đóng review grant đang mở có journal nhưng không tự thu hồi common pending/listed đã approve độc lập. Common/B cùng checksum hoặc physical key hợp lệ không bị xóa theo A.
+
+Chốt journal/cleanup: typed deletion cùng journal hiện hành, manifest đầy đủ chỉ ID/key/checksum/code/time; review closures trước, deletion event cuối trong batch để prefix chỉ hạn chế. Mirror false trước append, confirm sau fsync; replay không dựng target/User/credential/receipt. Fence theo key và toàn bộ tham chiếu hợp lệ trước S3 ngoài DB; scrub text/metadata private, chỉ giữ binding/ledger tối thiểu có giải thích. Agent chọn schema/routine nhỏ nhất theo hợp đồng, thêm revision sau head thực tế, không sửa migration đã merge hoặc nới quyền runtime.
+
+Duplicate/retry được hồi quy, deleted item không làm đích reuse hoặc sống lại qua retry; upload mới cùng bytes cần item/key và consent mới. F07 hiện còn cảnh báo duplicate phải được mô tả đúng, không coi là canonical dedup/link đã làm. Task không xây canonical graph/version merge; gap còn lại phải ghi cụ thể để chốt nghiệm thu gói C. Provider/charge, storage production, delivery và triển khai nhóm thử giữ gói D/E.
+
 ## C4: checkpoint sau reconciliation và topology runtime (2026-10-15)
 
 Revision `0051` thêm checkpoint contract riêng, được hoàn tất bởi recovery sau các hậu điều kiện thật. Runtime không tự tạo/sửa checkpoint. Trigger chỉ tiến checkpoint đã tồn tại qua record confirmed liên tục; foundation progress không vượt `recovery_begin` chỉ nhờ mirror, vì C3 cần chứng cứ đã reconcile hold. Gate đọc current journal dưới khóa hiện có và kiểm binding/provenance. Corruption của receipt/projection có thể đóng service bằng 503 trước kiểm caller; account bị hạn chế vẫn bị từ chối riêng.

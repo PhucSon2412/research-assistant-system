@@ -292,7 +292,8 @@ def _mirror(record: Record, via: str, result: str, tombstone_id: uuid.UUID | Non
     return RevocationJournalRecord(seq=record.seq, kind=record.kind, record_hash=record.hash, line=record.line,
                                    tombstone_id=tombstone_id, review_request_id=review_request_id, applied_via=via,
                                    session_id=session_id, session_user_id=session_user_id,
-                                   result=result, journal_confirmed=confirmed, **token_fields, **invitation_fields, **auth_fields)
+                                   result=result, journal_confirmed=confirmed,
+                                   **token_fields, **invitation_fields, **auth_fields)
 
 
 def insert_case_mirror(db: Session, record: Record, via: str, result: str, *, confirmed: bool) -> None:
@@ -630,6 +631,17 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
     # Validate even direct replay callers, not just lines read from the file.
     if journal.make_record(record.seq, record.kind, record.body, record.prev) != record:
         raise RecoveryError("journal_corrupt")
+    if record.kind == journal.PRIVATE_DELETION:
+        from app import private_cleanup
+        from app.models import PrivateItemDeletion
+        present=db.get(RevocationJournalRecord,record.seq)
+        if present is None:
+            private_cleanup.replay(db,record)  # all resource locks and DML before journal
+        else:
+            private_cleanup.validate(db,record.body,deleted=True)
+            tomb=db.get(PrivateItemDeletion,uuid.UUID(record.body['id']))
+            if tomb is None or private_cleanup.body_of(tomb)!=record.body:
+                raise RecoveryError('private_deletion_conflict')
     item, rights, rr, session_row, token_row, invitation_row = None, [], None, None, None, None
     if record.kind in journal.AUTH_KINDS:
         db.execute(text("SELECT ras_auth_lock_users(:ids)"), {"ids": [uuid.UUID(record.body["user_id"])]})
@@ -745,6 +757,10 @@ def apply_record(db: Session, record: Record, now: datetime, via: str = "replay"
         db.execute(text("SELECT ras_auth_confirm(:seq)"), {"seq": record.seq})
     elif record.kind == journal.OPERATOR_RECOVERY_CASE:
         insert_case_mirror(db, record, via, result, confirmed=True)
+    elif record.kind == journal.PRIVATE_DELETION:
+        db.execute(text("""INSERT INTO revocation_journal_records(seq,kind,record_hash,line,applied_via,result,
+         journal_confirmed,private_deletion_id) VALUES(:seq,'private_deletion',:hash,:line,:via,:result,true,:id)"""),
+         dict(seq=record.seq,hash=record.hash,line=record.line,via=via,result=result,id=uuid.UUID(record.body['id'])))
     else:
         db.add(_mirror(record, via, result, tombstone_id, confirmed=True, review_request_id=request_id,
                        session_id=uuid.UUID(record.body["session_id"]) if record.kind == SESSION_REVOCATION else None,
@@ -1253,6 +1269,15 @@ def _verify(engine: Engine, path: Path) -> None:
         if _unjournaled_invitations(db):
             raise RecoveryError("invitations_not_journaled")
         for record in journal.read(path).records:
+            if record.kind == journal.PRIVATE_DELETION:
+                from app import private_cleanup
+                from app.models import PrivateItemDeletion
+                private_cleanup.validate(db,record.body,deleted=True)
+                tomb=db.get(PrivateItemDeletion,uuid.UUID(record.body['id']))
+                if tomb is None or private_cleanup.body_of(tomb)!=record.body or tomb.purged_at is None:
+                    raise RecoveryError('private_cleanup_incomplete')
+                if db.scalar(text('SELECT cardinality(ras_common_copy_derived_left(:id))'),{'id':tomb.item_id}):
+                    raise RecoveryError('private_derived_rows_left')
             if record.kind == INVITATION_CLOSURE:
                 _apply_invitation_closure(db.get(Invitation, uuid.UUID(record.body["invitation_id"]),
                                                 options=_invitation_recovery_columns()),
@@ -1378,6 +1403,30 @@ def recover(engine: Engine, storage, settings: Settings, now: datetime, *,
             _import_legacy_auth_tokens(engine, path, report)
             _cleanup(engine, storage, settings, now, report)
             _sweep_objects(engine, storage, path, report)
+            from app.private_cleanup import cleanup_private
+            # Current binary must hold/recover pre-0052 snapshots before migration.
+            # Such a schema cannot contain a private decision; a current journal
+            # that does contain one requires migration before its replay.
+            private_counts={}
+            if any(r.kind==journal.PRIVATE_DELETION for r in journal.read(path).records):
+                # The durable recovery_begin keeps readiness closed. Release even
+                # the orchestration mutex connection before private storage I/O.
+                # Concurrent recovery may perform the same at-least-once sweep;
+                # this run must reacquire the mutex and the SAME open hold before
+                # it can verify or complete anything.
+                mutex.execute(text('SELECT pg_advisory_unlock(:k)'),{'k':RECOVER_LOCK})
+                mutex.commit(); mutex.close()
+                private_counts=cleanup_private(engine,storage,settings,operator=True,sweep=True,clock=lambda:now)
+                mutex=engine.connect()
+                if not mutex.scalar(text('SELECT pg_try_advisory_lock(:k)'),{'k':RECOVER_LOCK}):
+                    raise RecoveryError('recovery_already_running')
+                mutex.commit()
+                if journal.read(path).open_recovery!=recovery_id:
+                    raise RecoveryError('recovery_scope_changed')
+            for code,count in private_counts.items():
+                report.cleanup['private:'+code]=count
+            if any(code.startswith(('halted:','error:')) for code in private_counts):
+                raise RecoveryError('private_cleanup_incomplete')
             _verify(engine, path)
             from app.auth_safety import verify
             with Session(engine) as db:
@@ -1401,8 +1450,10 @@ def recover(engine: Engine, storage, settings: Settings, now: datetime, *,
             report.reconciliation_complete = not hold_for_operator
             report.held_for_operator = hold_for_operator
         finally:
-            mutex.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": RECOVER_LOCK})
-            mutex.commit()
+            if not mutex.closed:
+                mutex.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": RECOVER_LOCK})
+                mutex.commit()
+                mutex.close()
     status = evaluate(settings, engine, administrative=True)
     report.gate = status.reason
     report.safety_ready = status.open

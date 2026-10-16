@@ -83,6 +83,8 @@ class LibraryItem(Base):
     active_version_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     active_index_generation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     title: Mapped[str | None] = mapped_column(Text)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deletion_transaction_id: Mapped[int | None] = mapped_column(BigInteger)
     # Bumped on every revoke/delete (M5/M6); workers compare against the
     # epoch recorded on their job before calling out or publishing.
     rights_epoch: Mapped[int] = mapped_column(BigInteger, server_default=text("0"))

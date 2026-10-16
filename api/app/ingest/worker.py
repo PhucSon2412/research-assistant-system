@@ -93,7 +93,7 @@ def _context(db: Session, job: IngestionJob, item: LibraryItem | None) -> tuple[
 
 
 def _guard(job: IngestionJob, item: LibraryItem) -> None:
-    if job.cancel_requested or item.rights_epoch != job.rights_epoch_at_start:
+    if item.deleted_at is not None or job.cancel_requested or item.rights_epoch != job.rights_epoch_at_start:
         raise StepError("cancelled")
 
 
@@ -177,7 +177,9 @@ def _validate(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceFi
         lock_key = f"{item.owner_user_id}:{source.checksum_sha256}"
         db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"), {"key": lock_key})
         other = db.scalar(select(SourceFile.id).join(IngestionJob, SourceFile.job_id == IngestionJob.id)
+            .join(LibraryItem, LibraryItem.id == SourceFile.item_id)
             .where(SourceFile.checksum_sha256 == source.checksum_sha256,
+                   LibraryItem.deleted_at.is_(None),
                    SourceFile.id != source.id, IngestionJob.scope_visibility == Visibility.PRIVATE.value,
                    IngestionJob.scope_owner_user_id == item.owner_user_id,
                    IngestionJob.state.in_([JobState.STORED.value, JobState.EXTRACTING.value,

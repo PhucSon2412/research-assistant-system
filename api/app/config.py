@@ -227,6 +227,7 @@ class Retention(BaseModel):
     backup_retention: timedelta = timedelta(days=30)
     cleanup_poll_seconds: int = Field(default=900, gt=0)
     cleanup_batch_size: int = Field(default=50, gt=0, le=1000)
+    private_delete_manifest_limit: int = Field(default=128, ge=1, le=128)
 
     @model_validator(mode="after")
     def _check_positive(self) -> "Retention":

@@ -25,8 +25,11 @@ RECOVERY_ROUTINES = {"ras_auth_complete_contract", "ras_auth_mirror", "ras_auth_
 OPERATOR_ROUTINES = {"ras_auth_operator_whoami", "ras_auth_operator_gate", "ras_auth_operator_inspect",
                      "ras_auth_operator_case", "ras_auth_operator_snapshot", "ras_auth_operator_stage",
                      "ras_auth_operator_confirm", "ras_auth_operator_outcome"}
-PROTECTED = {"users", "invitations", "bootstrap_state", "sessions", "password_reset_tokens", "auth_change_receipts", "auth_safety_heads", "auth_safety_state", "auth_hash_policies", "revocation_journal_records", "object_delete_fences", "orphan_object_fences", "orphan_object_completions",
+PROTECTED = {"users", "invitations", "bootstrap_state", "sessions", "password_reset_tokens", "auth_change_receipts", "auth_safety_heads", "auth_safety_state", "auth_hash_policies", "revocation_journal_records", "object_delete_fences", "orphan_object_fences", "orphan_object_completions", "private_object_fences",
              "auth_recovery_operators", "auth_recovery_cases", "auth_operational_state", "recovery_registrations"}
+
+RUNTIME_ROUTINES.update({'ras_auth_private_delete_mirror', 'ras_auth_private_delete_confirm', 'ras_auth_private_cleanup_fence'})
+RECOVERY_ROUTINES.add('ras_auth_private_cleanup_fence')
 
 
 def _identifier(name):
@@ -105,6 +108,9 @@ def provision(engine, *, runtime: str, recovery: str, definer: str):
         # Approval mirror binds the exact private tuple and new common tuple/rights (C2d-5b).
         conn.execute(text(f"GRANT SELECT ON library_items,paper_versions,source_files,access_rights TO {df}"))
         conn.execute(text(f"GRANT SELECT ON common_publications,ingestion_jobs,deletion_tombstones,revocation_metadata_retentions,audit_events TO {df}"))
+        if conn.scalar(text("SELECT to_regclass('private_item_deletions') IS NOT NULL")):
+            conn.execute(text(f"GRANT SELECT ON private_item_deletions TO {df}"))
+            conn.execute(text(f"GRANT SELECT,INSERT ON private_object_fences TO {df}"))
         conn.execute(text(f"GRANT EXECUTE ON FUNCTION ras_auth_phc_valid(text,integer) TO {df}"))
         if conn.scalar(text("SELECT to_regclass('object_delete_fences') IS NOT NULL")):
             # Only the definer routine writes fences; logins read them (SourceFile INSERT trigger runs as invoker).

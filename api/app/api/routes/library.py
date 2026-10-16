@@ -16,14 +16,16 @@ permit external processing.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from enum import StrEnum
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictBool, ConfigDict, field_validator
 from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_clock, get_db, get_principal
+from app.api.deps import get_clock, get_db, get_principal, require_trusted_origin
 from app.api.errors import ApiError
 from app.api.resource_reads import resource_json
 from app.api.resource_writes import Mutation, resource_write
@@ -38,6 +40,33 @@ from app.models import (Chunk, DiscoveryPaper, IngestionJob, LibraryItem, Metada
 from app.models.enums import AuditActorType, AuditOutcome, ContentStatus, Visibility
 
 router = APIRouter(prefix="/library", tags=["library"])
+
+
+class DeleteInput(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    confirm_delete: StrictBool = Field(json_schema_extra={'const': True})
+
+    @field_validator('confirm_delete')
+    @classmethod
+    def confirmed(cls, value):
+        if value is not True:
+            raise ValueError('explicit confirmation required')
+        return value
+
+
+class DeleteReceipt(BaseModel):
+    item_id: uuid.UUID
+    deleted: Literal[True]
+    purge_due_at: datetime
+    cleanup_status: Literal['pending','completed']
+
+
+@router.post('/items/{item_id}/delete', dependencies=[Depends(require_trusted_origin)], response_model=DeleteReceipt)
+async def delete_item(request: Request, item_id: str, body: DeleteInput,
+    principal: Principal = Depends(get_principal), clock=Depends(get_clock), settings: Settings=Depends(get_settings)) -> dict:
+    """Permanently remove the owner's entire private item; physical cleanup is asynchronous."""
+    from app.api import private_delete
+    return await private_delete.receive(request,principal,item_id,clock,settings)
 
 
 class Scope(StrEnum):

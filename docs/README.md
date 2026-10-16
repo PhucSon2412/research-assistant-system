@@ -1,5 +1,11 @@
 # Tài liệu dự án
 
+**M6d trên nhánh triển khai, source `0052`, chưa merge:** [handoff/caller/FK/lock map](m6d-private-item-delete-restore.md) · [inventory](m6d-test-inventory.json). Luồng owner delete → denial → runtime cleanup → restore denial đang kiểm; giữ C4 readiness và common độc lập. PR #61 đã merge tại `fb96354c`, chưa rerun tại merge. F07 chưa hoàn tất toàn bộ; gap ghi trong handoff/kế hoạch. Các mốc dưới giữ lịch sử.
+
+**Sau merge PR #61, 2026-10-16:** C4 đã merge `fb96354c`, tree khớp `3f07901`, source **0051**, chưa rerun tại merge. Task tiếp theo là [M6d — xóa paper riêng, cleanup và chống hồi sinh sau restore](tasks/m6d-private-item-deletion-and-restore.md), một PR trọn luồng của gói C; mới giao/chưa triển khai hoặc kiểm. C4 readiness đã được kiểm cô lập, chưa cutover dev/provider thật. Giữ [review PR #61](reviews/pr61-c4-integrated-runtime-cutover.md) và docs task chưa commit trong PR kế tiếp; các mốc OPEN bên dưới là lịch sử.
+
+**Review C4, 2026-10-16:** [PR #61 tại `3f07901` không có điểm chặn merge mới trong phạm vi đã kiểm](reviews/pr61-c4-integrated-runtime-cutover.md). Source **0051**, PR **OPEN/chưa merge**; readiness/image/HTTP/Chrome/hold đã kiểm cô lập. Report phân biệt kiểm reviewer với artifact 5.163 node/năm drill của agent. Không cutover dev hoặc bật provider/pricing thật; giữ docs review chưa commit cho PR kế tiếp.
+
 **C4 đã triển khai và kiểm cô lập (source `0051`, chờ review/chưa merge):** [Handoff/runbook C4](c4-integrated-runtime-cutover.md) ghi checkpoint, image/roles và phạm vi kiểm cô lập. Không cutover dev hoặc bật provider/pricing thật. Inventory cuối đối chiếu đủ 5.163 node API đều pass, giữ 298 debt; năm full drill và CLI evaluation đã chạy. Các mốc bên dưới giữ lịch sử theo source riêng.
 
 **Hiện hành sau merge PR #60, 2026-10-15:** B1 đã merge `44633b99`, tree khớp `c6f200e`, source **0050**, chưa rerun tại merge. Đã giao [C4 — bản chạy tích hợp, readiness và restore](tasks/m6c2b2c4-integrated-cutover.md), mới giao/chưa triển khai hoặc kiểm. Mã hiện vẫn pending; C4 kiểm operational readiness có điều kiện trên project cô lập, không cutover dev hoặc mở provider thật. [Review B1](reviews/pr60-pre-c4-auth-receipts-regression.md) giữ chứng cứ/giới hạn trước merge; các mốc OPEN bên dưới là lịch sử.

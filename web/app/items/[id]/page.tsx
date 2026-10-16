@@ -12,6 +12,8 @@ import { sourceKindLabel } from "../../../lib/search";
 import { ReviewRequests } from "../../components/review-request";
 import { ErrorText, Shell, useSession } from "../../components/session";
 import type { Item } from "../../page";
+import { DeletePrivate } from "../../components/private-delete";
+import { deletionStatus, type DeletionReceipt } from "../../../lib/private-delete";
 
 type Version = {
   id: string;
@@ -68,6 +70,7 @@ export default function ItemPage() {
   const [item, setItem] = useState<(Detail & { files: FileInfo[]; jobs: JobInfo[] }) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [deletion, setDeletion] = useState<DeletionReceipt | null>(null);
   const [question, setQuestion] = useState("");
   const [mode, setMode] = useState<"keyword" | "hybrid">("keyword");
   const [ragScope, setRagScope] = useState("item");
@@ -82,7 +85,11 @@ export default function ItemPage() {
   const readsDerived = ownPrivate || (item?.visibility === "common" && item.fulltext_search_available);
 
   useEffect(() => {
-    if (!user) return;
+    setDeletion(null); setItem(null); setError(null); setRag(null); setReferences(null);
+  }, [id]);
+
+  useEffect(() => {
+    if (!user || deletion) return;
     let active = true;
     const refresh = () => api<{ item: Detail & { files: FileInfo[]; jobs: JobInfo[] } }>(`/library/items/${encodeURIComponent(id)}`)
       .then((d) => { if (active) setItem(d.item); })
@@ -90,7 +97,7 @@ export default function ItemPage() {
     void refresh();
     const timer = setInterval(() => { void refresh(); }, 5000);
     return () => { active = false; clearInterval(timer); };
-  }, [user, id]);
+  }, [user, id, deletion]);
 
   useEffect(() => {
     if (!user) return;
@@ -147,6 +154,10 @@ export default function ItemPage() {
         <Link href="/">← Thư viện</Link>
       </p>
       <ErrorText message={error} />
+      {deletion && <p role="status">{deletionStatus(deletion)}</p>}
+      {ownPrivate && !deletion && <DeletePrivate itemId={id} onDeleted={(receipt) => {
+        setDeletion(receipt); setItem(null); setRag(null); setReferences(null); setError(null);
+      }} />}
       {item && (
         <>
           <h1>{item.title ?? "(chưa có tiêu đề)"}</h1>

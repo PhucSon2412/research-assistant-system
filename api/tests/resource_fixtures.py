@@ -72,14 +72,14 @@ BODY = b"Synthetic identical file bytes for two independent owners."
 SHA = hashlib.sha256(BODY).hexdigest()
 
 
-def source(w, owner, marker, *, data=BODY):
+def source(w, owner, marker, *, data=BODY, storage_key=None):
     with Session(w.engine, expire_on_commit=False) as db:
         item = LibraryItem(visibility="private", owner_user_id=owner, title=marker)
         db.add(item); db.flush()
         version = PaperVersion(item_id=item.id, version_label="v1", coverage="partial")
         db.add(version); db.flush()
         file = SourceFile(item_id=item.id, version_id=version.id, verified_mime="text/markdown",
-                          storage_key=f"synthetic/{item.id}", byte_size=len(data),
+                          storage_key=storage_key or f"synthetic/{item.id}", byte_size=len(data),
                           checksum_sha256=hashlib.sha256(data).hexdigest())
         db.add(file); db.flush()
         item.active_version_id = version.id

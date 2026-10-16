@@ -52,3 +52,4 @@ __all__ = [
 ]
 
 from app.models.auth_safety import AuthChangeReceipt, AuthSafetyHead, AuthSafetyState, AuthHashPolicy, AuthRecoveryCase, AuthRecoveryOperator, AuthOperationalState
+from app.models.private_deletion import PrivateItemDeletion, PrivateObjectFence

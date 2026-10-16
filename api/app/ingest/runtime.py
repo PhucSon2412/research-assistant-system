@@ -35,7 +35,7 @@ def require_runtime(db):
               OR EXISTS (SELECT 1 FROM unnest(ARRAY['users','invitations','bootstrap_state','sessions',
                  'password_reset_tokens','auth_change_receipts','auth_safety_heads','auth_safety_state',
                  'auth_hash_policies','revocation_journal_records','object_delete_fences',
-                 'orphan_object_fences','orphan_object_completions','recovery_registrations',
+                 'orphan_object_fences','orphan_object_completions','private_object_fences','recovery_registrations',
                  'auth_operational_state','auth_recovery_operators','auth_recovery_cases']) AS t(name)
                  WHERE (to_regclass(t.name) IS NULL AND to_regclass('auth_operational_state') IS NOT NULL)
                    OR COALESCE(has_table_privilege(to_regclass(t.name),'INSERT,UPDATE,DELETE,TRUNCATE,TRIGGER'),false)
@@ -47,6 +47,18 @@ def require_runtime(db):
               OR COALESCE(has_table_privilege(to_regclass('auth_operational_state'),'INSERT,UPDATE,DELETE,TRUNCATE,TRIGGER'),false)
               OR NOT has_function_privilege('ras_auth_status_live(uuid)','EXECUTE')
               OR NOT has_function_privilege('ras_auth_session_create(uuid,uuid,uuid,text,text,timestamp with time zone,timestamp with time zone)','EXECUTE')
+              OR (to_regclass('private_item_deletions') IS NOT NULL AND (
+                 NOT COALESCE(has_function_privilege(to_regprocedure('ras_auth_private_delete_mirror(text[])'),'EXECUTE'),false)
+                 OR NOT COALESCE(has_function_privilege(to_regprocedure('ras_auth_private_delete_confirm(text[])'),'EXECUTE'),false)
+                 OR NOT COALESCE(has_function_privilege(to_regprocedure('ras_auth_private_cleanup_fence(uuid,text)'),'EXECUTE'),false)
+                 OR EXISTS(SELECT 1 FROM pg_proc p JOIN pg_roles d ON d.oid=p.proowner
+                   WHERE p.proname IN ('ras_auth_private_delete_mirror','ras_auth_private_delete_confirm','ras_auth_private_cleanup_fence')
+                    AND (NOT p.prosecdef OR d.rolcanlogin OR d.rolsuper
+                     OR p.proowner<>(SELECT proowner FROM pg_proc WHERE oid=
+                      'ras_auth_session_create(uuid,uuid,uuid,text,text,timestamptz,timestamptz)'::regprocedure)
+                     OR NOT COALESCE(p.proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp'],false)
+                     OR EXISTS(SELECT 1 FROM aclexplode(COALESCE(p.proacl,acldefault('f',p.proowner))) a
+                        WHERE a.grantee=0 AND a.privilege_type='EXECUTE')))))
               OR NOT has_table_privilege('ingestion_jobs','UPDATE')
               OR EXISTS (SELECT 1 FROM unnest(ARRAY['embedding_calls','embedding_budget_days',
                  'embedding_user_budget_days','index_generations','index_entries']) AS t(name)

@@ -1,5 +1,11 @@
 # Kế hoạch hoàn thành MVP
 
+**M6d trên nhánh triển khai, 2026-10-16:** source `0052`, base PR #61 `fb96354c`; chưa merge, kiểm đang thực hiện. [Handoff](m6d-private-item-delete-restore.md) và [inventory](m6d-test-inventory.json) giữ luồng owner delete/cleanup/restore, caller/FK/lock map và chứng cứ riêng. C4 readiness giữ thật. F07 còn gap: cảnh báo hiện không xét bản đã ready/indexed, chưa reuse derivatives/canonical version graph hoặc nhận diện paper khác bytes; hồi quy retry không khép toàn F07. Gói D/E chưa mở, không cutover dev/provider thật.
+
+**Sau merge C4, 2026-10-16:** PR #61 đã merge `fb96354c`, tree khớp `3f07901`, source **0051**, chưa rerun tại merge. Gói B hoàn tất trong phạm vi code/kiểm cô lập; [review](reviews/pr61-c4-integrated-runtime-cutover.md) giữ giới hạn production. Giao [M6d — owner delete → cleanup → restore denial](tasks/m6d-private-item-deletion-and-restore.md) thành một PR của gói C, mới giao/chưa triển khai hoặc kiểm. Giữ common độc lập và hồi quy duplicate/retry; gap F07 còn thiếu phải báo riêng, không gọi cảnh báo duplicate là nghiệm thu xong. Gói D/E và cutover thật chưa mở.
+
+**Review C4, 2026-10-16:** PR #61 tại `3f07901`, source **0051**, không có điểm chặn merge mới trong scope C4 đã kiểm; [report độc lập](reviews/pr61-c4-integrated-runtime-cutover.md). Readiness có hậu điều kiện, image/roles và business HTTP/Chrome/hold đã kiểm cô lập; artifact agent giữ đủ 5.163 node cùng năm full drill. PR còn **OPEN/chưa merge**. Chưa cutover dev hoặc mở pricing/provider thật; các gói xóa/restore còn thiếu và vận hành/provider/nghiệm thu tiếp tục theo kế hoạch, không coi C4 là hoàn tất production. Các mốc pending trước C4 bên dưới giữ lịch sử.
+
 **C4 đã triển khai và kiểm cô lập (source `0051`, chờ review/chưa merge):** [Handoff/runbook C4](c4-integrated-runtime-cutover.md) ghi checkpoint, image/roles và phạm vi kiểm cô lập. Không cutover dev hoặc bật provider/pricing thật. Inventory cuối đối chiếu đủ 5.163 node API đều pass, giữ 298 debt; năm full drill và CLI evaluation đã chạy. Các mốc bên dưới giữ lịch sử theo source riêng.
 
 **Sau merge B1, 2026-10-15:** PR #60 đã merge `44633b99`, tree khớp `c6f200e`, source **0050**; chưa rerun tại merge. Giao [một PR C4 tích hợp](tasks/m6c2b2c4-integrated-cutover.md), mới giao/chưa triển khai hoặc kiểm: operational readiness có hậu điều kiện, cùng image/roles, HTTP/browser không seam, năm full drill và CLI evaluation. Mã hiện vẫn pending, dev/provider thật chưa được mở. Giữ forecast/checklist tới khi có chứng cứ C4; các mốc review dưới đây là lịch sử.
@@ -30,8 +36,8 @@ Ngày chốt **2026-10-11**. Chủ dự án giao orchestrator chọn phạm vi v
 
 ## Trạng thái hiện tại
 
-- PR #60 đã merge tại `44633b99f8407c5b15a8afb967afcd3c4d135018`; head review `c6f200e` là ancestor, tree khớp. Source migration **0050**; không suy revision DB dev hoặc cộng pass mới tại merge.
-- C4 source `0051` đã hoàn tất code/kiểm cô lập và chờ review: operational readiness có hậu điều kiện, image/roles đồng bộ, HTTP/browser/năm full restore drill/CLI evaluation đã thực chạy. DB chưa đủ hậu điều kiện vẫn 503; chưa cutover dev hoặc mở provider/pricing thật.
+- PR #61 đã merge tại `fb96354c4f8dc8fb8f4f8a54f1516d9d2e13625e`; head review `3f07901` là ancestor, tree khớp. Source migration **0051**; không suy revision DB dev hoặc cộng pass mới tại merge.
+- C4 đã hoàn tất code/review/kiểm cô lập: operational readiness có hậu điều kiện, image/roles đồng bộ, HTTP/browser/năm full restore drill/CLI evaluation đã thực chạy. DB chưa đủ hậu điều kiện vẫn 503; chưa cutover dev hoặc mở provider/pricing thật. M6d của gói C mới được giao.
 - Citation reconcile và [discovery harvesting](c2d5f2-discovery-runtime.md) đã chuyển runtime. [Review PR #56](reviews/pr56-c2d5f2-discovery-runtime.md) giữ kết quả trước merge; chưa rerun tại merge. Docs orchestrator bị sót đã được đưa vào commit của PR #57.
 - [C2d-6 search/query embedding/rerank](c2d6-search-query-rerank-runtime.md) đã merge; [review độc lập](reviews/pr57-c2d6-search-query-rerank-runtime.md) giữ chứng cứ trước merge, chưa rerun tại merge. Không suy kết quả này thành RAG runtime hoặc cutover.
 - [C2d-7 RAG/generation runtime](c2d7-rag-generation-runtime.md) đã merge PR #58, source **0048**; [review độc lập](reviews/pr58-c2d7-rag-generation-runtime.md) và [inventory](c2d7-test-inventory.json) giữ chứng cứ trước merge, chưa rerun tại merge. Gói A hoàn tất chuyển runtime trong scope đã review, chưa cutover/nghiệm thu end-to-end. C3 đã merge PR #59; tiếp B1 hồi quy/debt và tích hợp C4. Private deletion/restore, provider thật và vận hành triển khai cần nghiệm thu riêng. Giữ và đưa docs review/task mới chưa commit vào PR kế tiếp.
@@ -45,8 +51,8 @@ Ngày chốt **2026-10-11**. Chủ dự án giao orchestrator chọn phạm vi v
 | Gói | Phạm vi và đầu ra | Ước lượng | Trạng thái |
 | --- | --- | --- | --- |
 | A — hoàn tất runtime | Search + query embedding + rerank; RAG + generation. Giữ quyền trước retrieval/provider và kế toán hiện hành | Đã merge | PR #57/#58 đã merge; chưa cutover/nghiệm thu end-to-end |
-| B — recovery và bản chạy đầy đủ | C3 CLI operator tối thiểu; xử lý debt hồi quy; C4 Compose/image/role/journal, readiness thật, HTTP/browser không patch pending, hai vòng restore/recover | Chờ review | C3/B1 đã merge PR #59/#60; C4 hoàn tất code/kiểm cô lập, chờ review/merge theo handoff |
-| C — đóng yêu cầu sản phẩm còn thiếu | Xóa item private + chống xuất hiện lại sau restore; nghiệm thu duplicate/retry hiện hành, chỉ bổ sung chỗ thiếu để luồng dùng được | 2–4 ngày | Chưa giao |
+| B — recovery và bản chạy đầy đủ | C3 CLI operator tối thiểu; xử lý debt hồi quy; C4 Compose/image/role/journal, readiness thật, HTTP/browser không patch pending, hai vòng restore/recover | Đã merge | C3/B1/C4 đã merge PR #59–#61; nghiệm thu cô lập, chưa cutover thật |
+| C — đóng yêu cầu sản phẩm còn thiếu | Xóa item private + chống xuất hiện lại sau restore; nghiệm thu duplicate/retry hiện hành, chỉ bổ sung chỗ thiếu để luồng dùng được | 2–4 ngày | M6d đã giao trọn luồng xóa/cleanup/restore; duplicate/retry hồi quy và ghi gap F07, chưa triển khai/kiểm |
 | D — provider và chất lượng | Smoke tổng hợp có trần chi phí, đối soát charge, routing/retention; sau đó thử paper được phép xử lý, người đọc kiểm câu trả lời/citation/abstention | 2–4 ngày | Chưa giao; chưa mở trả phí |
 | E — triển khai nhóm thử | HTTPS/cookie Secure, kênh invite/reset dùng được, rate limit, CI, journal độc lập, backup/retention/alert tối thiểu và nghiệm thu browser | 3–5 ngày | Chưa giao |
 

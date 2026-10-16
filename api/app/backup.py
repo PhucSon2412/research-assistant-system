@@ -67,7 +67,8 @@ JOURNAL_SQL = """SELECT r.journal_id::text, r.genesis_hash, (SELECT count(*) FRO
                  WHERE r.id = 1"""
 FILES_SQL = """SELECT f.storage_key, f.byte_size, f.checksum_sha256 FROM source_files f
                JOIN library_items i ON i.id = f.item_id
-               WHERE i.publication_state IS DISTINCT FROM 'revoked'"""
+               WHERE i.publication_state IS DISTINCT FROM 'revoked'
+                 AND (to_jsonb(i)->>'deleted_at') IS NULL"""
 
 
 def journal_at_backup(row) -> dict | None:
