@@ -494,3 +494,39 @@ def test_journal_parser_rejects_incomplete_or_ambiguous_private_manifest(mutatio
     elif mutation=='foreign_key':body['manifest']['files'][0]['storage_key']='private/title-containing-key'
     else:body['purge_due_at']='2026-10-15T00:00:00+00:00'
     with pytest.raises(journal.JournalError):journal.make_record(2,journal.PRIVATE_DELETION,body,journal.ZERO_HASH)
+
+
+@pytest.mark.parametrize('mode',['none','prefix','full_fault','success'])
+def test_final_session_expiry_after_every_append_result_rolls_back_then_replay_only_restricts(deletion,monkeypatch,mode):
+    b=deletion;opened(b);original=journal.append
+    def append(path,state,records):
+        if mode!='none':original(path,state,records[:1] if mode=='prefix' else records)
+        b.at+=get_settings().auth.session_idle+timedelta(seconds=1)
+        if mode!='success':raise OSError('injected append/fsync fault after session expiry')
+    monkeypatch.setattr(journal,'append',append)
+    outcome=boundary.Outcome()
+    with pytest.raises(ApiError) as error:direct(b,outcome)
+    assert error.value.status_code==503 and error.value.code=='deletion_pending_recovery'
+    assert outcome.append_started and not outcome.commit_started and outcome.rollback_confirmed
+    assert scalar(b,'SELECT deleted_at FROM library_items WHERE id=:i',i=b.own.item) is None
+    assert scalar(b,'SELECT count(*) FROM private_item_deletions')==0
+    assert scalar(b,"SELECT status FROM review_requests WHERE id=:r",r=b.rid)=='open'
+    monkeypatch.setattr(journal,'append',original)
+    assert recovery.recover(b.w.engine,b.storage,get_settings(),b.clock()).safety_ready
+    assert (scalar(b,'SELECT deleted_at IS NOT NULL FROM library_items WHERE id=:i',i=b.own.item))==(mode in ('full_fault','success'))
+    assert scalar(b,"SELECT status FROM review_requests WHERE id=:r",r=b.rid)==('open' if mode=='none' else 'closed_by_recovery')
+
+
+def test_response_session_expiry_after_known_commit_is_unknown_to_client_without_resend(deletion,monkeypatch):
+    b=deletion;original=boundary.respond
+    def respond(*args,**kwargs):
+        b.at+=get_settings().auth.session_idle+timedelta(seconds=1)
+        return original(*args,**kwargs)
+    monkeypatch.setattr(boundary,'respond',respond)
+    outcome=boundary.Outcome()
+    with pytest.raises(ApiError) as error:direct(b,outcome)
+    assert error.value.status_code==503 and error.value.code=='deletion_response_unavailable'
+    assert outcome.committed
+    assert scalar(b,'SELECT deleted_at IS NOT NULL FROM library_items WHERE id=:i',i=b.own.item)
+    assert scalar(b,'SELECT count(*) FROM private_item_deletions')==1
+    assert recovery.evaluate(get_settings(),b.w.runtime).open

@@ -178,8 +178,11 @@ def accept(principal,raw_id,csrf,clock,settings,stopped,outcome):
                 outcome.written=True
                 db.execute(text('SELECT ras_auth_private_delete_confirm(:lines)'),{'lines':lines})
                 _gate(db,settings)
-                _binding(db,decision,closed)
-                _current(db,principal,csrf,clock,settings)
+            # Every append result, including fsync failure, gets a fresh final
+            # binding/caller/clock proof. A failed proof rolls back DB state; any
+            # journal prefix can only replay restrictions during recovery.
+            _binding(db,decision,closed)
+            _current(db,principal,csrf,clock,settings)
         outcome.commit_started=True
         db.commit()
         outcome.committed=True
@@ -194,6 +197,8 @@ def accept(principal,raw_id,csrf,clock,settings,stopped,outcome):
     if outcome.committed and not outcome.written:
         raise ApiError(503,'deletion_journal_unavailable') from None
     if isinstance(failure,ApiError):
+        if outcome.append_started:
+            raise ApiError(503,'deletion_pending_recovery') from None
         raise failure
     if failure is not None and not isinstance(failure,Exception):
         raise failure
@@ -223,8 +228,6 @@ def respond(principal,item_id,csrf,clock,settings,outcome):
         failure=exc
     finally:
         common_revoke._release(db,response)
-    if isinstance(failure,ApiError):
-        raise failure
     if failure is not None or response.teardown_failed:
         raise ApiError(503,'deletion_response_unavailable') from None
     return result

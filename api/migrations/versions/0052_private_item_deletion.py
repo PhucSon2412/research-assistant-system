@@ -9,12 +9,31 @@ branch_labels = None
 depends_on = None
 
 
+def _rewrite_function(signature, replacements):
+    # PostgreSQL evaluates the existing definition in both online migrations and
+    # exported offline SQL. Preserve every prior check and function property.
+    def literal(value):
+        return "'" + value.replace("'", "''") + "'"
+    assignments=[]
+    for replacement in replacements:
+        old,new,*limit=replacement
+        # These migrations use either all occurrences or the first BEGIN only.
+        if limit and limit != [1]:
+            raise ValueError('unsupported rewrite limit')
+        if limit:
+            assignments.append('definition := overlay(definition placing '+literal(new)
+                +' from strpos(definition, '+literal(old)+') for '+str(len(old))+');')
+        else:
+            assignments.append('definition := replace(definition, '+literal(old)+', '+literal(new)+');')
+    op.execute('DO $m6d_migration$ DECLARE definition text; BEGIN '
+        'SELECT pg_get_functiondef('+literal(signature)+'::regprocedure) INTO STRICT definition; '
+        + ' '.join(assignments) + ' EXECUTE definition; END $m6d_migration$;')
+
+
 def upgrade():
     op.execute(Path(__file__).with_suffix('.sql').read_text(encoding='utf-8'))
-    conn = op.get_bind()
-    # Preserve every existing check. Extend only the explicit scrub exception.
-    source = conn.scalar(text("SELECT pg_get_functiondef('ras_source_files_immutable()'::regprocedure)"))
-    source = source.replace('BEGIN', """BEGIN
+    source=[]
+    source.append(('BEGIN', """BEGIN
       -- M6d source scrub begin
       IF EXISTS(SELECT 1 FROM library_items WHERE id=OLD.item_id AND deleted_at IS NOT NULL) THEN
        IF (to_jsonb(NEW)-ARRAY['original_filename','file_source']) IS NOT DISTINCT FROM
@@ -25,14 +44,13 @@ def upgrade():
        RAISE EXCEPTION 'deleted file only permits scrub' USING ERRCODE='check_violation';
       END IF;
       -- M6d source scrub end
-    """,1)
-    source = source.replace("publication_state = 'revoked'", "(publication_state = 'revoked' OR deleted_at IS NOT NULL)")
-    source = source.replace('OR NEW.file_source IS DISTINCT FROM OLD.file_source',
-        "OR (NEW.file_source IS DISTINCT FROM OLD.file_source AND NOT (NEW.file_source IS NULL AND "
-        "EXISTS(SELECT 1 FROM library_items WHERE id=OLD.item_id AND deleted_at IS NOT NULL)))")
-    op.execute(source)
-    review = conn.scalar(text("SELECT pg_get_functiondef('ras_review_requests_transition()'::regprocedure)"))
-    review = review.replace('BEGIN', """BEGIN
+    """, 1))
+    source.append(("publication_state = 'revoked'", "(publication_state = 'revoked' OR deleted_at IS NOT NULL)"))
+    source.append(('OR NEW.file_source IS DISTINCT FROM OLD.file_source', "OR (NEW.file_source IS DISTINCT FROM OLD.file_source AND NOT (NEW.file_source IS NULL AND "
+        "EXISTS(SELECT 1 FROM library_items WHERE id=OLD.item_id AND deleted_at IS NOT NULL)))"))
+    _rewrite_function('ras_source_files_immutable()', source)
+    review=[]
+    review.append(('BEGIN', """BEGIN
       -- M6d review scrub begin
       IF EXISTS(SELECT 1 FROM library_items WHERE id=OLD.item_id AND deleted_at IS NOT NULL)
        AND NEW.declared_source IS NULL AND NEW.declared_rights IS NULL
@@ -42,19 +60,18 @@ def upgrade():
         (to_jsonb(OLD)-ARRAY['declared_source','declared_rights','declared_source_url','declared_license_url','rejection_note'])
        THEN RETURN NEW; END IF;
       -- M6d review scrub end
-    """, 1)
-    op.execute(review)
+    """, 1))
+    _rewrite_function('ras_review_requests_transition()', review)
     op.execute('ALTER TABLE review_requests ALTER COLUMN declared_source DROP NOT NULL; '
                'ALTER TABLE review_requests ALTER COLUMN declared_rights DROP NOT NULL; '
                'ALTER TABLE upload_intents ALTER COLUMN filename DROP NOT NULL')
-    # Confirm-only guard includes the new binding column; it cannot be repointed while confirming.
-    guard = conn.scalar(text("SELECT pg_get_functiondef('ras_revocation_journal_records_confirm_only()'::regprocedure)"))
-    guard = guard.replace('NEW.seq,', 'NEW.private_deletion_id, NEW.seq,').replace('OLD.seq,', 'OLD.private_deletion_id, OLD.seq,')
-    op.execute(guard)
-    common_fence = conn.scalar(text("SELECT pg_get_functiondef('ras_auth_cleanup_fence(uuid,uuid,uuid,text,bigint)'::regprocedure)"))
-    common_fence = common_fence.replace("li.publication_state IS DISTINCT FROM 'revoked'",
-        "(li.publication_state IS DISTINCT FROM 'revoked' AND li.deleted_at IS NULL)")
-    op.execute(common_fence)
+    guard=[]
+    guard.append(('NEW.seq,', 'NEW.private_deletion_id, NEW.seq,'))
+    guard.append(('OLD.seq,', 'OLD.private_deletion_id, OLD.seq,'))
+    _rewrite_function('ras_revocation_journal_records_confirm_only()', guard)
+    common_fence=[]
+    common_fence.append(("li.publication_state IS DISTINCT FROM 'revoked'", "(li.publication_state IS DISTINCT FROM 'revoked' AND li.deleted_at IS NULL)"))
+    _rewrite_function('ras_auth_cleanup_fence(uuid,uuid,uuid,text,bigint)', common_fence)
 
 
 def downgrade():

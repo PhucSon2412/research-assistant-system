@@ -87,7 +87,8 @@ def main():
     if a.phase=='prepare':
         admin,user,other=(login(k) for k in ('admin','a','b'))
         data=('# M6d synthetic method '+str(time.time_ns())+'\n\n## Methods\nSynthetic method measures nine units.\n').encode()
-        ids,same,unknown=(upload(out,data) for out in (user,other,user))
+        ids=upload(user,data);same=upload(other,data)
+        unknown=upload(user,data+b'\n\n## Extra\nUnknown outcome control.\n')
         for out,item in ((user,ids),(other,same),(user,unknown)):wait_index(out,item['item_id'])
         check('three real worker indexes and per-upload consent',True)
         rid=review(user,ids)
@@ -162,7 +163,7 @@ def main():
             page.goto(origin+'/items/'+t['unknown']['item_id'])
             page.get_by_label('Tôi xác nhận xóa toàn item và mọi version/file.').check()
             page.get_by_role('button',name='Xóa vĩnh viễn item riêng',exact=True).click()
-            expect(page.get_by_role('alert')).to_contain_text('Chưa xác định')
+            expect(page.locator('section[aria-label="Xóa paper riêng"]').get_by_role('alert')).to_contain_text('Chưa xác định')
             expect(page.get_by_role('button',name='Xóa vĩnh viễn item riêng',exact=True)).to_be_disabled()
             page.wait_for_timeout(5500)
             check('Chrome lost committed response remains unknown and never resends POST',len(sent)==1)
@@ -200,34 +201,59 @@ def main():
     dc['env']['RAS_JOURNAL_SOURCE']=str(dst/'current-journal').replace('\\','/')
     (dst/'stack.json').write_text(json.dumps(dc));(dst/'stack.env').write_text(''.join(f'{k}={v}\n' for k,v in dc['env'].items()))
     override=json.loads((dst/'override.json').read_text());override['services']['web']['image']=c['project']+'-web:local'
+    for service in ('db','minio'):
+        override['services'].setdefault(service,{})['depends_on']={'exposure':{'condition':'service_started'}}
     (dst/'override.json').write_text(json.dumps(override))
+    subprocess.run([sys.executable,str(REPO/'scripts/c4_stack.py'),'--context',str(dst),'fake-on'],check=True)
     shutil.copytree(Path(t['current_journal']),dst/'current-journal',dirs_exist_ok=True)
     source_journal=Path(t['current_journal'])/'revocations.jsonl';source_hash=hashlib.sha256(source_journal.read_bytes()).hexdigest()
+    sys.path.insert(0,str(REPO/'api'))
+    from app.backup import verify_artifact,restore_objects
+    from app import journal
+    from ras_backup import storage_at
+    storage=storage_at(int(dc['env']['MINIO_API_HOST_PORT']),dc['env'])
+    private_keys={f['storage_key'] for r in journal.read(source_journal).records
+        if r.kind=='private_deletion' for f in r.body['manifest']['files']}
+    from botocore.exceptions import ClientError
+    def absent(key):
+        try:storage.size(key)
+        except ClientError as error:
+            if error.response.get('Error',{}).get('Code') in ('404','NoSuchKey','NotFound'):return True
+            raise
+        return False
     for number,artifact in enumerate((t['backup_before'],t['backup_before'],t['backup_after']),1):
         restored=backup_cli(dst,'restore','--artifact',artifact,'--project',dc['project'],'--journal-dir',dst/'current-journal')
         check('restore '+str(number)+' real DB and objects remains held',restored['gate']!='open')
         if number==3:
             # Restore purged objects from the earlier artifact while retaining the
             # newer DB's purged_at: recovery must sweep them again, without reset.
-            sys.path.insert(0,str(REPO/'api'))
-            from app.backup import verify_artifact,restore_objects
-            from ras_backup import storage_at
-            from pydantic import SecretStr
             old=Path(t['backup_before']);manifest=verify_artifact(old)
-            storage=storage_at(int(dc['env']['MINIO_API_HOST_PORT']),dc['env'])
             restore_objects(storage,old,manifest)
-            check('purged originals physically restored from older object snapshot',True)
+            restored_private={o['key'] for o in manifest['objects']['entries']} & private_keys
+            check('purged originals physically restored from older object snapshot',
+                bool(restored_private) and all(not absent(k) for k in restored_private))
         compose(dst,'run','--rm','--no-deps','recovery-init','python','-m','app.cli.recovery','recover')
         compose(dst,'run','--rm','--no-deps','recovery-init','python','-m','app.cli.recovery','recover')
+        check('restore '+str(number)+' all private physical keys absent after recovery',all(absent(k) for k in private_keys))
         compose(dst,'up','-d','--no-deps','--wait','api','web')
         url='http://127.0.0.1:'+dc['env']['WEB_HOST_PORT']
-        check('restore '+str(number)+' readiness after two recover passes',httpx.get(url+'/api/readyz',timeout=120).status_code==200)
+        check('restore '+str(number)+' readiness after two recover passes',httpx.get('http://127.0.0.1:'+dc['env']['API_HOST_PORT']+'/readyz',timeout=120).status_code==200)
         for who in ('a','b','admin'):
             out=login(who,url)
             check('restore '+str(number)+' '+who+' original/source/private denied',
                 all(out.get('/api'+path).status_code==404 for path in ('/library/items/'+t['item']['item_id'],
                     '/files/'+t['item']['file_id']+'/original','/search/chunks/'+t['chunk'])))
             check('restore '+str(number)+' '+who+' common original control',out.get('/api/files/'+t['common_file']+'/original').status_code==200)
+            hits=post(out,'/search',dict(query='Synthetic method',mode='keyword',item_id=t['common']))
+            check('restore '+str(number)+' '+who+' common fulltext control',hits.status_code==200 and bool(hits.json().get('hits')))
+            denied=post(out,'/search',dict(query='Synthetic method',mode='keyword',item_id=t['item']['item_id']))
+            check('restore '+str(number)+' '+who+' deleted search denied',denied.status_code==404)
+            denied=post(out,'/rag/ask',dict(question='What does synthetic method measure?',mode='keyword',item_id=t['item']['item_id']))
+            check('restore '+str(number)+' '+who+' deleted RAG denied',denied.status_code==404)
+            if who=='b':
+                answer=post(out,'/rag/ask',dict(question='What does synthetic method measure?',mode='keyword',item_id=t['same']['item_id']))
+                check('restore '+str(number)+' B private RAG control',answer.status_code==200 and answer.json().get('status')=='answered')
+
             if who=='b':check('restore B private same bytes control',out.get('/api/files/'+t['same']['file_id']+'/original').status_code==200)
             if who=='admin':check('restore review grant still closed',out.get('/api/admin/review-requests/'+t['rid']).json()['request']['review_available'] is False)
             if who=='a':check('post-backup deleted item stays absent',out.get('/api/library/items/'+t['late']['item_id']).status_code==404)

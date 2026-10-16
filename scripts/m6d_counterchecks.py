@@ -29,6 +29,10 @@ def main():
             (b' IF EXISTS(SELECT 1 FROM source_files f LEFT JOIN library_items i ON i.id=f.item_id',
              b' IF false AND EXISTS(SELECT 1 FROM source_files f LEFT JOIN library_items i ON i.id=f.item_id')],
          tests+'test_multiversion_purge_scrubs_all_and_preserves_shared_key'),
+        ('final-fsync-authority','api/app/api/private_delete.py',[
+            (b'            _current(db,principal,csrf,clock,settings)\n        outcome.commit_started=True',
+             b'        outcome.commit_started=True')],
+         tests+'test_final_session_expiry_after_every_append_result_rolls_back_then_replay_only_restricts'),
         ('restore-purged-object','api/app/private_cleanup.py',[
             (b'if tomb.purged_at is not None and not sweep:',b'if tomb.purged_at is not None:')],
          tests+'test_restore_old_target_with_current_journal_twice'),

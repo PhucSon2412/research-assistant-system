@@ -47,3 +47,31 @@ def test_0051_upgrade_preserves_private_data_then_real_runtime_delete(empty_db_u
         assert TestClient(app).get('/readyz').status_code==200
     finally:
         runtime.dispose();owner.dispose()
+
+
+
+def test_0052_exported_offline_sql_applies_and_matches_online_guards(empty_db_url,admin_engine):
+    import io
+    from alembic import command
+    from tests.conftest import alembic_config,create_empty_database,drop_database
+    upgrade(empty_db_url,'0051')
+    output=io.StringIO()
+    command.upgrade(alembic_config(None,output),'0051:0052',sql=True)
+    exported=output.getvalue()
+    offline=make_engine(empty_db_url);online_url=create_empty_database(admin_engine)
+    online=make_engine(online_url)
+    try:
+        with offline.connect() as connection:
+            driver=connection.connection.driver_connection
+            driver.execute(exported,prepare=False)
+            driver.commit()
+        upgrade(online_url)
+        def guards(engine):
+            with engine.connect() as connection:
+                assert connection.scalar(text('SELECT version_num FROM alembic_version'))=='0052'
+                return dict(connection.execute(text("SELECT p.oid::regprocedure::text,pg_get_functiondef(p.oid) "
+                    "FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND p.proname LIKE 'ras_%'" )).all())
+        actual=guards(offline)
+        assert len(actual)>60 and actual==guards(online)
+    finally:
+        offline.dispose();online.dispose();drop_database(admin_engine,online_url)
