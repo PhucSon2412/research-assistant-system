@@ -1,6 +1,6 @@
 # Tài liệu dự án
 
-**M6d trên nhánh triển khai, source `0052`, chưa merge:** [handoff/caller/FK/lock map](m6d-private-item-delete-restore.md) · [inventory](m6d-test-inventory.json). Luồng owner delete → denial → runtime cleanup → restore denial đang kiểm; giữ C4 readiness và common độc lập. PR #61 đã merge tại `fb96354c`, chưa rerun tại merge. F07 chưa hoàn tất toàn bộ; gap ghi trong handoff/kế hoạch. Các mốc dưới giữ lịch sử.
+**M6d trên nhánh triển khai, source `0052`, chưa merge:** [handoff/caller/FK/lock map](m6d-private-item-delete-restore.md) · [inventory](m6d-test-inventory.json). Luồng owner delete → denial → runtime cleanup → restore denial đã kiểm cô lập; giữ C4 readiness và common độc lập. PR #61 đã merge tại `fb96354c`, chưa rerun tại merge. F07 chưa hoàn tất toàn bộ; gap ghi trong handoff/kế hoạch. Các mốc dưới giữ lịch sử.
 
 **Sau merge PR #61, 2026-10-16:** C4 đã merge `fb96354c`, tree khớp `3f07901`, source **0051**, chưa rerun tại merge. Task tiếp theo là [M6d — xóa paper riêng, cleanup và chống hồi sinh sau restore](tasks/m6d-private-item-deletion-and-restore.md), một PR trọn luồng của gói C; mới giao/chưa triển khai hoặc kiểm. C4 readiness đã được kiểm cô lập, chưa cutover dev/provider thật. Giữ [review PR #61](reviews/pr61-c4-integrated-runtime-cutover.md) và docs task chưa commit trong PR kế tiếp; các mốc OPEN bên dưới là lịch sử.
 

@@ -5,6 +5,60 @@ Base đã fetch/xác minh: PR #61 merged `fb96354c4f8dc8fb8f4f8a54f1516d9d2e1362
 `feat/m6d-private-item-delete-restore`; chưa merge. Chứng cứ nghiệm thu và hash ở
 [inventory](m6d-test-inventory.json). Kết quả C4 trước merge giữ nguyên nguồn, không tính là một lượt kiểm mới.
 
+## Chứng cứ kiểm cô lập
+
+Source chạy inventory cuối: `3f0695b550e9a2e08617320596be0932171fe65b`;
+migration `0052`. Image `rasc47507ea3a-api:local`,
+`sha256:465f004562ce25848e3566b4454eaaf5a7e8a5e1ba92ec9502faa513f3015013`:
+207 file app/migration/config khớp host; API/worker/beat/migrate/provision/recovery-init
+cùng image, OS user `ras`, network ứng dụng internal. Inventory API mới tại source cuối
+**5.250/5.250 ID pass**, 0 fail/error/skip/not-run; giữ đủ 5.163 ID C4 và 87 ID mới.
+441 hash source trước/sau lượt cuối khớp; node/JUnit/artifact hash trong JSON inventory.
+Lượt full bị ngắt sau 7 nhóm/1.852 ca có exit 0; chạy tiếp các file còn lại
+tại cùng source, giữ log/JUnit của cả hai lượt. Số trên hợp nhất theo ID,
+không gọi một invocation toàn xanh. Nhóm thiếu kết quả được chạy lại cả file.
+Continuation ở source cuối có failure `test_revoke_can_commit_while_http_waits`: barrier chưa vào fetcher giả trong 10 giây. Chạy lại toàn file một lần cùng source với observer chỉ đọc đạt 6/6; outcome pages/records/requests đều 1, không có checkpoint error. Không đổi timeout/gate/clock/assertion; nguyên nhân chưa xác lập. Giữ failure/exit gốc và rerun riêng; tổng trên hợp nhất theo ID.
+Lượt chính còn có một failure orphan process smoke: DELETE barrier không tới trong 60 giây, container dừng `orphan_clock_invalid` trước DELETE. Chẩn đoán toàn file một lần cùng source/guard/timeout đạt 1/1, SIGKILL exit137 rồi resume hoàn tất; observer clock chỉ đọc không ghi nhận lỗi. Nguyên nhân halt ở lượt gốc chưa xác lập; giữ riêng log container, clock, failure và rerun. Tổng hai failure của continuation không được đổi thành một invocation toàn xanh.
+
+- Web: 72 test pass, typecheck và build exit 0; bytes web không đổi sau lượt này.
+- Image default: 7 check pass, bootstrap/invitation thật, pricing chưa xác minh chặn
+  paid call, zero provider calls, readiness giữ mở sau mutation hợp lệ.
+- Image M6d: prepare 3, Chrome/delete 19, restore 70 check pass. Chrome thật
+  `155.0.8059.79` qua Next proxy; lost committed response không resend POST và không
+  có request ngoài origin. Backup dùng exported snapshot/pg_dump và checksum object.
+- Hai vòng restore snapshot trước deletion, cộng snapshot sau purge có object từ
+  artifact cũ được trả lại; mỗi vòng recover hai lần. Kiểm HEAD chứng minh mọi
+  private key vắng trước start traffic/readiness 200; A/B/Admin bị từ chối, B cùng
+  bytes và common vẫn đọc/fulltext được, B RAG trả câu trả lời có nguồn.
+- Shared key trên MinIO thật: 9 check pass. Fixture tạo hai SourceFile của hai
+  owner cùng key bằng migrator, mọi trigger bật; đây là setup kiểm, không là flow
+  upload mới. Delete/cleanup dùng API/runtime CLI/image thật. Sau xóa A, B đọc đúng
+  bytes; sau xóa tham chiếu B cuối, object vắng và writer mới bị fence. Common và
+  B độc lập vẫn đọc được.
+- Bảy countercheck bắt guard bị gỡ, khôi phục đúng bytes trước inventory: private
+  SQL ACL, late derived, known-commit release, shared key, coverage sau purge,
+  caller sau fsync lỗi và sweep object ở tombstone đã purged.
+
+Evidence tại `C:/Users/ADMIN/AppData/Local/Temp/ras-m6d-20261016`.
+Lượt `full-c129c5e` dừng ở 4.351 pass/1 fail (SQL offline); lượt `full-2ed16c4`
+dừng ở các nhóm đầu để khóa coverage. Không tính các lượt này là inventory cuối.
+Lượt `full-a7b57b0` tại application source trước đó bị gián đoạn, tiến trình không còn khi tiếp
+tục phiên; giữ riêng 5 nhóm runner đã ghi exit 0/1.403 ID pass. File review writers
+có JUnit đầy đủ nhưng chưa ghi nhận exit cũng được chạy lại cả file. Continuation
+chạy mọi file còn thiếu; 441 hash trước lượt chính và tại lúc tiếp tục khớp nhau.
+Không đổi một lượt bị ngắt thành exit 0 hoặc dùng các dòng dấu chấm làm kết quả.
+Năm ca tái hiện caller trước sửa đều fail; kiểm sửa tập trung đã pass. Assertion
+replay review được sửa theo semantics có sẵn `closed_by_recovery`; phép thử coverage
+JSON ban đầu không chứng minh guard vì cột là enum text, ca hợp lệ `complete` đã
+tái hiện fail trước sửa. Các lỗi fixture duplicate, wiring relay và URL readiness
+của harness được giữ riêng; không ghi chúng thành lỗi sản phẩm hay pass cuối.
+
+Container/volume và credential thử đã dọn theo ownership sau inventory; image
+không còn consumer của task đã gỡ. Không còn container M6d. Chi tiết cleanup và
+baseline nằm trong inventory/evidence.
+Giữ Dify theo lựa chọn của chủ dự án; không thao tác dev `ras` hoặc sửa restart
+drift có từ trước. Không prune Docker toàn máy.
+
 ## API và quyết định
 
 `POST /library/items/{item_id}/delete`, JSON duy nhất `{ "confirm_delete": true }`.
@@ -145,3 +199,20 @@ khe mạng proof → send. Provider fixture không xác minh charge/model routin
 hay semantic production. DB và journal cùng rollback vẫn ngoài khả năng phát hiện.
 Fault injection/SIGKILL không chứng minh chịu mất điện; deployment/storage/retention
 backup production và provider thật tiếp tục thuộc gói D/E.
+
+
+Continuation ở application source `a7b57b0` hoàn tất **3.837 pass/10 fail**,
+giữ riêng khỏi inventory mới: bảy ca thuộc giả định upgrade trong bốn file test
+(JSON toàn hàng có thêm `private_deletion_id`, hoặc thiếu reprovision routine mới).
+Phép thử sửa vẫn so đủ mọi cột lịch sử, buộc binding mới NULL, reprovision và
+kiểm C4 thật trước business write. Một smoke proxy khác fail trước request vì
+cổng cố định 58589 nằm trong dải Windows loại trừ 58587–58686; harness chuyển
+sang bộ chọn cổng C4, không sửa mạng hệ thống hoặc assertion. Tổng 29 ca của
+năm file đạt trước full inventory mới. Application/migration/web bytes giữ
+nguyên; chỉ năm file test đổi sau `a7b57b0`.
+Hai ca còn lại thuộc citations/discovery: một outcome `discovery_lease_lost`,
+một lượt không ghi record. Chẩn đoán hai ca cùng source/clock thật đạt nhưng
+chưa xác lập nguyên nhân; không gọi là lỗi baseline hoặc quy cho Windows.
+Lượt full mới có observer chỉ đọc clock/checkpoint/outcome ở hai file đó;
+không nới lease/gate, đổi clock hoặc thêm retry/fallback. Log/JUnit lỗi, observer
+và kết quả các lượt riêng đều giữ trong inventory.
