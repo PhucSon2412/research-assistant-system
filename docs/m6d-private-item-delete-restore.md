@@ -1,13 +1,51 @@
 # M6d — xóa toàn item private và restore
 
+## Sửa P2 của PR #62 — chờ review lại
+
+Code `a5eb8bb6aeb81814707fbe2207e147c8a6120274`, source giữ **0052**. Cleanup finalize nay khóa **tombstone → mọi
+review request theo UUID → item → derived/scrub → journal**. Acceptance/approval
+giữ review → item; review-original, approval proof và review reads cũng khóa
+review trước item. Common publication không lấy private review row lock.
+Repeat chỉ đọc tombstone hiện có bằng MVCC, không lấy row lock
+hoặc cập nhật tombstone. Các cleanup cùng tombstone vẫn dùng SKIP LOCKED. Guard
+0052 chặn thêm review sau deletion nên tập request đã khóa không mọc thêm. Không
+đổi acceptance, receipt proof, parser/SQL/grants/migration, timeout hoặc clock.
+S3 vẫn ngoài mọi connection/DB/key/journal lock; recovery vẫn quiescent.
+
+Regression trước sửa: **2 control pass / 2 failure**, cả HTTP và boundary có review
+đều ghi `40P01 DeadlockDetected`. Sau sửa, **9/9 ca mới pass**: cleanup đi trước,
+repeat đi trước, 0/1/3 review history, repeat sau purge và hai deletion đồng thời.
+Observer chỉ đọc lấy PID từ Session lifecycle, kiểm `pg_blocking_pids`, ghi SQLSTATE;
+barrier được thả trong finally. Lượt chuẩn bị observer thread-local sai được giữ
+riêng (không là chứng cứ P2). Countercheck khôi phục code cũ bắt lại `40P01`; đã
+khôi phục đúng bytes bản sửa trước lượt cuối.
+
+Lượt hồi quy source sửa: **731/731 pass**, 0 fail/error/skip; **4.528 not-run**
+trong collection 5.259. Gồm bốn file M6d, review/approval, cleanup runtime, C4
+contract, ORM/migrations và schema. Source hash trước/sau khớp. Runtime/PG/journal
+thật, operational C4 và `/readyz` thật; lock tests dùng storage fake đã khai báo.
+Không chạy lại full 5.250, web/image/Chrome/backup-restore cho sửa Python lock hẹp;
+chứng cứ trước P2 bên dưới giữ source cũ. Hai failure discovery barrier/orphan clock
+lịch sử vẫn chưa xác lập nguyên nhân, không được coi đã giải thích bởi P2 này.
+F07 và các giới hạn production/provider giữ nguyên.
+
+[Inventory P2 theo ID, source/JUnit/artifact hash](m6d-p2-lock-order-inventory.json)
+· [Review tại 7494f8c](reviews/pr62-m6d-private-item-delete-restore.md)
+· [Task sửa](tasks/fix-pr62-private-cleanup-repeat-delete-lock-order.md).
+Raw runner ghi commit `917a294`; chỉ thông điệp commit được sửa UTF-8,
+tree/code/test bytes không đổi (mapping trong inventory). Evidence:
+`C:/Users/ADMIN/AppData/Local/Temp/ras-m6d-p2-20261017`. Cleanup theo ownership, baseline và scan secret ghi trong inventory;
+Dify/dev giữ nguyên. PR #62 vẫn OPEN, chưa merge.
+
+
 Base đã fetch/xác minh: PR #61 merged `fb96354c4f8dc8fb8f4f8a54f1516d9d2e13625e`,
 `3f07901` là ancestor, tree khớp. Source `0051 → 0052`, nhánh
 `feat/m6d-private-item-delete-restore`; chưa merge. Chứng cứ nghiệm thu và hash ở
 [inventory](m6d-test-inventory.json). Kết quả C4 trước merge giữ nguyên nguồn, không tính là một lượt kiểm mới.
 
-## Chứng cứ kiểm cô lập
+## Chứng cứ kiểm cô lập trước sửa P2
 
-Source chạy inventory cuối: `3f0695b550e9a2e08617320596be0932171fe65b`;
+Source chạy full inventory trước sửa P2: `3f0695b550e9a2e08617320596be0932171fe65b`;
 migration `0052`. Image `rasc47507ea3a-api:local`,
 `sha256:465f004562ce25848e3566b4454eaaf5a7e8a5e1ba92ec9502faa513f3015013`:
 207 file app/migration/config khớp host; API/worker/beat/migrate/provision/recovery-init
@@ -130,7 +168,7 @@ sau journal.
 
 Cleanup prepare chỉ scalar + key advisory `1918989163/hashtext(key)` → journal;
 SourceFile INSERT dùng cùng key serialization và thấy cả common/orphan/private
-fence, READ COMMITTED bắt buộc. Finalize tombstone → item → derived/metadata rows →
+fence, READ COMMITTED bắt buộc. Finalize tombstone → review request UUID → item → derived/metadata rows →
 journal, không key. Pre-delete proof mới đã release sạch; HEAD/DELETE/HEAD ngoài
 mọi connection của cleanup. Recovery cũng trả connection giữ orchestration mutex
 trước private sweep; `recovery_begin` bền vẫn đóng readiness. Sau sweep, run phải

@@ -1,5 +1,9 @@
 # Kế hoạch hoàn thành MVP
 
+**M6d sửa P2 PR #62 tại `a5eb8bb` (chờ review lại, chưa merge):** cleanup theo review UUID → item, guard/C4 giữ nguyên. [Handoff](m6d-private-item-delete-restore.md) · [inventory sửa hẹp](m6d-p2-lock-order-inventory.json): 731 pass, 4.528 not-run; không thay kết quả full theo source cũ hoặc coi hai failure lịch sử đã rõ nguyên nhân. F07 và phạm vi sau M6d giữ nguyên.
+
+**Review M6d, 2026-10-17:** PR #62 tại `7494f8c`, source **0052**, còn [P2 deadlock cleanup/xóa lặp](reviews/pr62-m6d-private-item-delete-restore.md), cần [sửa cùng PR](tasks/fix-pr62-private-cleanup-repeat-delete-lock-order.md) trước merge. Gói C chưa nghiệm thu; F07 còn gap đã công bố. Giữ C4 readiness và các giới hạn D/E, không mở scope mới để sửa P2 hoặc coi 5.250 artifact pass là miễn lỗi mới.
+
 **M6d trên nhánh triển khai, 2026-10-16:** source `0052`, base PR #61 `fb96354c`; chưa merge; đã kiểm cô lập. [Handoff](m6d-private-item-delete-restore.md) và [inventory](m6d-test-inventory.json) giữ luồng owner delete/cleanup/restore, caller/FK/lock map và chứng cứ riêng. C4 readiness giữ thật. F07 còn gap: cảnh báo hiện không xét bản đã ready/indexed, chưa reuse derivatives/canonical version graph hoặc nhận diện paper khác bytes; hồi quy retry không khép toàn F07. Gói D/E chưa mở, không cutover dev/provider thật.
 
 **Sau merge C4, 2026-10-16:** PR #61 đã merge `fb96354c`, tree khớp `3f07901`, source **0051**, chưa rerun tại merge. Gói B hoàn tất trong phạm vi code/kiểm cô lập; [review](reviews/pr61-c4-integrated-runtime-cutover.md) giữ giới hạn production. Giao [M6d — owner delete → cleanup → restore denial](tasks/m6d-private-item-deletion-and-restore.md) thành một PR của gói C, mới giao/chưa triển khai hoặc kiểm. Giữ common độc lập và hồi quy duplicate/retry; gap F07 còn thiếu phải báo riêng, không gọi cảnh báo duplicate là nghiệm thu xong. Gói D/E và cutover thật chưa mở.

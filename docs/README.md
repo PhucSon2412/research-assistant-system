@@ -1,5 +1,9 @@
 # Tài liệu dự án
 
+**Sửa P2 M6d tại `a5eb8bb`, chờ review lại:** [thứ tự khóa cleanup/repeat](m6d-private-item-delete-restore.md#sửa-p2-của-pr-62--chờ-review-lại) đã sửa; [inventory P2](m6d-p2-lock-order-inventory.json) ghi 731 pass/4.528 not-run tại source mới, before/countercheck `40P01` riêng. PR #62 chưa merge, source 0052 và C4 readiness giữ nguyên. Report reviewer bên dưới là kết quả tại 7494f8c.
+
+**Review M6d, 2026-10-17:** PR #62 tại `7494f8c`, source **0052**, còn [P2 deadlock giữa cleanup và xóa lặp](reviews/pr62-m6d-private-item-delete-restore.md); [sửa hẹp trên cùng PR](tasks/fix-pr62-private-cleanup-repeat-delete-lock-order.md). Chưa merge; C4 readiness giữ thật. Kết quả reviewer, artifact agent và hai failure lịch sử giữ riêng; không cutover dev/provider thật.
+
 **M6d trên nhánh triển khai, source `0052`, chưa merge:** [handoff/caller/FK/lock map](m6d-private-item-delete-restore.md) · [inventory](m6d-test-inventory.json). Luồng owner delete → denial → runtime cleanup → restore denial đã kiểm cô lập; giữ C4 readiness và common độc lập. PR #61 đã merge tại `fb96354c`, chưa rerun tại merge. F07 chưa hoàn tất toàn bộ; gap ghi trong handoff/kế hoạch. Các mốc dưới giữ lịch sử.
 
 **Sau merge PR #61, 2026-10-16:** C4 đã merge `fb96354c`, tree khớp `3f07901`, source **0051**, chưa rerun tại merge. Task tiếp theo là [M6d — xóa paper riêng, cleanup và chống hồi sinh sau restore](tasks/m6d-private-item-deletion-and-restore.md), một PR trọn luồng của gói C; mới giao/chưa triển khai hoặc kiểm. C4 readiness đã được kiểm cô lập, chưa cutover dev/provider thật. Giữ [review PR #61](reviews/pr61-c4-integrated-runtime-cutover.md) và docs task chưa commit trong PR kế tiếp; các mốc OPEN bên dưới là lịch sử.
