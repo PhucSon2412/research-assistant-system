@@ -179,6 +179,10 @@ def one(engine,storage,settings,ident,*,operator=False,sweep=False,clock=utcnow)
         tomb=db.scalar(select(PrivateItemDeletion).where(PrivateItemDeletion.id==ident)
                         .with_for_update(skip_locked=True).execution_options(populate_existing=True))
         if tomb is None: return None
+        # Repeat deletion and approval take review -> item, including closed
+        # history. Own those rows before item so scrub cannot invert that order.
+        db.execute(select(ReviewRequest.id).where(ReviewRequest.item_id==tomb.item_id)
+                   .order_by(ReviewRequest.id).with_for_update()).all()
         db.execute(select(LibraryItem.id).where(LibraryItem.id==tomb.item_id).with_for_update()).all()
         _proof(db,ident,expected)
         for key,result in results.items():
