@@ -14,6 +14,7 @@ import { ErrorText, Shell, useSession } from "../../components/session";
 import type { Item } from "../../page";
 import { DeletePrivate } from "../../components/private-delete";
 import { deletionStatus, type DeletionReceipt } from "../../../lib/private-delete";
+import { duplicateNotice, type ExistingCopy } from "../../../lib/duplicates";
 
 type Version = {
   id: string;
@@ -26,7 +27,7 @@ type Version = {
 type Detail = Item & { versions: Version[] };
 type FileInfo = ItemFile;
 type JobInfo = { id: string; state: string; origin: string; attempt_count: number;
-  last_error_code: string | null; warnings: string[];
+  last_error_code: string | null; warnings: string[]; existing_copy?: ExistingCopy | null;
   extraction_finished_at: string | null; finished_at: string | null };
 // `original_url` is set only when the download route's own gate allows it (RAG rights never do).
 type RagCitation = { chunk_id: string; quote: string; url: string;
@@ -53,7 +54,7 @@ const stateText: Record<string, string> = {
   cancelled: "Đã hủy xử lý",
 };
 const issueText: Record<string, string> = {
-  duplicate_in_private_library: "Chỉ là cảnh báo trùng: chưa liên kết với bản khác hoặc dùng lại nội dung đã trích xuất; bản gốc vẫn được giữ.",
+  duplicate_in_private_library: "Chỉ là cảnh báo trùng: không liên kết với bản khác hoặc dùng lại nội dung đã trích xuất; bản gốc vẫn được giữ.",
   storage_unavailable: "Chưa đọc được file gốc; hệ thống sẽ thử lại.",
   checksum_mismatch: "File gốc không khớp bản đã nhận.",
   invalid_markdown: "Markdown không hợp lệ.",
@@ -196,6 +197,11 @@ export default function ItemPage() {
             {j.finished_at && ` · job kết thúc ${new Date(j.finished_at).toLocaleString("vi-VN")}`}
             {j.last_error_code && ` · lỗi: ${issueText[j.last_error_code] ?? j.last_error_code}`}
             {j.warnings.length > 0 && ` · cảnh báo: ${j.warnings.map((w) => issueText[w] ?? w).join(", ")}`}
+            {j.state === "duplicate" && j.warnings.includes("duplicate_in_private_library") && (() => {
+              const notice = duplicateNotice(j.existing_copy);
+              return <p role="note" style={{ background: "#fff7e0", padding: "0.5rem" }}>{notice.text}
+                {notice.href && <>{" "}<Link href={notice.href}>{notice.label}</Link></>}</p>;
+            })()}
           </li>)}</ul>
           <h2>File gốc</h2>
           {/* Only files the API listed after its own permission check; no list, no link. */}
