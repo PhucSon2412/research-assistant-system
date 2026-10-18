@@ -283,6 +283,7 @@ def closed_item_clause(item_id):
     """
     item, stone = aliased(LibraryItem), aliased(DeletionTombstone)
     return select(item.id).where(item.id == item_id, or_(
+        item.deleted_at.is_not(None),
         item.publication_state == PublicationState.REVOKED.value,
         select(stone.id).where(stone.item_id == item.id).exists())).exists()
 
@@ -342,11 +343,11 @@ def reconcile_arxiv_ids(db: Session, arxiv_ids: Iterable[str], now: datetime | N
         if limit is not None and len(rows) > limit:
             raise RetargetLimit()
         return rows
-    hint = {r.item_id for r in candidates() if r.visibility == "common"}
+    hint = {r.item_id for r in candidates()}
     _key_share(db, hint)
     _lock(db, exclusive=True)
     rows = candidates()
-    late = {r.item_id for r in rows if r.visibility == "common"} - hint
+    late = {r.item_id for r in rows} - hint
     if late:
         try:
             _key_share(db, late, nowait=True)
@@ -495,12 +496,12 @@ def _batch(engine: Engine, policy: CitationPolicy, after: uuid.UUID | None, fact
         def skip(code):
             skipped[code] = skipped.get(code, 0) + 1
         # 2. Common items first (UUID order, never waiting): serializes with revoke/cleanup/extraction.
-        common = {h.item_id for h in hints if h.visibility == 'common'}
+        common = {h.item_id for h in hints}
         locked = _key_share(db, common, skip=True)
         closed = set(db.scalars(select(LibraryItem.id).where(
             LibraryItem.id.in_(sorted(locked)), closed_item_clause(LibraryItem.id)))) if locked else set()
         allowed = {h.id: h.item_id for h in hints
-                   if h.visibility == 'private' or (h.item_id in locked and h.item_id not in closed)}
+                   if h.item_id in locked and h.item_id not in closed}
         for h in hints:
             if h.id not in allowed:
                 skip('skipped:busy' if h.item_id not in locked else 'skipped:revoked')

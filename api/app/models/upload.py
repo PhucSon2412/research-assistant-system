@@ -38,7 +38,7 @@ class UploadIntent(Base):
     session_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("sessions.id", ondelete="RESTRICT"))
     notice_version: Mapped[str] = mapped_column(Text)
     file_kind: Mapped[str] = mapped_column(Text)
-    filename: Mapped[str] = mapped_column(Text)
+    filename: Mapped[str | None] = mapped_column(Text)
     declared_size: Mapped[int] = mapped_column(BigInteger)
     declared_sha256: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

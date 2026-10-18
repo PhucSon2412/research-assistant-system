@@ -34,7 +34,7 @@ def main() -> int:
         return 2
     counts = cleanup_revoked(engine, storage, settings)
     print("Cleanup outcomes: " + (", ".join(f"{k}={v}" for k, v in sorted(counts.items())) or "nothing to do"))
-    return 1 if any(k.startswith("halted:") for k in counts) else 0
+    return 1 if any(k.startswith(("halted:","private:halted:")) for k in counts) else 0
 
 
 if __name__ == "__main__":

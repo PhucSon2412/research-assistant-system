@@ -68,6 +68,7 @@ def visible_items_clause(principal: Principal) -> ColumnElement[bool]:
         and_(
             LibraryItem.visibility == Visibility.PRIVATE.value,
             LibraryItem.owner_user_id == principal.user_id,
+            LibraryItem.deleted_at.is_(None),
         ),
     )
 
@@ -83,6 +84,7 @@ def m2a_private_derivatives_clause(principal: Principal) -> ColumnElement[bool]:
     return and_(
         LibraryItem.visibility == Visibility.PRIVATE.value,
         LibraryItem.owner_user_id == principal.user_id,
+        LibraryItem.deleted_at.is_(None),
     )
 
 
@@ -244,6 +246,7 @@ def review_grant_clause(principal: Principal) -> ColumnElement[bool]:
         ReviewRequest.file_checksum_sha256 == SourceFile.checksum_sha256,
         LibraryItem.visibility == Visibility.PRIVATE.value,
         LibraryItem.owner_user_id == ReviewRequest.requester_user_id,
+        LibraryItem.deleted_at.is_(None),
         LibraryItem.rights_epoch == ReviewRequest.rights_epoch_at_submit,
     )
 
@@ -279,6 +282,8 @@ def review_copy_admin_clause(principal: Principal) -> ColumnElement[bool]:
 
 
 def can_edit_item(principal: Principal, item: LibraryItem) -> bool:
+    if item.deleted_at is not None:
+        return False
     if item.visibility == Visibility.COMMON.value:
         return principal.is_admin
     return item.owner_user_id == principal.user_id

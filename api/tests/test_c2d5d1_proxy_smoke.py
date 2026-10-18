@@ -28,17 +28,17 @@ from tests.test_c2d1_final_caller import browser  # noqa: F401
 from tests.test_c2c1_bootstrap import installation  # noqa: F401
 from tests.test_c2c2_invitations import operational_world as world  # noqa: F401
 
-API_PORT, WEB_PORT = 58589, 53589
-
-
 def test_chrome_index_unticked_busy_reuse_unknown_no_repost_and_denials(indexes, tmp_path, monkeypatch):
     b = indexes
     root = Path(__file__).resolve().parents[2]
+    monkeypatch.syspath_prepend(str(root / 'scripts'))
+    from c4_isolation import free_port
+    api_port, web_port = free_port(), free_port()
     assert not list((root / 'web').glob('.env*'))
     chrome = Path(r'C:\Program Files\Google\Chrome\Application\chrome.exe')
     assert chrome.is_file()
-    api, web = f'http://127.0.0.1:{API_PORT}', f'http://127.0.0.1:{WEB_PORT}'
-    for port in (API_PORT, WEB_PORT):
+    api, web = f'http://127.0.0.1:{api_port}', f'http://127.0.0.1:{web_port}'
+    for port in (api_port, web_port):
         with socket.socket() as s:
             s.bind(('127.0.0.1', port))
     monkeypatch.setenv('RAS_HTTP__ALLOWED_ORIGINS', json.dumps(['http://web.test', web]))
@@ -56,7 +56,7 @@ def test_chrome_index_unticked_busy_reuse_unknown_no_repost_and_denials(indexes,
         return real_respond(*a)
     monkeypatch.setattr(common_index_request, 'accept', accept)
     monkeypatch.setattr(common_index_request, 'respond', respond)
-    server = uvicorn.Server(uvicorn.Config(app, host='127.0.0.1', port=API_PORT, log_level='critical', access_log=False))
+    server = uvicorn.Server(uvicorn.Config(app, host='127.0.0.1', port=api_port, log_level='critical', access_log=False))
     thread = threading.Thread(target=server.run)
     proc = None
     log = (tmp_path / 'next.log').open('w', encoding='utf-8')
@@ -79,7 +79,7 @@ def test_chrome_index_unticked_busy_reuse_unknown_no_repost_and_denials(indexes,
     try:
         wait(api + '/healthz')
         proc = subprocess.Popen(['node', str(root / 'web/node_modules/next/dist/bin/next'), 'start', str(root / 'web'),
-            '--hostname', '127.0.0.1', '--port', str(WEB_PORT)],
+            '--hostname', '127.0.0.1', '--port', str(web_port)],
             env=os.environ | {'API_INTERNAL_URL': api, 'WEB_PROXY_TIMEOUT_SECONDS': '15'},
             stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
         wait(web + '/login')

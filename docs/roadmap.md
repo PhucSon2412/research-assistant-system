@@ -1,5 +1,9 @@
 # Roadmap đề xuất
 
+**M6d trên nhánh triển khai (2026-10-16):** source `0052`, owner delete/cleanup/restore đã kiểm cô lập trong một PR; chưa merge. [Handoff](m6d-private-item-delete-restore.md) và [inventory](m6d-test-inventory.json) giữ bằng chứng theo source. C4 readiness giữ thật; F07 còn gap cảnh báo/reuse, chưa gọi toàn gói C hoàn tất. Dev, provider/pricing thật và gói D/E chưa mở.
+
+**Sau merge PR #61, 2026-10-16:** C4 đã merge `fb96354c`, source **0051**, tree khớp bản review `3f07901`; chưa rerun tại merge. Gói tiếp theo là [M6d — xóa paper riêng, cleanup và restore](tasks/m6d-private-item-deletion-and-restore.md), một PR trọn luồng thuộc gói C; mới giao/chưa triển khai hoặc kiểm. C4 readiness có điều kiện đã kiểm cô lập, không cutover dev/provider thật. Duplicate/retry hồi quy và gap F07 giữ riêng; không mở thêm graph/streaming hoặc chia từng endpoint. Các trạng thái OPEN/pending bên dưới giữ lịch sử.
+
 **C4 đã triển khai và kiểm cô lập (source `0051`, chờ review/chưa merge):** [Handoff/runbook C4](c4-integrated-runtime-cutover.md) ghi checkpoint, image/roles và phạm vi kiểm cô lập. Không cutover dev hoặc bật provider/pricing thật. Inventory cuối đối chiếu đủ 5.163 node API đều pass, giữ 298 debt; năm full drill và CLI evaluation đã chạy. Các mốc bên dưới giữ lịch sử theo source riêng.
 
 **Hiện hành sau merge PR #60 (2026-10-15):** B1 đã merge `44633b99`, tree khớp `c6f200e`, source **0050**; chưa rerun tại merge. [Handoff](pre-c4-auth-receipts-regression.md) · [review](reviews/pr60-pre-c4-auth-receipts-regression.md). Đã giao [một PR C4 tích hợp](tasks/m6c2b2c4-integrated-cutover.md), mới giao/chưa triển khai hoặc kiểm: image/roles, operational readiness có hậu điều kiện, HTTP/browser không seam, năm full drill và CLI evaluation. Mã hiện vẫn pending, không cutover dev/provider thật. Giữ forecast/checklist MVP; các mốc dưới đây là lịch sử.

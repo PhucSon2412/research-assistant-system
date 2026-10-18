@@ -75,9 +75,10 @@ AUTH_REASONS = {"credential": {"bootstrap", "invitation_accept", "password_reset
                 "active": {"bootstrap", "invitation_accept", "verified_initial_status", "admin_enable"},
                 "disabled": {"admin_disable", "legacy_disabled"}}
 OPERATOR_RECOVERY_CASE = "operator_recovery_case"
+PRIVATE_DELETION = 'private_deletion'
 CASE_ACTIONS = ("set_credential", "resolve_initial_status")
 KINDS = (*AUTH_KINDS, GENESIS, REVOCATION, RECOVERY_BEGIN, RECOVERY_END, REVIEW_CLOSURE, SESSION_REVOCATION, RESET_TOKEN_CLOSURE, INVITATION_CLOSURE,
-         OPERATOR_RECOVERY_CASE)
+         OPERATOR_RECOVERY_CASE, PRIVATE_DELETION)
 GENESIS_MODES = ("new_install", "existing_db", "rebuilt_from_db")
 REVOCATION_FIELDS = ("id", "target_kind", "item_id", "version_id", "source_file_id", "storage_key",
                      "access_rights_id", "reason_code", "prior_publication_state", "rights_epoch", "recorded_at",
@@ -98,6 +99,7 @@ BODY_FIELDS = {
     INVITATION_CLOSURE: frozenset({"invitation_id", "end_kind", "reason_code", "ended_at"}),
     RESET_TOKEN_CLOSURE: frozenset({"token_id", "user_id", "end_kind", "reason_code", "ended_at"}),
     OPERATOR_RECOVERY_CASE: frozenset({"case_id", "operator_id", "user_id", "action", "operation_id", "recorded_at"}),
+    PRIVATE_DELETION: frozenset({'id','item_id','owner_user_id','rights_epoch','deleted_at','purge_due_at','manifest'}),
 }
 _STAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})")
 _KEY = re.compile(r"originals/[0-9a-f]{32}")
@@ -207,7 +209,43 @@ def _check_body(kind: str, body) -> None:
     if kind not in KINDS or not isinstance(body, dict) or set(body) != BODY_FIELDS[kind]:
         raise JournalError("journal_corrupt")
     try:
-        if kind in AUTH_KINDS:
+        if kind == PRIVATE_DELETION:
+            for key in ('id','item_id','owner_user_id'):
+                _uuid(body[key])
+            _count(body['rights_epoch'])
+            if body['rights_epoch'] < 1:
+                raise ValueError('epoch')
+            for key in ('deleted_at','purge_due_at'):
+                _time(body[key])
+            if datetime.fromisoformat(body['purge_due_at']) < datetime.fromisoformat(body['deleted_at']):
+                raise ValueError('deadline')
+            manifest = body['manifest']
+            if not isinstance(manifest, dict) or set(manifest) != {'versions','files'}:
+                raise ValueError('manifest')
+            versions, files = manifest['versions'], manifest['files']
+            if not isinstance(versions,list) or not isinstance(files,list) or max(len(versions),len(files))>128:
+                raise ValueError('bound')
+            for version in versions:
+                _uuid(version)
+            if versions != sorted(set(versions)):
+                raise ValueError('version_order')
+            ids = []
+            for file in files:
+                if not isinstance(file,dict) or set(file) != {'id','version_id','job_id','storage_key','checksum_sha256'}:
+                    raise ValueError('file')
+                _uuid(file['id']); _uuid(file['version_id'],nullable=True); _uuid(file['job_id'],nullable=True)
+                if file['version_id'] is not None and file['version_id'] not in versions:
+                    raise ValueError('file_version')
+                if file['version_id'] is None and file['job_id'] is None:
+                    raise ValueError('file_owner')
+                if not isinstance(file['storage_key'],str) or not _KEY.fullmatch(file['storage_key']):
+                    raise ValueError('key')
+                if not isinstance(file['checksum_sha256'],str) or not _HASH.fullmatch(file['checksum_sha256']):
+                    raise ValueError('checksum')
+                ids.append(file['id'])
+            if ids != sorted(set(ids)):
+                raise ValueError('file_order')
+        elif kind in AUTH_KINDS:
             for key in ("user_id", "operation_id", "generation"):
                 _uuid(body[key])
             for key in ("operation_id", "generation"):
@@ -345,6 +383,7 @@ def parse(data: bytes) -> JournalState:
     open_recovery = None
     auth_ids = set()
     case_ids = set()
+    deleted_items, deletion_ids = set(), set()
     for number, raw in enumerate(parts, start=1):
         if len(raw) + 1 > MAX_LINE_BYTES:
             raise JournalError("journal_corrupt")
@@ -369,6 +408,10 @@ def parse(data: bytes) -> JournalState:
             if record.body["case_id"] in case_ids:
                 raise JournalError("operator_case_reused")
             case_ids.add(record.body["case_id"])
+        if record.kind == PRIVATE_DELETION:
+            if record.body['item_id'] in deleted_items or record.body['id'] in deletion_ids:
+                raise JournalError('private_deletion_reused')
+            deleted_items.add(record.body['item_id']); deletion_ids.add(record.body['id'])
         records.append(record)
         prev = record.hash
     if not records:

@@ -300,7 +300,7 @@ def _object_in_use(db: Session, key: str, source_file_id: uuid.UUID | None) -> b
     """Whether a row that is not a revoked copy (a private file, a live copy) names the key."""
     return db.execute(text("""SELECT 1 FROM source_files f LEFT JOIN library_items i ON i.id = f.item_id
         WHERE f.storage_key = :k AND f.id IS DISTINCT FROM CAST(:f AS uuid)
-          AND (i.id IS NULL OR i.publication_state IS DISTINCT FROM 'revoked') LIMIT 1"""),
+          AND (i.id IS NULL OR (i.publication_state IS DISTINCT FROM 'revoked' AND i.deleted_at IS NULL)) LIMIT 1"""),
         {"k": key, "f": source_file_id}).first() is not None
 
 

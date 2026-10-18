@@ -9,7 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
 
-JOURNAL_KINDS = "'genesis', 'revocation', 'recovery_begin', 'recovery_end', 'review_closure', 'session_revocation', 'reset_token_closure', 'invitation_closure', 'credential_transition', 'account_status_decision', 'operator_recovery_case'"
+JOURNAL_KINDS = "'genesis', 'revocation', 'recovery_begin', 'recovery_end', 'review_closure', 'session_revocation', 'reset_token_closure', 'invitation_closure', 'credential_transition', 'account_status_decision', 'operator_recovery_case', 'private_deletion'"
 TOKEN_IDS_REQUIRED = ("CASE WHEN kind = 'reset_token_closure' THEN reset_token_id IS NOT NULL"
                       " AND reset_token_user_id IS NOT NULL AND reset_end_kind IS NOT NULL"
                       " AND reset_reason_code IS NOT NULL AND reset_ended_at IS NOT NULL"
@@ -106,6 +106,9 @@ class RevocationJournalRecord(Base):
         UniqueConstraint("case_id", name="uq_revocation_journal_records_case_id"),
         UniqueConstraint("case_operation_id", name="uq_revocation_journal_records_case_operation_id"),
         CheckConstraint(CASE_FIELDS_REQUIRED, name="case_fields_required"),
+        CheckConstraint("CASE WHEN kind='private_deletion' THEN private_deletion_id IS NOT NULL"
+                        " AND private_deletion_id::text IS NOT DISTINCT FROM (line::jsonb #>> '{body,id}')"
+                        " ELSE private_deletion_id IS NULL END", name="private_deletion_binding"),
         CheckConstraint(INVITATION_IDS_REQUIRED, name="invitation_fields_required"),
         CheckConstraint(INVITATION_MATCHES_BODY, name="invitation_matches_body"),
         CheckConstraint(TOKEN_IDS_REQUIRED, name="reset_fields_required"),
@@ -145,6 +148,7 @@ class RevocationJournalRecord(Base):
     )
 
     auth_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    private_deletion_id = Column(UUID(as_uuid=True), unique=True)
     auth_operation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), unique=True)
     auth_generation: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), unique=True)
     auth_domain: Mapped[str | None] = mapped_column(Text)
@@ -178,7 +182,7 @@ class RevocationJournalRecord(Base):
     case_action = Column(Text)
     case_operation_id = Column(UUID(as_uuid=True))
     case_recorded_at = Column(DateTime(timezone=True))
-    __mapper_args__ = {"exclude_properties": list(CASE_FIELDS)}
+    __mapper_args__ = {"exclude_properties": [*CASE_FIELDS,'private_deletion_id']}
     applied_via: Mapped[str] = mapped_column(Text)
     result: Mapped[str] = mapped_column(Text)
     journal_confirmed: Mapped[bool] = mapped_column(Boolean)

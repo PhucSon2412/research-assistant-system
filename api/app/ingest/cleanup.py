@@ -55,7 +55,8 @@ TOMBSTONE = ('id', 'target_kind', 'item_id', 'version_id', 'source_file_id', 'st
              'reason_code', 'prior_publication_state', 'rights_epoch', 'recorded_at', 'recorded_by_user_id',
              'purge_due_at')
 LIVE_REFERENCES = text("""SELECT count(*) FROM source_files f LEFT JOIN library_items i ON i.id = f.item_id
-    WHERE f.storage_key = :k AND (i.id IS NULL OR i.publication_state IS DISTINCT FROM 'revoked')""")
+    WHERE f.storage_key = :k AND (i.id IS NULL OR
+    (i.publication_state IS DISTINCT FROM 'revoked' AND i.deleted_at IS NULL))""")
 
 
 @dataclass(frozen=True)
@@ -416,4 +417,7 @@ def cleanup_revoked(engine, storage, settings=None) -> dict[str, int]:
                 add(result)
     except runtime.Halt as halt:
         add('halted:' + halt.code)
+    if not any(code.startswith('halted:') for code in counts):
+        from app.private_cleanup import cleanup_private
+        counts.update({'private:'+code:count for code,count in cleanup_private(engine,storage,settings).items()})
     return counts
