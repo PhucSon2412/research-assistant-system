@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import httpx
 
 from app.config import Settings
-from app.provider_identity import VERIFIED_EMBEDDING_IDENTITIES, audit_identity, verified_identity
+from app.provider_identity import VERIFIED_EMBEDDING_IDENTITIES, audit_identity, routed_provider, verified_identity
 
 
 @dataclass(frozen=True)
@@ -40,7 +40,8 @@ def embed(text: str, settings: Settings, *, input_type: str = "search_document")
                 headers={"Authorization": f"Bearer {policy.api_key.get_secret_value()}",
                          "Content-Type": "application/json"},
                 json={"model": policy.model_id, "input": text,
-                      "input_type": input_type, "encoding_format": "float"})
+                      "input_type": input_type, "encoding_format": "float",
+                      "provider": policy.routing.body({"prompt": policy.max_usd_per_million_tokens})})
     except httpx.RequestError:
         raise EmbeddingError("provider_outcome_uncertain") from None
     if response.status_code == 429:
@@ -56,8 +57,9 @@ def embed(text: str, settings: Settings, *, input_type: str = "search_document")
             raise ValueError()
         response_model = audit_identity(payload.get("model"))
         response_provider = audit_identity(payload.get("provider"))
-        if not verified_identity(policy.model_id, response_model, response_provider,
-                                 VERIFIED_EMBEDDING_IDENTITIES):
+        if not (verified_identity(policy.model_id, response_model, response_provider,
+                                  VERIFIED_EMBEDDING_IDENTITIES)
+                and routed_provider(response_provider, policy.routing.only)):
             raise EmbeddingError("provider_response_invalid", response_model_id=response_model,
                                  response_provider=response_provider)
         entries = payload["data"]

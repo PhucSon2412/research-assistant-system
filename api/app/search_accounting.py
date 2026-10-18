@@ -78,7 +78,7 @@ def settle(engine, proof, settings, *, tokens=None, units=None, output_tokens=No
                     and type(output_tokens) is int and 0 <= output_tokens <= policy.max_output_tokens
                     and response_model_id == proof.model_id and isinstance(response_provider, str)
                     and bool(response_provider))
-                amount = (s.money(tokens, policy.max_input_usd_per_million_tokens)
+                amount = (s.money(tokens, policy.input_usd_per_million_ceiling)
                     + s.money(output_tokens, policy.max_output_usd_per_million_tokens)) if valid else None
                 if amount is not None and amount <= row.reserved_usd:
                     row.status, row.cost_usd, row.cost_status = 'completed', amount, 'usage_price_estimate'

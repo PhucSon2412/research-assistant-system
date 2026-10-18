@@ -288,11 +288,13 @@ def test_openrouter_contract_identity_and_usage_synthetic(api, monkeypatch):
             "usage": {"prompt_tokens": 12, "completion_tokens": 5},
             "openrouter_metadata": {"requested": settings.generation.model_id,
                 "endpoints": {"available": [{"model": settings.generation.model_id,
-                    "provider": "SyntheticProvider", "selected": True}]}}})
+                    "provider": "Azure", "selected": True}]}}})
     monkeypatch.setattr(httpx.Client, "post", send)
     result = generate([{"role": "user", "content": "synthetic"}], settings)
     assert result.response_model_id == settings.generation.model_id
-    assert result.response_provider == "SyntheticProvider" and result.input_tokens == 12
+    assert result.response_provider == "Azure" and result.input_tokens == 12
+    assert sent[0]["json"]["provider"] == {"only": ["azure"], "allow_fallbacks": False, "data_collection": "deny",
+        "zdr": True, "max_price": {"prompt": "2.000000", "completion": "10.000000"}, "require_parameters": True}
     assert sent[0]["json"]["stream"] is False and sent[0]["json"]["max_completion_tokens"] == settings.generation.max_output_tokens
     assert sent[0]["headers"]["X-OpenRouter-Metadata"] == "enabled"
     assert settings.generation.pricing_verified is False
@@ -305,8 +307,11 @@ def test_generation_adapter_rejects_bad_identity_shape_and_http_failures(api, mo
         "usage": {"prompt_tokens": 12, "completion_tokens": 5},
         "openrouter_metadata": {"requested": settings.generation.model_id,
             "endpoints": {"available": [{"model": settings.generation.model_id,
-                "provider": "SyntheticProvider", "selected": True}]}}}
+                "provider": "Azure", "selected": True}]}}}
+    outside = {**valid, "openrouter_metadata": {"requested": settings.generation.model_id,
+        "endpoints": {"available": [{"model": settings.generation.model_id, "provider": "OpenAI", "selected": True}]}}}
     payloads = [({**valid, "model": "other/model"}, "rag_provider_response_invalid", False),
+                (outside, "rag_provider_response_invalid", False),
                 ({**valid, "usage": {"prompt_tokens": "12", "completion_tokens": 5}}, "rag_provider_response_invalid", False),
                 (None, "rag_provider_rate_limited", True)]
     for payload, code, rejected in payloads:

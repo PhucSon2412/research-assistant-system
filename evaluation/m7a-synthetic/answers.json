@@ -1,0 +1,76 @@
+{
+  "note": "Synthetic corpus and model answers from the M7a live smoke (openai/gpt-6-sol via Azure, keyword RAG). Labels are pending_human_review: JSON validity and exact-quote checks are not grounding or citation-quality judgements.",
+  "label_status": "pending_human_review",
+  "answers": [
+    {
+      "label": "single",
+      "question": "How much drift did the Lumen calibration bench measure over twelve hours?",
+      "status": "answered",
+      "claims": [
+        {
+          "text": "The Lumen calibration bench measured 0.4 percent drift over twelve hours.",
+          "citations": [
+            {
+              "title": "lumen-bench",
+              "locator_kind": "markdown",
+              "start_page": null,
+              "start_line": 5,
+              "quote": "measured a drift of 0.4 percent over twelve hours"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "compare",
+      "question": "Compare the drift of the Lumen calibration bench with the error of the Harbor tide sensor.",
+      "status": "answered",
+      "claims": [
+        {
+          "text": "The Lumen calibration bench measured 0.4% drift over twelve hours, whereas the Harbor tide sensor reported a mean error of 1.2 centimeters over thirty synthetic days; these are different measures with different units.",
+          "citations": [
+            {
+              "title": "lumen-bench",
+              "locator_kind": "markdown",
+              "start_page": null,
+              "start_line": 5,
+              "quote": "measured a drift of 0.4 percent over twelve hours"
+            },
+            {
+              "title": "harbor-sensor",
+              "locator_kind": "pdf",
+              "start_page": 1,
+              "start_line": null,
+              "quote": "Over thirty synthetic days the Harbor tide sensor reported a mean error of 1.2 centimeters"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "insufficient",
+      "question": "What was the purchase price of the Lumen calibration bench?",
+      "status": "insufficient_evidence",
+      "claims": []
+    },
+    {
+      "label": "chrome",
+      "question": "What error did the Harbor tide sensor report?",
+      "status": "answered",
+      "claims": [
+        {
+          "text": "The Harbor tide sensor reported a mean error of 1.2 centimeters against a reference gauge over thirty synthetic days.",
+          "citations": [
+            {
+              "title": "harbor-sensor",
+              "locator_kind": "pdf",
+              "start_page": 1,
+              "start_line": null,
+              "quote": "Over thirty synthetic days the Harbor tide sensor reported a mean error of 1.2 centimeters against a fictional reference gauge"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

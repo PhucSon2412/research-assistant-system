@@ -1,0 +1,37 @@
+Harbor Tide Sensor: a synthetic field note
+Abstract
+This synthetic note was written for the M7a live smoke test and describes an invented sensor.
+Introduction
+The Harbor tide sensor is an imaginary instrument placed on a fictional pier for this test.
+It records water level every five minutes and stores readings on a small invented logger.
+No real harbor, person, dataset or publication is described anywhere in this document.
+The note exists only so that a PDF with enough extractable body text can be indexed.
+Over thirty synthetic days the Harbor tide sensor reported a mean error of 1.2 centimeters
+against a fictional reference gauge installed beside it on the same imaginary pier.
+The error grew during storm periods and returned to its usual level within two days.
+Each reading was compared with the reference gauge at the same five minute interval.
+The invented logger kept every reading and flagged values outside a fixed tolerance band.
+The mean error of 1.2 centimeters stayed below the tolerance band on twenty eight days.
+On two storm days the error exceeded the band and those readings were flagged for review.
+The sensor did not lose power during the invented deployment and no reading was missing.
+Calibration was checked once at the start and once at the end of the thirty day period.
+These synthetic numbers are not measurements and must not be cited as real findings.
+They are only meant to give a retrieval system a second document with distinct content.
+A comparison question can contrast this sensor error with the drift of another device.
+The Harbor tide sensor and the Lumen calibration bench are both fictional instruments.
+Further synthetic paragraphs follow to keep enough body text on this single page.
+The fictional pier was described as calm on most days with light wind from the west.
+Maintenance visits were imagined as weekly and lasted about twenty minutes each time.
+During each visit the invented technician wiped the sensor housing and checked cables.
+No firmware change was made during the deployment described in this synthetic note.
+The logger clock was assumed to be correct and no time correction was applied.
+All values in this note are invented for software testing and carry no real meaning.
+The invented deployment log lists each storm day with its start and end time in hours.
+Water temperature was not measured because the fictional sensor has no thermometer.
+A second imaginary pier was considered for the test but it was never used in this note.
+The tolerance band was set at two centimeters before the synthetic deployment began.
+Readings flagged during storms were kept in the log rather than deleted from the record.
+The synthetic summary above is the only result reported for the Harbor tide sensor.
+Nothing in this document should be read as advice about real tides or real instruments.
+References
+[1] Synthetic Author. An invented reference used only for parser testing. 2026.

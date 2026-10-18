@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from app.api.errors import ApiError
 from app.authz import Principal
 from app.config import Settings
-from app.provider_identity import audit_identity
+from app.provider_identity import audit_identity, generation_endpoint_model, routed_provider
 from app.search import _audience, money, original_urls
 
 
@@ -90,7 +90,9 @@ def generate(messages: list[dict], settings: Settings) -> GenerationResult:
                 "Content-Type": "application/json", "X-OpenRouter-Metadata": "enabled"},
                 json={"model": policy.model_id, "messages": messages, "stream": False,
                       "max_completion_tokens": policy.max_output_tokens,
-                      "response_format": {"type": "json_object"}})
+                      "response_format": {"type": "json_object"},
+                      "provider": policy.routing.body({"prompt": policy.max_input_usd_per_million_tokens,
+                          "completion": policy.max_output_usd_per_million_tokens}, require_parameters=True)})
     except httpx.RequestError:
         raise GenerationError("rag_provider_outcome_uncertain") from None
     if response.status_code == 429:
@@ -110,9 +112,10 @@ def generate(messages: list[dict], settings: Settings) -> GenerationResult:
         endpoints = endpoints_data.get('available') if isinstance(endpoints_data, dict) else None
         selected = [row for row in endpoints if isinstance(row, dict) and row.get("selected") is True] if isinstance(endpoints, list) else []
         provider = audit_identity(selected[0].get("provider")) if len(selected) == 1 else None
-        if (data.get("object") != "chat.completion" or model != policy.model_id or provider is None
+        if (data.get("object") != "chat.completion" or model != policy.model_id
+                or not routed_provider(provider, policy.routing.only)
                 or metadata.get("requested") != policy.model_id
-                or selected[0].get("model") != policy.model_id):
+                or not generation_endpoint_model(policy.model_id, selected[0].get("model"))):
             raise ValueError("identity")
         choices = data["choices"]
         if not isinstance(choices, list) or len(choices) != 1 or choices[0].get("finish_reason") != "stop":

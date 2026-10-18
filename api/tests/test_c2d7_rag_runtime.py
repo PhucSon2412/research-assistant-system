@@ -30,7 +30,7 @@ def completion(b, payload):
     first = evidence[0]
     return {'object': 'chat.completion', 'model': b.settings.generation.model_id,
         'openrouter_metadata': {'requested': b.settings.generation.model_id, 'endpoints': {'available': [
-            {'selected': True, 'provider': 'SyntheticProvider', 'model': b.settings.generation.model_id}]}},
+            {'selected': True, 'provider': 'Azure', 'model': b.settings.generation.model_id}]}},
         'choices': [{'finish_reason': 'stop', 'message': {'content': json.dumps({'claims': [
             {'text': 'A measured result.', 'citations': [{'chunk_id': first['chunk_id'], 'quote': 'measured'}]}]})}}],
         'usage': {'prompt_tokens': 20, 'completion_tokens': 10}}
@@ -322,13 +322,13 @@ def test_generation_bucket_and_user_quota(generated, limit, code):
 def test_warning_is_counted_and_trusted_usage_uses_both_prices(generated):
     b=generated
     p=b.settings.generation
-    ceiling=rag.rag.money(p.max_input_tokens_estimate,p.max_input_usd_per_million_tokens)+rag.rag.money(p.max_output_tokens,p.max_output_usd_per_million_tokens)
+    ceiling=rag.rag.money(p.max_input_tokens_estimate,p.input_usd_per_million_ceiling)+rag.rag.money(p.max_output_tokens,p.max_output_usd_per_million_tokens)
     b.settings.budget.generation_daily_usd=float(ceiling)
     response=ask(b)
     assert response.status_code==200,response.text
     cost=response.json()['cost']
     assert 'generation_bucket_near_limit' in cost['warnings']
-    assert Decimal(cost['estimated_usd'])==rag.rag.money(20,p.max_input_usd_per_million_tokens)+rag.rag.money(10,p.max_output_usd_per_million_tokens)
+    assert Decimal(cost['estimated_usd'])==rag.rag.money(20,p.input_usd_per_million_ceiling)+rag.rag.money(10,p.max_output_usd_per_million_tokens)
 
 
 def test_expiry_releases_slot_without_resurrection_and_holds_money(generated):

@@ -246,7 +246,9 @@ def test_rerank_transport_contract_and_bad_response(monkeypatch):
         payload = __import__("json").loads(request.content)
         captured.append(payload)
         assert payload == {"model": settings.rerank.model_id, "query": "synthetic query",
-                           "documents": ["synthetic body"], "top_n": 1}
+                           "documents": ["synthetic body"], "top_n": 1,
+                           "provider": {"only": ["fireworks"], "allow_fallbacks": False, "data_collection": "deny",
+                                        "zdr": True, "max_price": {"prompt": "0.200000", "request": "0.010000"}}}
         return httpx.Response(200, json={"model": "accounts/fireworks/models/qwen3-reranker-8b",
             "provider": "Fireworks",
             "results": [{"index": 0, "relevance_score": .8}], "usage": {"total_tokens": 5}})

@@ -32,7 +32,7 @@ from app.ingest.embedding import EmbeddingError, embed
 from app.models import (EmbeddingBudgetDay, EmbeddingCall, EmbeddingUserBudgetDay, LibraryItem, PaperVersion,
                         SearchRequestDay, SearchUsage, SourceFile)
 from app.provider_capacity import LOCK, lease_deadline, reap_expired, reservation_heartbeat
-from app.provider_identity import VERIFIED_RERANK_IDENTITIES, audit_identity, verified_identity
+from app.provider_identity import VERIFIED_RERANK_IDENTITIES, audit_identity, routed_provider, verified_identity
 
 log = logging.getLogger(__name__)
 MONEY = Decimal("0.00000001")
@@ -443,7 +443,9 @@ def rerank(query: str, docs: list[str], settings: Settings) -> RerankResult:
             response = client.post(policy.endpoint, headers={
                 "Authorization": f"Bearer {settings.embedding.api_key.get_secret_value()}",
                 "Content-Type": "application/json"}, json={"model": policy.model_id,
-                "query": query, "documents": docs, "top_n": len(docs)})
+                "query": query, "documents": docs, "top_n": len(docs),
+                "provider": policy.routing.body({"prompt": policy.max_usd_per_million_tokens,
+                                                 "request": policy.max_request_usd})})
     except httpx.RequestError:
         raise RerankError("rerank_outcome_uncertain") from None
     if response.status_code == 429:
@@ -459,8 +461,9 @@ def rerank(query: str, docs: list[str], settings: Settings) -> RerankResult:
             raise ValueError()
         response_model = audit_identity(data.get("model"))
         response_provider = audit_identity(data.get("provider"))
-        if not verified_identity(policy.model_id, response_model, response_provider,
-                                 VERIFIED_RERANK_IDENTITIES):
+        if not (verified_identity(policy.model_id, response_model, response_provider,
+                                  VERIFIED_RERANK_IDENTITIES)
+                and routed_provider(response_provider, policy.routing.only)):
             raise RerankError("rerank_response_invalid", response_model_id=response_model,
                               response_provider=response_provider)
         if (not isinstance(data.get("results"), list)
