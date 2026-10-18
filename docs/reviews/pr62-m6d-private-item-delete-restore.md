@@ -1,5 +1,46 @@
 # Review PR #62 — M6d private deletion và restore
 
+## Review lại bản sửa P2 — 2026-10-18
+
+PR vẫn **OPEN/chưa merge**, head **`15f1dfae24a721df39a11756c1638e0054e6d848`**, code **`a5eb8bb6aeb81814707fbe2207e147c8a6120274`**, source **0052**. **P2 đã được sửa; không phát hiện điểm chặn merge mới trong phạm vi M6d đã kiểm.** Kết luận P2 tại `7494f8c` bên dưới là lịch sử trước sửa.
+
+### Thay đổi và đồ thị khóa
+
+Production delta so với head review ban đầu chỉ thêm khóa mọi `ReviewRequest` của item, theo UUID tăng dần, trong `private_cleanup.finalize()` **trước** khóa item. Thứ tự mới là **tombstone → review UUID → item → scrub → journal**. Acceptance/approval vẫn review → item; không đổi quyền, receipt, trigger, migration, clock, timeout hoặc outcome.
+
+Nhánh xóa lặp trên tombstone hiện hữu và proof receipt chỉ đọc tombstone bằng MVCC, không giữ item rồi đòi khóa tombstone. Các lượt cleanup được serialize bởi khóa tombstone `SKIP LOCKED`; guard item đã xóa ngăn thêm review mới. Vì vậy khóa tombstone đi trước không tạo lại cycle review/item trong các đường đồng thời này. Recovery vẫn đòi quiescence như hợp đồng hiện có.
+
+### Reviewer thực chạy tại source sửa
+
+Conda `ras`, PostgreSQL/roles/journal riêng trong project `rasc3322fa6db`, DB data tmpfs như runner repo; không đổi fsync policy hoặc gate C4. MinIO/Redis riêng được dựng, nhưng fixture storage M6d trong selection dùng fake, nên đây không phải một image/browser/MinIO drill mới.
+
+| Nhóm | Kết quả |
+| --- | --- |
+| Chín regression khóa mới; approve/delete; cleanup/storage/outcome; migration; C4 hold/readiness; ORM/schema | **26/26 pass**, 193,76 s, ba warning hiện có |
+| Hai cặp ca độc lập ngoài repo: cleanup/xóa lặp có và không review, qua HTTP và boundary | **4/4 pass**, 36,56 s, một warning; process exit 0 |
+
+Tổng lượt review lại **30 test pass**, không failure/error/skip. Hai ca có review vốn tái hiện `40P01` nay hoàn tất; không đổi source/timeout/guard để làm chúng đạt. Chín regression repo kiểm hai thứ tự khóa, 0/1/3 review và first-delete; selected approve/delete giữ race với grant đang mở. Reviewer không sửa production/test/migration/grants.
+
+Phiên tool trả exit của nhóm 26 bị mất khi usage limit/phiên làm việc bị gián đoạn; JUnit và log hoàn chỉnh xác nhận đủ 26 pass, không suy thêm exit code chưa quan sát. Khi tiếp tục, ba container **của task** đã `Exited (255)`; lần gọi independent đầu dừng tại setup trước pytest. Reviewer giữ log đó, chỉ khởi động lại đúng project sở hữu rồi chạy đủ bốn ca, exit 0. Không quy sự gián đoạn này cho lỗi sản phẩm hay khẳng định nguyên nhân hạ tầng.
+
+### Đối chiếu chứng cứ agent và giới hạn
+
+- **79 artifact hash** hiện hữu/khớp; **442 source hash** trong inventory P2 khớp source, before/after trùng. Reviewer theo dõi **443 tracked source hashes** gồm `.env.example`: trước/sau test và cleanup trùng. Không đọc `.env` thật.
+- **731 ID pass** khớp từng trạng thái trong **10 nhóm JUnit**, không thiếu/trùng; **4.528 not-run**, tổng collection **5.259**, hai tập không giao nhau. Đây là audit artifact, không phải reviewer chạy lại 731 test.
+- Tree của SHA chạy test `917a294` trùng code `a5eb8bb`; khác biệt là sửa subject commit. Artifact countercheck của agent ghi bỏ khóa mới tái hiện `40P01` rồi khôi phục hash source; reviewer không chạy thêm mutant.
+- Inventory full 5.250 cũ còn nguyên checksum. Full suite/image/web/Chrome/restore vẫn là chứng cứ tại source trước P2, không chuyển thành pass mới. Hai failure lịch sử discovery barrier/orphan clock chưa rõ nguyên nhân, không được giải thích bằng lỗi khóa này. F07 vẫn có gap đã công bố; chưa thêm reuse/canonical graph.
+- Không chạy lại browser/image/full restore drill hoặc benchmark cho thay đổi bốn dòng khóa. Giữ C4 readiness thật; không cutover dev/production hoặc mở provider/pricing thật.
+
+### Dọn dẹp và bàn giao review lại
+
+Evidence riêng: `C:\Users\ADMIN\AppData\Local\Temp\ras-pr62-rereview-20261017`, gồm `repo.xml/log`, `independent.xml/log`, audit artifact, source hashes, baseline và cleanup. Đã kiểm label/mount/consumer rồi gỡ đúng **3 container thử**, network và một anonymous DB volume cũ của task; xóa ba file credentials/config. Scan bảy secret thử trên Git/log/JUnit: **0 hit**; không còn container của task.
+
+**24 container có sẵn giữ nguyên ID/name/image/mount/label**, không có container lạ mới. Có drift StartedAt/trạng thái/RestartCount ở 15 container Dify/dev trong thời gian gián đoạn; ghi nguyên quan sát trong `cleanup-result.json`, không sửa hoặc suy nguyên nhân. Mọi lệnh start/stop/down của reviewer chỉ nhắm project thử. Không query/migrate/restart dev, gọi arXiv/provider hoặc đổi pricing.
+
+Báo cáo và cập nhật trạng thái reviewer để **chưa commit**, dành cho PR tiếp theo sau khi chủ dự án merge. Reviewer không merge hoặc gửi comment GitHub.
+
+## Review ban đầu tại `7494f8c` — lịch sử trước sửa
+
 Ngày **2026-10-17**, PR **OPEN/chưa merge**, base `fb96354c4f8dc8fb8f4f8a54f1516d9d2e13625e`, head `7494f8c01e7af52e3a4f7db07384ee16d44ee999`, source **0052**. **Có một P2 cần sửa trước merge:** đảo thứ tự khóa giữa cleanup và xóa lặp gây PostgreSQL deadlock. [Prompt sửa cùng PR](../tasks/fix-pr62-private-cleanup-repeat-delete-lock-order.md).
 
 [Task gốc](../tasks/m6d-private-item-deletion-and-restore.md) · [Handoff agent](../m6d-private-item-delete-restore.md) · [Inventory agent](../m6d-test-inventory.json)

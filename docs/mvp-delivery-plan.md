@@ -1,5 +1,11 @@
 # Kế hoạch hoàn thành MVP
 
+**M6e trên nhánh review, 2026-10-18 (chưa merge):** F07 khép theo hợp đồng exact-byte MVP — cảnh báo cả bản ready/indexed, điều hướng owner-only theo ACL hiện hành, retry/redelivery/lease không tạo tác dụng phụ lặp; không schema mới. [Handoff](m6e-private-duplicate-retry.md) · [inventory](m6e-test-inventory.json): selection 1.462 pass/3.836 not-run, image+Chrome 19/19. Later: canonical graph, paper khác bytes, reuse dẫn xuất, xử lý lại duplicate khi đích lỗi/xóa. Sau review/merge chuyển D/E.
+
+**Sau merge M6d, 2026-10-18:** PR #62 đã merge `d9bec94`, tree khớp head review `15f1dfa`, source **0052**; không cộng test mới tại merge. Xóa private/cleanup/restore đã qua review cô lập; gói C còn [M6e — duplicate private và retry](tasks/m6e-private-duplicate-and-retry.md), mới giao/chưa triển khai hoặc kiểm. Hợp đồng MVP là exact bytes cùng owner, cảnh báo/điều hướng hợp lệ và retry idempotent; upload bằng intent mới là thao tác riêng giữ original mới, không tự hợp nhất/reuse dẫn xuất. Canonical graph/nhận diện paper khác bytes để later. Sau M6e chuyển D/E; không mở thêm nhánh chức năng nâng cao hoặc đặt lại C4 pending. Hai failure lịch sử còn nguyên giới hạn, chưa cutover dev/provider thật.
+
+**Review lại M6d, 2026-10-18:** PR #62 tại `15f1dfa`, code `a5eb8bb`, đã sửa P2; [reviewer](reviews/pr62-m6d-private-item-delete-restore.md) 26 repo + 4 ca độc lập pass, audit riêng 731 ID agent/4.528 not-run. Không thấy điểm chặn merge mới trong scope M6d, PR vẫn OPEN/source 0052. Gói C chưa khép F07; hai failure lịch sử vẫn chưa rõ nguyên nhân. Không giảm checklist D/E hoặc coi kết quả này là cutover/provider thật; full/image/browser/restore theo source trước P2. Giữ các mốc chờ review bên dưới là lịch sử.
+
 **M6d sửa P2 PR #62 tại `a5eb8bb` (chờ review lại, chưa merge):** cleanup theo review UUID → item, guard/C4 giữ nguyên. [Handoff](m6d-private-item-delete-restore.md) · [inventory sửa hẹp](m6d-p2-lock-order-inventory.json): 731 pass, 4.528 not-run; không thay kết quả full theo source cũ hoặc coi hai failure lịch sử đã rõ nguyên nhân. F07 và phạm vi sau M6d giữ nguyên.
 
 **Review M6d, 2026-10-17:** PR #62 tại `7494f8c`, source **0052**, còn [P2 deadlock cleanup/xóa lặp](reviews/pr62-m6d-private-item-delete-restore.md), cần [sửa cùng PR](tasks/fix-pr62-private-cleanup-repeat-delete-lock-order.md) trước merge. Gói C chưa nghiệm thu; F07 còn gap đã công bố. Giữ C4 readiness và các giới hạn D/E, không mở scope mới để sửa P2 hoặc coi 5.250 artifact pass là miễn lỗi mới.
@@ -40,8 +46,8 @@ Ngày chốt **2026-10-11**. Chủ dự án giao orchestrator chọn phạm vi v
 
 ## Trạng thái hiện tại
 
-- PR #61 đã merge tại `fb96354c4f8dc8fb8f4f8a54f1516d9d2e13625e`; head review `3f07901` là ancestor, tree khớp. Source migration **0051**; không suy revision DB dev hoặc cộng pass mới tại merge.
-- C4 đã hoàn tất code/review/kiểm cô lập: operational readiness có hậu điều kiện, image/roles đồng bộ, HTTP/browser/năm full restore drill/CLI evaluation đã thực chạy. DB chưa đủ hậu điều kiện vẫn 503; chưa cutover dev hoặc mở provider/pricing thật. M6d của gói C mới được giao.
+- PR #62 đã merge tại `d9bec94c63fd8f27a8897f4f83ce8f6a063d26dc`; head review `15f1dfa` là ancestor, tree khớp. Source migration **0052**; không suy revision DB dev hoặc cộng pass mới tại merge.
+- C4 và M6d đã hoàn tất code/review/kiểm cô lập: operational readiness có hậu điều kiện, image/roles, HTTP/browser/restore và private delete/cleanup có chứng cứ theo source trong handoff. DB chưa đủ hậu điều kiện vẫn 503; chưa cutover dev hoặc mở provider/pricing thật. Gói C còn M6e mới được giao.
 - Citation reconcile và [discovery harvesting](c2d5f2-discovery-runtime.md) đã chuyển runtime. [Review PR #56](reviews/pr56-c2d5f2-discovery-runtime.md) giữ kết quả trước merge; chưa rerun tại merge. Docs orchestrator bị sót đã được đưa vào commit của PR #57.
 - [C2d-6 search/query embedding/rerank](c2d6-search-query-rerank-runtime.md) đã merge; [review độc lập](reviews/pr57-c2d6-search-query-rerank-runtime.md) giữ chứng cứ trước merge, chưa rerun tại merge. Không suy kết quả này thành RAG runtime hoặc cutover.
 - [C2d-7 RAG/generation runtime](c2d7-rag-generation-runtime.md) đã merge PR #58, source **0048**; [review độc lập](reviews/pr58-c2d7-rag-generation-runtime.md) và [inventory](c2d7-test-inventory.json) giữ chứng cứ trước merge, chưa rerun tại merge. Gói A hoàn tất chuyển runtime trong scope đã review, chưa cutover/nghiệm thu end-to-end. C3 đã merge PR #59; tiếp B1 hồi quy/debt và tích hợp C4. Private deletion/restore, provider thật và vận hành triển khai cần nghiệm thu riêng. Giữ và đưa docs review/task mới chưa commit vào PR kế tiếp.
@@ -56,7 +62,7 @@ Ngày chốt **2026-10-11**. Chủ dự án giao orchestrator chọn phạm vi v
 | --- | --- | --- | --- |
 | A — hoàn tất runtime | Search + query embedding + rerank; RAG + generation. Giữ quyền trước retrieval/provider và kế toán hiện hành | Đã merge | PR #57/#58 đã merge; chưa cutover/nghiệm thu end-to-end |
 | B — recovery và bản chạy đầy đủ | C3 CLI operator tối thiểu; xử lý debt hồi quy; C4 Compose/image/role/journal, readiness thật, HTTP/browser không patch pending, hai vòng restore/recover | Đã merge | C3/B1/C4 đã merge PR #59–#61; nghiệm thu cô lập, chưa cutover thật |
-| C — đóng yêu cầu sản phẩm còn thiếu | Xóa item private + chống xuất hiện lại sau restore; nghiệm thu duplicate/retry hiện hành, chỉ bổ sung chỗ thiếu để luồng dùng được | 2–4 ngày | M6d đã giao trọn luồng xóa/cleanup/restore; duplicate/retry hồi quy và ghi gap F07, chưa triển khai/kiểm |
+| C — đóng yêu cầu sản phẩm còn thiếu | Xóa item private + chống xuất hiện lại sau restore; nghiệm thu duplicate/retry hiện hành, chỉ bổ sung chỗ thiếu để luồng dùng được | 2–4 ngày theo mốc gốc | M6d đã merge PR #62; M6e khép F07 exact-byte trên nhánh review, kiểm cô lập, chưa merge |
 | D — provider và chất lượng | Smoke tổng hợp có trần chi phí, đối soát charge, routing/retention; sau đó thử paper được phép xử lý, người đọc kiểm câu trả lời/citation/abstention | 2–4 ngày | Chưa giao; chưa mở trả phí |
 | E — triển khai nhóm thử | HTTPS/cookie Secure, kênh invite/reset dùng được, rate limit, CI, journal độc lập, backup/retention/alert tối thiểu và nghiệm thu browser | 3–5 ngày | Chưa giao |
 

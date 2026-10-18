@@ -94,6 +94,8 @@ Daily arXiv/Hugging Face cũng dùng cùng gate quyền cho đúng version trư�
 
 Không dùng hash trùng giữa tenant để báo rằng người khác có paper nào; không trả count, lỗi, thời gian phản hồi hoặc citation tiết lộ item riêng. API, worker, search index, cache và lời gọi LLM đều phải kiểm cùng phạm vi. [Chi tiết retrieval](search-and-rag.md).
 
+**M6e — trùng file trong kho riêng (quyết định thực hiện MVP theo ủy quyền, không do chủ dự án xác nhận từng lựa chọn kỹ thuật):** chỉ SHA-256 chính xác của file đã được worker kiểm, chỉ trong cùng owner/private; file của owner khác hoặc bản chung không bao giờ dùng để quyết định hay hiển thị. Upload bằng intent/consent mới là thao tác riêng: giữ item/original mới, job dừng `duplicate` trước extraction/index/provider, không hợp nhất, không đổi quyền/collection, không chép dẫn xuất. Item detail của owner có `existing_copy` tính lại ở mỗi lần đọc theo ACL hiện hành, chỉ để điều hướng; trang đích kiểm quyền như bình thường. Bản đã xóa/có quyết định xóa hoặc tombstone không là đích. [Handoff M6e](m6e-private-duplicate-retry.md).
+
 ## Hợp đồng xác nhận upload riêng
 
 **Đã xác nhận:** Trước lúc upload paper riêng, UI thông báo toàn bộ text trích xuất sẽ gửi tới OpenRouter/provider để embedding; candidate chunk có thể gửi để rerank và câu hỏi/chunk được chọn để generation. User **xác nhận tường minh cho từng upload** bằng ô không chọn sẵn. UI gọi bước tạo upload intent **không kèm file** sau xác nhận; chỉ khi bước này thành công mới bắt đầu truyền file. Một multipart request chứa cả xác nhận và file không chứng minh được yêu cầu “từ chối trước khi gửi bytes”, vì bytes có thể đã tới server trước lúc kiểm xác nhận.

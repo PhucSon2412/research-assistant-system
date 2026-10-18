@@ -37,7 +37,8 @@ from app.authz import (Principal, can_edit_item, common_derivatives_clause, comm
 from app.citations import RELATION_NOTE, citation_link_out, hidden_discovery_clause
 from app.models import (Chunk, DiscoveryPaper, IngestionJob, LibraryItem, MetadataCandidate, PaperVersion, PdfPage,
                         ReferenceCitationLink, ReferenceEntry, Section, SourceFile)
-from app.models.enums import AuditActorType, AuditOutcome, ContentStatus, Visibility
+from app.ingest import duplicates
+from app.models.enums import AuditActorType, AuditOutcome, ContentStatus, JobState, Visibility
 
 router = APIRouter(prefix="/library", tags=["library"])
 
@@ -223,9 +224,11 @@ def _read_count_items(
 def get_item(item_id: str, principal: Principal = Depends(get_principal), db: Session = Depends(get_db),
     clock=Depends(get_clock), settings: Settings = Depends(get_settings),
 ) -> dict:
+    # A duplicate's navigation target is SHARE-locked and re-read like the item itself.
     return resource_json(db, principal, clock=clock, idle=settings.auth.session_idle,
         read=lambda current: _read_get_item(item_id=item_id, principal=current, db=db),
-        item_ids=lambda data: [data["item"]["id"]])
+        item_ids=lambda data: [data["item"]["id"]] + [j["existing_copy"]["item_id"]
+            for j in data["item"]["jobs"] if j["existing_copy"]])
 
 
 def _read_get_item(item_id: str, principal: Principal, db: Session) -> dict:
@@ -271,6 +274,7 @@ def _read_get_item(item_id: str, principal: Principal, db: Session) -> dict:
             "jobs": [{"id": str(j.id), "state": j.state, "origin": j.origin,
                       "attempt_count": j.attempt_count, "last_error_code": j.last_error_code,
                       "warnings": j.warnings if item.visibility == Visibility.PRIVATE.value else [],
+                      "existing_copy": _existing_copy(db, principal, item, j),
                       "queue_wait_ms": int((j.started_at - j.created_at).total_seconds() * 1000)
                           if j.started_at else None,
                       "extraction_finished_at": j.extraction_finished_at.isoformat()
@@ -283,6 +287,31 @@ def _read_get_item(item_id: str, principal: Principal, db: Session) -> dict:
                      for j in jobs],
         }
     }
+
+
+def _existing_copy(db: Session, principal: Principal, item: LibraryItem, job: IngestionJob) -> dict | None:
+    """M6e: the owner's current live copy of a duplicate's exact bytes, for navigation only.
+
+    Recomputed on every read with the worker's eligibility predicate and the
+    caller's private ACL; never stored, never canonical, never another owner's
+    or a common copy. ``None`` when no target is currently valid.
+    """
+    if (job.state != JobState.DUPLICATE.value or duplicates.WARNING not in (job.warnings or [])
+            or item.visibility != Visibility.PRIVATE.value or item.owner_user_id != principal.user_id):
+        return None
+    source = db.scalar(select(SourceFile).where(SourceFile.job_id == job.id, SourceFile.item_id == item.id))
+    if source is None:
+        return None
+    found = db.execute(duplicates.targets(principal.user_id, source.checksum_sha256,
+                                          exclude_file_id=source.id).limit(1)).first()
+    if found is None:
+        return None
+    target = db.execute(select(LibraryItem.id, LibraryItem.title, LibraryItem.content_status)
+        .where(LibraryItem.id == found.item_id, LibraryItem.id != item.id, visible_items_clause(principal),
+               LibraryItem.visibility == Visibility.PRIVATE.value)).first()
+    if target is None:
+        return None
+    return {"item_id": str(target.id), "title": target.title, "content_status": target.content_status}
 
 
 @router.get("/items/{item_id}/chunks")

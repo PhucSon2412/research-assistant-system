@@ -224,6 +224,8 @@ query/migrate/restart dev, arXiv/provider hoặc pricing thật.
 
 ## Duplicate/retry và giới hạn
 
+*Sau M6e (nhánh review): gap cảnh báo ready/indexed bên dưới đã được xử lý theo [handoff M6e](m6e-private-duplicate-retry.md); đoạn này mô tả source M6d.*
+
 F07 còn gap: ingest hiện chỉ cảnh báo duplicate trong cùng owner khi file trước ở
 `stored/extracting/chunking/awaiting_index`; bản trước đã `ready/indexed` không nằm
 trong query cảnh báo. Cảnh báo tạo job `duplicate`, chưa liên kết/reuse derivatives

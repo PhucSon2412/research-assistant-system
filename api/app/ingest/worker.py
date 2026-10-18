@@ -26,7 +26,7 @@ from sqlalchemy import and_, or_, select, text
 from sqlalchemy.orm import Session
 
 from app import auth_safety
-from app.ingest import checkpoints, runtime
+from app.ingest import checkpoints, duplicates, runtime
 from app.citations import reconcile_references
 from app.config import Settings, get_settings
 from app.db import get_sessionmaker
@@ -172,21 +172,16 @@ def _validate(db: Session, job_id: uuid.UUID, token: uuid.UUID, source: SourceFi
         if job.origin == JobOrigin.PROMOTION.value:
             # A common copy is one reviewed file; exact-byte duplicates are the publication's rule.
             return JobState.STORED.value
-        # Transaction advisory lock serializes same-owner/same-hash validation.
-        # It avoids both jobs choosing the other as canonical.
+        # Transaction advisory lock serializes same-owner/same-hash validation
+        # (the owner User lock already does too); neither job can pick the
+        # other, and a duplicate is never a target. Target rows are only read,
+        # never locked: no lock is taken after the advisory (M6e lock map).
         lock_key = f"{item.owner_user_id}:{source.checksum_sha256}"
         db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"), {"key": lock_key})
-        other = db.scalar(select(SourceFile.id).join(IngestionJob, SourceFile.job_id == IngestionJob.id)
-            .join(LibraryItem, LibraryItem.id == SourceFile.item_id)
-            .where(SourceFile.checksum_sha256 == source.checksum_sha256,
-                   LibraryItem.deleted_at.is_(None),
-                   SourceFile.id != source.id, IngestionJob.scope_visibility == Visibility.PRIVATE.value,
-                   IngestionJob.scope_owner_user_id == item.owner_user_id,
-                   IngestionJob.state.in_([JobState.STORED.value, JobState.EXTRACTING.value,
-                                           JobState.CHUNKING.value, JobState.AWAITING_INDEX.value]))
-            .order_by(IngestionJob.created_at, IngestionJob.id).limit(1))
+        other = db.execute(duplicates.targets(item.owner_user_id, source.checksum_sha256,
+                                              exclude_file_id=source.id).limit(1)).first()
         if other is not None:
-            job.warnings = ["duplicate_in_private_library"]
+            job.warnings = [duplicates.WARNING]
             return JobState.DUPLICATE.value
         return JobState.STORED.value
 
