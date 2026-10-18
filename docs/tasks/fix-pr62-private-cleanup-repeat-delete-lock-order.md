@@ -1,5 +1,7 @@
 # Sửa PR #62 — deadlock cleanup và xóa lặp
 
+**Trạng thái 2026-10-18:** P2 đã sửa ở code `a5eb8bb`, review lại head `15f1dfa` không phát hiện điểm chặn merge mới trong scope M6d; [report cập nhật](../reviews/pr62-m6d-private-item-delete-restore.md). PR vẫn OPEN/chưa merge. Nội dung dưới giữ yêu cầu và lỗi tại source trước sửa, không giao thêm một lượt coding.
+
 Sửa **trên cùng PR #62**, không mở task/PR khác và không mở rộng M6d. Đọc [review](../reviews/pr62-m6d-private-item-delete-restore.md), [handoff](../m6d-private-item-delete-restore.md) và task M6d gốc. Head được review `7494f8c`, source `0052`; source application `a7b57b0` và test `3f0695b` theo inventory. Giữ toàn bộ docs reviewer/orchestrator modified/untracked, đưa vào PR.
 
 ## Lỗi đã xác nhận

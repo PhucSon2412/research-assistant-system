@@ -1,5 +1,17 @@
 # Nhật ký quyết định
 
+## Quyết định triển khai M6e (2026-10-18)
+
+Theo [task M6e](tasks/m6e-private-duplicate-and-retry.md), orchestrator chọn **không đổi schema** (source giữ `0052`): một predicate `app/ingest/duplicates.py` dùng chung cho worker validate và item DTO; không lưu binding duplicate → đích, nên cleanup/replay/FK/restore không có tham chiếu mới. Đích là bản cùng SHA-256, cùng owner/private/upload, binding/epoch đúng, không deleted/quyết định xóa/tombstone, job đang xử lý/chờ index/indexing/retryable theo resume hoặc ready có active generation đúng job/file/version/epoch; sớm nhất `(created_at, id)`. Duplicate/lỗi/hủy không là đích. `existing_copy` tính lại mỗi lần đọc (có thể khác bản worker thấy lúc validate), boundary đọc khóa SHARE cả đích. Worker không lấy khóa mới; khóa owner User sẵn có tuần tự hóa validate với private delete cùng owner. Không canonical/reuse/recovery endpoint. Đây là lựa chọn thực hiện MVP theo ủy quyền, không phải từng mục đã được chủ dự án xác nhận. [Handoff](m6e-private-duplicate-retry.md) · [inventory](m6e-test-inventory.json).
+
+## Giao M6e sau merge PR #62 (2026-10-18)
+
+Đã fetch/xác minh merge `d9bec94c63fd8f27a8897f4f83ce8f6a063d26dc`, head review `15f1dfa` là ancestor và tree khớp; source **0052**, không rerun hoặc suy DB dev tại merge. [Task M6e](tasks/m6e-private-duplicate-and-retry.md) là một PR tiếp theo của gói C, **mới giao, chưa triển khai hoặc kiểm**.
+
+Theo ủy quyền hoàn tất MVP, orchestrator chọn F07 ở phạm vi exact SHA-256 trong cùng owner/private: nhận diện cả bản ready/indexed, cảnh báo có ý nghĩa và link owner-only tới bản còn hợp lệ. Đây không phải liên kết cấp quyền hoặc canonical graph. Intent mới là một upload riêng có thể giữ original/item mới rồi dừng duplicate; replay cùng intent/job không được tạo side effect lặp. Không dùng checksum xuyên owner/common, không đích deleted/tombstoned, không reuse chunk/vector/citation giữa item. Retry cùng file giữ completed-call accounting/F09 hiện có; uncertain không tự gửi lại provider.
+
+Không xây nhận diện paper khác bytes, merge/version graph hoặc API retry mới để khép gói này. Nếu lưu binding mới thì cleanup/replay/FK/ACL phải bảo vệ đầy đủ; ưu tiên schema nhỏ nhất. Lock graph validation/delete phải được chứng minh và hồi quy bản sửa P2 M6d; không giữ DB qua storage/provider. C4 readiness giữ thật, dev/Dify/provider/pricing không bị thao tác. Sau review/merge M6e chuyển gói D/E theo kế hoạch, không coi giao task là F07 đã hoàn tất. Các mốc gap M6d bên dưới mô tả source trước triển khai M6e.
+
 ## Quyết định triển khai M6d (2026-10-16)
 
 Theo task [owner delete/cleanup/restore](tasks/m6d-private-item-deletion-and-restore.md) đã được giao, chọn schema `0052`: marker private cuối, tombstone/manifest độc lập target và fence riêng theo key. Batch cùng journal hiện hành đặt review withdrawal trước private deletion; không biến approved thành withdrawn. SQL và parser kiểm manifest độc lập, giới hạn cấu hình tối đa 128 mỗi tập; không truncate. Cleanup giữ skeleton cho FK/đối soát và scrub private text/URL/filename/vector/hash; common đã approve độc lập giữ nguyên. Recover sweep cả tombstone đã purged và nhả connection/mutex trước private S3; phải lấy lại cùng open recovery trước complete. C4 readiness không đặt lại pending hoặc bypass. [Handoff và lựa chọn chi tiết](m6d-private-item-delete-restore.md) · [inventory đang kiểm](m6d-test-inventory.json).

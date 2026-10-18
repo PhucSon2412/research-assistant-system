@@ -1,5 +1,11 @@
 # Tài liệu dự án
 
+**M6e trên nhánh review, 2026-10-18 (chưa merge):** [handoff duplicate private/retry](m6e-private-duplicate-retry.md) · [inventory](m6e-test-inventory.json). Exact SHA-256 cùng owner, nhận diện cả ready/indexed, `existing_copy` chỉ điều hướng theo ACL hiện hành; không schema/canonical/reuse. Selection 1.462 pass/3.836 not-run, image+Chrome 19/19; full inventory chưa rerun. Mục "mới giao" bên dưới là lịch sử.
+
+**Sau merge PR #62, 2026-10-18:** merge `d9bec94`, tree khớp `15f1dfa`, source **0052**; chưa có pass mới tại merge. Task tiếp là [M6e — nhận diện upload trùng và retry an toàn](tasks/m6e-private-duplicate-and-retry.md), một PR khép F07 theo hợp đồng exact-byte cùng owner; **mới giao/chưa triển khai hoặc kiểm**. Giữ C4 readiness, deletion/cleanup/journal và docs reviewer. Provider thật/chất lượng và vận hành nhóm thử thuộc gói D/E sau đó; các trạng thái OPEN bên dưới giữ lịch sử.
+
+**Review lại M6d, 2026-10-18:** [PR #62 tại `15f1dfa`](reviews/pr62-m6d-private-item-delete-restore.md) đã sửa P2, không thấy điểm chặn merge mới trong phạm vi đã kiểm; reviewer 26 repo + 4 ca độc lập pass. Artifact 731 pass/4.528 not-run được audit riêng. PR vẫn OPEN, source 0052; C4 readiness thật, chưa cutover dev/provider. Full/browser/restore cũ và hai failure lịch sử/F07 giữ giới hạn riêng. Các mốc chặn/chờ review bên dưới là lịch sử trước lượt này; giữ docs reviewer chưa commit cho PR kế tiếp.
+
 **Sửa P2 M6d tại `a5eb8bb`, chờ review lại:** [thứ tự khóa cleanup/repeat](m6d-private-item-delete-restore.md#sửa-p2-của-pr-62--chờ-review-lại) đã sửa; [inventory P2](m6d-p2-lock-order-inventory.json) ghi 731 pass/4.528 not-run tại source mới, before/countercheck `40P01` riêng. PR #62 chưa merge, source 0052 và C4 readiness giữ nguyên. Report reviewer bên dưới là kết quả tại 7494f8c.
 
 **Review M6d, 2026-10-17:** PR #62 tại `7494f8c`, source **0052**, còn [P2 deadlock giữa cleanup và xóa lặp](reviews/pr62-m6d-private-item-delete-restore.md); [sửa hẹp trên cùng PR](tasks/fix-pr62-private-cleanup-repeat-delete-lock-order.md). Chưa merge; C4 readiness giữ thật. Kết quả reviewer, artifact agent và hai failure lịch sử giữ riêng; không cutover dev/provider thật.

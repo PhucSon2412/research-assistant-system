@@ -1,5 +1,9 @@
 # Roadmap đề xuất
 
+**M6e trên nhánh review (2026-10-18):** duplicate private exact-byte gồm cả ready/indexed, điều hướng có ACL, retry an toàn; không migration. [Handoff](m6e-private-duplicate-retry.md) · [inventory](m6e-test-inventory.json). Chưa merge; sau đó gói D/E.
+
+**Sau merge PR #62 (2026-10-18):** M6d đã merge `d9bec94`, tree khớp `15f1dfa`, source **0052**, chưa rerun tại merge. Tiếp [M6e — upload trùng và retry an toàn](tasks/m6e-private-duplicate-and-retry.md) trong một PR khép F07 MVP; mới giao/chưa triển khai hoặc kiểm. Giữ exact bytes cùng owner, cảnh báo/điều hướng có quyền, không canonical/reuse khác item; giữ C4 readiness và lock fix M6d. Sau đó gói D provider/chất lượng và E vận hành nhóm thử theo [kế hoạch](mvp-delivery-plan.md). Không cutover dev/Dify/provider thật; các mốc OPEN/chưa giao bên dưới là lịch sử.
+
 **M6d trên nhánh triển khai (2026-10-16):** source `0052`, owner delete/cleanup/restore đã kiểm cô lập trong một PR; chưa merge. [Handoff](m6d-private-item-delete-restore.md) và [inventory](m6d-test-inventory.json) giữ bằng chứng theo source. C4 readiness giữ thật; F07 còn gap cảnh báo/reuse, chưa gọi toàn gói C hoàn tất. Dev, provider/pricing thật và gói D/E chưa mở.
 
 **Sau merge PR #61, 2026-10-16:** C4 đã merge `fb96354c`, source **0051**, tree khớp bản review `3f07901`; chưa rerun tại merge. Gói tiếp theo là [M6d — xóa paper riêng, cleanup và restore](tasks/m6d-private-item-deletion-and-restore.md), một PR trọn luồng thuộc gói C; mới giao/chưa triển khai hoặc kiểm. C4 readiness có điều kiện đã kiểm cô lập, không cutover dev/provider thật. Duplicate/retry hồi quy và gap F07 giữ riêng; không mở thêm graph/streaming hoặc chia từng endpoint. Các trạng thái OPEN/pending bên dưới giữ lịch sử.
