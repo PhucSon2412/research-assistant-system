@@ -1,5 +1,11 @@
 # Tài liệu dự án
 
+**M7a trên nhánh review, 2026-10-19 (chưa merge):** [handoff OpenRouter live/đối soát](m7a-openrouter-live-verification.md) · [inventory](m7a-test-inventory.json). 19 request tổng hợp, billed $0,0194; ba route đã chạy live, routing pin ZDR; generation còn chờ xác nhận live sau sửa cache-write. Pricing mặc định tắt, chưa gửi paper thật.
+
+**Sau merge PR #63, 2026-10-18:** merge `5362ace`, tree khớp `c1f7bcc`, source **0052**; chưa có pass mới tại merge. Gói tiếp là [M7a — kiểm chứng OpenRouter và charge bằng dữ liệu tổng hợp](tasks/m7a-openrouter-live-verification.md), một PR có cap/key/routing/outcome và smoke runtime thật; **mới giao/chưa triển khai hoặc kiểm live**. M7b chấm chất lượng bằng người đọc và E vận hành nhóm thử còn riêng. Giữ [review M6e](reviews/pr63-m6e-private-duplicate-retry.md) chưa commit; không coi merge là mở pricing/cutover dev. Các mốc OPEN bên dưới là lịch sử.
+
+**Review M6e, 2026-10-18:** [PR #63 tại `c1f7bcc`](reviews/pr63-m6e-private-duplicate-retry.md) không có điểm chặn merge mới trong scope đã kiểm; reviewer 50 repo + 1 ca độc lập API pass, web 75/typecheck; artifact 1.462/3.836 not-run giữ riêng. PR OPEN/source 0052, chưa cutover dev/provider thật. Sau merge chuyển D/E theo kế hoạch MVP; giữ giới hạn duplicate/canonical và docs reviewer chưa commit.
+
 **M6e trên nhánh review, 2026-10-18 (chưa merge):** [handoff duplicate private/retry](m6e-private-duplicate-retry.md) · [inventory](m6e-test-inventory.json). Exact SHA-256 cùng owner, nhận diện cả ready/indexed, `existing_copy` chỉ điều hướng theo ACL hiện hành; không schema/canonical/reuse. Selection 1.462 pass/3.836 not-run, image+Chrome 19/19; full inventory chưa rerun. Mục "mới giao" bên dưới là lịch sử.
 
 **Sau merge PR #62, 2026-10-18:** merge `d9bec94`, tree khớp `15f1dfa`, source **0052**; chưa có pass mới tại merge. Task tiếp là [M6e — nhận diện upload trùng và retry an toàn](tasks/m6e-private-duplicate-and-retry.md), một PR khép F07 theo hợp đồng exact-byte cùng owner; **mới giao/chưa triển khai hoặc kiểm**. Giữ C4 readiness, deletion/cleanup/journal và docs reviewer. Provider thật/chất lượng và vận hành nhóm thử thuộc gói D/E sau đó; các trạng thái OPEN bên dưới giữ lịch sử.
