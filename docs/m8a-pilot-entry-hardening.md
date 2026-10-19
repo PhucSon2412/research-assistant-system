@@ -6,7 +6,8 @@ grant hay bảng auth. Kết quả kiểm ở [inventory M8a](m8a-test-inventory
 
 **Trạng thái:** đã triển khai và kiểm trên project Docker cô lập với CA/SMTP thử; **chưa có** domain, host,
 tài khoản SMTP, operator hay nơi lưu journal độc lập thật; **chưa cutover, chưa nghiệm thu production**.
-Workflow CI đã viết và các bước của nó đã chạy local; **chưa có run trên GitHub** tại thời điểm viết. Không đọc
+Workflow CI chạy trên GitHub: run `39284225688` tại commit `6cb5253` **pass cả ba job** (selection API
+1102/1102, web, deploy contract); hai run trước fail và được giữ ở mục Kết quả. Không đọc
 `.env`/key, không gọi provider/arXiv, không gửi mail thật, `pricing_verified` giữ false, không đụng dev `ras`/Dify.
 Không điền phiếu human M7b.
 
@@ -168,12 +169,24 @@ rủi ro, không phải full suite.
   `latest`, cả bản Docker Hub) cũng không còn tải ẩn danh — máy local chỉ chạy được nhờ image đã cache. Đây là
   phát hiện ảnh hưởng **cài mới** bằng dev/deploy compose, không phải hành vi M8a; nguồn image MinIO cho triển
   khai là quyết định mở của chủ dự án. CI và harness nay nhận `RAS_TEST_MINIO_IMAGE`, CI dùng
-  `cgr.dev/chainguard/minio@sha256:709099…e510` (đã thử local: 114 test storage/limiter pass). Kết quả run sau
-  sửa xem trên PR; handoff không tự nhận xanh.
+  `cgr.dev/chainguard/minio@sha256:709099…e510` (đã thử local: 114 test storage/limiter pass).
+  Run GitHub thứ hai (`39268774452`): web pass, deploy contract pass; **API fail 908 pass / 26 failure / 168
+  error**, tất cả cùng nguyên nhân `case_file_permissions` ở các file C3/C2a/C2b/C4/auth-safety: fixture
+  `tests/test_c3_operator_recovery.py` ghi file case theo umask mặc định (0644), guard POSIX của
+  `app/operator_cases.py` từ chối đúng. Đây là lỗi fixture chỉ lộ trên Linux (mọi lượt local trước chạy Windows,
+  nơi kiểm mode bị bỏ qua); guard giữ nguyên, fixture nay `chmod 0600`. Tái hiện bằng container Linux
+  `python:3.12-slim` nối tới hạ tầng thử: hai file từng lỗi 91/91 pass sau sửa; cả selection trong container
+  877 pass / 225 error, toàn bộ error là `EndpointConnectionError` tới `127.0.0.1` vì fixture upload gắn cứng
+  loopback cho MinIO (artefact mạng container, không phải sản phẩm).
+  Run GitHub thứ ba (`39284225688`, commit `6cb5253`): **API 1102/1102 pass** (JUnit đã quét, 2943 s), web pass,
+  deploy contract pass. Commit chỉ đổi docs/inventory sau đó chưa được chờ run lại.
   Timeout job API 100 phút vì selection mất ~63 phút trên máy này (thời gian runner GitHub chưa đo).
 - Sau lượt cuối chỉ đổi line ending CRLF → LF của bốn file working copy (`api/tests/test_c2a_origin.py`,
   `docker-compose.yml`, `docs/dev-setup.md`, `web/tests/proxy.test.mjs`; nội dung giữ nguyên, blob Git vốn là LF)
   và sinh inventory; hash trong inventory là bytes LF đã commit.
+- Sau selection local lượt 6 còn hai thay đổi chỉ ở test/harness theo kết quả CI Linux: `scripts/m8a_test_host.py`
+  nhận `RAS_TEST_MINIO_IMAGE` và chờ MinIO qua HTTP; fixture C3 `chmod 0600`. Không đổi `api/app`; hai thay đổi
+  này được kiểm bằng run GitHub `39284225688` (Linux, 1102/1102), không chạy lại selection Windows.
 
 **Failure/sửa trong quá trình (giữ lịch sử):**
 

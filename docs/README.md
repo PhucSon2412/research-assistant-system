@@ -1,6 +1,6 @@
 # Tài liệu dự án
 
-**M8a trên nhánh review, 2026-10-19 (chưa merge):** [handoff HTTPS/SMTP TLS/rate limit/CI](m8a-pilot-entry-hardening.md) · [inventory](m8a-test-inventory.json) · [deploy](../deploy/compose.yaml) · [CI](../.github/workflows/ci.yml). Kiểm cô lập (image thật, Chrome HTTPS với CA thử, SMTP capture); chưa domain/host/SMTP/operator/journal độc lập thật, chưa cutover; CI chưa có run GitHub. M8b tiếp sau.
+**M8a trên nhánh review, 2026-10-19 (chưa merge):** [handoff HTTPS/SMTP TLS/rate limit/CI](m8a-pilot-entry-hardening.md) · [inventory](m8a-test-inventory.json) · [deploy](../deploy/compose.yaml) · [CI](../.github/workflows/ci.yml). Kiểm cô lập (image thật, Chrome HTTPS với CA thử, SMTP capture); chưa domain/host/SMTP/operator/journal độc lập thật, chưa cutover. CI GitHub pass trên `6cb5253` (run `39284225688`, selection API 1102/1102, không phải full suite). M8b tiếp sau.
 
 **Sau merge PR #65 (`3b59a1d`, 2026-10-19):** M7b tooling đã merge, phiếu thật vẫn **0/awaiting_human_review**. Tiếp [M8a — HTTPS, SMTP TLS, rate limit auth và CI](tasks/m8a-pilot-entry-hardening.md), phần đầu gói E, mới giao/chưa triển khai. Làm độc lập lúc chủ dự án duyệt phiếu; M8b vận hành journal/backup/alert theo sau. Không cutover dev/provider/pricing hoặc tự cấp ngân sách live.
 

@@ -2,7 +2,7 @@
  "task": "M8a pilot entry hardening",
  "base": "3b59a1db4e784df0891a844ba968ba85e2797746",
  "migration_head": "0052",
- "status": "implemented and verified on isolated projects only; not merged, no cutover, no production acceptance; CI workflow written and run locally, no GitHub run yet",
+ "status": "implemented and verified on isolated projects; GitHub CI run 39284225688 on 6cb5253 passed all three jobs; not merged, no cutover, no production acceptance",
  "python": "C:\\Users\\ADMIN\\.conda\\envs\\ras\\python.exe (3.12)",
  "evidence_root": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-m8a-20261019",
  "commands_run": [
@@ -79,7 +79,8 @@
   "STARTTLS through the smoke image (pytest only; smoke uses SMTPS)",
   "multiple API replicas in the smoke (cross-process sharing shown by two pytest processes on real Redis)",
   "reset timing-enumeration measurement",
-  "a GitHub Actions run of the API job after the MinIO image fix (pending at commit time)"
+  "a CI run on the final docs-only commit (not waited for)",
+  "Windows selection rerun after the harness MinIO-image and C3 chmod fixture changes (covered by GitHub run 3 on Linux)"
  ],
  "docker_inventory": {
   "before": {
@@ -106,15 +107,17 @@
  },
  "incident": "while stopping selection-4 a broad 'taskkill //F //IM python.exe' was issued on the host; afterwards no python.exe was running and it cannot be shown whether a Python process outside the task was stopped; containers were not affected",
  "github_ci": {
-  "first_run": "PR #66 run 39266920892: web pass, deploy-config pass, API failed at infra setup (quay.io MinIO tag unauthorized)",
-  "fix": "RAS_TEST_MINIO_IMAGE=cgr.dev/chainguard/minio@sha256:709099319add48dfb44aa596a7070d3ddd8dd04d7ae881765719aec29df9e510; local trial 114 passed (test_invitation_journal + test_m8a_rate_limit)",
-  "after_fix": "see PR checks; not claimed here"
+  "run_1": "39266920892: web pass, deploy-config pass, API failed at infra setup (quay.io MinIO tag unauthorized)",
+  "run_2": "39268774452: web pass, deploy-config pass, API 908 pass / 26 failure / 168 error, all case_file_permissions (C3 fixture wrote case files 0644; POSIX guard refused)",
+  "run_3": "39284225688 at 6cb52537d6169e8e405f14250facfb88f55c63df: API 1102/1102 pass (2943 s, scanned JUnit), web pass, deploy-config pass",
+  "linux_container_check": "python:3.12-slim against isolated infra: 2 affected files 91/91 after fix; full selection 877 pass / 225 error, all EndpointConnectionError to 127.0.0.1 MinIO (upload fixture hardcodes loopback; container artefact)",
+  "after": "docs/inventory-only commit after 6cb5253 not re-verified by waiting for CI"
  },
  "source": {
   "base": "3b59a1db4e784df0891a844ba968ba85e2797746",
   "changed_files": {
    ".github/workflows/ci.yml": "2ede937265959ed1dfecd47bd64c97fa1fb2faa60b18abd08e6400793d73a8fb",
-   "AGENTS.md": "33e628ed4af13c9f50952cf8f80efc966e8934521579b903c5a1041325e70fa6",
+   "AGENTS.md": "81d1e4f4fbd5bb88c45e5642e776cbbca12814e95c04fb8d0e7c74dcdf3720ac",
    "README.md": "f8346b5639887597f37b5cbba3dd12f7a1de626acda20e44197f0284c0f82f6f",
    "api/Dockerfile": "36e07f93b2a86f0a7a45bf142dea19553a0bcedc6df23172793f37b4de64f2c3",
    "api/app/api/auth_limits.py": "94724a23c21c2210109b96ecd2bc6bbfef5ce7361d24ffac342222c7e6a4e5a0",
@@ -129,6 +132,7 @@
    "api/tests/m8a_tls.py": "0e5af6029818a333c7cc333e79fed96311de964d95048c4683afc85ac384d97d",
    "api/tests/smtp_capture.py": "57aea98780331ec78a522b8f4164a8eb924c4bb36562b4cc8529b4cccd3ee7ff",
    "api/tests/test_c2a_origin.py": "e6334ad9c631b41ef0e7c1fa9bea5dbc430f9303bf7af725ce66ef4ef8eddabe",
+   "api/tests/test_c3_operator_recovery.py": "9224e08b7ec60540dc2336fbb7c25399dc07129fe781401a58c3f4f3399dba4b",
    "api/tests/test_m8a_auth_delivery.py": "770a4c73a404a5824ee5a888e3c24576965e4c268ff4909af71a2352175b1e6f",
    "api/tests/test_m8a_rate_limit.py": "338e4cd6d6a10c97c6beebf426e66f75c4e2dd66d6887337be9bb28cdfa71ec4",
    "api/tests/test_m8a_smtp_delivery.py": "065e6d477c45ac03dd570d65e0a7681b36e1492d97be957d33a492ada42ceae7",
@@ -138,11 +142,11 @@
    "deploy/pilot.env.example": "d768a5b21ca598ed6431ebea0383c434cd74e00028a97d87bfabcea3d1245d90",
    "deploy/trust/README.md": "4302f9e23178fbf44bd5c58682e47daf5df9e9e73a41c4b6143eceea80cd7130",
    "docker-compose.yml": "1b60d7590f6f6bcb00f66cf9e57fd28a3e4abc2533f454e449119721aa06f9a1",
-   "docs/README.md": "af22297bae1d8c29f09888e4f600d24ed2311f7d03f36ac86a2a29be4007e6d1",
+   "docs/README.md": "90b998ac9ca371027d18f3b4d1ca5f45b755e99d4db7170853d39d7217ceaab4",
    "docs/decisions.md": "253a74cf745f0bb91851d8669ea7b27782078bd0b3dabdf537b3a0782f47c087",
    "docs/dev-setup.md": "628cca90c0a5667d5e08718efa061479fbb5bd0633dcde4e38d0d8f95b0b55f2",
-   "docs/m8a-pilot-entry-hardening.md": "0949c7744675169b5ed3ce4888a18e63e7bdd37367fe6a7622829ab3b2e42a9d",
-   "docs/mvp-delivery-plan.md": "04cbbc686b26e51585e66cd8d695aae133bdaf756ae49e36c6ccd35806f227ba",
+   "docs/m8a-pilot-entry-hardening.md": "d82ce243950ecc799ca312e364f09ea64e1f6dcdcc37e7a88401defded842fae",
+   "docs/mvp-delivery-plan.md": "03ef95eefd8288b0af94a62f6b55e3d90b64825698ef88058100ddfb93e2d437",
    "docs/reviews/pr65-m7b-human-quality-review.md": "39a14f4c3914492361687821b035c45a481c70599766e66b3a3d0b1d116f71ca",
    "docs/roadmap.md": "957fb518b94088f8aaef60219c9b7fa196d4b1cd469b7f5ad20b1aac8f49ccc1",
    "docs/tasks/fix-pr65-human-review-provenance.md": "a7c7da6c39ea23bb9d9c2dd7566976fae70ae2ba7f211d7de84aa799419861a0",
@@ -478,6 +482,235 @@
     "tests/test_session_revocation_journal.py": {
      "error": 48,
      "failure": 2
+    }
+   }
+  },
+  "github-run-3": {
+   "sha256": "341d6d89acda64d09fbfd3ecb42f42345d311451011f2b1731a52efba962852f",
+   "total": 1102,
+   "pass": 1102,
+   "per_file": {
+    "tests/test_auth_safety_foundation.py": {
+     "pass": 154
+    },
+    "tests/test_auth_secrets.py": {
+     "pass": 1
+    },
+    "tests/test_auth_sessions.py": {
+     "pass": 19
+    },
+    "tests/test_c2a_login_sessions.py": {
+     "pass": 68
+    },
+    "tests/test_c2a_origin.py": {
+     "pass": 66
+    },
+    "tests/test_c2b_reset_status.py": {
+     "pass": 103
+    },
+    "tests/test_c2c1_bootstrap.py": {
+     "pass": 74
+    },
+    "tests/test_c2c2_invitations.py": {
+     "pass": 151
+    },
+    "tests/test_c4_contract.py": {
+     "pass": 23
+    },
+    "tests/test_config.py": {
+     "pass": 61
+    },
+    "tests/test_csrf_and_cookies.py": {
+     "pass": 8
+    },
+    "tests/test_health.py": {
+     "pass": 6
+    },
+    "tests/test_invitation_journal.py": {
+     "pass": 88
+    },
+    "tests/test_invitations.py": {
+     "pass": 20
+    },
+    "tests/test_m8a_auth_delivery.py": {
+     "pass": 11
+    },
+    "tests/test_m8a_rate_limit.py": {
+     "pass": 26
+    },
+    "tests/test_m8a_smtp_delivery.py": {
+     "pass": 25
+    },
+    "tests/test_migrations.py": {
+     "pass": 28
+    },
+    "tests/test_password_reset.py": {
+     "pass": 10
+    },
+    "tests/test_pre_c4_initial_receipts.py": {
+     "pass": 18
+    },
+    "tests/test_reset_token_journal.py": {
+     "pass": 92
+    },
+    "tests/test_session_revocation_journal.py": {
+     "pass": 50
+    }
+   }
+  },
+  "github-run-2": {
+   "sha256": "af60b7b4ecfc7e5fc3ee4b38765160ad0c57b279d4ed8be4ce6c6af3fd891743",
+   "total": 1102,
+   "pass": 908,
+   "error": 168,
+   "failure": 26,
+   "per_file": {
+    "tests/test_auth_safety_foundation.py": {
+     "pass": 131,
+     "failure": 23
+    },
+    "tests/test_auth_secrets.py": {
+     "pass": 1
+    },
+    "tests/test_auth_sessions.py": {
+     "pass": 19
+    },
+    "tests/test_c2a_login_sessions.py": {
+     "error": 68
+    },
+    "tests/test_c2a_origin.py": {
+     "pass": 66
+    },
+    "tests/test_c2b_reset_status.py": {
+     "error": 100,
+     "failure": 2,
+     "pass": 1
+    },
+    "tests/test_c2c1_bootstrap.py": {
+     "pass": 74
+    },
+    "tests/test_c2c2_invitations.py": {
+     "pass": 151
+    },
+    "tests/test_c4_contract.py": {
+     "pass": 22,
+     "failure": 1
+    },
+    "tests/test_config.py": {
+     "pass": 61
+    },
+    "tests/test_csrf_and_cookies.py": {
+     "pass": 8
+    },
+    "tests/test_health.py": {
+     "pass": 6
+    },
+    "tests/test_invitation_journal.py": {
+     "pass": 88
+    },
+    "tests/test_invitations.py": {
+     "pass": 20
+    },
+    "tests/test_m8a_auth_delivery.py": {
+     "pass": 11
+    },
+    "tests/test_m8a_rate_limit.py": {
+     "pass": 26
+    },
+    "tests/test_m8a_smtp_delivery.py": {
+     "pass": 25
+    },
+    "tests/test_migrations.py": {
+     "pass": 28
+    },
+    "tests/test_password_reset.py": {
+     "pass": 10
+    },
+    "tests/test_pre_c4_initial_receipts.py": {
+     "pass": 18
+    },
+    "tests/test_reset_token_journal.py": {
+     "pass": 92
+    },
+    "tests/test_session_revocation_journal.py": {
+     "pass": 50
+    }
+   }
+  },
+  "linux-container": {
+   "sha256": "7f7d91feca6274547f4e1b77d3298ab2836f3d0965b0f4f66a3f8d81810e9d30",
+   "total": 1102,
+   "pass": 877,
+   "error": 225,
+   "per_file": {
+    "tests/test_auth_safety_foundation.py": {
+     "pass": 154
+    },
+    "tests/test_auth_secrets.py": {
+     "pass": 1
+    },
+    "tests/test_auth_sessions.py": {
+     "pass": 19
+    },
+    "tests/test_c2a_login_sessions.py": {
+     "pass": 68
+    },
+    "tests/test_c2a_origin.py": {
+     "pass": 66
+    },
+    "tests/test_c2b_reset_status.py": {
+     "pass": 103
+    },
+    "tests/test_c2c1_bootstrap.py": {
+     "pass": 74
+    },
+    "tests/test_c2c2_invitations.py": {
+     "pass": 151
+    },
+    "tests/test_c4_contract.py": {
+     "pass": 23
+    },
+    "tests/test_config.py": {
+     "pass": 61
+    },
+    "tests/test_csrf_and_cookies.py": {
+     "pass": 8
+    },
+    "tests/test_health.py": {
+     "pass": 6
+    },
+    "tests/test_invitation_journal.py": {
+     "error": 87,
+     "pass": 1
+    },
+    "tests/test_invitations.py": {
+     "pass": 20
+    },
+    "tests/test_m8a_auth_delivery.py": {
+     "pass": 11
+    },
+    "tests/test_m8a_rate_limit.py": {
+     "pass": 26
+    },
+    "tests/test_m8a_smtp_delivery.py": {
+     "pass": 25
+    },
+    "tests/test_migrations.py": {
+     "pass": 28
+    },
+    "tests/test_password_reset.py": {
+     "pass": 10
+    },
+    "tests/test_pre_c4_initial_receipts.py": {
+     "pass": 18
+    },
+    "tests/test_reset_token_journal.py": {
+     "error": 90,
+     "pass": 2
+    },
+    "tests/test_session_revocation_journal.py": {
+     "error": 48,
+     "pass": 2
     }
    }
   }
