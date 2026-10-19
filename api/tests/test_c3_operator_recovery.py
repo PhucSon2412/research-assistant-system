@@ -136,6 +136,7 @@ def make_case(w, uid, action, *, operator=None, register=True, role=None, approv
             "expires_at": (expires or NOW + timedelta(hours=1)).isoformat()} | override
     path = w.cases / f"{body['case_id']}.json"
     path.write_text(json.dumps(body), encoding="utf-8")
+    os.chmod(path, 0o600)  # an operator's restricted case file; POSIX refuses group/other bits
     case = load_case_file(path, max_bytes=4096)
     if register:
         register_case(w.engine, case, now=NOW - timedelta(minutes=10), max_lifetime=w.settings.auth_recovery.case_max_lifetime)
@@ -1053,6 +1054,7 @@ def test_two_dump_restore_rounds_never_reuse_case_or_rebuild_credential(world, a
             body.update(case_id=str(uuid.uuid4()), expected_credential_operation_id=credential.body["operation_id"])
             path = w.cases / f"{body['case_id']}.json"
             path.write_text(json.dumps(body))
+            os.chmod(path, 0o600)
             fresh = load_case_file(path, max_bytes=4096)
             register_case(owner, fresh, now=NOW - timedelta(minutes=1), max_lifetime=settings.auth_recovery.case_max_lifetime)
             result = ops.run(op_engine, settings, fresh, user_id=uid, installation=w.journal_id, action=fresh.action,
