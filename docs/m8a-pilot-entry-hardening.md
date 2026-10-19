@@ -162,7 +162,14 @@ rủi ro, không phải full suite.
   gửi mail khi proof trước gửi đã mất, web chuyển IP không cần token edge — mỗi đột biến làm fail đúng test nhắm.
 - Web: `npm test` **79/79**, typecheck và build exit 0. Deploy contract ok, `Settings` production kiểm trong image
   smoke3; `caddy validate` "Valid configuration".
-- CI: `.github/workflows/ci.yml` đã viết; các bước tương ứng đã chạy local như trên; **chưa có run GitHub**.
+- CI: `.github/workflows/ci.yml` đã viết; các bước tương ứng đã chạy local như trên. Run GitHub đầu tiên
+  (PR #66, run `39266920892`): **web pass, deploy contract pass, API fail ở bước dựng hạ tầng** vì runner không kéo
+  được `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z` ("unauthorized"); từ máy này manifest tag đó (và
+  `latest`, cả bản Docker Hub) cũng không còn tải ẩn danh — máy local chỉ chạy được nhờ image đã cache. Đây là
+  phát hiện ảnh hưởng **cài mới** bằng dev/deploy compose, không phải hành vi M8a; nguồn image MinIO cho triển
+  khai là quyết định mở của chủ dự án. CI và harness nay nhận `RAS_TEST_MINIO_IMAGE`, CI dùng
+  `cgr.dev/chainguard/minio@sha256:709099…e510` (đã thử local: 114 test storage/limiter pass). Kết quả run sau
+  sửa xem trên PR; handoff không tự nhận xanh.
   Timeout job API 100 phút vì selection mất ~63 phút trên máy này (thời gian runner GitHub chưa đo).
 - Sau lượt cuối chỉ đổi line ending CRLF → LF của bốn file working copy (`api/tests/test_c2a_origin.py`,
   `docker-compose.yml`, `docs/dev-setup.md`, `web/tests/proxy.test.mjs`; nội dung giữ nguyên, blob Git vốn là LF)
@@ -205,8 +212,10 @@ xác định được nó có dừng process Python ngoài task hay không. Cont
 
 ## Giới hạn và phần chưa làm
 
-- Chưa có run GitHub Actions; CI chỉ chạy selection, không phải full suite (> 5.000 test) và không chạy browser,
-  image smoke hay năm restore drill. Chặn outbound trong CI là guard httpx trong pytest, không phải firewall.
+- CI chỉ chạy selection, không phải full suite (> 5.000 test) và không chạy browser, image smoke hay năm restore
+  drill. Chặn outbound trong CI là guard httpx trong pytest, không phải firewall.
+- Image MinIO pin trong `docker-compose.yml`/`deploy/compose.yaml` không còn kéo ẩn danh được; host mới cần
+  mirror/registry có quyền hoặc chọn image khác (chưa đổi trong PR này vì là quyết định nguồn phần mềm).
 - Không có domain/ACME/certificate thật, SMTP relay/account thật, deliverability (SPF/DKIM/DMARC), host thật,
   operator thật hay journal độc lập. Server nhận mail không chứng minh người nhận nhận được.
 - Timing enumeration của reset chưa đo; giới hạn rate limit chưa benchmark; HSTS ngắn, chưa preload.

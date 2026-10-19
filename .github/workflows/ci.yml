@@ -31,6 +31,10 @@ jobs:
       - name: Install API with dev extras
         run: python -m pip install -e "./api[dev]"
       - name: Start isolated PostgreSQL/Redis/MinIO
+        # The repo's pinned quay.io MinIO tag is no longer anonymously pullable
+        # (first GitHub run, 2026-10-19); tests use a digest-pinned public build.
+        env:
+          RAS_TEST_MINIO_IMAGE: cgr.dev/chainguard/minio@sha256:709099319add48dfb44aa596a7070d3ddd8dd04d7ae881765719aec29df9e510
         run: python scripts/m8a_test_host.py --context "$RUNNER_TEMP/m8a-api" setup
       - name: Run API selection
         # Why each file: config and new M8a modules; session/CSRF/Origin/cookies;

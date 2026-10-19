@@ -75,11 +75,11 @@
  "deploy_contract": "ok; production Settings validated inside rasm8a426c22e7-api:local; Caddyfile valid",
  "not_run": [
   "full API suite (>5,000 nodes) and the five restore drills (no journal/restore/schema change)",
-  "GitHub Actions run of .github/workflows/ci.yml",
   "real domain/ACME, real SMTP relay/account/deliverability, real host/operator, independent journal storage",
   "STARTTLS through the smoke image (pytest only; smoke uses SMTPS)",
   "multiple API replicas in the smoke (cross-process sharing shown by two pytest processes on real Redis)",
-  "reset timing-enumeration measurement"
+  "reset timing-enumeration measurement",
+  "a GitHub Actions run of the API job after the MinIO image fix (pending at commit time)"
  ],
  "docker_inventory": {
   "before": {
@@ -105,10 +105,15 @@
   "note": "baseline snapshot was taken after the caddy/playwright pulls had started; only rasm8a*/rasm8at* projects were removed after label checks; dev ras and Dify untouched"
  },
  "incident": "while stopping selection-4 a broad 'taskkill //F //IM python.exe' was issued on the host; afterwards no python.exe was running and it cannot be shown whether a Python process outside the task was stopped; containers were not affected",
+ "github_ci": {
+  "first_run": "PR #66 run 39266920892: web pass, deploy-config pass, API failed at infra setup (quay.io MinIO tag unauthorized)",
+  "fix": "RAS_TEST_MINIO_IMAGE=cgr.dev/chainguard/minio@sha256:709099319add48dfb44aa596a7070d3ddd8dd04d7ae881765719aec29df9e510; local trial 114 passed (test_invitation_journal + test_m8a_rate_limit)",
+  "after_fix": "see PR checks; not claimed here"
+ },
  "source": {
   "base": "3b59a1db4e784df0891a844ba968ba85e2797746",
   "changed_files": {
-   ".github/workflows/ci.yml": "91a45db6215e38f24a0fc6a118714c4bdbf0e821d1e7e471d8356c289c5b8364",
+   ".github/workflows/ci.yml": "2ede937265959ed1dfecd47bd64c97fa1fb2faa60b18abd08e6400793d73a8fb",
    "AGENTS.md": "33e628ed4af13c9f50952cf8f80efc966e8934521579b903c5a1041325e70fa6",
    "README.md": "f8346b5639887597f37b5cbba3dd12f7a1de626acda20e44197f0284c0f82f6f",
    "api/Dockerfile": "36e07f93b2a86f0a7a45bf142dea19553a0bcedc6df23172793f37b4de64f2c3",
@@ -134,9 +139,9 @@
    "deploy/trust/README.md": "4302f9e23178fbf44bd5c58682e47daf5df9e9e73a41c4b6143eceea80cd7130",
    "docker-compose.yml": "1b60d7590f6f6bcb00f66cf9e57fd28a3e4abc2533f454e449119721aa06f9a1",
    "docs/README.md": "af22297bae1d8c29f09888e4f600d24ed2311f7d03f36ac86a2a29be4007e6d1",
-   "docs/decisions.md": "989e83400f4cd1b2a0a43971633ae9639b41e9548c13a0913162ec273faf4fb3",
+   "docs/decisions.md": "253a74cf745f0bb91851d8669ea7b27782078bd0b3dabdf537b3a0782f47c087",
    "docs/dev-setup.md": "628cca90c0a5667d5e08718efa061479fbb5bd0633dcde4e38d0d8f95b0b55f2",
-   "docs/m8a-pilot-entry-hardening.md": "b130bf592da48c056e66a5b6cbedb86ad24f772854e6f99b72a539c123a40db2",
+   "docs/m8a-pilot-entry-hardening.md": "0949c7744675169b5ed3ce4888a18e63e7bdd37367fe6a7622829ab3b2e42a9d",
    "docs/mvp-delivery-plan.md": "04cbbc686b26e51585e66cd8d695aae133bdaf756ae49e36c6ccd35806f227ba",
    "docs/reviews/pr65-m7b-human-quality-review.md": "39a14f4c3914492361687821b035c45a481c70599766e66b3a3d0b1d116f71ca",
    "docs/roadmap.md": "957fb518b94088f8aaef60219c9b7fa196d4b1cd469b7f5ad20b1aac8f49ccc1",
@@ -150,7 +155,7 @@
    "scripts/m8a_inventory.py": "85a3ca45014b602559f1f10938af32e0ed8f984b8a17893782819992f0dfef40",
    "scripts/m8a_probe.py": "36cbb4d96ca7273f86998cac4e4cb61eafcaaef0a57958aff17c9444a6560286",
    "scripts/m8a_smoke.py": "ad9b6c9dc6c20adc11c71b02723dfa6d9da35d7fd0e7695f6eb96e0ae855c07e",
-   "scripts/m8a_test_host.py": "3b456e16205e25e40d847f4c69aa9eba08bc190c92a79621b27083831ad14c04",
+   "scripts/m8a_test_host.py": "a4ff18f9786a5fc82e23262cc426fb159a304504a3f11b9aa9c792aff76555f5",
    "web/app/admin/page.tsx": "35c3917baf03f8aa3a3d0880604af952575ea51cfb10fc6c8987019e7e5143a0",
    "web/lib/api.ts": "62b9f6d6b153c3be8817da0ae455f79a83c38cf210dbb219a491469f722f234b",
    "web/lib/proxy.ts": "2f72003bd0d61d2eb9827a72ccef675ceecb6c2463d23c7e0c4effa6b1efc3d3",

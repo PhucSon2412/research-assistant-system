@@ -39,6 +39,24 @@ httpx.HTTPTransport.handle_request = guard(httpx.HTTPTransport.handle_request)
 """
 
 
+MINIO_IMAGE = "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z"
+
+
+def wait_http(url: str, seconds: float) -> bool:
+    import time
+    import urllib.request
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=3) as response:
+                if response.status == 200:
+                    return True
+        except OSError:
+            pass
+        time.sleep(1)
+    return False
+
+
 def context(root: Path) -> dict:
     return json.loads((root / "context.json").read_text(encoding="utf-8"))
 
@@ -79,16 +97,20 @@ def main() -> int:
             "redis": {"image": "redis:7-alpine", "labels": label,
                       "command": ["redis-server", "--save", "", "--appendonly", "no", "--requirepass", c["redis"]],
                       "ports": [f"127.0.0.1:{c['redis_port']}:6379"]},
-            "minio": {"image": "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z", "labels": label,
+            # The repo's pinned quay.io tag is no longer anonymously pullable (seen 2026-10-19);
+            # CI passes a digest-pinned public image. Readiness is polled over HTTP below,
+            # since minimal images ship no `mc`.
+            "minio": {"image": os.environ.get("RAS_TEST_MINIO_IMAGE", MINIO_IMAGE), "labels": label,
                       "command": ["server", "/data"], "tmpfs": ["/data"],
                       "environment": {"MINIO_ROOT_USER": "m8a_minio", "MINIO_ROOT_PASSWORD": c["minio"]},
-                      "ports": [f"127.0.0.1:{c['minio_port']}:9000"],
-                      "healthcheck": {"test": ["CMD", "mc", "ready", "local"], "interval": "2s", "retries": 30}}}}
+                      "ports": [f"127.0.0.1:{c['minio_port']}:9000"]}}}
         (root / "compose.json").write_text(json.dumps(spec, indent=2), encoding="utf-8")
         (root / "context.json").write_text(json.dumps(c), encoding="utf-8")
         (root / "guard").mkdir(exist_ok=True)
         (root / "guard" / "sitecustomize.py").write_text(GUARD, encoding="utf-8")
         code = compose(root, c, "up", "-d", "--wait")
+        if code == 0 and not wait_http(f"http://127.0.0.1:{c['minio_port']}/minio/health/live", 90):
+            code = 1
         print("isolated test infra " + c["project"] + (" up" if code == 0 else " FAILED"))
         return code
     c = context(root)
