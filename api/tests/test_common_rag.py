@@ -212,7 +212,7 @@ def test_generation_on_common_evidence_is_charged_to_the_asking_user(w, monkeypa
     # same copy.
     policy = w.settings.generation
     w.settings.budget.user_generation_daily_usd = float(
-        money(policy.max_input_tokens_estimate, policy.max_input_usd_per_million_tokens)
+        money(policy.max_input_tokens_estimate, policy.input_usd_per_million_ceiling)
         + money(policy.max_output_tokens, policy.max_output_usd_per_million_tokens))
     refused = ask(w.a, item_id=w.ok)
     assert (refused.status_code, refused.json()) == (429, {"error": "rag_user_budget_exhausted"})

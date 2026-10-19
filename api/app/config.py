@@ -325,6 +325,39 @@ class ProviderBudget(BaseModel):
         return self
 
 
+_PROVIDER_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}(/[a-z0-9][a-z0-9-]{0,63})?$")
+
+
+class ProviderRouting(BaseModel):
+    """M7a request-level OpenRouter provider policy, sent on every call of a route.
+
+    Pins a nonempty set of reviewed provider slugs with no fallback, data
+    collection denied and Zero Data Retention required; ``max_price`` is derived
+    from the route's own configured price ceiling so a provider priced above
+    the reservation estimate is never selected. Pinning a provider does not
+    enable a route: ``pricing_verified`` stays the separate gate.
+    """
+    only: tuple[str, ...]
+    zdr: Literal[True] = True
+    data_collection: Literal["deny"] = "deny"
+    allow_fallbacks: Literal[False] = False
+
+    @field_validator("only")
+    @classmethod
+    def _slugs(cls, value):
+        if not value or len(value) > 8 or len(set(value)) != len(value) or not all(
+                isinstance(slug, str) and _PROVIDER_SLUG.fullmatch(slug) for slug in value):
+            raise ValueError("routing.only needs 1-8 distinct lowercase provider slugs")
+        return tuple(value)
+
+    def body(self, max_price: dict, *, require_parameters: bool = False) -> dict:
+        out = {"only": list(self.only), "allow_fallbacks": False, "data_collection": "deny",
+               "zdr": True, "max_price": {k: format(v, "f") for k, v in max_price.items()}}
+        if require_parameters:
+            out["require_parameters"] = True
+        return out
+
+
 class EmbeddingPolicy(BaseModel):
     model_id: str = "openai/text-embedding-3-small"
     provider: str = "openrouter"
@@ -339,6 +372,8 @@ class EmbeddingPolicy(BaseModel):
     # synthetic request before setting pricing_verified for private documents.
     max_usd_per_million_tokens: float = Field(default=0.10, gt=0)
     pricing_verified: bool = False
+    # M7a: OpenRouter lists only the Azure endpoint of this model as ZDR.
+    routing: ProviderRouting = ProviderRouting(only=("azure",))
 
     @field_validator("api_key", mode="before")
     @classmethod
@@ -386,6 +421,8 @@ class RerankPolicy(BaseModel):
     reservation_lease_seconds: int = Field(default=60, gt=0)
     max_usd_per_million_tokens: float = Field(default=0.20, gt=0)
     max_request_usd: float = Field(default=0.01, gt=0)
+    # M7a: the only listed endpoint (Fireworks) is also OpenRouter's ZDR endpoint.
+    routing: ProviderRouting = ProviderRouting(only=("fireworks",))
 
     @model_validator(mode="after")
     def _check_endpoint(self) -> "RerankPolicy":
@@ -411,8 +448,20 @@ class GenerationPolicy(BaseModel):
     request_timeout_seconds: int = Field(default=60, gt=0)
     reservation_lease_seconds: int = Field(default=100, gt=0)
     max_input_usd_per_million_tokens: float = Field(default=2.0, gt=0)
+    # M7a live charge: prompts above the provider's cache threshold were billed at
+    # the endpoint's cache-write price (listed $2.5/M for the reviewed Azure
+    # endpoint), which max_price.prompt does not bound. Input is estimated at the
+    # higher of the two so reservation and settlement never fall below the charge.
+    max_input_cache_write_usd_per_million_tokens: float = Field(default=2.5, gt=0)
     max_output_usd_per_million_tokens: float = Field(default=10.0, gt=0)
     max_request_usd: float = Field(default=0.05, gt=0)
+    # M7a: OpenRouter's ZDR endpoints of the model are Azure; max_price excludes
+    # the Azure variants priced above the configured ceilings.
+    routing: ProviderRouting = ProviderRouting(only=("azure",))
+
+    @property
+    def input_usd_per_million_ceiling(self) -> float:
+        return max(self.max_input_usd_per_million_tokens, self.max_input_cache_write_usd_per_million_tokens)
 
     @model_validator(mode="after")
     def _check_endpoint(self) -> "GenerationPolicy":

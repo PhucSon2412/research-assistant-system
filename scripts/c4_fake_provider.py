@@ -24,6 +24,9 @@ def controlled(self, request):
         raise AssertionError('fake transport requires the synthetic key')
     body = json.loads(request.content)
     path = request.url.path
+    policy = body.get('provider') or {}
+    if policy.get('allow_fallbacks') is not False or policy.get('zdr') is not True or not policy.get('only'):
+        raise AssertionError('fake transport requires the pinned no-fallback ZDR provider policy')
     log = os.environ.get('C4_FAKE_CALL_LOG')
     if log:
         with Path(log).open('a', encoding='utf-8') as output:
@@ -41,7 +44,7 @@ def controlled(self, request):
         claims = {'claims':[{'text':quote,'citations':[{'chunk_id':evidence[0]['chunk_id'],'quote':quote}]}]}
         data = {'object':'chat.completion','model':body['model'],
             'openrouter_metadata':{'requested':body['model'],'endpoints':{'available':[
-                {'selected':True,'provider':'C4 synthetic capture','model':body['model']}]}},
+                {'selected':True,'provider':'Azure','model':body['model']}]}},
             'choices':[{'finish_reason':'stop','message':{'content':json.dumps(claims)}}],
             'usage':{'prompt_tokens':1,'completion_tokens':1}}
     else:

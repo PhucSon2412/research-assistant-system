@@ -18,7 +18,9 @@ def test_embedding_transport_sends_only_one_extracted_text(monkeypatch):
         assert str(request.url) == "https://openrouter.ai/api/v1/embeddings"
         assert request.headers["authorization"] == "Bearer synthetic-key"
         assert payload == {"model": "openai/text-embedding-3-small", "input": "synthetic extracted body",
-                           "input_type": "search_document", "encoding_format": "float"}
+                           "input_type": "search_document", "encoding_format": "float",
+                           "provider": {"only": ["azure"], "allow_fallbacks": False, "data_collection": "deny",
+                                        "zdr": True, "max_price": {"prompt": "0.100000"}}}
         seen.append(payload["input"])
         return httpx.Response(200, json={"model": "text-embedding-3-small", "provider": "Azure",
             "data": [{"index": 0, "embedding": [0.1] * 1536}],

@@ -71,7 +71,7 @@ def counter(engine, principal, settings, clock, csrf, item, collection, scope):
 
 def admission(engine, principal, settings, clock, csrf, item, collection, scope, rows):
     policy = settings.generation
-    ceiling = rag.money(policy.max_input_tokens_estimate, policy.max_input_usd_per_million_tokens) + rag.money(
+    ceiling = rag.money(policy.max_input_tokens_estimate, policy.input_usd_per_million_ceiling) + rag.money(
         policy.max_output_tokens, policy.max_output_usd_per_million_tokens)
     if ceiling > Decimal(str(policy.max_request_usd)):
         content(engine, 'unavailable', principal, settings, clock, csrf, item, collection, scope, rows)
