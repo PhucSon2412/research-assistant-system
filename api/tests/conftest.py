@@ -23,6 +23,7 @@ from sqlalchemy.engine import URL, make_url
 
 from app import config as app_config
 from app import db as app_db
+from app.rate_limit import make_rate_limiter as REAL_MAKE_RATE_LIMITER
 
 API_DIR = Path(__file__).resolve().parents[1]
 # Latest Alembic revision; bump when a migration is added.
@@ -201,6 +202,30 @@ def api(app_env, migrated_db_url: URL, monkeypatch: pytest.MonkeyPatch, engine: 
     app.dependency_overrides.clear()
     get_delivery.cache_clear()
     runtime.dispose()
+
+
+@pytest.fixture(autouse=True)
+def _auth_rate_limit_default(monkeypatch: pytest.MonkeyPatch):
+    """M8a: suites that do not target the auth limiter keep the pre-M8a request
+    flow. The settings are left untouched (production still refuses
+    ``disabled``); only the route's limiter factory is replaced here. Limiter
+    tests restore the real factory with ``real_rate_limiter``."""
+    from app import rate_limit
+
+    monkeypatch.setattr(rate_limit, "make_rate_limiter", lambda settings: rate_limit.DisabledRateLimiter())
+    rate_limit.get_rate_limiter.cache_clear()
+    yield
+    rate_limit.get_rate_limiter.cache_clear()
+
+
+@pytest.fixture
+def real_rate_limiter(monkeypatch: pytest.MonkeyPatch):
+    from app import rate_limit
+
+    monkeypatch.setattr(rate_limit, "make_rate_limiter", REAL_MAKE_RATE_LIMITER)
+    rate_limit.get_rate_limiter.cache_clear()
+    yield
+    rate_limit.get_rate_limiter.cache_clear()
 
 
 @pytest.fixture

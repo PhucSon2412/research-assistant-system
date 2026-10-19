@@ -154,6 +154,10 @@ services:
       # Invitation/reset links are kept in API memory for an Admin to read
       # at /admin (single process; emptied on restart). Real channel: open.
       RAS_DELIVERY__MODE: dev_outbox
+      # M8a: the Redis auth rate limiter needs a deployment HMAC secret file;
+      # the dev stack keeps it off (development only, refused in production).
+      # The pilot deployment (deploy/compose.yaml) runs it with Redis.
+      RAS_RATE_LIMIT__MODE: disabled
       RAS_EMBEDDING__API_KEY: ${OPENROUTER_API_KEY:-}
       RAS_EMBEDDING__PRICING_VERIFIED: ${RAS_EMBEDDING__PRICING_VERIFIED:-false}
       RAS_EMBEDDING__MAX_USD_PER_MILLION_TOKENS: ${RAS_EMBEDDING__MAX_USD_PER_MILLION_TOKENS:-0.10}

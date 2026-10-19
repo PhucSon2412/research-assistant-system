@@ -1,0 +1,309 @@
+# M8a pilot deployment (closed test group). Separate from the dev stack in
+# ../docker-compose.yml: production settings are fixed here, not switched by
+# variables. Run every command with an operator-provided env file and project:
+#
+#   docker compose --env-file <pilot.env> -p <project> -f deploy/compose.yaml <cmd>
+#
+# Topology (docs/m8a-pilot-entry-hardening.md):
+#   internet -> edge (Caddy, the only published ports) -> web (Next.js) -> api
+#   public   : edge only, normal bridge (ACME/HTTPS clients)
+#   edge     : edge + web, internal (no route out)
+#   backend  : web, api, worker, beat, db, redis, minio, one-shot CLIs; internal
+#   egress   : api + worker only, for SMTP relay / provider / arXiv when enabled
+# Trusted proxy chain: Caddy overwrites X-RAS-Client-IP with the TCP peer and
+# adds the edge token (secret file); web forwards that address only when the
+# token matches; the API trusts it only from web's fixed backend address.
+#
+# Secrets: database/MinIO/Redis passwords come from the env file, split per
+# C4 role (runtime services never receive migrator/recovery passwords). SMTP
+# password, rate-limit HMAC key and edge token are files in RAS_SECRETS_DIR,
+# mounted read-only. The journal directory is given explicitly by the
+# operator; it is never a default named volume.
+
+name: ${RAS_DEPLOY_PROJECT:?set RAS_DEPLOY_PROJECT}
+
+x-api-image: &api-image
+  image: ${RAS_API_IMAGE:?set the frozen API image tag or digest}
+  pull_policy: never
+x-db-env: &db-env
+  RAS_DB__HOST: db
+  RAS_DB__PORT: "5432"
+  RAS_DB__USER: ${RAS_RUNTIME_DB_USER:?set runtime LOGIN}
+  RAS_DB__PASSWORD: ${RAS_RUNTIME_DB_PASSWORD:?set runtime password}
+  RAS_DB__NAME: ${POSTGRES_DB:?set POSTGRES_DB}
+x-migrator-env: &migrator-env
+  RAS_DB__HOST: db
+  RAS_DB__PORT: "5432"
+  RAS_DB__USER: ${POSTGRES_USER:?set POSTGRES_USER}
+  RAS_DB__PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+  RAS_DB__NAME: ${POSTGRES_DB:?set POSTGRES_DB}
+x-journal-env: &journal-env
+  RAS_RECOVERY__JOURNAL_PATH: /var/lib/ras/journal/revocations.jsonl
+x-journal-volume: &journal-volume ${RAS_JOURNAL_DIR:?set an operator-provided journal directory outside DB/object storage and their backups}:/var/lib/ras/journal
+x-storage-env: &storage-env
+  RAS_STORAGE__ENDPOINT_URL: http://minio:9000
+  RAS_STORAGE__ACCESS_KEY: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
+  RAS_STORAGE__SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+  RAS_STORAGE__BUCKET: ras-originals
+x-provider-env: &provider-env
+  # Pricing stays a separate gate, default false; an empty key sends nothing.
+  RAS_EMBEDDING__API_KEY: ${OPENROUTER_API_KEY:-}
+  RAS_EMBEDDING__PRICING_VERIFIED: ${RAS_EMBEDDING__PRICING_VERIFIED:-false}
+  RAS_RERANK__PRICING_VERIFIED: ${RAS_RERANK__PRICING_VERIFIED:-false}
+  RAS_GENERATION__PRICING_VERIFIED: ${RAS_GENERATION__PRICING_VERIFIED:-false}
+
+services:
+  edge:
+    image: ${RAS_EDGE_IMAGE:-caddy:2.10.2-alpine}
+    environment:
+      RAS_PUBLIC_HOST: ${RAS_PUBLIC_HOST:?set the public HTTPS host name}
+      RAS_HSTS_MAX_AGE: ${RAS_HSTS_MAX_AGE:-86400}
+    ports:
+      - "${RAS_EDGE_BIND:-0.0.0.0}:${RAS_EDGE_HTTP_PORT:-80}:80"
+      - "${RAS_EDGE_BIND:-0.0.0.0}:${RAS_EDGE_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${RAS_CADDY_TLS_DIR:-./caddy/tls.d}:/etc/caddy/tls.d:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    secrets:
+      - edge_token
+    networks: [public, edge]
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    image: ${RAS_WEB_IMAGE:?set the frozen web image tag or digest}
+    build: ../web
+    pull_policy: never
+    environment:
+      API_INTERNAL_URL: http://api:8000
+      WEB_EDGE_TOKEN_FILE: /run/secrets/edge_token
+      WEB_PROXY_TIMEOUT_SECONDS: ${WEB_PROXY_TIMEOUT_SECONDS:-15}
+      WEB_PROXY_PROVIDER_TIMEOUT_SECONDS: ${WEB_PROXY_PROVIDER_TIMEOUT_SECONDS:-120}
+      WEB_PROXY_REVIEW_APPROVAL_TIMEOUT_SECONDS: ${WEB_PROXY_REVIEW_APPROVAL_TIMEOUT_SECONDS:-120}
+      WEB_PROXY_PUBLICATION_TIMEOUT_SECONDS: ${WEB_PROXY_PUBLICATION_TIMEOUT_SECONDS:-120}
+    secrets:
+      - edge_token
+    networks:
+      edge: {}
+      backend:
+        ipv4_address: ${RAS_WEB_BACKEND_IP:?set web's fixed address inside RAS_BACKEND_SUBNET}
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    # Celery broker (db 0) and the shared auth rate limiter (db 1).
+    image: redis:7-alpine
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$${REDIS_PASSWORD}\""]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio-data:/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  migrate:
+    <<: *api-image
+    build: ../api
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      <<: *migrator-env
+    networks: [backend]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  provision:
+    <<: *api-image
+    command: ["python", "-m", "app.cli.provision_auth_roles", "--create-logins",
+              "--runtime", "${RAS_RUNTIME_DB_USER:?set runtime LOGIN}",
+              "--recovery", "${RAS_RECOVERY_DB_USER:?set recovery LOGIN}",
+              "--definer", "${RAS_DEFINER_DB_ROLE:?set NOLOGIN definer}"]
+    environment:
+      <<: *migrator-env
+      RAS_PROVISION_RUNTIME_PASSWORD: ${RAS_RUNTIME_DB_PASSWORD:?set runtime password}
+      RAS_PROVISION_RECOVERY_PASSWORD: ${RAS_RECOVERY_DB_PASSWORD:?set recovery password}
+    networks: [backend]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  recovery-init:
+    # C4 new-install registration only; a registered/non-empty DB or an
+    # existing journal is never adopted (no register-existing here).
+    <<: *api-image
+    command: ["python", "-m", "app.cli.initialize_installation"]
+    environment:
+      <<: [*migrator-env, *journal-env, *storage-env]
+    volumes:
+      - *journal-volume
+    networks: [backend]
+    depends_on:
+      provision:
+        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *api-image
+    environment:
+      <<: [*db-env, *journal-env, *storage-env, *provider-env]
+      RAS_ENVIRONMENT: production
+      RAS_HTTP__COOKIE_SECURE: "true"
+      RAS_HTTP__PUBLIC_BASE_URL: https://${RAS_PUBLIC_HOST:?set the public HTTPS host name}
+      RAS_HTTP__ALLOWED_ORIGINS: '["https://${RAS_PUBLIC_HOST:?set the public HTTPS host name}"]'
+      RAS_HTTP__TRUSTED_PROXY_CIDRS: '["${RAS_WEB_BACKEND_IP:?set web backend address}/32"]'
+      RAS_REDIS_HOST: redis
+      RAS_REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+      RAS_RATE_LIMIT__MODE: redis
+      RAS_RATE_LIMIT__KEY_SECRET_FILE: /run/secrets/rate_limit_key
+      RAS_DELIVERY__MODE: smtp
+      RAS_DELIVERY__SMTP__HOST: ${RAS_SMTP_HOST:?set the SMTP relay host}
+      RAS_DELIVERY__SMTP__PORT: ${RAS_SMTP_PORT:?set the SMTP relay port}
+      RAS_DELIVERY__SMTP__SECURITY: ${RAS_SMTP_SECURITY:?set implicit_tls or starttls}
+      RAS_DELIVERY__SMTP__SENDER: ${RAS_SMTP_SENDER:?set the sender address}
+      RAS_DELIVERY__SMTP__SENDER_NAME: ${RAS_SMTP_SENDER_NAME:-Research Assistant System}
+      RAS_DELIVERY__SMTP__USERNAME: ${RAS_SMTP_USERNAME:-}
+      RAS_DELIVERY__SMTP__PASSWORD_FILE: ${RAS_SMTP_PASSWORD_FILE:-}
+      RAS_DELIVERY__SMTP__CA_FILE: ${RAS_SMTP_CA_FILE:-}
+      RAS_DELIVERY__SMTP__CONNECT_TIMEOUT_SECONDS: ${RAS_SMTP_CONNECT_TIMEOUT_SECONDS:-5}
+      RAS_DELIVERY__SMTP__TOTAL_TIMEOUT_SECONDS: ${RAS_SMTP_TOTAL_TIMEOUT_SECONDS:-10}
+    volumes:
+      - *journal-volume
+      - ${RAS_TRUST_DIR:-./trust}:/etc/ras/trust:ro
+    secrets:
+      - rate_limit_key
+      - smtp_password
+    networks: [backend, egress]
+    depends_on:
+      recovery-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  worker:
+    <<: *api-image
+    command: ["celery", "-A", "app.ingest.celery_app:celery_app", "worker", "--loglevel=WARNING", "--concurrency=2"]
+    environment:
+      <<: [*db-env, *journal-env, *storage-env, *provider-env]
+      RAS_ENVIRONMENT: production
+      RAS_REDIS_HOST: redis
+      RAS_REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+      RAS_DISCOVERY__ENABLED: ${RAS_DISCOVERY__ENABLED:-false}
+    volumes:
+      - *journal-volume
+    networks: [backend, egress]
+    depends_on:
+      recovery-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+
+  beat:
+    <<: *api-image
+    command: ["celery", "-A", "app.ingest.celery_app:celery_app", "beat", "--loglevel=WARNING", "--schedule=/tmp/celerybeat-schedule"]
+    environment:
+      <<: [*db-env, *journal-env, *provider-env]
+      RAS_ENVIRONMENT: production
+      RAS_REDIS_HOST: redis
+      RAS_REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+      RAS_DISCOVERY__ENABLED: ${RAS_DISCOVERY__ENABLED:-false}
+    volumes:
+      - *journal-volume
+    networks: [backend]
+    depends_on:
+      recovery-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+secrets:
+  edge_token:
+    file: ${RAS_SECRETS_DIR:?set the operator secrets directory}/edge_token
+  rate_limit_key:
+    file: ${RAS_SECRETS_DIR:?set the operator secrets directory}/rate_limit_key
+  smtp_password:
+    file: ${RAS_SECRETS_DIR:?set the operator secrets directory}/smtp_password
+
+networks:
+  public: {}
+  edge:
+    internal: true
+  backend:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${RAS_BACKEND_SUBNET:?set a private subnet for the backend network}
+  egress: {}
+
+volumes:
+  db-data:
+  redis-data:
+  minio-data:
+  caddy-data:
+  caddy-config:

@@ -18,11 +18,13 @@ from app.api.cookies import (
     set_csrf_cookie,
     set_session_cookie,
 )
+from app.api.auth_limits import enforce
 from app.api.deps import get_clock, get_db, get_now, get_session_context, get_auth_write_context
 from app.api.errors import ApiError
 from app.audit import record_event
 from app.config import Settings, get_settings
 from app.delivery import DeliveryAdapter, MessageKind, OutgoingMessage, build_link, get_delivery
+from app.rate_limit import AuthAction, get_rate_limiter
 from app.identity import invitations, password_reset
 from app.identity.errors import InvalidCredentials, InvalidToken
 from app.identity.login import login
@@ -122,7 +124,9 @@ def login_route(
     now: datetime = Depends(get_now),
     settings: Settings = Depends(get_settings),
     clock=Depends(get_clock),
+    limiter=Depends(get_rate_limiter),
 ) -> dict:
+    enforce(request, settings, limiter, AuthAction.LOGIN, account=body.email)
     try:
         user, issued = login(db, email=body.email, password=body.password, now=now, settings=settings,
                              previous_token=request.cookies.get(session_cookie_name(settings)), clock=clock)
@@ -234,9 +238,11 @@ def revoke_other_sessions(
 
 
 @router.post("/invitations/inspect")
-def inspect_invitation(body: TokenIn, db: Session = Depends(get_db), clock=Depends(get_clock)) -> dict:
+def inspect_invitation(body: TokenIn, request: Request, db: Session = Depends(get_db), clock=Depends(get_clock),
+                       settings: Settings = Depends(get_settings), limiter=Depends(get_rate_limiter)) -> dict:
     """Show the invitee which email they are activating (token in the body,
     never in a URL)."""
+    enforce(request, settings, limiter, AuthAction.TOKEN)
     try:
         inv = invitations.inspect_invitation(db, body.token, clock=clock)
     except InvalidToken:
@@ -247,11 +253,14 @@ def inspect_invitation(body: TokenIn, db: Session = Depends(get_db), clock=Depen
 @router.post("/invitations/accept", status_code=status.HTTP_201_CREATED)
 def accept_invitation(
     body: AcceptInvitationIn,
+    request: Request,
     clock=Depends(get_clock),
     db: Session = Depends(get_db),
     now: datetime = Depends(get_now),
     settings: Settings = Depends(get_settings),
+    limiter=Depends(get_rate_limiter),
 ) -> dict:
+    enforce(request, settings, limiter, AuthAction.TOKEN)
     try:
         user: User = invitations.accept_invitation(
             db,
@@ -272,15 +281,19 @@ def accept_invitation(
 @router.post("/password-reset/request", status_code=status.HTTP_202_ACCEPTED)
 def request_password_reset(
     body: ResetRequestIn,
+    request: Request,
     background: BackgroundTasks,
     db: Session = Depends(get_db),
     now: datetime = Depends(get_now),
     settings: Settings = Depends(get_settings),
     delivery: DeliveryAdapter = Depends(get_delivery),
     clock=Depends(get_clock),
+    limiter=Depends(get_rate_limiter),
 ) -> dict:
     """Generic acceptance, not a guarantee of delivery. Only a known committed
-    token reaches the adapter. This does not claim to prevent timing enumeration."""
+    token reaches the adapter. This does not claim to prevent timing enumeration.
+    The limit is the same for every email, with or without an account."""
+    enforce(request, settings, limiter, AuthAction.RESET_REQUEST, account=body.email)
     if delivery.enabled:
         try:
             issued = password_reset.request_reset(db, email=body.email, now=now,
@@ -307,12 +320,15 @@ def request_password_reset(
 @router.post("/password-reset/confirm")
 def confirm_password_reset(
     body: ResetConfirmIn,
+    request: Request,
     response: Response,
     db: Session = Depends(get_db),
     now: datetime = Depends(get_now),
     settings: Settings = Depends(get_settings),
     clock=Depends(get_clock),
+    limiter=Depends(get_rate_limiter),
 ) -> dict:
+    enforce(request, settings, limiter, AuthAction.TOKEN)
     try:
         password_reset.confirm_reset(
             db, raw_token=body.token, new_password=body.new_password, now=now, policy=settings.password, clock=clock
@@ -335,8 +351,8 @@ def _send_quietly(delivery: DeliveryAdapter, message: OutgoingMessage, engine, t
             db.rollback()  # no journal/User lock across external adapter I/O
         delivery.send(message, now=at)
     except Exception as exc:  # noqa: BLE001
-        # Type only: the message holds the link (token) and the recipient.
-        log.error("password reset delivery failed (%s)", type(exc).__name__)
+        # Code/type only: the message holds the link (token) and the recipient.
+        log.error("password reset delivery failed (%s)", getattr(exc, "code", type(exc).__name__))
 
 
 def _audit_session(db: Session, ctx: SessionContext, action: str, session_id: uuid.UUID, details=None) -> None:

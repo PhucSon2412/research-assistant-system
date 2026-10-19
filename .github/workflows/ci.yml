@@ -1,0 +1,104 @@
+# M8a minimal CI: an explicit API selection (not the full suite), web
+# tests/typecheck/build and the pilot deploy contract. No .env, no real account,
+# no provider/arXiv key: tests run against throwaway PostgreSQL/Redis/MinIO
+# containers with random per-run credentials; pytest refuses outbound HTTP
+# except loopback (scripts/m8a_test_host.py). No continue-on-error: a failing
+# step fails the job after the evidence step ran.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API selection (config, auth, invitation/reset/delivery, limiter, migrations, C4 contract)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install API with dev extras
+        run: python -m pip install -e "./api[dev]"
+      - name: Start isolated PostgreSQL/Redis/MinIO
+        run: python scripts/m8a_test_host.py --context "$RUNNER_TEMP/m8a-api" setup
+      - name: Run API selection
+        # Why each file: config and new M8a modules; session/CSRF/Origin/cookies;
+        # invitation and reset runtime/journal/compensation (delivery boundary);
+        # provenance/receipts and auth safety; migrations/ORM; C4 contract/health.
+        # Deselected: one dump/restore round that needs the C3 host container fixture.
+        run: >-
+          python scripts/m8a_test_host.py --context "$RUNNER_TEMP/m8a-api" test
+          --junit "$RUNNER_TEMP/m8a-api/junit-api.xml" --
+          tests/test_config.py tests/test_m8a_smtp_delivery.py tests/test_m8a_rate_limit.py
+          tests/test_m8a_auth_delivery.py tests/test_csrf_and_cookies.py tests/test_c2a_origin.py
+          tests/test_auth_sessions.py tests/test_c2a_login_sessions.py tests/test_auth_secrets.py
+          tests/test_invitations.py tests/test_invitation_journal.py tests/test_c2c2_invitations.py
+          tests/test_password_reset.py tests/test_c2b_reset_status.py tests/test_reset_token_journal.py
+          tests/test_session_revocation_journal.py tests/test_pre_c4_initial_receipts.py
+          tests/test_auth_safety_foundation.py tests/test_c2c1_bootstrap.py tests/test_migrations.py
+          tests/test_c4_contract.py tests/test_health.py
+          --deselect tests/test_pre_c4_initial_receipts.py::test_two_dump_restore_rounds_keep_valid_provenance_and_restrict_forgery
+      - name: Scan JUnit for context secrets before upload
+        if: always()
+        run: python scripts/m8a_ci_scan.py --context "$RUNNER_TEMP/m8a-api" "$RUNNER_TEMP/m8a-api/junit-api.xml"
+      - name: Upload scanned JUnit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-api
+          path: ${{ runner.temp }}/m8a-api/junit-api.xml
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Stop test containers
+        if: always()
+        run: python scripts/m8a_test_host.py --context "$RUNNER_TEMP/m8a-api" cleanup
+
+  web:
+    name: Web tests, typecheck, build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --prefix web --no-audit --no-fund
+      - run: npm test --prefix web
+      - run: npm run typecheck --prefix web
+      - run: npm run build --prefix web
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+  deploy-config:
+    name: Pilot deploy config contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build the API image (validates Settings inside it)
+        run: docker build -t ras-ci-api:check api
+      - name: Compose contract and production Settings in the image
+        run: python scripts/m8a_deploy_check.py --settings-image ras-ci-api:check
+      - name: Caddyfile validates with a placeholder edge token
+        run: |
+          mkdir -p "$RUNNER_TEMP/edge" && printf 'placeholder-edge-token-for-validate-only' > "$RUNNER_TEMP/edge/edge_token"
+          docker run --rm --network none -e RAS_PUBLIC_HOST=ras.example.org -e RAS_HSTS_MAX_AGE=86400 \
+            -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" -v "$PWD/deploy/caddy/tls.d:/etc/caddy/tls.d:ro" \
+            -v "$RUNNER_TEMP/edge/edge_token:/run/secrets/edge_token:ro" \
+            caddy:2.10.2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile

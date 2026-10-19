@@ -1,5 +1,35 @@
 # Review PR #65 — bộ duyệt chất lượng và provenance
 
+## Review lại tại `8799216` — hai P2 đã sửa
+
+Ngày **2026-10-19**, head **`8799216bf7b6f80efe93e9165ddc592f72e33b18`**, source **0052**, PR **OPEN/chưa merge**. **Không phát hiện điểm chặn merge mới trong phạm vi M7b đã kiểm.** Kết luận hai P2 bên dưới thuộc lượt review trước tại `44e3bd3`; giữ nguyên làm lịch sử, không còn là trạng thái hiện hành.
+
+### Hai bản sửa đã kiểm
+
+- **P2-1:** binding v2 của label gồm nội dung nhãn, manifest, hash bytes corpus thực và parser; answer gồm row, toàn response, snapshot, corpus và parser, kể cả abstention. Report chỉ tính record khớp binding hiện hành. Corpus không khớp run/manifest hoặc bundle M7a stale làm phần tương ứng `source_mismatch`, không có live verdict hay mẫu số chất lượng; Markdown nêu lỗi. Thay parser rồi dựng lại bundle không tái duyệt record cũ. Record thiếu binding/hash không hợp lệ được giữ để truy vết và loại khỏi kết quả.
+- **P2-2:** validate/import dùng preflight chung, dựng lại bundle từ nguồn hiện hành rồi so HTML, bản đọc, file nguồn, snapshot và manifest trước khi ghi. Sửa/thiếu nội dung hiển thị bị từ chối; record đã có không đổi bytes. Điền cột human hợp lệ và file phụ của bảng tính vẫn được nhận. Cache của phép dựng bind theo nội dung đầu vào và parser.
+
+### Reviewer thực chạy và đối chiếu
+
+| Nhóm | Kết quả tại head review lại |
+| --- | --- |
+| 50 test human + 18 evaluation trong repo | **68/68 pass**, 4 DB test deselect, exit 0, **119,94 s**; chặn kết nối DB và HTTP ngoài |
+| Bảy repro độc lập từ lượt review trước | **7/7 pass**: control, M4c bytes, M7a parser, rebuild, corpus/abstention, label HTML và answer HTML |
+| `human-prepare --check` | Exit 0, bundle khớp nguồn |
+| `human-report` ra thư mục ngoài repo | Exit 0, **`awaiting_human_review`**, 0 verdict thật |
+
+JUnit reviewer và agent khớp đủ **68 ID pass**. **10 hash artifact/provenance**, **121 hash nội dung bundle** và **561 source hash trước suite của agent** khớp head. Seal báo before/after unchanged; không có map after riêng để đối chiếu độc lập. Metadata HEAD của seal vẫn là `44e3bd3` (trước commit sửa), nên bằng chứng source đã kiểm là map hash khớp head mới, không suy working tree khi seal là sạch. **618 tracked source/data hash reviewer trước/sau trùng**, gồm phiếu/report thật. Không cộng kết quả lịch sử hoặc countercheck/Chrome của agent thành test reviewer.
+
+Không rerun 13 countercheck hoặc Chrome 85 trang (chỉ audit hash metadata); không full API/DB/MinIO/web/restore/live. Đây là bản sửa evaluation offline, không đổi production/migration/grants/routing/pricing. Các giới hạn M7a (mẫu tổng hợp nhỏ, không evidence pack/gold, Lumen mapping suy từ kế hoạch upload, reviewer tự khai danh tính) vẫn giữ nguyên; review này không chứng minh chất lượng production.
+
+### Dữ liệu thật, tài nguyên và bước tiếp
+
+Evidence reviewer: `C:/Users/ADMIN/AppData/Local/Temp/ras-pr65-rereview-20261019` (`offline.xml/log`, `bindings.log`, audit, baseline/source/cleanup và report ngoài repo). Mọi verdict giả chỉ nằm trong bản sao tạm; **không nhập hay sửa phiếu thật**. Không tạo container/volume/credential; 24 container có sẵn giữ ID/name/image/mount/label, không có container mới. Beat/worker có vòng restart sẵn tiếp tục tăng RestartCount **367→371 / 368→372**, không can thiệp. Không đọc key/`.env`, gọi provider/inference/arXiv, sửa ledger/pricing hoặc query/migrate/restart dev/Dify.
+
+Có thể merge phần coding/bundle của PR #65 trong phạm vi đã review. Sau merge, chủ dự án có thể mở `evaluation/human-review/bundle/index.html`, điền phiếu theo rubric rồi validate/import; hiện **0 verdict thật, `awaiting_human_review`**, M7b/D chưa nghiệm thu về chất lượng. Cache-write live cần ngân sách riêng, policy/paper thật và gói E vẫn còn. Reviewer để cập nhật docs **chưa commit**, không merge/gửi comment GitHub.
+
+## Lịch sử review lần đầu tại `44e3bd3`
+
 Ngày **2026-10-19**, base **`2df77d0ac2b3e9371aa33753f4ab591fb09d1fa3`**, head **`44e3bd3efe76ca2ae9f1e071bd31d6209be3834a`**, source migration **0052**. PR **OPEN/chưa merge**. **Có hai P2 cần sửa trên cùng PR trước merge.** Không sửa production, DB/grants, pricing hoặc điền phiếu thật trong review này.
 
 [Handoff agent](../m7b-human-quality-review.md) · [Inventory agent](../m7b-test-inventory.json) · [Prompt sửa](../tasks/fix-pr65-human-review-provenance.md)

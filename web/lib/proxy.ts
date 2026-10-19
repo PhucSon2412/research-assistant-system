@@ -5,12 +5,26 @@
 // use their own streaming routes (app/api/uploads, app/api/files and the M6a
 // Admin review download under app/api/admin/review-requests).
 
+import { readFileSync } from "node:fs";
+import { isIP } from "node:net";
+import { timingSafeEqual } from "node:crypto";
+
+// M8a trusted chain edge -> web -> API. Caddy overwrites X-RAS-Client-IP with the
+// TCP peer and adds the edge token read from a secret file. Only when that token
+// matches WEB_EDGE_TOKEN_FILE does this proxy forward the single client address;
+// otherwise (dev, a direct connection, a forged header) no address is forwarded
+// and the API keys auth rate limits by this container. X-Forwarded-For is never
+// forwarded. The API itself trusts the header only from its configured proxy IP.
+export const CLIENT_IP_HEADER = "x-ras-client-ip";
+export const EDGE_TOKEN_HEADER = "x-ras-edge-token";
+export const MIN_EDGE_TOKEN_LENGTH = 32;
+
 // First path segment the proxy forwards; anything else is 404 here.
 export const ALLOWED_PREFIXES = new Set([
   "auth", "admin", "library", "uploads", "discovery", "search", "collections", "rag", "review-requests",
 ]);
 const REQUEST_HEADERS = ["cookie", "content-type", "accept", "origin", "x-csrf-token"];
-const RESPONSE_HEADERS = ["content-type", "cache-control"];
+const RESPONSE_HEADERS = ["content-type", "cache-control", "retry-after"];
 
 // Routes whose API handler waits on OpenRouter synchronously. RAG runs query
 // embedding (hybrid) then generation; hybrid search runs query embedding then
@@ -32,7 +46,16 @@ export const DEFAULT_PUBLICATION_TIMEOUT_SECONDS = 120;
 export const MAX_TIMEOUT_SECONDS = 300;
 
 export type ProxyConfig = { base: string; timeoutMs: number; providerTimeoutMs: number; approvalTimeoutMs: number;
-  publicationTimeoutMs: number };
+  publicationTimeoutMs: number; edgeToken: string | null };
+
+function readEdgeToken(path: string): string | null {
+  try {
+    const value = readFileSync(path, "utf8").replace(/[\r\n]+$/, "");
+    return value.length >= MIN_EDGE_TOKEN_LENGTH && !/\s/.test(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
 
 function seconds(raw: string | undefined, fallback: number): number | null {
   if (raw === undefined || raw.trim() === "") return fallback;
@@ -42,8 +65,13 @@ function seconds(raw: string | undefined, fallback: number): number | null {
 }
 
 // Invalid values make the proxy refuse requests instead of guessing a limit.
-export function loadProxyConfig(env: Record<string, string | undefined>): ProxyConfig | null {
+export function loadProxyConfig(env: Record<string, string | undefined>,
+  readToken: (path: string) => string | null = readEdgeToken): ProxyConfig | null {
   const base = env.API_INTERNAL_URL;
+  // A configured but unreadable/short token file refuses requests, never trusts headers.
+  const tokenFile = env.WEB_EDGE_TOKEN_FILE?.trim();
+  const edgeToken = tokenFile ? readToken(tokenFile) : null;
+  if (tokenFile && edgeToken === null) return null;
   const timeout = seconds(env.WEB_PROXY_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS);
   const provider = seconds(env.WEB_PROXY_PROVIDER_TIMEOUT_SECONDS, DEFAULT_PROVIDER_TIMEOUT_SECONDS);
   const approval = seconds(env.WEB_PROXY_REVIEW_APPROVAL_TIMEOUT_SECONDS, DEFAULT_REVIEW_APPROVAL_TIMEOUT_SECONDS);
@@ -51,7 +79,19 @@ export function loadProxyConfig(env: Record<string, string | undefined>): ProxyC
   if (!base || timeout === null || provider === null || provider < timeout || approval === null
     || approval < timeout || publication === null || publication < timeout) return null;
   return { base: base.replace(/\/+$/, ""), timeoutMs: timeout * 1000, providerTimeoutMs: provider * 1000,
-    approvalTimeoutMs: approval * 1000, publicationTimeoutMs: publication * 1000 };
+    approvalTimeoutMs: approval * 1000, publicationTimeoutMs: publication * 1000, edgeToken };
+}
+
+// The client address named by the trusted edge, or null. A missing/forged token,
+// a repeated header (joined with ", ") or a non-IP value forwards nothing.
+export function trustedClientIp(request: Request, config: ProxyConfig): string | null {
+  if (!config.edgeToken) return null;
+  const presented = request.headers.get(EDGE_TOKEN_HEADER) ?? "";
+  const expected = Buffer.from(config.edgeToken);
+  const actual = Buffer.from(presented);
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return null;
+  const value = (request.headers.get(CLIENT_IP_HEADER) ?? "").trim();
+  return value && isIP(value) ? value : null;
 }
 
 // Exactly POST admin/review-requests/<one segment>/approve; no prefix match.
@@ -90,6 +130,8 @@ export async function proxyRequest(request: Request, path: string[], config: Pro
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
+  const client = trustedClientIp(request, config);
+  if (client) headers.set(CLIENT_IP_HEADER, client);
   let body: ArrayBuffer | undefined;
   if (request.method !== "GET" && request.method !== "HEAD") {
     try {

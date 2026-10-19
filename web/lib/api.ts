@@ -6,17 +6,27 @@ export class ApiError extends Error {
   status: number;
   code: string;
   detail?: string;
+  // Seconds from Retry-After (429 rate limit, 503); never used to resubmit.
+  retryAfter?: number;
 
   constructor(
     status: number,
     code: string,
     detail?: string,
+    retryAfter?: number,
   ) {
     super(code);
     this.status = status;
     this.code = code;
     this.detail = detail;
+    this.retryAfter = retryAfter;
   }
+}
+
+export function parseRetryAfter(raw: string | null): number | undefined {
+  if (!raw || !/^\d{1,6}$/.test(raw.trim())) return undefined;
+  const value = Number(raw.trim());
+  return value > 0 ? value : undefined;
 }
 
 export type User = { id: string; email: string; display_name: string | null; role: "admin" | "user" };
@@ -54,7 +64,9 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
     credentials: "same-origin",
   });
   const data = res.status === 204 ? null : await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(res.status, data?.error ?? "http_error", data?.message);
+  if (!res.ok) {
+    throw new ApiError(res.status, data?.error ?? "http_error", data?.message, parseRetryAfter(res.headers.get("retry-after")));
+  }
   return data as T;
 }
 
@@ -69,6 +81,9 @@ const MESSAGES: Record<string, string> = {
   not_found: "Không tìm thấy.",
   account_exists: "Email này đã có tài khoản.",
   delivery_unavailable: "Chưa cấu hình kênh gửi liên kết.",
+  delivery_failed: "Máy chủ thư không nhận lời mời; lời mời này đã bị hủy. Có thể tạo lời mời mới sau khi kiểm tra kênh gửi.",
+  rate_limited: "Quá nhiều yêu cầu trong thời gian ngắn. Hãy chờ rồi tự thử lại.",
+  rate_limit_unavailable: "Tạm thời chưa kiểm được giới hạn yêu cầu; thao tác chưa được thực hiện. Thử lại sau.",
   invalid_email: "Email không hợp lệ.",
   cannot_change_own_status: "Không thể tự vô hiệu hóa tài khoản của mình.",
   invalid_intent: "Phiên xác nhận upload không hợp lệ, đã dùng hoặc hết hạn. Hãy xác nhận lại.",
@@ -187,10 +202,23 @@ const MESSAGES: Record<string, string> = {
 
 export function describeError(err: unknown): string {
   if (err instanceof ApiError) {
-    const base = MESSAGES[err.code] ?? `Lỗi (${err.code}).`;
+    let base = MESSAGES[err.code] ?? `Lỗi (${err.code}).`;
+    if (err.code === "rate_limited" && err.retryAfter) {
+      base = `Quá nhiều yêu cầu trong thời gian ngắn. Hãy chờ khoảng ${err.retryAfter} giây rồi tự thử lại.`;
+    }
     return err.detail ? `${base} ${err.detail}` : base;
   }
   return "Không kết nối được tới máy chủ.";
+}
+
+// M8a: only the invite form uses this. A lost/timed-out reply never proves the
+// invitation was not created or that the mail server did not receive it.
+export function invitationError(error: unknown): string {
+  if (!(error instanceof ApiError) || error.status === 502 || error.status === 504
+    || ["http_error", "api_timeout", "api_unreachable", "api_response_incomplete"].includes(error.code)) {
+    return "Không xác định được kết quả gửi lời mời. Tải lại danh sách lời mời trước khi gửi lại; không tự gửi lại.";
+  }
+  return describeError(error);
 }
 
 // Only the publish form uses this outcome language. A transport failure or

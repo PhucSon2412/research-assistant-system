@@ -1,5 +1,9 @@
 # Research Assistant System
 
+**M8a trên nhánh review (2026-10-19, chưa merge):** cấu hình triển khai nhóm thử riêng [`deploy/`](deploy/compose.yaml) với Caddy HTTPS, cookie Secure/Origin, invite/reset qua SMTP TLS, rate limit auth Redis và CI GitHub Actions; [handoff](docs/m8a-pilot-entry-hardening.md). Chỉ kiểm cô lập với CA/SMTP thử; chưa domain/host/SMTP thật, chưa cutover hay nghiệm thu production, pricing vẫn tắt.
+
+**Cập nhật 2026-10-19:** PR #65 (M7b) đã merge `3b59a1d`; bộ đọc/nhập/chấm phiếu sẵn, **0 verdict thật/awaiting_human_review**. Gói tiếp theo là [M8a — HTTPS, invite/reset qua SMTP TLS, rate limit và CI cho nhóm thử](docs/tasks/m8a-pilot-entry-hardening.md), mới giao/chưa triển khai. Không bật pricing hoặc cutover thật bằng kết quả merge; [kế hoạch MVP](docs/mvp-delivery-plan.md) giữ các điều kiện D/E còn lại. Các mốc chờ review trong báo cáo lịch sử không phải trạng thái hiện hành.
+
 **M7b trên nhánh review (2026-10-19, chưa merge):** bộ duyệt người đọc offline tại [`evaluation/human-review/`](evaluation/human-review/README.md) — mở `bundle/index.html`, điền hai phiếu CSV, rồi `human-import`/`human-report`. Chưa có phiếu thật: `awaiting_human_review`. [Handoff](docs/m7b-human-quality-review.md).
 
 **Hiện hành sau merge PR #64 (2026-10-19):** source **0052**, main `2df77d0`; C4/M6d/M6e/M7a đã merge trong phạm vi đã review. [Kế hoạch MVP](docs/mvp-delivery-plan.md) giữ các điều kiện nghiệm thu còn thiếu. Tiếp [M7b — bộ duyệt nhãn/answer và nhập phiếu người đọc](docs/tasks/m7b-human-quality-review.md), mới giao/chưa triển khai. Pricing mặc định tắt; cache-write live source cuối, human review, provider/policy và vận hành nhóm thử E chưa hoàn tất. Không cộng pass mới tại merge hoặc coi các trạng thái OPEN/pending lịch sử bên dưới là hiện trạng.

@@ -1,5 +1,7 @@
 # Sửa PR #65 — hiệu lực verdict và nội dung bundle đã được xem
 
+**Đã kiểm lại tại `8799216` (2026-10-19): hai P2 đã sửa, không phát hiện điểm chặn merge mới trong scope M7b.** Reviewer 68 repo + 7 repro độc lập pass; [kết luận hiện hành](../reviews/pr65-m7b-human-quality-review.md#review-lại-tại-8799216--hai-p2-đã-sửa). Nội dung dưới là prompt sửa lịch sử tại `44e3bd3`, không giao thêm việc coding. PR chưa merge; 0 verdict thật, `awaiting_human_review`, chưa nghiệm thu chất lượng D.
+
 Sửa **trên cùng PR #65**, head review **`44e3bd3`**, source **0052**. Đọc [report độc lập](../reviews/pr65-m7b-human-quality-review.md), [task gốc](m7b-human-quality-review.md) và [handoff](../m7b-human-quality-review.md). Giữ mọi docs reviewer/orchestrator modified/untracked vào PR, không discard hoặc sửa lịch sử chứng cứ.
 
 Reviewer đã chạy 55 test repo + 1 control độc lập pass, sáu repro fail thuộc **hai P2** dưới đây. Chỉ sửa evaluation/bundle/CLI/test/docs; không thêm production permission, DB migration hoặc hệ thống phê duyệt/ký số.

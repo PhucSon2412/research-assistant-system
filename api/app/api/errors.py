@@ -16,21 +16,24 @@ from app.config import get_settings
 
 
 class ApiError(Exception):
-    def __init__(self, status_code: int, code: str, *, message: str | None = None, clear_session: bool = False):
+    def __init__(self, status_code: int, code: str, *, message: str | None = None, clear_session: bool = False,
+                 headers: dict[str, str] | None = None, extra: dict[str, int | str] | None = None):
         super().__init__(code)
         self.status_code = status_code
         self.code = code
         self.message = message
         self.clear_session = clear_session
+        self.headers = headers or {}
+        self.extra = extra or {}
 
 
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ApiError)
     async def _api_error(request: Request, exc: ApiError) -> JSONResponse:
-        body: dict[str, str] = {"error": exc.code}
+        body: dict[str, int | str] = {**exc.extra, "error": exc.code}
         if exc.message:
             body["message"] = exc.message
-        response = JSONResponse(body, status_code=exc.status_code)
+        response = JSONResponse(body, status_code=exc.status_code, headers=exc.headers)
         if exc.clear_session:
             clear_session_cookie(response, get_settings())
         return response
