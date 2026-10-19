@@ -5,6 +5,20 @@ Source migration giữ **0052**, không migration/grant. [Task](tasks/m7a-openro
 [inventory](m7a-test-inventory.json). Chưa merge. Dữ liệu chỉ tổng hợp tự viết
 ([corpus](../evaluation/m7a-synthetic/README.md)); không dev/Dify/arXiv, không paper thật.
 
+## Sửa review lại PR #64 tại `f538ddf` — deadline HTTP
+
+[Review lại](reviews/pr64-m7a-openrouter-live-verification.md) xác nhận P2-1/P2-2 và còn nhánh P2-3: timeout HTTPX
+giới hạn từng lần chờ, không giới hạn cả request. `_get` nay chạy mỗi GET read-only trên event loop ngắn dưới
+`asyncio.wait_for(timeout)`: hết hạn thì hủy request và đóng kết nối, không trả response hoàn tất sau hạn;
+`reconcile` ghi pending/`deadline_reached`, `/key` chậm thành `key_status=deadline`. Chỉ đổi
+`scripts/m7a_live.py` và test; không đọc key/`.env`, không inference.
+
+Regression HTTP loopback thật (`api/tests/test_m7a_poll_http.py`, deadline 1 s): tại `f538ddf` **3 fail / 1 pass**
+(5,3–7,2 s với body/header nhỏ giọt và `/key` chậm; control nhanh pass). Sau sửa seal **71/71 pass** (67 cũ + 4 mới),
+485 source hash trùng; repro unittest của reviewer trong Linux `--network none`: nhỏ giọt dừng ở 1,003 s, control
+0,108 s. Image không có pytest nên test repo chạy trên host. Giới hạn: luồng DNS treo trong executor vẫn có thể
+làm chậm lúc thoát interpreter (chưa tái hiện). Evidence: `C:/Users/ADMIN/AppData/Local/Temp/ras-pr64-fix2-20261019`.
+
 ## Sửa review PR #64 — chờ review lại
 
 [Review tại `5dc8947`](reviews/pr64-m7a-openrouter-live-verification.md) tìm ba P2 ở tooling experiment; đã

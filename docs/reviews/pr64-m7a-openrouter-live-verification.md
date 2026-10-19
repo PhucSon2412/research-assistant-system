@@ -1,5 +1,40 @@
 # Review PR #64 — OpenRouter live và chi phí
 
+## Review lại tại `f538ddf` — còn P2-3 ở deadline HTTP
+
+Ngày **2026-10-19**, head **`f538ddfa534a87132cb4e2b095da9e2c6ce7d2bb`**, code **`37684c6`**, source **0052**, PR **OPEN/chưa merge**. **P2-1 và P2-2 đã sửa qua kiểm độc lập; P2-3 mới sửa phần điều phối batch, còn thiếu deadline bao trọn HTTP đang đọc body. Chưa nên merge.** Phần review tại `5dc8947` bên dưới là lịch sử, không phải ba finding còn mở ở head này.
+
+### P2-3 còn lại — `timeout=remaining` không phải deadline toàn request
+
+Vị trí: [`scripts/m7a_live.py:205`](../../scripts/m7a_live.py) (`_get`), các chỗ gọi trong `reconcile` dòng 362 và 381.
+
+`client.get(..., timeout=remaining)` dùng timeout theo từng pha/chờ dữ liệu của HTTPX. Read timeout giới hạn thời gian chờ **một phần dữ liệu tiếp theo**, không giới hạn tổng thời gian đọc body ([tài liệu HTTPX](https://www.python-httpx.org/advanced/timeouts/)). Một response tiếp tục gửi từng byte trước khi read timeout hết có thể giữ `_get()` lâu hơn deadline, thậm chí không có giới hạn tổng. Kiểm đồng hồ ở vòng ngoài chỉ chạy lại sau khi `client.get` đã đọc xong response. `/generation` và `/key` cùng dùng đường này.
+
+**Tái hiện thực chạy:** container `rasm7a-api:local --network none --rm`, HTTP server chỉ nghe loopback trong container, key tổng hợp; gọi chính `_get`/`reconcile` hiện hành, không mock transport hay đồng hồ. Server trả JSON hợp lệ từng byte cách nhau 80 ms. Với `deadline_s=1`, lượt đầu mất **2,329 s**, lượt xác nhận mất **2,305 s**, assertion kết thúc trước 1,5 s fail cả hai lần. Control cùng server/body nhưng gửi ngay mất **0,041 s**, pass. Đây là test deadline rút ngắn để tái hiện, **không phải** đo OpenRouter hay chạy chờ 300 s. `key_status=skipped_deadline` chỉ bỏ GET kế tiếp; không hủy GET đã vượt hạn.
+
+Hai fake-clock test của reviewer và test trong repo đều qua vì `_get` giả tự kết thúc trong timeout được cấp. Chúng xác nhận batch không cấp thêm thời gian sai, nhưng chưa xác nhận HTTP thật tuân deadline tổng. Bản sửa cần một deadline có thể hủy toàn thao tác HTTP (headers/body, cả `/key`), giữ kết quả đã hoàn tất và ID pending, giải phóng response/client. Không chỉ kiểm sau khi body đã đọc xong, không dùng thread timeout rồi chờ thread treo lúc thoát. Giữ phạm vi tooling nhỏ và [prompt sửa cùng PR](../tasks/fix-pr64-m7a-experiment-cap-and-polling.md).
+
+### Kết quả reviewer ở head sửa
+
+| Kiểm | Kết quả |
+| --- | --- |
+| Bốn file offline trong repo, HTTP ngoài bị chặn | **67/67 pass**, exit 0, 2,23 s; JUnit khớp từng ID với agent |
+| Linux permit/observer độc lập | **3/3 pass**: giữ slot 20 khi claimed/chưa marker, chặn action chạy chồng, receipt muộn không gán sang action sau |
+| Cost MockTransport độc lập | **2/2 pass**: positive control và negative giữ đầy đủ trần |
+| Poll fake-clock độc lập | **2/2 pass**: fast control và batch dừng ở 300 s, không gọi `/key` sau hạn |
+| HTTP loopback thật trong container không mạng | **1 control pass / 1 failure P2-3**; failure được xác nhận lại, không đếm lặp thành test mới |
+| Hai phía Windows/Linux cùng quan sát một token trước `rename` | **12/12 kiểm pass**, 6 claimed / 6 host revoked, không token đồng thời ở hai đích |
+
+Tổng **67 repo + 8 ca độc lập pass, 1 ca độc lập fail**; 12 kiểm token tách riêng. Barrier token dừng observer ngay trước `rename`, buộc cả hai phía thấy cùng source trước khi release; đây là chứng cứ trên bind mount hiện tại, không phải bảo đảm cho mọi filesystem hay mất điện. Ledger lock giữ qua action/outcome; consumed không receipt giữ trần, receipt gắn token. Không phát hiện điểm chặn mới ở P2-1/P2-2.
+
+**Audit lượt sửa:** **16 artifact hash** khớp; **484 source hash** trước/sau của agent bằng nhau và khớp source hiện tại; JUnit **67 ID** khớp inventory và lượt reviewer. Đọc lại ledger lịch sử mà không sửa bytes: **20 request / $0,11675006 cam kết**, không còn lượt inference trong trần gốc. Dữ kiện lịch sử 19 physical call / $0,01941006 billed và audit selection 652 giữ riêng theo lượt trước; không rerun live/selection. Việc agent đã đọc key một lần để quét vắng mặt được giữ như deviation trong handoff/inventory; reviewer không đọc lại key để kiểm.
+
+Evidence: `C:\Users\ADMIN\AppData\Local\Temp\ras-pr64-rereview-20261019` (`offline.xml/log`, `runtime-gate.log`, `cost_receipt.log`, `poll_deadline.log`, `poll-drip-first.log`, `poll-drip.log`, `rename-result.json`, `audit-fix-result.json`, source/baseline/cleanup). Không thay production, tests repo, migration/grants hoặc pricing; không key/`.env`, provider inference, DB/dev/Dify. Container thử tự gỡ, không tạo volume; **24 container có sẵn giữ ID/name/image/mount/label**, worker/beat đã restarting từ baseline, RestartCount 48→53, không can thiệp. **454 tracked source hash reviewer** trước/sau trùng.
+
+Giữ report và prompt cập nhật **chưa commit** cho cùng PR sửa; reviewer không merge/gửi comment GitHub. Cache-write live, policy/account verification, M7b và E vẫn riêng; P2 còn lại không cần inference hoặc ngân sách mới để sửa.
+
+## Lịch sử review tại `5dc8947`
+
 Ngày **2026-10-19**, PR **OPEN/chưa merge**, base **`5362ace04d0d211005753aecddd760a4ad7d548b`**, head **`5dc8947051c4d5e3e320118608d0c56ce9ef1ec8`**, code **`7357216`**, source **0052**. **Có ba P2 cần sửa trên cùng PR trước merge**, đều ở tooling experiment/cap/polling. Không cần chạy lại selection 652 hoặc monitor đã hết hạn để xác định các lỗi này.
 
 [Handoff](../m7a-openrouter-live-verification.md) · [Inventory agent](../m7a-test-inventory.json) · [Prompt sửa hẹp](../tasks/fix-pr64-m7a-experiment-cap-and-polling.md)

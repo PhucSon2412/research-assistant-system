@@ -1,5 +1,9 @@
 # Tài liệu dự án
 
+**Sửa review lại PR #64, 2026-10-19:** deadline tổng cho HTTP polling M7a đã sửa và kiểm bằng loopback thật; chờ review lại, chưa merge.
+
+**Review lại PR #64 tại `f538ddf`, 2026-10-19:** P2-1/P2-2 qua kiểm, còn [P2-3 deadline của HTTP đang đọc body](reviews/pr64-m7a-openrouter-live-verification.md#review-lại-tại-f538ddf--còn-p2-3-ở-deadline-http). [Sửa tiếp cùng PR](tasks/fix-pr64-m7a-experiment-cap-and-polling.md) bằng local HTTP, không inference/key/ngân sách mới; chưa merge. Các báo cáo “đã sửa ba P2” bên dưới giữ lịch sử trước review lại.
+
 **Sửa review PR #64, 2026-10-19:** ba P2 cap/cost/polling của tooling M7a đã sửa và kiểm offline + repro Linux; chờ review lại, chưa merge. [Handoff](m7a-openrouter-live-verification.md#sửa-review-pr-64--chờ-review-lại).
 
 **Review M7a, 2026-10-19:** PR #64 tại `5dc8947`, source **0052**, còn [ba P2 cap/receipt cost/polling](reviews/pr64-m7a-openrouter-live-verification.md); [sửa cùng PR](tasks/fix-pr64-m7a-experiment-cap-and-polling.md) trước merge. Reviewer 31 repo + 2 control pass/4 repro failure; selection 652 và 19 live charge được audit riêng, không bị phủ nhận bởi monitor hết hạn. Không key/provider/dev/Dify hoặc bật pricing trong review; giữ docs reviewer cho lượt sửa.

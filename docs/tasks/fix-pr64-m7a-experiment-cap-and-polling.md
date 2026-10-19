@@ -1,5 +1,22 @@
 # Sửa PR #64 — cap experiment, receipt cost và polling
 
+## Review lại tại `f538ddf`: chỉ còn deadline HTTP của P2-3
+
+**P2-1/P2-2 đã qua review độc lập; không mở lại hai phần đó.** Sửa tiếp trên cùng PR #64, source **0052**, chỉ tooling HTTP polling/test/docs. [Report mới](../reviews/pr64-m7a-openrouter-live-verification.md#review-lại-tại-f538ddf--còn-p2-3-ở-deadline-http) giữ 67 repo + 8 independent pass, một repro fail.
+
+`_get` dùng `httpx.Client.get(timeout=remaining)`: HTTPX read timeout áp cho mỗi lần chờ dữ liệu, không phải tổng headers/body. HTTP loopback thật trong Linux `--network none` gửi JSON từng byte cách 80 ms: `reconcile(..., deadline_s=1)` mất 2,329 s và 2,305 s ở hai lượt; control gửi ngay 0,041 s. Fake `_get` tự kết thúc trong timeout nên không bắt nhánh này.
+
+- Thi hành **deadline tổng có khả năng hủy HTTP đang chờ/đọc**, gồm `/generation` và `/key`, cả headers/body/connection. Có thể dùng async cancellation được giới hạn bởi deadline tuyệt đối ở helper polling nhỏ; không bắt buộc phương án, không thêm framework. Timeout theo pha vẫn có ích nhưng không thay deadline tổng.
+- Khi hết hạn, dừng request/vòng mới, trả các ID hoàn tất trước hạn và pending chính xác, đóng response/client. Không chỉ kiểm đồng hồ sau khi `get()` trả về, không bỏ thread treo rồi chờ vô hạn lúc teardown/exit. Không nhận body hoàn tất sau hạn làm bằng chứng đã hoàn tất trong hạn.
+- Thêm regression **HTTP loopback thật**, không chỉ MockTransport/fake clock: fast control, body nhỏ giọt luôn đến trước read timeout, header chậm, và `/key` chậm sau khi IDs đã tìm được. Rút deadline để test nhanh, tolerance hợp lý; kiểm elapsed, pending/found, đóng tài nguyên và process thoát. Giữ các ca batch/fake clock hiện có.
+- Chạy lại bốn file offline 67 ca cùng test mới và repro HTTP. Không rerun 652/full suite/Chrome/restore hoặc live để sửa nhánh scripts này. Không đổi production/migration/grants/adapter/routing/pricing/cap.
+- **Không đọc key/`.env`, không inference mới, không thao tác dev/Dify/account.** Trần gốc đã hết theo ledger fail-closed (20 request/$0,11675006 cam kết); không xóa/reset ledger. Lỗi này kiểm bằng local HTTP không mạng ngoài, không cần xin thêm ngân sách.
+- Giữ report/prompt reviewer và docs modified/untracked, commit vào cùng PR sửa; history pass/fail/source tách riêng, không ghi cả ba P2 đã được reviewer duyệt. Cập nhật PR tiếng Việt, không merge, không AI trailer/promo.
+
+Evidence tái hiện độc lập ở `C:\Users\ADMIN\AppData\Local\Temp\ras-pr64-rereview-20261019`: `test_poll_drip.py`, `run_drip.py`, hai log và exit JSON. Reuse/đưa regression phù hợp vào repo; không phụ thuộc đường TEMP này để test sau merge.
+
+## Prompt lượt trước — giữ lịch sử phạm vi ba P2
+
 Sửa **trên cùng PR #64**, head review `5dc8947`, source **0052**. Đọc [report độc lập](../reviews/pr64-m7a-openrouter-live-verification.md), [handoff](../m7a-openrouter-live-verification.md) và [task gốc](m7a-openrouter-live-verification.md). Giữ và đưa mọi docs reviewer/orchestrator modified/untracked vào PR; không discard/ghi đè. Không chia PR mới hoặc mở thêm billing/auth/permission framework.
 
 ## 1. Giữ cap/concurrency khi runtime action kết thúc trước handler

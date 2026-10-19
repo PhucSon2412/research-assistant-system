@@ -1,5 +1,7 @@
 # Kế hoạch hoàn thành MVP
 
+**Review lại PR #64 tại `f538ddf`, 2026-10-19:** cap/permit và cost đã qua review, còn một nhánh [P2-3 deadline HTTP body nhỏ giọt](reviews/pr64-m7a-openrouter-live-verification.md#review-lại-tại-f538ddf--còn-p2-3-ở-deadline-http). Chưa merge; sửa hẹp polling trên cùng PR, không chia milestone hoặc thêm live calls. Trần gốc đã hết; cache-write live/M7b/E vẫn riêng, không mở pricing.
+
 **Sửa review PR #64, 2026-10-19:** tooling experiment M7a đã sửa ba P2 (permit/serialization, cost receipt, deadline); không inference mới, trần live gốc đã hết theo ledger fail-closed. Gói D vẫn chờ xác nhận live cache-write, duyệt policy và M7b.
 
 **Review M7a, 2026-10-19:** PR #64 tại `5dc8947` còn [ba P2 ở tooling cap/cost/polling](reviews/pr64-m7a-openrouter-live-verification.md); [sửa hẹp cùng PR](tasks/fix-pr64-m7a-experiment-cap-and-polling.md), chưa merge. 19 live ID/charge $0,01941006 và selection 652 khớp artifact; guard chưa an toàn ở các cửa sổ reviewer tái hiện, không suy lượt lịch sử đã vượt cap. Cache-write source cuối mới kiểm offline, default pricing off; chưa khép D hoặc gửi paper thật. Không giảm checklist M7b/E bằng số test hoặc quote.
