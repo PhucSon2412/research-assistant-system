@@ -1,5 +1,7 @@
 # Sửa PR #64 — cap experiment, receipt cost và polling
 
+**Đã qua review lại tại `285fd37` (code `38d5409`, 2026-10-19):** ba P2 và các nhánh deadline/DNS đã sửa; reviewer 73 repo + 4 ca độc lập pass, không thấy điểm chặn merge mới trong scope M7a. [Kết luận và giới hạn](../reviews/pr64-m7a-openrouter-live-verification.md#review-lại-tại-285fd37--ba-p2-đã-sửa-không-thấy-điểm-chặn-merge-mới). Các prompt bên dưới giữ lịch sử, không phải giao thêm vòng sửa hoặc inference. PR vẫn OPEN/chưa merge; pricing mặc định tắt, trần live gốc hết, cache-write live/M7b/E còn riêng.
+
 ## Review lại tại `9b64901`: chỉ còn deadline thoát tiến trình khi DNS treo
 
 Body/header nhỏ giọt và `/key` chậm **đã được reviewer xác nhận sửa**: 71 repo pass và repro Linux body 1,003 s với deadline 1 s. P2-1/P2-2 giữ kết luận đã sửa. Chỉ sửa tiếp nhánh shutdown của P2-3, cùng PR #64/source **0052**.

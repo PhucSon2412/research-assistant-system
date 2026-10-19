@@ -1,5 +1,31 @@
 # Review PR #64 — OpenRouter live và chi phí
 
+## Review lại tại `285fd37` — ba P2 đã sửa, không thấy điểm chặn merge mới
+
+Ngày **2026-10-19**, head **`285fd37ba020b3b3392bba997af121caae8d97f2`**, code **`38d5409`**, source **0052**, PR **OPEN/chưa merge**. **P2-1/P2-2/P2-3 đã qua kiểm trong phạm vi M7a; không phát hiện điểm chặn merge mới. Có thể merge PR #64 trong phạm vi này.** Các finding bên dưới là lịch sử tại source cũ. Đây không phải cho phép mở pricing, gửi paper thật hoặc khép toàn bộ gói D/E.
+
+### Xác nhận bản sửa deadline và thoát tiến trình
+
+GET read-only của `reconcile`/`catalog` dùng `Fetcher` với process riêng. Key được ghi qua stdin, không ghép vào command/argv; request/reply JSON trên pipe. Parent giới hạn thời gian chờ, kill/wait child và đóng pipe/reader khi hết hạn hoặc thoát boundary. Worker có DNS thread bị kẹt không còn giữ interpreter của caller. Caller là script thường, không cần guard `__main__` của `multiprocessing`.
+
+**Ca độc lập Linux `--network none`:** sitecustomize được truyền tới **mọi interpreter**; marker PID xác nhận lỗi DNS xảy ra ở đúng process GET, không chỉ process gọi. Với deadline 1 s, `reconcile` giữ ID pending và trả sau **1,031 s**, toàn bộ caller thoát sau **1,485 s** kể cả startup. Kiểm PID xác nhận child đã được reap. Control resolver trả loopback ngay: trả ID và `/key` đúng sau **0,407 s**, caller thoát **0,830 s**, child cũng đã reap. Transport thật tới HTTP loopback kiểm header Authorization bằng key tổng hợp; key không có trong argv/stdout/stderr. Không DNS/provider thật.
+
+Harness DNS cũ của reviewer patch riêng process gọi nên không còn đặt lỗi vào chỗ thực thi HTTP của source mới. Failure `dns-started` ở harness cũ là điểm tiêm không còn phù hợp, không phải hồi quy sản phẩm; không tính là pass. Harness độc lập mới giữ yêu cầu nghiệp vụ process phải exit và bổ sung PID proof để không pass vì chưa thực sự tiêm lỗi.
+
+| Reviewer thực chạy tại head này | Kết quả |
+| --- | --- |
+| Sáu file offline trong repo | **73/73 pass**, exit 0, 11,27 s; MockTransport/loopback và DNS fault injection |
+| DNS process độc lập, Linux không mạng | **2/2 pass**: blocked resolver đúng process được kill/reap; fast resolver/key qua stdin |
+| HTTP nhỏ giọt độc lập, Linux không mạng | **2/2 pass**: fast control 0,347 s; body nhỏ giọt bị cắt **1,011 s**, ID chưa xong giữ pending |
+
+Tổng **73 repo + 4 ca độc lập pass**, không failure/error/skip trong các lượt này. Test repo giữ cả header nhỏ giọt, `/key` chậm và hai subprocess cases. Không rerun selection 652/full suite/web/Chrome/restore/live vì bản sửa chỉ thay tooling read-only; P2-1/P2-2 giữ bằng chứng ở các mốc trước, không cộng thành test mới.
+
+**Đối chiếu artifact:** **17 hash** của lượt fix3 khớp; **486 source hash** agent trước/sau bằng nhau và khớp source hiện tại; inventory/JUnit/reviewer khớp từng **73 ID**. Reviewer **456 tracked source hash** trước/sau trùng. Không đọc/sửa ledger lịch sử trong lượt này: giữ mốc đã audit **20 request / $0,11675006 cam kết** (trần inference gốc đã hết), và **19 physical call / $0,01941006 billed**. Cache-write settlement source cuối vẫn chưa xác nhận live; M7b human review, provider/account policy và gói E vẫn chưa xong. Không suy chất lượng production từ tests/tooling hoặc live corpus tổng hợp.
+
+Evidence: `C:\Users\ADMIN\AppData\Local\Temp\ras-pr64-rereview3-20261019` (`offline.xml/log`, `dns_process.log`, `poll_drip.log`, các helper/exit JSON, `audit-result.json`, source/baseline/cleanup). Container thử `--rm` không mạng đã tự gỡ, worker child trong harness được kiểm reap, không tạo volume/credentials. **24 container có sẵn giữ ID/name/image/mount/label**; dev worker/beat đã restarting từ baseline, RestartCount 114→116, không can thiệp. Không key/`.env`, inference, DB/dev/Dify, production/grants/migration/pricing/account setting. Report và cập nhật trạng thái giữ **chưa commit** cho PR kế tiếp/theo luồng dự án; reviewer không merge hoặc gửi comment GitHub.
+
+## Lịch sử review tại `9b64901`
+
 ## Review lại tại `9b64901` — HTTP đã hủy đúng, còn P2-3 ở thoát tiến trình khi DNS treo
 
 Ngày **2026-10-19**, head **`9b649015395330ca96e580dce1e2df9aa544f6f3`**, code **`959441c`**, source **0052**, PR **OPEN/chưa merge**. Body/header nhỏ giọt và `/key` chậm đã qua kiểm. **Còn một nhánh P2-3: deadline của hàm không bảo đảm lệnh kết thúc khi DNS bị kẹt trong executor.** Giới hạn được agent ghi là “chưa tái hiện” nay đã tái hiện độc lập; cần sửa cùng PR theo điều kiện không chờ thread treo lúc thoát đã nêu trong prompt trước. P2-1/P2-2 giữ kết luận đã sửa, không mở lại scope.
