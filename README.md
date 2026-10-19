@@ -1,5 +1,9 @@
 # Research Assistant System
 
+**M7b trên nhánh review (2026-10-19, chưa merge):** bộ duyệt người đọc offline tại [`evaluation/human-review/`](evaluation/human-review/README.md) — mở `bundle/index.html`, điền hai phiếu CSV, rồi `human-import`/`human-report`. Chưa có phiếu thật: `awaiting_human_review`. [Handoff](docs/m7b-human-quality-review.md).
+
+**Hiện hành sau merge PR #64 (2026-10-19):** source **0052**, main `2df77d0`; C4/M6d/M6e/M7a đã merge trong phạm vi đã review. [Kế hoạch MVP](docs/mvp-delivery-plan.md) giữ các điều kiện nghiệm thu còn thiếu. Tiếp [M7b — bộ duyệt nhãn/answer và nhập phiếu người đọc](docs/tasks/m7b-human-quality-review.md), mới giao/chưa triển khai. Pricing mặc định tắt; cache-write live source cuối, human review, provider/policy và vận hành nhóm thử E chưa hoàn tất. Không cộng pass mới tại merge hoặc coi các trạng thái OPEN/pending lịch sử bên dưới là hiện trạng.
+
 **C4 đã triển khai và kiểm cô lập (source `0051`, chờ review/chưa merge):** [Handoff/runbook C4](docs/c4-integrated-runtime-cutover.md) ghi checkpoint, image/roles và phạm vi kiểm cô lập. Không cutover dev hoặc bật provider/pricing thật. Inventory cuối đối chiếu đủ 5.163 node API đều pass, giữ 298 debt; năm full drill và CLI evaluation đã chạy. Các mốc bên dưới giữ lịch sử theo source riêng.
 
 **Hiện hành sau merge PR #60 (2026-10-15):** B1 đã merge `44633b99`, tree khớp `c6f200e`, source **0050**; chưa rerun tại merge. [Handoff B1](docs/pre-c4-auth-receipts-regression.md) và [review](docs/reviews/pr60-pre-c4-auth-receipts-regression.md) giữ chứng cứ/giới hạn. Đã giao [C4 — bản chạy tích hợp/readiness/restore](docs/tasks/m6c2b2c4-integrated-cutover.md), mới giao/chưa triển khai hoặc kiểm. Mã hiện vẫn pending; C4 chỉ kiểm operational readiness có hậu điều kiện trên project cô lập, không cutover dev hoặc mở provider thật. [Kế hoạch MVP](docs/mvp-delivery-plan.md) giữ checklist; các mốc bên dưới là lịch sử.

@@ -6,3 +6,8 @@
 evaluation/rag/corpus/**/*.md text eol=lf
 evaluation/rag/corpus/**/*.json text eol=lf
 evaluation/rag/corpus/**/*.pdf binary
+
+# M7b review bundle and the M7a synthetic corpus are bound by SHA-256: keep bytes identical.
+evaluation/m7a-synthetic/** text eol=lf
+evaluation/human-review/** text eol=lf
+evaluation/human-review/**/*.pdf binary

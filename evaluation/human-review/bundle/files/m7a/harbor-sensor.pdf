@@ -1,0 +1,107 @@
+%PDF-1.3
+%“Œ‹ž ReportLab Generated PDF document (opensource)
+1 0 obj
+<<
+/F1 2 0 R
+>>
+endobj
+2 0 obj
+<<
+/BaseFont /Helvetica /Encoding /WinAnsiEncoding /Name /F1 /Subtype /Type1 /Type /Font
+>>
+endobj
+3 0 obj
+<<
+/Contents 7 0 R /MediaBox [ 0 0 612 792 ] /Parent 6 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+4 0 obj
+<<
+/PageMode /UseNone /Pages 6 0 R /Type /Catalog
+>>
+endobj
+5 0 obj
+<<
+/Author (anonymous) /CreationDate (D:20000101000000+00'00') /Creator (anonymous) /Keywords () /ModDate (D:20000101000000+00'00') /Producer (ReportLab PDF Library - \(opensource\)) 
+  /Subject (unspecified) /Title (untitled) /Trapped /False
+>>
+endobj
+6 0 obj
+<<
+/Count 1 /Kids [ 3 0 R ] /Type /Pages
+>>
+endobj
+7 0 obj
+<<
+/Length 4160
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT 1 0 0 1 36 760 Tm (Harbor Tide Sensor: a synthetic field note) Tj T* ET
+BT 1 0 0 1 36 746 Tm (Abstract) Tj T* ET
+BT 1 0 0 1 36 732 Tm (This synthetic note was written for the M7a live smoke test and describes an invented sensor.) Tj T* ET
+BT 1 0 0 1 36 718 Tm (Introduction) Tj T* ET
+BT 1 0 0 1 36 704 Tm (The Harbor tide sensor is an imaginary instrument placed on a fictional pier for this test.) Tj T* ET
+BT 1 0 0 1 36 690 Tm (It records water level every five minutes and stores readings on a small invented logger.) Tj T* ET
+BT 1 0 0 1 36 676 Tm (No real harbor, person, dataset or publication is described anywhere in this document.) Tj T* ET
+BT 1 0 0 1 36 662 Tm (The note exists only so that a PDF with enough extractable body text can be indexed.) Tj T* ET
+BT 1 0 0 1 36 648 Tm (Over thirty synthetic days the Harbor tide sensor reported a mean error of 1.2 centimeters) Tj T* ET
+BT 1 0 0 1 36 634 Tm (against a fictional reference gauge installed beside it on the same imaginary pier.) Tj T* ET
+BT 1 0 0 1 36 620 Tm (The error grew during storm periods and returned to its usual level within two days.) Tj T* ET
+BT 1 0 0 1 36 606 Tm (Each reading was compared with the reference gauge at the same five minute interval.) Tj T* ET
+BT 1 0 0 1 36 592 Tm (The invented logger kept every reading and flagged values outside a fixed tolerance band.) Tj T* ET
+BT 1 0 0 1 36 578 Tm (The mean error of 1.2 centimeters stayed below the tolerance band on twenty eight days.) Tj T* ET
+BT 1 0 0 1 36 564 Tm (On two storm days the error exceeded the band and those readings were flagged for review.) Tj T* ET
+BT 1 0 0 1 36 550 Tm (The sensor did not lose power during the invented deployment and no reading was missing.) Tj T* ET
+BT 1 0 0 1 36 536 Tm (Calibration was checked once at the start and once at the end of the thirty day period.) Tj T* ET
+BT 1 0 0 1 36 522 Tm (These synthetic numbers are not measurements and must not be cited as real findings.) Tj T* ET
+BT 1 0 0 1 36 508 Tm (They are only meant to give a retrieval system a second document with distinct content.) Tj T* ET
+BT 1 0 0 1 36 494 Tm (A comparison question can contrast this sensor error with the drift of another device.) Tj T* ET
+BT 1 0 0 1 36 480 Tm (The Harbor tide sensor and the Lumen calibration bench are both fictional instruments.) Tj T* ET
+BT 1 0 0 1 36 466 Tm (Further synthetic paragraphs follow to keep enough body text on this single page.) Tj T* ET
+BT 1 0 0 1 36 452 Tm (The fictional pier was described as calm on most days with light wind from the west.) Tj T* ET
+BT 1 0 0 1 36 438 Tm (Maintenance visits were imagined as weekly and lasted about twenty minutes each time.) Tj T* ET
+BT 1 0 0 1 36 424 Tm (During each visit the invented technician wiped the sensor housing and checked cables.) Tj T* ET
+BT 1 0 0 1 36 410 Tm (No firmware change was made during the deployment described in this synthetic note.) Tj T* ET
+BT 1 0 0 1 36 396 Tm (The logger clock was assumed to be correct and no time correction was applied.) Tj T* ET
+BT 1 0 0 1 36 382 Tm (All values in this note are invented for software testing and carry no real meaning.) Tj T* ET
+BT 1 0 0 1 36 368 Tm (The invented deployment log lists each storm day with its start and end time in hours.) Tj T* ET
+BT 1 0 0 1 36 354 Tm (Water temperature was not measured because the fictional sensor has no thermometer.) Tj T* ET
+BT 1 0 0 1 36 340 Tm (A second imaginary pier was considered for the test but it was never used in this note.) Tj T* ET
+BT 1 0 0 1 36 326 Tm (The tolerance band was set at two centimeters before the synthetic deployment began.) Tj T* ET
+BT 1 0 0 1 36 312 Tm (Readings flagged during storms were kept in the log rather than deleted from the record.) Tj T* ET
+BT 1 0 0 1 36 298 Tm (The synthetic summary above is the only result reported for the Harbor tide sensor.) Tj T* ET
+BT 1 0 0 1 36 284 Tm (Nothing in this document should be read as advice about real tides or real instruments.) Tj T* ET
+BT 1 0 0 1 36 270 Tm (References) Tj T* ET
+BT 1 0 0 1 36 256 Tm ([1] Synthetic Author. An invented reference used only for parser testing. 2026.) Tj T* ET
+ 
+endstream
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000061 00000 n 
+0000000092 00000 n 
+0000000199 00000 n 
+0000000392 00000 n 
+0000000460 00000 n 
+0000000721 00000 n 
+0000000780 00000 n 
+trailer
+<<
+/ID 
+[<1c178198fbdfa51b25995d89d4102043><1c178198fbdfa51b25995d89d4102043>]
+% ReportLab generated PDF document -- digest (opensource)
+
+/Info 5 0 R
+/Root 4 0 R
+/Size 8
+>>
+startxref
+4991
+%%EOF

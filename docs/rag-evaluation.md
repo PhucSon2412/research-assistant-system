@@ -6,7 +6,7 @@ M4c thêm dữ liệu đánh giá, công cụ kiểm/chạy và báo cáo mẫu.
 
 ## Trạng thái nhãn
 
-Toàn bộ 80 câu, span chuẩn và lý do do coding agent soạn từ corpus tổng hợp, trạng thái `pending_human_review`, `label_author=coding_agent`. Schema chỉ nhận đúng giá trị này, nên không file nào có thể ghi là đã được người dùng hay chuyên gia duyệt. Offset/dòng do máy điền từ quote (`annotate`), còn việc chọn quote, side và kỳ vọng là phán đoán của agent cần người đọc kiểm.
+Toàn bộ 80 câu, span chuẩn và lý do do coding agent soạn từ corpus tổng hợp, trạng thái `pending_human_review`, `label_author=coding_agent`. Schema chỉ nhận đúng giá trị này, nên không file nào có thể ghi là đã được người dùng hay chuyên gia duyệt. Offset/dòng do máy điền từ quote (`annotate`), còn việc chọn quote, side và kỳ vọng là phán đoán của agent cần người đọc kiểm. Từ M7b, verdict của người đọc là record overlay bind đúng nội dung nhãn/corpus/parser, không sửa `questions.json` (xem [M7b](#m7b--duyệt-nhãn-và-chấm-answer-bằng-người-đọc)); hiện chưa có verdict nào.
 
 ## Dữ liệu
 
@@ -18,7 +18,8 @@ Toàn bộ 80 câu, span chuẩn và lý do do coding agent soạn từ corpus t
 | `evaluation/rag/questions.json` | 80 câu hỏi có ID ổn định |
 | `evaluation/rag/review/human-review-template.csv` | Phiếu chấm cho người đọc |
 | `evaluation/rag/reports/` | Báo cáo mẫu JSON + Markdown |
-| `api/app/evaluation/` | Schema, locator, metric, embedder cục bộ, runner, report, review, CLI |
+| `api/app/evaluation/` | Schema, locator, metric, embedder cục bộ, runner, report, review, CLI; M7b `human.py`/`human_bundle.py` |
+| `evaluation/human-review/` | M7b: bundle đọc offline + hai phiếu, record verdict đã nhập, report người đọc |
 
 `.gitattributes` giữ LF/binary cho corpus để checksum không đổi khi checkout trên Windows.
 
@@ -280,9 +281,18 @@ Trong 14 câu nhiều side có đáp án, pack hybrid sau đủ mọi side 12/12
 
 **An toàn và giới hạn.** 400 bản ghi search/vector/RAG và 261 lượt mở viewer (87 chunk × 3 identity), 0 vi phạm ACL; 0 nhãn chỉ có trong payload, 0 outbound HTTP, 239 embedding cục bộ trong lượt sau. Test bao gồm hit nhiễu, chunk sâu, cap/duplicate/reference, `metadata_only`, A/B/Admin, mất membership trước provider và khi generation đang chạy, title nhiễu xếp trước, cặp title đồng hạng và scope hai paper với tên không khớp câu hỏi. Không thay public search ranking, luật so sánh hay keyword query. Kết quả **63/63 chỉ là độ phủ evidence pack trên corpus tổng hợp nhỏ**, không chứng minh chất lượng trên paper thật; 80 nhãn agent chưa được người duyệt. Grounded answer, citation accuracy, abstention appropriateness, chi phí thật, p95 production đều chưa đo.
 
+## M7b — duyệt nhãn và chấm answer bằng người đọc
+
+[Handoff](m7b-human-quality-review.md) · [inventory](m7b-test-inventory.json). Bundle offline tại `evaluation/human-review/bundle/` (mở `index.html`), hai phiếu tách tập: `label-review.csv` (80 nhãn M4c) và `answer-review.csv` (answer live M7a trên corpus tổng hợp khác, không cộng mẫu số với M4c). Luồng `human-prepare` → người đọc điền → `human-validate`/`human-import` → `human-report`.
+
+- Nhãn: verdict `accepted`/`changes_requested`/`rejected` + reviewer/ngày (notes bắt buộc khi không accepted) thành record bind `label_sha256` toàn câu, `corpus_sha256` và parser; đổi nhãn/corpus/parser làm record stale, câu về chưa duyệt. Kết quả retrieval ở trên vẫn **provisional** cho tới khi đủ 80/80 accepted.
+- Answer M7a: phiếu theo `answer_rows`/`score`, thêm `run_id`/`response_id`/`row_key`; `score` nhóm theo `response_id` nên hai lần trả lời cùng câu/mode không gộp. Kiểm máy chỉ cấu trúc; evidence pack/gold không có thì `not_available`. Mẫu Chrome chỉ có text màn hình, không chấm.
+- Import all-or-nothing; dòng thiếu/trùng/lạ, sửa nội dung/provenance, thiếu reviewer/ngày/verdict và phán đoán mâu thuẫn là lỗi. Reviewer khác nhau lệch → `conflicting`, ngoài mẫu số. Tên reviewer do người điền tự ghi.
+- Trạng thái hiện tại: **`awaiting_human_review`**, 0 verdict thật; grounded/citation/abstention `not measured`. M4c vẫn không có answer generation.
+
 ## Cần người đọc duyệt và việc tiếp theo
 
-- Duyệt 80 nhãn: quote/side có đủ và đúng không, kỳ vọng `insufficient_evidence` của câu mâu thuẫn (RCI-06), bibliographic (RCI-01) và so sánh một phía có hợp ý sản phẩm không. Sau khi duyệt, đổi trạng thái cần một quyết định schema mới (hiện schema cố ý chỉ nhận `pending_human_review`).
+- Duyệt 80 nhãn qua bundle M7b: quote/side có đủ và đúng không, kỳ vọng `insufficient_evidence` của câu mâu thuẫn (RCI-06), bibliographic (RCI-01/02/04) và so sánh một phía (CMP-12/14/15) có hợp ý sản phẩm không. Verdict được ghi bằng overlay M7b, schema nhãn vẫn chỉ nhận `pending_human_review`.
 - Chạy lại `run` với embedding/rerank/generation thật chỉ sau khi đối soát charge trên key và bật `pricing_verified` có chủ đích; khi đó mới có answer để chấm bằng phiếu người đọc và mới báo grounded/citation/abstention.
 - Thêm corpus thật có giấy phép phân phối rõ cho đúng version, tiến dần tới workload 1.000 paper; giữ holdout tách khỏi mọi lần chỉnh.
 - Ba phát hiện search/RAG được tách thành task riêng sau khi merge PR M4c (xem [roadmap](roadmap.md#task-sau-m4c)): keyword query yếu với câu hỏi tự nhiên (đã xử lý ở [M4d-1](#m4d-1--keyword-query-cho-câu-hỏi-tự-nhiên-đo-trướcsau)), regex so sánh bỏ sót “differ” (đã xử lý ở [M4d-2](#m4d-2--nhận-diện-câu-so-sánh-đo-trướcsau)), giới hạn pack so sánh làm rơi chứng cứ (đo ở [M4d-3](#m4d-3--chọn-evidence-pack-cho-câu-so-sánh)). Mỗi task đo lại bằng bộ này, không chỉnh theo holdout.

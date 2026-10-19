@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width, initial-scale=1"><title>P09 — Federated Learning for Hospital Readmission Prediction</title><style>
+body{font:15px/1.5 system-ui,sans-serif;margin:0 auto;max-width:72rem;padding:0 1rem 3rem;color:#1d1d1f;background:#fff}
+nav{padding:.6rem 0;border-bottom:1px solid #ccc;margin-bottom:1rem}
+table{border-collapse:collapse;width:100%;margin:.5rem 0}td,th{border:1px solid #ccc;padding:.25rem .4rem;vertical-align:top;text-align:left}
+th{background:#f3f3f3}pre,.ctx{white-space:pre-wrap;word-break:break-word;background:#f7f7f7;border:1px solid #ddd;padding:.5rem;font:13px/1.45 ui-monospace,Consolas,monospace}
+.q{font:17px/1.5 system-ui,sans-serif;white-space:pre-wrap;background:#f7f7f7;border:1px solid #ddd;padding:.5rem .7rem}
+mark{background:#ffe066;padding:0 .1rem}.ne mark{background:#ffc9c9}.note{background:#eef5ff;border-left:4px solid #3a7bd5;padding:.5rem .8rem}
+.warn{background:#fff4e5;border-left:4px solid #d58b00;padding:.5rem .8rem}.side{border:1px solid #bbb;padding:.5rem .8rem;margin:.6rem 0}
+.ln{color:#888;display:inline-block;min-width:3em;user-select:none}.ref{color:#7a4a00}:target{background:#fff3b0}
+@media (prefers-color-scheme:dark){body{background:#151515;color:#eee}th{background:#262626}pre,.ctx,.q{background:#202020;border-color:#444}
+mark{color:#000}.note{background:#14243a}.warn{background:#3a2a10}td,th,.side{border-color:#555}}
+</style></head><body><nav><a href="../index.html">Mục lục</a> · <a href="../index.html#guide">Hướng dẫn</a></nav><h1>P09 — Federated Learning for Hospital Readmission Prediction</h1><p>Trang thiếu/không trích xuất được: [4]. <a href="../files/pdf/p09-federated-readmission.pdf">File gốc trong bundle</a></p><h2 id="page-1">Trang 1</h2><p>Vùng parser: abstract [207:373) · <a href="../files/pdf/p09-federated-readmission.pdf#page=1">mở trang PDF</a></p><pre>Federated Learning for Hospital Readmission Prediction
+Authors: Sara Haile and Luca Bianchi (fictional authors; synthetic evaluation paper).
+Identifier: doi:10.5555/ras-eval.p09 (fictional, not registered).
+Abstract
+Seven hospitals trained a readmission model without sharing patient records.
+The federated model reached an AUROC of 0.78, close to 0.79 for pooled training.</pre><h2 id="page-2">Trang 2</h2><p>Vùng parser: body [0:647) · <a href="../files/pdf/p09-federated-readmission.pdf#page=2">mở trang PDF</a></p><pre>Introduction
+Readmission within 30 days is costly for hospitals and harmful for patients.
+Prediction models need data from many hospitals to generalise across populations.
+Legal rules often prevent hospitals from pooling patient records in one place.
+Federated learning trains a shared model while each hospital keeps its own data.
+We test whether federated training can match a model trained on pooled records.
+We also measure the cost of adding differential privacy to the shared updates.
+Our cohort comes from seven hospitals of very different sizes in one region.
+All analyses were approved by the ethics boards of the participating hospitals.</pre><h2 id="page-3">Trang 3</h2><p>Vùng parser: body [0:615) · <a href="../files/pdf/p09-federated-readmission.pdf#page=3">mở trang PDF</a></p><pre>Methods
+Each hospital ran 5 local epochs per round for 60 rounds of federated training.
+Updates were clipped to norm 1.0 and aggregated with secure summation.
+The model is a gradient-boosted ensemble distilled into a small neural network.
+Features include diagnoses, length of stay, age group and prior admissions.
+The outcome is an unplanned readmission within 30 days of hospital discharge.
+Pooled training on the same features serves as an upper reference model.
+Each hospital held out 20% of its admissions for the final evaluation step.
+We repeated federated training with three random seeds for every setting.</pre><h2 id="page-4">Trang 4</h2><p>Vùng parser: không có vùng index · <a href="../files/pdf/p09-federated-readmission.pdf#page=4">mở trang PDF</a></p><pre>(không có text layer)</pre><h2 id="page-5">Trang 5</h2><p>Vùng parser: body [0:636) · <a href="../files/pdf/p09-federated-readmission.pdf#page=5">mở trang PDF</a></p><pre>Results
+Per-hospital AUROC values are listed in Table 4, which is provided as a scanned image.
+The smallest hospital, with 1,900 admissions, gained the most from federation.
+Differential privacy with epsilon 8 reduced the federated AUROC to 0.75.
+Calibration of the federated model was similar to that of the pooled model.
+Training finished in 11 hours of wall-clock time across all seven hospitals.
+Communication per round stayed below 4 megabytes for every participating site.
+Hospitals with fewer than 5,000 admissions benefited more than large hospitals.
+No hospital performed worse with the federated model than with a local model.</pre><h2 id="page-6">Trang 6</h2><p>Vùng parser: body [0:665) · <a href="../files/pdf/p09-federated-readmission.pdf#page=6">mở trang PDF</a></p><pre>Discussion
+Federated training nearly matched pooled training without moving patient records.
+The privacy cost of epsilon 8 may be acceptable for decision support but not for all uses.
+Small hospitals gain the most, which supports regional collaboration on such models.
+Our cohort covers one region, so external validation in other regions is needed.
+Scanned appendix tables should be converted to text before any automated reuse.
+Future work will test personalisation layers for hospitals with unusual case mixes.
+Secure summation added little overhead compared with the local training time.
+Clinicians reviewed the top features and found them clinically plausible.</pre><h2 id="page-7">Trang 7</h2><p>Vùng parser: body [0:178), references [178:314) · <a href="../files/pdf/p09-federated-readmission.pdf#page=7">mở trang PDF</a></p><pre>Conclusion
+Federated learning offers near-pooled readmission prediction across seven hospitals.
+Per-hospital values remain available only in the scanned Table 4 of the original.
+References
+[1] E. Novak. Secure Aggregation for Federated Health Models. 2024.
+[2] D. Ferreira. Readmission Risk Scores Revisited. 2023.</pre></body></html>

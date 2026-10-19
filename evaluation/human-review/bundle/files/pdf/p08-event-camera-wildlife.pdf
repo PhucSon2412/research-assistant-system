@@ -1,0 +1,275 @@
+%PDF-1.3
+%“Œ‹ž ReportLab Generated PDF document (opensource)
+1 0 obj
+<<
+/F1 2 0 R
+>>
+endobj
+2 0 obj
+<<
+/BaseFont /Helvetica /Encoding /WinAnsiEncoding /Name /F1 /Subtype /Type1 /Type /Font
+>>
+endobj
+3 0 obj
+<<
+/Contents 13 0 R /MediaBox [ 0 0 612 792 ] /Parent 12 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+4 0 obj
+<<
+/Contents 14 0 R /MediaBox [ 0 0 612 792 ] /Parent 12 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+5 0 obj
+<<
+/Contents 15 0 R /MediaBox [ 0 0 612 792 ] /Parent 12 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+6 0 obj
+<<
+/Contents 16 0 R /MediaBox [ 0 0 612 792 ] /Parent 12 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+7 0 obj
+<<
+/Contents 17 0 R /MediaBox [ 0 0 612 792 ] /Parent 12 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+8 0 obj
+<<
+/Contents 18 0 R /MediaBox [ 0 0 612 792 ] /Parent 12 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+9 0 obj
+<<
+/Contents 19 0 R /MediaBox [ 0 0 612 792 ] /Parent 12 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+10 0 obj
+<<
+/PageMode /UseNone /Pages 12 0 R /Type /Catalog
+>>
+endobj
+11 0 obj
+<<
+/Author (anonymous) /CreationDate (D:20000101000000+00'00') /Creator (anonymous) /Keywords () /ModDate (D:20000101000000+00'00') /Producer (ReportLab PDF Library - \(opensource\)) 
+  /Subject (unspecified) /Title (untitled) /Trapped /False
+>>
+endobj
+12 0 obj
+<<
+/Count 7 /Kids [ 3 0 R 4 0 R 5 0 R 6 0 R 7 0 R 8 0 R 9 0 R ] /Type /Pages
+>>
+endobj
+13 0 obj
+<<
+/Length 632
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT /F1 11 Tf 13.2 TL ET
+BT 1 0 0 1 35 750 Tm (Low-Light Wildlife Detection with Event Cameras) Tj T* ET
+BT 1 0 0 1 35 735 Tm (Authors: Joon Park and Emma Laurent \(fictional authors; synthetic evaluation paper\).) Tj T* ET
+BT 1 0 0 1 35 720 Tm (Identifier: doi:10.5555/ras-eval.p08 \(fictional, not registered\).) Tj T* ET
+BT 1 0 0 1 35 705 Tm (Abstract) Tj T* ET
+BT 1 0 0 1 35 690 Tm (We detect nocturnal animals with an event camera and a spiking neural detector.) Tj T* ET
+BT 1 0 0 1 35 675 Tm (At 2 lux the detector reaches a mean recall of 0.71 across nine species.) Tj T* ET
+.6 g
+0 g
+ 
+endstream
+endobj
+14 0 obj
+<<
+/Length 1031
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT /F1 11 Tf 13.2 TL ET
+BT 1 0 0 1 35 750 Tm (Introduction) Tj T* ET
+BT 1 0 0 1 35 735 Tm (Camera traps at night rely on infrared illumination, which can disturb some animals.) Tj T* ET
+BT 1 0 0 1 35 720 Tm (Event cameras report brightness changes per pixel and work at very low light levels.) Tj T* ET
+BT 1 0 0 1 35 705 Tm (Their sparse output suits spiking detectors that run on low-power hardware in the field.) Tj T* ET
+BT 1 0 0 1 35 690 Tm (Few studies measure how detection quality changes as the scene gets darker.) Tj T* ET
+BT 1 0 0 1 35 675 Tm (We collect clips in forests and report recall at several controlled light levels.) Tj T* ET
+BT 1 0 0 1 35 660 Tm (Our aim is to find the light level below which detection becomes unreliable.) Tj T* ET
+BT 1 0 0 1 35 645 Tm (We also compare the power draw of the event camera with an infrared reference camera.) Tj T* ET
+BT 1 0 0 1 35 630 Tm (The dataset and labels are described in the methods section of this paper.) Tj T* ET
+.6 g
+0 g
+ 
+endstream
+endobj
+15 0 obj
+<<
+/Length 976
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT /F1 11 Tf 13.2 TL ET
+BT 1 0 0 1 35 750 Tm (Methods) Tj T* ET
+BT 1 0 0 1 35 735 Tm (Events are accumulated into 4 temporal bins of 25 milliseconds each.) Tj T* ET
+BT 1 0 0 1 35 720 Tm (The detector was trained on 14,200 labelled clips from 3 forest sites.) Tj T* ET
+BT 1 0 0 1 35 705 Tm (Clips were labelled by two ecologists who marked the species and a bounding box.) Tj T* ET
+BT 1 0 0 1 35 690 Tm (Light levels were measured with a calibrated lux meter placed next to the camera.) Tj T* ET
+BT 1 0 0 1 35 675 Tm (We report recall because false negatives matter most for population surveys.) Tj T* ET
+BT 1 0 0 1 35 660 Tm (Each site contributed clips from both summer and winter recording periods.) Tj T* ET
+BT 1 0 0 1 35 645 Tm (Training used a fixed learning schedule without any per-site tuning at all.) Tj T* ET
+BT 1 0 0 1 35 630 Tm (Test clips come from recording nights that were not used during training.) Tj T* ET
+.6 g
+0 g
+ 
+endstream
+endobj
+16 0 obj
+<<
+/Length 392
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT /F1 11 Tf 13.2 TL ET
+BT 1 0 0 1 35 750 Tm (Results) Tj T* ET
+BT 1 0 0 1 35 735 Tm (Figure 3. Recall per species at 2 lux.) Tj T* ET
+.6 g
+n 60 200 40 380 re B*
+n 120 200 40 250 re B*
+n 180 200 40 330 re B*
+n 240 200 40 190 re B*
+n 300 200 40 420 re B*
+n 360 200 40 270 re B*
+n 420 200 40 150 re B*
+n 480 200 40 310 re B*
+n 540 200 40 230 re B*
+0 g
+ 
+endstream
+endobj
+17 0 obj
+<<
+/Length 949
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT /F1 11 Tf 13.2 TL ET
+BT 1 0 0 1 35 750 Tm (Figure 3 shows per-species recall; the exact values appear only in the figure.) Tj T* ET
+BT 1 0 0 1 35 735 Tm (Mean recall fell from 0.71 at 2 lux to 0.52 at 0.5 lux across all nine species.) Tj T* ET
+BT 1 0 0 1 35 720 Tm (False positives were most often caused by moving branches in windy conditions.) Tj T* ET
+BT 1 0 0 1 35 705 Tm (Recall was stable across the two recording seasons for most of the species.) Tj T* ET
+BT 1 0 0 1 35 690 Tm (Small animals such as mice were detected less often than larger mammals.) Tj T* ET
+BT 1 0 0 1 35 675 Tm (Detection latency on the field hardware stayed below 40 milliseconds per clip.) Tj T* ET
+BT 1 0 0 1 35 660 Tm (Adding a fifth temporal bin did not change mean recall in our ablation runs.) Tj T* ET
+BT 1 0 0 1 35 645 Tm (Clips with rain produced more events but did not reduce recall noticeably.) Tj T* ET
+.6 g
+0 g
+ 
+endstream
+endobj
+18 0 obj
+<<
+/Length 998
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT /F1 11 Tf 13.2 TL ET
+BT 1 0 0 1 35 750 Tm (Discussion) Tj T* ET
+BT 1 0 0 1 35 735 Tm (The event camera consumed 0.9 W compared with 2.6 W for the infrared reference camera.) Tj T* ET
+BT 1 0 0 1 35 720 Tm (Lower power allows longer deployments on the same battery in remote locations.) Tj T* ET
+BT 1 0 0 1 35 705 Tm (Detection below 0.5 lux may need longer bins or a more sensitive sensor model.) Tj T* ET
+BT 1 0 0 1 35 690 Tm (Branch motion remains the main source of errors and needs better filtering.) Tj T* ET
+BT 1 0 0 1 35 675 Tm (Our sites were temperate forests, so other habitats may behave differently.) Tj T* ET
+BT 1 0 0 1 35 660 Tm (Species with little motion at night are hard to detect with events alone.) Tj T* ET
+BT 1 0 0 1 35 645 Tm (A combined event and infrared system could cover both situations in future.) Tj T* ET
+BT 1 0 0 1 35 630 Tm (Ethics approval covered passive recording only, without any animal handling.) Tj T* ET
+.6 g
+0 g
+ 
+endstream
+endobj
+19 0 obj
+<<
+/Length 564
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT /F1 11 Tf 13.2 TL ET
+BT 1 0 0 1 35 750 Tm (Conclusion) Tj T* ET
+BT 1 0 0 1 35 735 Tm (Event cameras detect nocturnal wildlife reliably down to about 2 lux at low power.) Tj T* ET
+BT 1 0 0 1 35 720 Tm (Per-species values should be read from Figure 3 in the original file.) Tj T* ET
+BT 1 0 0 1 35 705 Tm (References) Tj T* ET
+BT 1 0 0 1 35 690 Tm ([1] M. Haddad. Spiking Detectors for Neuromorphic Vision. 2024.) Tj T* ET
+BT 1 0 0 1 35 675 Tm ([2] B. Keller. Camera Traps and Animal Disturbance. 2022.) Tj T* ET
+.6 g
+0 g
+ 
+endstream
+endobj
+xref
+0 20
+0000000000 65535 f 
+0000000061 00000 n 
+0000000092 00000 n 
+0000000199 00000 n 
+0000000394 00000 n 
+0000000589 00000 n 
+0000000784 00000 n 
+0000000979 00000 n 
+0000001174 00000 n 
+0000001369 00000 n 
+0000001564 00000 n 
+0000001634 00000 n 
+0000001896 00000 n 
+0000001992 00000 n 
+0000002675 00000 n 
+0000003758 00000 n 
+0000004785 00000 n 
+0000005228 00000 n 
+0000006228 00000 n 
+0000007277 00000 n 
+trailer
+<<
+/ID 
+[<1c178198fbdfa51b25995d89d4102043><1c178198fbdfa51b25995d89d4102043>]
+% ReportLab generated PDF document -- digest (opensource)
+
+/Info 11 0 R
+/Root 10 0 R
+/Size 20
+>>
+startxref
+7892
+%%EOF

@@ -1,5 +1,15 @@
 # Nhật ký quyết định
 
+## Quyết định triển khai M7b (2026-10-19)
+
+Theo [task M7b](tasks/m7b-human-quality-review.md), coding agent chọn (chủ dự án chưa trực tiếp xác nhận): verdict người đọc là **record overlay** trong `evaluation/human-review/records/`, không sửa `questions.json`/schema nhãn; nhãn bind JSON chuẩn hóa toàn câu + hash manifest corpus + phiên bản parser, answer bind mọi cột hiển thị của dòng + hash snapshot M7a. Import all-or-nothing; cùng reviewer đổi phán đoán phải `--replace`, reviewer khác lệch thì `conflicting` và ra khỏi mẫu số. Attribution là tên người điền tự ghi, không xác thực danh tính. `review.score` nhóm theo `response_id` khi có (M7a), giữ `question_id/mode` cho phiếu M4c. M7a: kỳ vọng lấy từ ý định drill (không phải gold), file của citation lumen suy từ kế hoạch upload user A (ghi basis), ledger chỉ gán khi đúng một call/answer cho route, mẫu Chrome chỉ có text màn hình không chấm. Bundle commit vào repo để mở ngay; `human-prepare --check` giữ đồng bộ. [Handoff](m7b-human-quality-review.md).
+
+## Giao M7b sau merge PR #64 (2026-10-19)
+
+Đã fetch/xác minh merge `2df77d0ac2b3e9371aa33753f4ab591fb09d1fa3`, head `285fd37` là ancestor/tree khớp, source **0052**. Theo ủy quyền hoàn thành MVP, orchestrator chọn [M7b offline](tasks/m7b-human-quality-review.md): bộ đọc/phiếu cho 80 nhãn M4c và answer live tổng hợp M7a đã có; nhập verdict bind đúng nội dung/corpus/provenance và chấm với mẫu số rõ. Không chờ thêm budget để làm phần độc lập này, không dùng agent/LLM thay người chấm. Chủ dự án là người nhận bundle mặc định, chưa được ghi đã duyệt hoặc xác minh danh tính độc lập. Coding xong mà chưa có phiếu thật vẫn `awaiting_human_review`, không nghiệm thu D bằng test fixture.
+
+Trần M7a cũ hết (20 request/$0,11675006 cam kết); không tự reset/cấp lại, không đọc key/poll account hoặc live mới trong task. Cache-write source cuối cần ngân sách/ủy quyền riêng, paper thật cần policy/quyền rõ; chưa mở pricing hoặc vận hành E. Không thay production ranking/prompt/gate/schema để tăng điểm. Task mới giao, chưa triển khai/kiểm.
+
 ## Quyết định triển khai M7a (2026-10-18)
 
 Theo [task M7a](tasks/m7a-openrouter-live-verification.md) và ủy quyền dùng key hiện có, orchestrator chọn policy routing MVP: mỗi route pin provider đã kiểm và nằm trong danh sách ZDR của OpenRouter (embedding Azure, rerank Fireworks, generation Azure), `allow_fallbacks=false`, `data_collection=deny`, `zdr=true`, `max_price` bằng trần config; generation thêm `require_parameters`. Không mở route: `pricing_verified` vẫn tắt. Hai sửa từ chứng cứ live: mapping hữu hạn snapshot `openai/gpt-6-sol-20260922`, và tính input generation theo giá cao hơn giữa input/cache-write ($2,5/M) vì charge thật vượt công thức cũ. Đây là lựa chọn thực hiện theo ủy quyền, không phải chủ dự án đã xác nhận provider/điều khoản; chưa đủ điều kiện gửi paper thật. [Handoff](m7a-openrouter-live-verification.md) · [inventory](m7a-test-inventory.json).

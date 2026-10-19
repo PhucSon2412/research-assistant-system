@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width, initial-scale=1"><title>P08 — Low-Light Wildlife Detection with Event Cameras</title><style>
+body{font:15px/1.5 system-ui,sans-serif;margin:0 auto;max-width:72rem;padding:0 1rem 3rem;color:#1d1d1f;background:#fff}
+nav{padding:.6rem 0;border-bottom:1px solid #ccc;margin-bottom:1rem}
+table{border-collapse:collapse;width:100%;margin:.5rem 0}td,th{border:1px solid #ccc;padding:.25rem .4rem;vertical-align:top;text-align:left}
+th{background:#f3f3f3}pre,.ctx{white-space:pre-wrap;word-break:break-word;background:#f7f7f7;border:1px solid #ddd;padding:.5rem;font:13px/1.45 ui-monospace,Consolas,monospace}
+.q{font:17px/1.5 system-ui,sans-serif;white-space:pre-wrap;background:#f7f7f7;border:1px solid #ddd;padding:.5rem .7rem}
+mark{background:#ffe066;padding:0 .1rem}.ne mark{background:#ffc9c9}.note{background:#eef5ff;border-left:4px solid #3a7bd5;padding:.5rem .8rem}
+.warn{background:#fff4e5;border-left:4px solid #d58b00;padding:.5rem .8rem}.side{border:1px solid #bbb;padding:.5rem .8rem;margin:.6rem 0}
+.ln{color:#888;display:inline-block;min-width:3em;user-select:none}.ref{color:#7a4a00}:target{background:#fff3b0}
+@media (prefers-color-scheme:dark){body{background:#151515;color:#eee}th{background:#262626}pre,.ctx,.q{background:#202020;border-color:#444}
+mark{color:#000}.note{background:#14243a}.warn{background:#3a2a10}td,th,.side{border-color:#555}}
+</style></head><body><nav><a href="../index.html">Mục lục</a> · <a href="../index.html#guide">Hướng dẫn</a></nav><h1>P08 — Low-Light Wildlife Detection with Event Cameras</h1><p>Trang thiếu/không trích xuất được: [4]. <a href="../files/pdf/p08-event-camera-wildlife.pdf">File gốc trong bundle</a></p><h2 id="page-1">Trang 1</h2><p>Vùng parser: abstract [199:360) · <a href="../files/pdf/p08-event-camera-wildlife.pdf#page=1">mở trang PDF</a></p><pre>Low-Light Wildlife Detection with Event Cameras
+Authors: Joon Park and Emma Laurent (fictional authors; synthetic evaluation paper).
+Identifier: doi:10.5555/ras-eval.p08 (fictional, not registered).
+Abstract
+We detect nocturnal animals with an event camera and a spiking neural detector.
+At 2 lux the detector reaches a mean recall of 0.71 across nine species.</pre><h2 id="page-2">Trang 2</h2><p>Vùng parser: body [0:667) · <a href="../files/pdf/p08-event-camera-wildlife.pdf#page=2">mở trang PDF</a></p><pre>Introduction
+Camera traps at night rely on infrared illumination, which can disturb some animals.
+Event cameras report brightness changes per pixel and work at very low light levels.
+Their sparse output suits spiking detectors that run on low-power hardware in the field.
+Few studies measure how detection quality changes as the scene gets darker.
+We collect clips in forests and report recall at several controlled light levels.
+Our aim is to find the light level below which detection becomes unreliable.
+We also compare the power draw of the event camera with an infrared reference camera.
+The dataset and labels are described in the methods section of this paper.</pre><h2 id="page-3">Trang 3</h2><p>Vùng parser: body [0:612) · <a href="../files/pdf/p08-event-camera-wildlife.pdf#page=3">mở trang PDF</a></p><pre>Methods
+Events are accumulated into 4 temporal bins of 25 milliseconds each.
+The detector was trained on 14,200 labelled clips from 3 forest sites.
+Clips were labelled by two ecologists who marked the species and a bounding box.
+Light levels were measured with a calibrated lux meter placed next to the camera.
+We report recall because false negatives matter most for population surveys.
+Each site contributed clips from both summer and winter recording periods.
+Training used a fixed learning schedule without any per-site tuning at all.
+Test clips come from recording nights that were not used during training.</pre><h2 id="page-4">Trang 4</h2><p>Vùng parser: body [0:46) · <a href="../files/pdf/p08-event-camera-wildlife.pdf#page=4">mở trang PDF</a></p><pre>Results
+Figure 3. Recall per species at 2 lux.</pre><h2 id="page-5">Trang 5</h2><p>Vùng parser: body [0:617) · <a href="../files/pdf/p08-event-camera-wildlife.pdf#page=5">mở trang PDF</a></p><pre>Figure 3 shows per-species recall; the exact values appear only in the figure.
+Mean recall fell from 0.71 at 2 lux to 0.52 at 0.5 lux across all nine species.
+False positives were most often caused by moving branches in windy conditions.
+Recall was stable across the two recording seasons for most of the species.
+Small animals such as mice were detected less often than larger mammals.
+Detection latency on the field hardware stayed below 40 milliseconds per clip.
+Adding a fifth temporal bin did not change mean recall in our ablation runs.
+Clips with rain produced more events but did not reduce recall noticeably.</pre><h2 id="page-6">Trang 6</h2><p>Vùng parser: body [0:634) · <a href="../files/pdf/p08-event-camera-wildlife.pdf#page=6">mở trang PDF</a></p><pre>Discussion
+The event camera consumed 0.9 W compared with 2.6 W for the infrared reference camera.
+Lower power allows longer deployments on the same battery in remote locations.
+Detection below 0.5 lux may need longer bins or a more sensitive sensor model.
+Branch motion remains the main source of errors and needs better filtering.
+Our sites were temperate forests, so other habitats may behave differently.
+Species with little motion at night are hard to detect with events alone.
+A combined event and infrared system could cover both situations in future.
+Ethics approval covered passive recording only, without any animal handling.</pre><h2 id="page-7">Trang 7</h2><p>Vùng parser: body [0:164), references [164:296) · <a href="../files/pdf/p08-event-camera-wildlife.pdf#page=7">mở trang PDF</a></p><pre>Conclusion
+Event cameras detect nocturnal wildlife reliably down to about 2 lux at low power.
+Per-species values should be read from Figure 3 in the original file.
+References
+[1] M. Haddad. Spiking Detectors for Neuromorphic Vision. 2024.
+[2] B. Keller. Camera Traps and Animal Disturbance. 2022.</pre></body></html>

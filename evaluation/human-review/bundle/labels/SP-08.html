@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SP-08 — duyệt nhãn</title><style>
+body{font:15px/1.5 system-ui,sans-serif;margin:0 auto;max-width:72rem;padding:0 1rem 3rem;color:#1d1d1f;background:#fff}
+nav{padding:.6rem 0;border-bottom:1px solid #ccc;margin-bottom:1rem}
+table{border-collapse:collapse;width:100%;margin:.5rem 0}td,th{border:1px solid #ccc;padding:.25rem .4rem;vertical-align:top;text-align:left}
+th{background:#f3f3f3}pre,.ctx{white-space:pre-wrap;word-break:break-word;background:#f7f7f7;border:1px solid #ddd;padding:.5rem;font:13px/1.45 ui-monospace,Consolas,monospace}
+.q{font:17px/1.5 system-ui,sans-serif;white-space:pre-wrap;background:#f7f7f7;border:1px solid #ddd;padding:.5rem .7rem}
+mark{background:#ffe066;padding:0 .1rem}.ne mark{background:#ffc9c9}.note{background:#eef5ff;border-left:4px solid #3a7bd5;padding:.5rem .8rem}
+.warn{background:#fff4e5;border-left:4px solid #d58b00;padding:.5rem .8rem}.side{border:1px solid #bbb;padding:.5rem .8rem;margin:.6rem 0}
+.ln{color:#888;display:inline-block;min-width:3em;user-select:none}.ref{color:#7a4a00}:target{background:#fff3b0}
+@media (prefers-color-scheme:dark){body{background:#151515;color:#eee}th{background:#262626}pre,.ctx,.q{background:#202020;border-color:#444}
+mark{color:#000}.note{background:#14243a}.warn{background:#3a2a10}td,th,.side{border-color:#555}}
+</style></head><body><nav><a href="../index.html">Mục lục</a> · <a href="../index.html#guide">Hướng dẫn</a></nav><h1>SP-08 — nhãn M4c</h1><p class="note">Điền dòng <b>SP-08</b> trong <code>label-review.csv</code>. Nhãn do coding agent soạn, trạng thái <code>pending_human_review</code>.</p><h2>Câu hỏi</h2><div class="q">What inter-annotator agreement was reported for the CNDI-5k benchmark?</div><table><tr><th>Split</th><td>dev</td></tr><tr><th>Nhóm</th><td>single_paper</td></tr><tr><th>Tags</th><td>—</td></tr><tr><th>Identity</th><td>user_a</td></tr><tr><th>Scope</th><td>all<br></td></tr><tr><th>Expected status</th><td>answered</td></tr><tr><th>Expected reason</th><td>—</td></tr><tr><th>Expected coverage</th><td>—</td></tr><tr><th>Supported claim</th><td>Inter-annotator agreement on CNDI-5k was a Cohen&#x27;s kappa of 0.87.</td></tr><tr><th>Rationale</th><td>Annotation section states Cohen&#x27;s kappa.</td></tr><tr><th>Forbidden markers</th><td>—</td></tr><tr><th>Label</th><td>pending_human_review / coding_agent</td></tr></table><h2>Evidence (1 side)</h2><div class="side"><h3>Side: agreement</h3><table><tr><th>Item</th><td>A/P03 — CNDI-5k: A Benchmark for Clinical Note De-identification (markdown, owner user_a)</td></tr><tr><th>Vị trí</th><td>dòng L13–L13, offset [449:506) — <a href="../papers/P03.html#L13">bản đọc P03</a> · <a href="../files/markdown/p03-clinical-deidentification-benchmark.md">file gốc markdown/p03-clinical-deidentification-benchmark.md</a></td></tr><tr><th>Parser</th><td>markdown-lines-v2</td></tr><tr><th>Quote</th><td>inter-annotator agreement reached a Cohen&#x27;s kappa of 0.87</td></tr></table><p>Vùng parser: <b>body</b> [392:637)</p><div class="ctx">## Annotation
+
+Three annotators labelled every note, and <mark>inter-annotator agreement reached a Cohen&#x27;s kappa of 0.87</mark>.
+Notes were generated from templates and contain no real patient data.
+Disagreements were resolved by a fourth senior annotator.
+
+</div></div><h2>Non-evidence (0)</h2><p><a href="SP-07.html">← SP-07</a> <a href="SP-09.html">SP-09 →</a></p></body></html>
