@@ -1,5 +1,9 @@
 # Roadmap đề xuất
 
+**M7b trên nhánh review (2026-10-19):** bộ duyệt/nhập/chấm phiếu người đọc offline xong phần coding; chờ chủ dự án điền phiếu ([handoff](m7b-human-quality-review.md)). D còn cache-write live, policy và paper thật; E riêng.
+
+**Sau merge PR #64, 2026-10-19:** M7a đã merge `2df77d0`, tree khớp `285fd37`, source **0052**, không cộng kiểm mới tại merge. Giao [M7b — bộ duyệt/nhập/chấm phiếu người đọc](tasks/m7b-human-quality-review.md) một PR offline, dùng nhãn/answer tổng hợp đã có; mới giao/chưa triển khai. D chưa khép tới khi có duyệt thật và các điều kiện provider còn thiếu; E vẫn riêng. Không cấp lại trần live đã hết hoặc bật pricing/dev/Dify.
+
 **M7a trên nhánh review (2026-10-19):** OpenRouter live synthetic ($0,0194 billed, 19 request) và routing ZDR pin; chưa merge. Tiếp M7b và gói E. [Handoff](m7a-openrouter-live-verification.md).
 
 **Sau merge PR #63, 2026-10-18:** M6e đã merge `5362ace`, tree khớp `c1f7bcc`, source **0052**, không rerun tại merge. Gói C đủ phạm vi exact-byte MVP; chuyển [M7a — OpenRouter live synthetic/charge](tasks/m7a-openrouter-live-verification.md), một PR mới giao/chưa triển khai/kiểm live. Giữ cap, default pricing off, runtime/ACL/accounting và dev/Dify; M7b chất lượng có người đọc cùng E vận hành còn riêng. Không mở canonical/reuse/format mới hoặc coi quote là charge.

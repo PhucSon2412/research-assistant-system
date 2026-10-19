@@ -6,3 +6,7 @@
 evaluation/rag/corpus/**/*.md text eol=lf
 evaluation/rag/corpus/**/*.json text eol=lf
 evaluation/rag/corpus/**/*.pdf binary
+
+# M7b review bundle is bound by SHA-256 to the exact bytes it was built from (the M7a corpus copy
+# keeps the CRLF bytes the live run uploaded): no line-ending conversion.
+evaluation/human-review/** -text

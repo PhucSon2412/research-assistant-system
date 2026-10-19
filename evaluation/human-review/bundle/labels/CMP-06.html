@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width, initial-scale=1"><title>CMP-06 — duyệt nhãn</title><style>
+body{font:15px/1.5 system-ui,sans-serif;margin:0 auto;max-width:72rem;padding:0 1rem 3rem;color:#1d1d1f;background:#fff}
+nav{padding:.6rem 0;border-bottom:1px solid #ccc;margin-bottom:1rem}
+table{border-collapse:collapse;width:100%;margin:.5rem 0}td,th{border:1px solid #ccc;padding:.25rem .4rem;vertical-align:top;text-align:left}
+th{background:#f3f3f3}pre,.ctx{white-space:pre-wrap;word-break:break-word;background:#f7f7f7;border:1px solid #ddd;padding:.5rem;font:13px/1.45 ui-monospace,Consolas,monospace}
+.q{font:17px/1.5 system-ui,sans-serif;white-space:pre-wrap;background:#f7f7f7;border:1px solid #ddd;padding:.5rem .7rem}
+mark{background:#ffe066;padding:0 .1rem}.ne mark{background:#ffc9c9}.note{background:#eef5ff;border-left:4px solid #3a7bd5;padding:.5rem .8rem}
+.warn{background:#fff4e5;border-left:4px solid #d58b00;padding:.5rem .8rem}.side{border:1px solid #bbb;padding:.5rem .8rem;margin:.6rem 0}
+.ln{color:#888;display:inline-block;min-width:3em;user-select:none}.ref{color:#7a4a00}:target{background:#fff3b0}
+@media (prefers-color-scheme:dark){body{background:#151515;color:#eee}th{background:#262626}pre,.ctx,.q{background:#202020;border-color:#444}
+mark{color:#000}.note{background:#14243a}.warn{background:#3a2a10}td,th,.side{border-color:#555}}
+</style></head><body><nav><a href="../index.html">Mục lục</a> · <a href="../index.html#guide">Hướng dẫn</a></nav><h1>CMP-06 — nhãn M4c</h1><p class="note">Điền dòng <b>CMP-06</b> trong <code>label-review.csv</code>. Nhãn do coding agent soạn, trạng thái <code>pending_human_review</code>.</p><h2>Câu hỏi</h2><div class="q">Compare the energy overhead reported for mixture-of-experts inference with the energy change caused by thermal-aware scheduling.</div><table><tr><th>Split</th><td>dev</td></tr><tr><th>Nhóm</th><td>comparison</td></tr><tr><th>Tags</th><td>mixed_format</td></tr><tr><th>Identity</th><td>user_a</td></tr><tr><th>Scope</th><td>all<br></td></tr><tr><th>Expected status</th><td>answered</td></tr><tr><th>Expected reason</th><td>—</td></tr><tr><th>Expected coverage</th><td>—</td></tr><tr><th>Supported claim</th><td>MoE inference used 1.3 times the dense energy per token, while thermal-aware scheduling raised energy per inference by 4%.</td></tr><tr><th>Rationale</th><td>Different units (ratio per token vs percent per inference) must be kept distinct.</td></tr><tr><th>Forbidden markers</th><td>—</td></tr><tr><th>Label</th><td>pending_human_review / coding_agent</td></tr></table><h2>Evidence (2 side)</h2><div class="side"><h3>Side: MoE</h3><table><tr><th>Item</th><td>A/P13 — Energy Cost of Mixture-of-Experts Inference on Edge Devices (markdown, owner user_a)</td></tr><tr><th>Vị trí</th><td>dòng L17–L17, offset [579:669) — <a href="../papers/P13.html#L17">bản đọc P13</a> · <a href="../files/markdown/p13-moe-energy.md">file gốc markdown/p13-moe-energy.md</a></td></tr><tr><th>Parser</th><td>markdown-lines-v2</td></tr><tr><th>Quote</th><td>The top-2 mixture-of-experts model used 1.3 times the energy per token of the dense model.</td></tr></table><p>Vùng parser: <b>body</b> [567:855)</p><div class="ctx">## Results
+
+<mark>The top-2 mixture-of-experts model used 1.3 times the energy per token of the dense model.</mark>
+Loading expert weights from flash memory accounted for 58% of the extra energy.
+Caching the four most used experts in RAM reduced the overhead to 1.1 times the dense energy per token.
+
+</div></div><div class="side"><h3>Side: scheduler</h3><table><tr><th>Item</th><td>A/P07 — Thermal-Aware Scheduling for Edge Inference (pdf, owner user_a)</td></tr><tr><th>Vị trí</th><td>trang 4, offset [180:267) — <a href="../papers/P07.html#page-4">bản đọc P07</a> · <a href="../files/pdf/p07-thermal-scheduling.pdf#page=4">file gốc pdf/p07-thermal-scheduling.pdf</a></td></tr><tr><th>Parser</th><td>pypdf-6.19.0-layout-v2</td></tr><tr><th>Quote</th><td>Energy per inference rose by 4% because deferred jobs later ran at higher clock speeds.</td></tr></table><p>Vùng parser: <b>body</b> [0:675)</p><div class="ctx">Results
+Across the three devices, p95 latency fell by 23% relative to first-come-first-served.
+Throttling events dropped from 41 to 9 per hour on average across the three devices.
+<mark>Energy per inference rose by 4% because deferred jobs later ran at higher clock speeds.</mark>
+The phone SoC showed the largest latency gain, a 31% reduction of p95 latency.
+The single-board computer improved by 27%, with most gains during long bursts.
+Median latency changed by less than 2% on every device, so the gain lies in the tail.
+Forecast error stayed below 1.5 degrees Celsius for 95% of the prediction windows.
+The scheduler itself used less than 1% of processor time on each of the devices.</div></div><h2>Non-evidence (0)</h2><p><a href="CMP-05.html">← CMP-05</a> <a href="CMP-07.html">CMP-07 →</a></p></body></html>

@@ -1,5 +1,15 @@
 # Tài liệu dự án
 
+**Sửa review PR #65, 2026-10-19 (chờ review lại):** hai P2 binding/preflight đã sửa offline ([handoff](m7b-human-quality-review.md#sửa-review-pr-65-tại-44e3bd3--chờ-review-lại)); 0 verdict thật, chưa merge.
+
+**Review M7b PR #65 tại `44e3bd3`, 2026-10-19:** còn [hai P2 về hiệu lực verdict và integrity của bundle được xem](reviews/pr65-m7b-human-quality-review.md); [sửa trên cùng PR](tasks/fix-pr65-human-review-provenance.md). Reviewer 55 repo + 1 control pass/6 repro fail, không ghi phiếu thật. PR chưa merge; human review vẫn pending, không inference/key/ngân sách mới.
+
+**M7b trên nhánh review, 2026-10-19 (chưa merge):** [handoff bộ duyệt nhãn/answer và nhập phiếu](m7b-human-quality-review.md) · [inventory](m7b-test-inventory.json) · [bundle](../evaluation/human-review/README.md). 0 verdict thật, `awaiting_human_review`; không inference, pricing tắt.
+
+**Sau merge PR #64 (`2df77d0`, 2026-10-19):** tiếp [M7b — bộ duyệt 80 nhãn và answer M7a, nhập/chấm phiếu human](tasks/m7b-human-quality-review.md), mới giao/chưa triển khai. Không thêm inference hoặc đọc key; trần cũ hết, default pricing off. Thiếu phiếu thật thì giữ human review pending; cache-write live/policy và E còn riêng. [Kế hoạch MVP](mvp-delivery-plan.md) là trạng thái hiện hành; các kết luận OPEN bên dưới giữ lịch sử.
+
+**Review lại PR #64 tại `285fd37`, 2026-10-19:** [ba P2 đã sửa, không thấy điểm chặn merge mới trong scope M7a](reviews/pr64-m7a-openrouter-live-verification.md#review-lại-tại-285fd37--ba-p2-đã-sửa-không-thấy-điểm-chặn-merge-mới). Reviewer 73 repo + 4 independent pass; PR vẫn OPEN/chưa merge. Không mở pricing/paper thật; cache-write live/M7b/policy/E giữ riêng, trần inference gốc đã hết. Các kết luận chặn ở source cũ bên dưới giữ lịch sử.
+
 **Sửa review lại PR #64 (DNS treo khi thoát), 2026-10-19:** đã sửa và kiểm bằng subprocess thật + fault injection Linux; chờ review lại, chưa merge.
 
 **Review lại PR #64 tại `9b64901`, 2026-10-19:** 71 test repo và HTTP nhỏ giọt đã qua; còn [P2-3 thoát process khi DNS treo](reviews/pr64-m7a-openrouter-live-verification.md#review-lại-tại-9b64901--http-đã-hủy-đúng-còn-p2-3-ở-thoát-tiến-trình-khi-dns-treo), tái hiện bằng fault injection và stack. [Sửa tiếp cùng PR](tasks/fix-pr64-m7a-experiment-cap-and-polling.md), chưa merge; không inference/ngân sách mới.

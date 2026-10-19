@@ -1,0 +1,270 @@
+{
+  "task": "M7b human quality review bundle, sheet import and report (offline, no inference)",
+  "status": "pr65_review_fixed_offline_awaiting_rereview_and_human_review_not_merged",
+  "branch": "feat/m7b-human-quality-review",
+  "base": "2df77d0ac2b3e9371aa33753f4ab591fb09d1fa3",
+  "base_check": "fetched origin/main; review head 285fd37 is ancestor; git diff 285fd37 origin/main empty",
+  "source_migration": "0052",
+  "migration_added": false,
+  "production_changed": false,
+  "real_human_verdicts": {
+    "labels": 0,
+    "answers": 0
+  },
+  "report_status": "awaiting_human_review",
+  "m4c_labels": {
+    "questions": 80,
+    "holdout": 16,
+    "groups": {
+      "single_paper": [
+        16,
+        4
+      ],
+      "comparison": [
+        12,
+        3
+      ],
+      "no_answer": [
+        12,
+        3
+      ],
+      "partial_pdf": [
+        8,
+        2
+      ],
+      "permission": [
+        8,
+        2
+      ],
+      "references_conflict_injection": [
+        8,
+        2
+      ]
+    },
+    "group_format": "[dev, holdout]",
+    "agent_notes": [
+      "CMP-12",
+      "CMP-14",
+      "CMP-15",
+      "RCI-01",
+      "RCI-02",
+      "RCI-04",
+      "RCI-06"
+    ],
+    "corpus_sha256": "cc453322c007ab49385e313cc74bea2d1f87370839a69ed4ff20b386c6114145",
+    "parsers": {
+      "markdown": "markdown-lines-v2",
+      "pdf": "pypdf-6.19.0-layout-v2"
+    }
+  },
+  "m7a_answers": {
+    "run_id": "m7a-runtime-2026-10-18",
+    "inputs_read": {
+      "state/runtime/answers.json": "ab70769f1a28b2f141250848b2c8dee3d489c6b8b71b81463c558e1524f35ca9",
+      "state/runtime/chrome-answer.txt": "97815cfe83a79d0a49e8c0ae597646395a70ce782fd0b03c804a3cc299da8bf3",
+      "state/runtime/targets.json": "cc4889ebec8cc295cf2abd8e8562c4b687279a0dd6405669d37745a724f66254",
+      "state/runtime/corpus.json": "889c05339de5d0ec5ee47128575d0f5d03bc24af32a2822bddefe78cce43a36e",
+      "state/ledger.jsonl": "750b2e0597ecdc11a176b0dc0037d61be390fa9ee75a53602fbb52ec78d4c7e4"
+    },
+    "not_read": ".env, keys, account/session/config, screenshots, compose logs, other evidence files",
+    "snapshot_sha256": "8e83bd48877d9fefa2f599bd05cba7f82b664a400ba2806ad3a9e8e032b6762e",
+    "corpus_matches_run": true,
+    "responses": [
+      {
+        "response_id": "m7a-runtime-2026-10-18/01-single",
+        "rows": 1,
+        "ledger_seq": 16,
+        "scoreable": true
+      },
+      {
+        "response_id": "m7a-runtime-2026-10-18/02-compare",
+        "rows": 2,
+        "ledger_seq": 17,
+        "scoreable": true
+      },
+      {
+        "response_id": "m7a-runtime-2026-10-18/03-insufficient",
+        "rows": 1,
+        "ledger_seq": 18,
+        "scoreable": true
+      },
+      {
+        "response_id": "m7a-runtime-2026-10-18/chrome",
+        "rows": 0,
+        "ledger_seq": 20,
+        "scoreable": false,
+        "reason": "screen_text_only"
+      }
+    ],
+    "machine_checks": {
+      "machine_quote_verbatim=yes": 3,
+      "machine_id_in_evidence=not_available": 3,
+      "machine_locator_covers_gold=not_available": 3,
+      "machine_file_binding=recorded:targets.json": 1,
+      "machine_file_binding=derived:drill_upload_plan_user_a": 2
+    },
+    "line_endings": "run uploaded lumen-bench.md as CRLF (sha e4015acd...); git blob is LF (2c22bc01...); bundle picks the variant matching the recorded run SHA-256, identical bundle on LF or CRLF checkout"
+  },
+  "bundle": {
+    "path": "evaluation/human-review/bundle",
+    "files": 124,
+    "manifest_sha256": "737748e232dc97ed693d08f8aa55bc3e7e66a4ed931cad69dcb38660e90df969",
+    "label_sheet_sha256": "bfbad3c4e0baacb763702f1f12de224f6d4c5b3c932fee0065dacde1ff328e49",
+    "answer_sheet_sha256": "6028fd545858d988fb6136bda04d3f9c5aec20255342d17692313ca0a1d5a741"
+  },
+  "tests": {
+    "environment": "Conda ras Python on Windows host; RAS_TEST_DATABASE_ADMIN_URL pointed at a closed port so no fixture falls back to .env",
+    "command": "python -m pytest tests/test_human_review.py tests/test_evaluation.py -q -p no:cacheprovider --deselect <4 DB tests> --junitxml=selection.xml",
+    "collected": 59,
+    "passed": 55,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "deselected": 4,
+    "by_file": {
+      "tests/test_human_review.py": 37,
+      "tests/test_evaluation.py": 18
+    },
+    "junit_sha256": "540905b91697b2cc63ad6f26ffe8b0be084a43897e11915a97ca63c54a3f046c",
+    "not_run": {
+      "tests/test_evaluation.py::test_local_embedding_is_deterministic_unit_and_token_free": "needs DB fixture api; code unchanged",
+      "tests/test_evaluation.py::test_eval_settings_leave_pricing_gates_off": "needs DB fixture api; code unchanged",
+      "tests/test_evaluation.py::test_runner_renews_expired_idle_session_through_real_login": "needs DB fixture api; runner unchanged",
+      "tests/test_evaluation.py::test_acl_same_doi_hash_matrix_through_runner": "needs DB/MinIO upload_api; runner/ACL unchanged",
+      "full API suite (>5000)": "no shared gate/schema/runtime change",
+      "web, restore drills, production Chrome flows": "not affected"
+    },
+    "source_hashes": {
+      "files": 561,
+      "unchanged_before_after": true
+    },
+    "warnings": [
+      "StarletteDeprecationWarning from fastapi.testclient import (pre-existing dependency warning)"
+    ],
+    "earlier_run": "54 pass / 4 deselected before the line-ending fix (evidence root, selection.xml 30f6bf25...); superseded, not added"
+  },
+  "cli": {
+    "validate": "exit 0, 80 questions, 16 holdout, 15 papers OK",
+    "build-pdfs --check": "exit 0",
+    "human-prepare --check": "exit 0, up to date",
+    "human-report": "exit 0, awaiting_human_review"
+  },
+  "counterchecks": {
+    "cases": 10,
+    "caught": 10,
+    "restored": 10,
+    "file": "final/counterchecks.json",
+    "sha256": "6c2d73725b705c17321b4560f143ed67ed40e7c7d51d2e34d5c987a9e7fd85e7",
+    "list": [
+      "response_id grouping",
+      "all-or-nothing import",
+      "stale label binding",
+      "html escape",
+      "formula prefix",
+      "edited display cells",
+      "guessed ledger call (two calls one route)",
+      "guessed ledger call (two answers one label)",
+      "run corpus line endings",
+      "cross-reviewer conflict"
+    ],
+    "development_note": "first run had 8/8 caught plus one case that mutated a guard the test did not exercise; a test for two ledger calls on one route was added and the guard split into two cases"
+  },
+  "browser": {
+    "chrome": "155.0.8059.80",
+    "mode": "playwright channel=chrome, offline context, every non-file: request aborted and recorded",
+    "pages": 85,
+    "outside_requests": 0,
+    "dialogs": 0,
+    "injected_script_ran": false,
+    "injected_text_visible": true,
+    "reader_link": "P01.html#L19 visible",
+    "file": "final/browser/browser-check.json",
+    "sha256": "613785cab19320301976dd50194adf92277d3b8292542801a10f714e56c12310"
+  },
+  "development_failures": [
+    "unhashable list record key (fixed before tests)",
+    "reviewer control-character regex excluded newline (caught by test, fixed)",
+    "playwright bundled browser missing; used installed Chrome instead of downloading",
+    "first .gitattributes rule (eol=lf) would have changed the M7a corpus bytes on fresh checkout; replaced before push"
+  ],
+  "limits": [
+    "no real verdicts; every metric not measured",
+    "M7a: 3 structured responses, 2 synthetic documents, one run, no gold, no evidence pack",
+    "lumen citation file binding derived from drill upload plan",
+    "reviewer identity self-reported",
+    "Chrome sample not scored"
+  ],
+  "evidence_root": "C:/Users/ADMIN/AppData/Local/Temp/ras-m7b-20261019",
+  "seal_sha256": "1847253548fad3526b747505a3ff716126778d53a77468796979df1b5269d3c5",
+  "seal_file": "final/seal.json",
+  "gitattributes": "evaluation/human-review/** -text (exact bytes); no rule added for evaluation/m7a-synthetic",
+  "pr65_review_fix": {
+    "review_head": "44e3bd3efe76ca2ae9f1e071bd31d6209be3834a",
+    "findings": [
+      "P2-1 report counted verdicts after actual corpus/parser/run changed",
+      "P2-2 validate/import did not check displayed bundle files"
+    ],
+    "changed": [
+      "api/app/evaluation/human.py",
+      "api/app/evaluation/human_bundle.py",
+      "api/app/evaluation/__main__.py",
+      "api/tests/test_human_review.py",
+      "evaluation/human-review/bundle (regenerated)",
+      "evaluation/human-review/report.*"
+    ],
+    "binding_version": 2,
+    "bundle_manifest_sha256": "aecd381e5f81099c813df9d74d6c3e13b4628f0a0fdef7b751a25b06966ff87d",
+    "reviewer_repro": {
+      "script": "C:/Users/ADMIN/AppData/Local/Temp/ras-pr65-review-20261019/test_bindings.py",
+      "before": "6 failed / 1 passed (exit 1)",
+      "after": "7 passed (exit 0)",
+      "before_log_sha256": "a82b6c65d1a36efd94f01aba297057e0a26895ffca52d8a9780a8d469ae8446d",
+      "after_log_sha256": "b4a0553a55c074ab16fc7a663d7c396a918be3e4584a7c8931821b2b19cf1cf0"
+    },
+    "selection": {
+      "collected": 72,
+      "passed": 68,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 4,
+      "by_file": {
+        "tests/test_human_review.py": 50,
+        "tests/test_evaluation.py": 18
+      },
+      "junit_sha256": "92a2c09080a1296ab35653a8582ad989a2c6750aa5299eeea9f5e4e3cf816a01",
+      "deselect_node_ids": "tests/test_evaluation.py::<4 DB tests> (root api/)",
+      "source_hashes": {
+        "files": 561,
+        "unchanged_before_after": true
+      },
+      "seal_sha256": "2fcc85c31aa9d43bfc6858480610da5324cf203287e70b7bfe8f9aad3d964608"
+    },
+    "counterchecks": {
+      "cases": 13,
+      "caught": 13,
+      "restored": 13,
+      "sha256": "631652d5e6f83927977901e9a8f22395dafcb642b8377cd91e9fc4ced8fbf020",
+      "new": [
+        "stale label binding (is_live)",
+        "actual corpus bytes (gate + file hash, combined: defense in depth)",
+        "answer binding without parser",
+        "import preflight disabled (7 drift cases fail)"
+      ]
+    },
+    "browser": {
+      "chrome": "155.0.8059.80",
+      "pages": 85,
+      "outside_requests": 0,
+      "injected_script_ran": false,
+      "sha256": "613785cab19320301976dd50194adf92277d3b8292542801a10f714e56c12310"
+    },
+    "cli": "validate, build-pdfs --check, human-prepare --check, human-report exit 0 (awaiting_human_review)",
+    "not_run": "4 DB evaluation tests, full API >5000, DB/MinIO/web/restore/live",
+    "evidence_root": "C:/Users/ADMIN/AppData/Local/Temp/ras-m7b-20261019/fix-pr65",
+    "real_human_verdicts": {
+      "labels": 0,
+      "answers": 0
+    }
+  }
+}

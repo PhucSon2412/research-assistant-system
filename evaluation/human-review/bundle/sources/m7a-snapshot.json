@@ -1,0 +1,197 @@
+{
+ "answers": [
+  {
+   "claims": [
+    {
+     "citations": [
+      {
+       "chunk_id": "ca2248ec-268a-46c2-a9d7-2223ca6c8830",
+       "locator_kind": "markdown",
+       "quote": "measured a drift of 0.4 percent over twelve hours",
+       "source_file_id": "ea53ef30-94e5-49a2-bf46-04d477a717a1",
+       "start_line": 5,
+       "start_page": null,
+       "title": "lumen-bench",
+       "version_id": "3a07287c-63e1-4013-8ce1-8b42e91894f0"
+      }
+     ],
+     "text": "The Lumen calibration bench measured 0.4 percent drift over twelve hours."
+    }
+   ],
+   "error": null,
+   "http": 200,
+   "label": "single",
+   "provider_calls": 1,
+   "question": "How much drift did the Lumen calibration bench measure over twelve hours?",
+   "reason": null,
+   "status": "answered"
+  },
+  {
+   "claims": [
+    {
+     "citations": [
+      {
+       "chunk_id": "ca2248ec-268a-46c2-a9d7-2223ca6c8830",
+       "locator_kind": "markdown",
+       "quote": "measured a drift of 0.4 percent over twelve hours",
+       "source_file_id": "ea53ef30-94e5-49a2-bf46-04d477a717a1",
+       "start_line": 5,
+       "start_page": null,
+       "title": "lumen-bench",
+       "version_id": "3a07287c-63e1-4013-8ce1-8b42e91894f0"
+      },
+      {
+       "chunk_id": "e76c1313-413f-4bae-829e-9c6a5bddd121",
+       "locator_kind": "pdf",
+       "quote": "Over thirty synthetic days the Harbor tide sensor reported a mean error of 1.2 centimeters",
+       "source_file_id": "608b3dd7-001c-4a9a-a8bd-a7089d0660ee",
+       "start_line": null,
+       "start_page": 1,
+       "title": "harbor-sensor",
+       "version_id": "1e98cda0-2bf2-4b68-8517-67d5d6be05d2"
+      }
+     ],
+     "text": "The Lumen calibration bench measured 0.4% drift over twelve hours, whereas the Harbor tide sensor reported a mean error of 1.2 centimeters over thirty synthetic days; these are different measures with different units."
+    }
+   ],
+   "error": null,
+   "http": 200,
+   "label": "compare",
+   "provider_calls": 1,
+   "question": "Compare the drift of the Lumen calibration bench with the error of the Harbor tide sensor.",
+   "reason": null,
+   "status": "answered"
+  },
+  {
+   "claims": [],
+   "error": null,
+   "http": 200,
+   "label": "insufficient",
+   "provider_calls": 1,
+   "question": "What was the purchase price of the Lumen calibration bench?",
+   "reason": null,
+   "status": "insufficient_evidence"
+  }
+ ],
+ "chrome_text": "Phạm vi đã hỏi: paper này.\r\n\r\nTrạng thái: Có câu trả lời.\r\n\r\nThe Harbor tide sensor reported a mean error of 1.2 centimeters against a reference gauge over thirty synthetic days. [harbor-sensor · trang 1] Over thirty synthetic days the Harbor tide sensor reported a mean error of 1.2 centimeters against a fictional reference gauge Paper riêng của bạn · Version 1e98cda0-2bf2-4b68-8517-67d5d6be05d2 · File 608b3dd7-001c-4a9a-a8bd-a7089d0660ee · file gốc",
+ "corpus": {
+  "harbor-pdf_sha256": "e060b84cd17e06ad0b1a5f374c556776a49814ce384eda6c961cef9a2d836b78",
+  "lumen-md_sha256": "e4015acd637896fb8558952f874119d3bc16345871d3a60a3c577aeefa9fbc41",
+  "plan": {
+   "harbor-pdf": 4,
+   "lumen-md": 2
+  }
+ },
+ "format": "ras-m7b-m7a-snapshot/1",
+ "generation_calls": [
+  {
+   "completion_tokens": 120,
+   "error_code": null,
+   "finish_reason": "stop",
+   "generation_id": "gen-1792338280-Wczvxm6IBWIISrNsCxwd",
+   "model": "openai/gpt-6-sol",
+   "prompt_tokens": 405,
+   "provider": "Azure",
+   "provider_cost_usd": 0.00201,
+   "route": "runtime:rag-single",
+   "selected": [
+    {
+     "model": "openai/gpt-6-sol-20260922",
+     "provider": "Azure"
+    }
+   ],
+   "seq": 16,
+   "status": "completed"
+  },
+  {
+   "completion_tokens": 217,
+   "error_code": null,
+   "finish_reason": "stop",
+   "generation_id": "gen-1792338291-04PzOzOx0pNtrHYFicTL",
+   "model": "openai/gpt-6-sol",
+   "prompt_tokens": 1399,
+   "provider": "Azure",
+   "provider_cost_usd": 0.005666,
+   "route": "runtime:rag-compare",
+   "selected": [
+    {
+     "model": "openai/gpt-6-sol-20260922",
+     "provider": "Azure"
+    }
+   ],
+   "seq": 17,
+   "status": "completed"
+  },
+  {
+   "completion_tokens": 11,
+   "error_code": null,
+   "finish_reason": "stop",
+   "generation_id": "gen-1792338304-Pbu6EsSOm4F19wGVpEao",
+   "model": "openai/gpt-6-sol",
+   "prompt_tokens": 637,
+   "provider": "Azure",
+   "provider_cost_usd": 0.001384,
+   "route": "runtime:rag-insufficient",
+   "selected": [
+    {
+     "model": "openai/gpt-6-sol-20260922",
+     "provider": "Azure"
+    }
+   ],
+   "seq": 18,
+   "status": "completed"
+  },
+  {
+   "completion_tokens": null,
+   "error_code": null,
+   "finish_reason": null,
+   "generation_id": null,
+   "model": null,
+   "prompt_tokens": null,
+   "provider": null,
+   "provider_cost_usd": null,
+   "route": "runtime:rag-after-delete",
+   "selected": null,
+   "seq": 19,
+   "status": "not_sent"
+  },
+  {
+   "completion_tokens": 144,
+   "error_code": null,
+   "finish_reason": "stop",
+   "generation_id": "gen-1792338349-Xl29fXhA96mlZsT73PHT",
+   "model": "openai/gpt-6-sol",
+   "prompt_tokens": 1456,
+   "provider": "Azure",
+   "provider_cost_usd": 0.0050785,
+   "route": "runtime:chrome-rag",
+   "selected": [
+    {
+     "model": "openai/gpt-6-sol-20260922",
+     "provider": "Azure"
+    }
+   ],
+   "seq": 20,
+   "status": "completed"
+  }
+ ],
+ "origin": "C:/Users/ADMIN/AppData/Local/Temp/ras-m7a-20261018/state",
+ "run_id": "m7a-runtime-2026-10-18",
+ "source_sha256": {
+  "answers.json": "ab70769f1a28b2f141250848b2c8dee3d489c6b8b71b81463c558e1524f35ca9",
+  "chrome-answer.txt": "97815cfe83a79d0a49e8c0ae597646395a70ce782fd0b03c804a3cc299da8bf3",
+  "corpus.json": "889c05339de5d0ec5ee47128575d0f5d03bc24af32a2822bddefe78cce43a36e",
+  "ledger.jsonl": "750b2e0597ecdc11a176b0dc0037d61be390fa9ee75a53602fbb52ec78d4c7e4",
+  "targets.json": "cc4889ebec8cc295cf2abd8e8562c4b687279a0dd6405669d37745a724f66254"
+ },
+ "targets": {
+  "harbor": {
+   "file_id": "608b3dd7-001c-4a9a-a8bd-a7089d0660ee",
+   "item_id": "5cc35149-37a9-4bc0-a3f3-3ff12e6c89f4",
+   "job_id": "9c8807ab-3576-459c-9fb8-87cc7b95eba8",
+   "state": "received",
+   "version_id": "1e98cda0-2bf2-4b68-8517-67d5d6be05d2"
+  },
+  "origin": "http://127.0.0.1:33215"
+ }
+}

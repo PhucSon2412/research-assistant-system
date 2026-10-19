@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width, initial-scale=1"><title>P07 — Thermal-Aware Scheduling for Edge Inference</title><style>
+body{font:15px/1.5 system-ui,sans-serif;margin:0 auto;max-width:72rem;padding:0 1rem 3rem;color:#1d1d1f;background:#fff}
+nav{padding:.6rem 0;border-bottom:1px solid #ccc;margin-bottom:1rem}
+table{border-collapse:collapse;width:100%;margin:.5rem 0}td,th{border:1px solid #ccc;padding:.25rem .4rem;vertical-align:top;text-align:left}
+th{background:#f3f3f3}pre,.ctx{white-space:pre-wrap;word-break:break-word;background:#f7f7f7;border:1px solid #ddd;padding:.5rem;font:13px/1.45 ui-monospace,Consolas,monospace}
+.q{font:17px/1.5 system-ui,sans-serif;white-space:pre-wrap;background:#f7f7f7;border:1px solid #ddd;padding:.5rem .7rem}
+mark{background:#ffe066;padding:0 .1rem}.ne mark{background:#ffc9c9}.note{background:#eef5ff;border-left:4px solid #3a7bd5;padding:.5rem .8rem}
+.warn{background:#fff4e5;border-left:4px solid #d58b00;padding:.5rem .8rem}.side{border:1px solid #bbb;padding:.5rem .8rem;margin:.6rem 0}
+.ln{color:#888;display:inline-block;min-width:3em;user-select:none}.ref{color:#7a4a00}:target{background:#fff3b0}
+@media (prefers-color-scheme:dark){body{background:#151515;color:#eee}th{background:#262626}pre,.ctx,.q{background:#202020;border-color:#444}
+mark{color:#000}.note{background:#14243a}.warn{background:#3a2a10}td,th,.side{border-color:#555}}
+</style></head><body><nav><a href="../index.html">Mục lục</a> · <a href="../index.html#guide">Hướng dẫn</a></nav><h1>P07 — Thermal-Aware Scheduling for Edge Inference</h1><p>Trang thiếu/không trích xuất được: không. <a href="../files/pdf/p07-thermal-scheduling.pdf">File gốc trong bundle</a></p><h2 id="page-1">Trang 1</h2><p>Vùng parser: abstract [196:385) · <a href="../files/pdf/p07-thermal-scheduling.pdf#page=1">mở trang PDF</a></p><pre>Thermal-Aware Scheduling for Edge Inference
+Authors: Ines Duarte and Kofi Asante (fictional authors; synthetic evaluation paper).
+Identifier: doi:10.5555/ras-eval.p07 (fictional, not registered).
+Abstract
+We schedule neural network inference on edge devices using on-chip temperature forecasts.
+The scheduler cuts p95 latency by 23% and thermal throttling events from 41 to 9 per hour.</pre><h2 id="page-2">Trang 2</h2><p>Vùng parser: body [0:820) · <a href="../files/pdf/p07-thermal-scheduling.pdf#page=2">mở trang PDF</a></p><pre>Introduction
+Edge devices lower their clock speed when the chip gets too hot, so latency becomes erratic.
+Reactive governors respond only after throttling has started and cannot plan ahead.
+Inference workloads are often bursty, which makes short-term temperature spikes common.
+A scheduler that predicts temperature can delay low-priority jobs before throttling begins.
+Such planning must stay cheap, because the forecaster runs on the same constrained device.
+We therefore restrict the forecaster to a linear model that needs no accelerator support.
+The goal is predictable latency for interactive requests rather than maximum throughput.
+We compare against first-come-first-served scheduling with the default thermal governor.
+Our contribution is a scheduler that uses forecasts, together with measurements on devices.</pre><h2 id="page-3">Trang 3</h2><p>Vùng parser: body [0:711) · <a href="../files/pdf/p07-thermal-scheduling.pdf#page=3">mở trang PDF</a></p><pre>Methods
+The forecaster is a linear model over the last 20 temperature readings sampled at 10 Hz.
+Jobs are deferred when the forecast exceeds 78 degrees Celsius within the next two seconds.
+Deferred jobs wait in a priority queue and are resumed once the forecast falls again.
+Interactive requests are never deferred for longer than 300 milliseconds in this design.
+We evaluated three device types: a phone SoC, a single-board computer and a drone controller.
+Each device ran the same image classification model with a batch size of one request.
+Every experiment lasted two hours at an ambient temperature of 24 degrees Celsius.
+Latency was logged per request, and throttling events were read from the kernel log.</pre><h2 id="page-4">Trang 4</h2><p>Vùng parser: body [0:675) · <a href="../files/pdf/p07-thermal-scheduling.pdf#page=4">mở trang PDF</a></p><pre>Results
+Across the three devices, p95 latency fell by 23% relative to first-come-first-served.
+Throttling events dropped from 41 to 9 per hour on average across the three devices.
+Energy per inference rose by 4% because deferred jobs later ran at higher clock speeds.
+The phone SoC showed the largest latency gain, a 31% reduction of p95 latency.
+The single-board computer improved by 27%, with most gains during long bursts.
+Median latency changed by less than 2% on every device, so the gain lies in the tail.
+Forecast error stayed below 1.5 degrees Celsius for 95% of the prediction windows.
+The scheduler itself used less than 1% of processor time on each of the devices.</pre><h2 id="page-5">Trang 5</h2><p>Vùng parser: body [0:638) · <a href="../files/pdf/p07-thermal-scheduling.pdf#page=5">mở trang PDF</a></p><pre>Discussion
+The drone controller benefited least, with a 9% latency reduction.
+Its cooling was already adequate, so the chip rarely approached the threshold.
+Longer forecast horizons made the scheduler defer too many jobs in our trials.
+A threshold below 78 degrees Celsius reduced throttling further but hurt throughput.
+Results may differ for workloads with large batches or for devices with active fans.
+We did not study multi-tenant settings where several models share one device.
+Integrating the forecaster into the kernel governor is left for future work.
+The measurements cover a single ambient temperature, which limits generality.</pre><h2 id="page-6">Trang 6</h2><p>Vùng parser: body [0:175), references [175:320) · <a href="../files/pdf/p07-thermal-scheduling.pdf#page=6">mở trang PDF</a></p><pre>Conclusion
+Forecast-driven deferral keeps tail latency predictable on thermally limited devices.
+The approach needs only a small linear model and a priority queue per device.
+References
+[1] P. Laine. Dynamic Thermal Management for Mobile Processors. 2023.
+[2] G. Ortiz. Tail Latency on Embedded Inference Hardware. 2024.</pre></body></html>

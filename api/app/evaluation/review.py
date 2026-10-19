@@ -146,6 +146,12 @@ def grounded_status(rows: list[dict]) -> tuple[str, bool | None]:
     return "complete", all(claim_rows[0]["human_claim_supported"] == "yes" for claim_rows in claims.values())
 
 
+def response_key(row: dict) -> str:
+    """One generated response: its own ``response_id`` when the sheet has one, so two runs of the
+    same question and mode are never merged; ``question/mode`` for sheets without it (M4c)."""
+    return row.get("response_id") or f"{row['question_id']}/{row['mode']}"
+
+
 def score(rows: list[dict]) -> dict:
     """Human-reviewed metrics with denominators; partial or contradictory sheets are reported, never scored.
 
@@ -161,28 +167,28 @@ def score(rows: list[dict]) -> dict:
               for column, allowed in HUMAN_VALUES.items() if row.get(column, "") not in allowed]
     if errors:
         raise ValueError("; ".join(errors))
-    responses: dict[tuple[str, str], list[dict]] = {}
+    responses: dict[str, list[dict]] = {}
     for row in rows:
-        responses.setdefault((row["question_id"], row["mode"]), []).append(row)
+        responses.setdefault(response_key(row), []).append(row)
     states: dict[str, list[str]] = {"complete": [], "incomplete": [], "conflicting": [], "unreviewed": []}
     grounded = 0
-    for (question_id, mode), group in sorted(responses.items()):
+    for key, group in sorted(responses.items()):
         if group[0]["observed_status"] != "answered":
             continue
         state, verdict = grounded_status(group)
-        states[state].append(f"{question_id}/{mode}")
+        states[state].append(key)
         grounded += bool(verdict)
     citations = [row for row in rows if row.get("citation_no") and row.get("reviewer")
                  and row.get("human_citation_correct")]
     abstention = {"graded": [], "conflicting": [], "unreviewed": []}
     appropriate = 0
-    for (question_id, mode), group in sorted(responses.items()):
+    for key, group in sorted(responses.items()):
         if group[0]["expected_status"] == "answered":
             continue
         verdicts = {row["human_abstention_appropriate"] for row in group if row.get("reviewer")
                     and row["human_abstention_appropriate"] in ("yes", "no")}
         state = "unreviewed" if not verdicts else "conflicting" if len(verdicts) > 1 else "graded"
-        abstention[state].append(f"{question_id}/{mode}")
+        abstention[state].append(key)
         appropriate += verdicts == {"yes"}
     reviewed = sum(bool(row.get("reviewer")) for row in rows)
     return {

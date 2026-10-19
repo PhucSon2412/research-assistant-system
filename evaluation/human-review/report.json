@@ -1,0 +1,330 @@
+{
+ "attribution": "self_reported: reviewer và review_date do người điền phiếu tự ghi; không phải danh tính hay chữ ký đã được xác thực độc lập",
+ "format": "ras-m7b-human-review/1#report",
+ "generated_on": "2026-10-19",
+ "limits": [
+  "M4c: 15 paper tổng hợp, 87 chunk, nhãn do agent soạn; không đại diện paper thật.",
+  "M7a: corpus tổng hợp riêng 2 tài liệu, vài answer live của một run (keyword, user A); không có gold label và không lưu evidence pack.",
+  "Các số ở đây không là chứng nhận production, quality SLO hay CI gate.",
+  "Tên reviewer do người điền phiếu tự ghi, không phải danh tính đã xác thực."
+ ],
+ "m4c_answers": {
+  "reason": "các lượt M4c chỉ capture payload generation và trả claims rỗng; 80 câu chưa có câu trả lời generation nào để chấm",
+  "status": "not_measured"
+ },
+ "m4c_labels": {
+  "bundle_current": true,
+  "by_group": {
+   "comparison": {
+    "unreviewed": 15
+   },
+   "no_answer": {
+    "unreviewed": 15
+   },
+   "partial_pdf": {
+    "unreviewed": 10
+   },
+   "permission": {
+    "unreviewed": 10
+   },
+   "references_conflict_injection": {
+    "unreviewed": 10
+   },
+   "single_paper": {
+    "unreviewed": 20
+   }
+  },
+  "by_split": {
+   "dev": {
+    "unreviewed": 64
+   },
+   "holdout": {
+    "unreviewed": 16
+   }
+  },
+  "corpus_errors": [],
+  "counts": {
+   "accepted": 0,
+   "changes_requested": 0,
+   "conflicting": 0,
+   "rejected": 0,
+   "unreviewed": 80
+  },
+  "effect": "kết quả retrieval M4c vẫn provisional cho tới khi mọi nhãn hiện hành được accepted",
+  "holdout": 16,
+  "not_accepted": {},
+  "questions": 80,
+  "records_for_unknown_questions": [],
+  "reviewers": [],
+  "stale_records": 0,
+  "status": "awaiting_human_review"
+ },
+ "m7a_answers": {
+  "bundle_current": true,
+  "by_group": {
+   "comparison": {
+    "abstention_appropriateness": {
+     "denominator": 0,
+     "numerator": 0,
+     "value": null
+    },
+    "abstention_responses": {
+     "conflicting": 0,
+     "conflicting_ids": [],
+     "graded": 0,
+     "unreviewed": 0
+    },
+    "answered_responses": {
+     "complete": 0,
+     "conflicting": 0,
+     "conflicting_ids": [],
+     "incomplete": 0,
+     "incomplete_ids": [],
+     "unreviewed": 1
+    },
+    "citation_accuracy": {
+     "denominator": 0,
+     "numerator": 0,
+     "value": null
+    },
+    "grounded_answer_rate": {
+     "denominator": 0,
+     "numerator": 0,
+     "value": null
+    },
+    "reviewed_rows": 0,
+    "rows": 2,
+    "unreviewed_rows": 2
+   },
+   "no_answer": {
+    "abstention_appropriateness": {
+     "denominator": 0,
+     "numerator": 0,
+     "value": null
+    },
+    "abstention_responses": {
+     "conflicting": 0,
+     "conflicting_ids": [],
+     "graded": 0,
+     "unreviewed": 1
+    },
+    "answered_responses": {
+     "complete": 0,
+     "conflicting": 0,
+     "conflicting_ids": [],
+     "incomplete": 0,
+     "incomplete_ids": [],
+     "unreviewed": 0
+    },
+    "citation_accuracy": {
+     "denominator": 0,
+     "numerator": 0,
+     "value": null
+    },
+    "grounded_answer_rate": {
+     "denominator": 0,
+     "numerator": 0,
+     "value": null
+    },
+    "reviewed_rows": 0,
+    "rows": 1,
+    "unreviewed_rows": 1
+   },
+   "single_paper": {
+    "abstention_appropriateness": {
+     "denominator": 0,
+     "numerator": 0,
+     "value": null
+    },
+    "abstention_responses": {
+     "conflicting": 0,
+     "conflicting_ids": [],
+     "graded": 0,
+     "unreviewed": 0
+    },
+    "answered_responses": {
+     "complete": 0,
+     "conflicting": 0,
+     "conflicting_ids": [],
+     "incomplete": 0,
+     "incomplete_ids": [],
+     "unreviewed": 1
+    },
+    "citation_accuracy": {
+     "denominator": 0,
+     "numerator": 0,
+     "value": null
+    },
+    "grounded_answer_rate": {
+     "denominator": 0,
+     "numerator": 0,
+     "value": null
+    },
+    "reviewed_rows": 0,
+    "rows": 1,
+    "unreviewed_rows": 1
+   }
+  },
+  "corpus_matches_run": true,
+  "live_records": 0,
+  "machine_checks": {
+   "machine_file_binding=derived:drill_upload_plan_user_a": 2,
+   "machine_file_binding=recorded:targets.json": 1,
+   "machine_id_in_evidence=not_available": 3,
+   "machine_locator_covers_gold=not_available": 3,
+   "machine_quote_verbatim=yes": 3
+  },
+  "metrics": {
+   "abstention_appropriateness": {
+    "denominator": 0,
+    "numerator": 0,
+    "value": null
+   },
+   "abstention_responses": {
+    "conflicting": 0,
+    "conflicting_ids": [],
+    "graded": 0,
+    "unreviewed": 1
+   },
+   "answered_responses": {
+    "complete": 0,
+    "conflicting": 0,
+    "conflicting_ids": [],
+    "incomplete": 0,
+    "incomplete_ids": [],
+    "unreviewed": 2
+   },
+   "citation_accuracy": {
+    "denominator": 0,
+    "numerator": 0,
+    "value": null
+   },
+   "grounded_answer_rate": {
+    "denominator": 0,
+    "numerator": 0,
+    "value": null
+   },
+   "reviewed_rows": 0,
+   "rows": 4,
+   "unreviewed_rows": 4
+  },
+  "not_scoreable": [
+   {
+    "reason": "screen_text_only",
+    "response_id": "m7a-runtime-2026-10-18/chrome"
+   }
+  ],
+  "provenance": [
+   {
+    "call": {
+     "completion_tokens": 120,
+     "error_code": null,
+     "finish_reason": "stop",
+     "generation_id": "gen-1792338280-Wczvxm6IBWIISrNsCxwd",
+     "model": "openai/gpt-6-sol",
+     "prompt_tokens": 405,
+     "provider": "Azure",
+     "provider_cost_usd": 0.00201,
+     "route": "runtime:rag-single",
+     "selected": [
+      {
+       "model": "openai/gpt-6-sol-20260922",
+       "provider": "Azure"
+      }
+     ],
+     "seq": 16,
+     "status": "completed"
+    },
+    "label": "single",
+    "observed_status": "answered",
+    "question": "How much drift did the Lumen calibration bench measure over twelve hours?",
+    "response_id": "m7a-runtime-2026-10-18/01-single"
+   },
+   {
+    "call": {
+     "completion_tokens": 217,
+     "error_code": null,
+     "finish_reason": "stop",
+     "generation_id": "gen-1792338291-04PzOzOx0pNtrHYFicTL",
+     "model": "openai/gpt-6-sol",
+     "prompt_tokens": 1399,
+     "provider": "Azure",
+     "provider_cost_usd": 0.005666,
+     "route": "runtime:rag-compare",
+     "selected": [
+      {
+       "model": "openai/gpt-6-sol-20260922",
+       "provider": "Azure"
+      }
+     ],
+     "seq": 17,
+     "status": "completed"
+    },
+    "label": "compare",
+    "observed_status": "answered",
+    "question": "Compare the drift of the Lumen calibration bench with the error of the Harbor tide sensor.",
+    "response_id": "m7a-runtime-2026-10-18/02-compare"
+   },
+   {
+    "call": {
+     "completion_tokens": 11,
+     "error_code": null,
+     "finish_reason": "stop",
+     "generation_id": "gen-1792338304-Pbu6EsSOm4F19wGVpEao",
+     "model": "openai/gpt-6-sol",
+     "prompt_tokens": 637,
+     "provider": "Azure",
+     "provider_cost_usd": 0.001384,
+     "route": "runtime:rag-insufficient",
+     "selected": [
+      {
+       "model": "openai/gpt-6-sol-20260922",
+       "provider": "Azure"
+      }
+     ],
+     "seq": 18,
+     "status": "completed"
+    },
+    "label": "insufficient",
+    "observed_status": "insufficient_evidence",
+    "question": "What was the purchase price of the Lumen calibration bench?",
+    "response_id": "m7a-runtime-2026-10-18/03-insufficient"
+   },
+   {
+    "call": {
+     "completion_tokens": 144,
+     "error_code": null,
+     "finish_reason": "stop",
+     "generation_id": "gen-1792338349-Xl29fXhA96mlZsT73PHT",
+     "model": "openai/gpt-6-sol",
+     "prompt_tokens": 1456,
+     "provider": "Azure",
+     "provider_cost_usd": 0.0050785,
+     "route": "runtime:chrome-rag",
+     "selected": [
+      {
+       "model": "openai/gpt-6-sol-20260922",
+       "provider": "Azure"
+      }
+     ],
+     "seq": 20,
+     "status": "completed"
+    },
+    "label": "chrome",
+    "observed_status": "",
+    "question": null,
+    "response_id": "m7a-runtime-2026-10-18/chrome"
+   }
+  ],
+  "responses": 4,
+  "reviewers": [],
+  "rows": 4,
+  "run_id": "m7a-runtime-2026-10-18",
+  "scoreable_responses": 3,
+  "source_problems": [],
+  "stale": [],
+  "stale_records": 0,
+  "status": "awaiting_human_review"
+ },
+ "status": "awaiting_human_review"
+}
