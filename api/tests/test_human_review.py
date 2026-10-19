@@ -199,11 +199,37 @@ def test_bundle_is_reproducible_and_check_finds_drift(tmp_path, built, m4c_parts
     assert human_bundle.check(bundle, built) == []
 
 
-def test_committed_bundle_is_current_and_holds_no_fixture_verdicts():
+def m7a_corpus_copy(tmp_path, newline: bytes):
+    corpus = tmp_path / f"m7a-{len(newline)}"
+    shutil.copytree(human.M7A_CORPUS, corpus)
+    for path in corpus.iterdir():
+        path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", newline))
+    return corpus
+
+
+def test_m7a_corpus_bytes_follow_the_run_not_the_checkout(tmp_path):
+    lf, crlf = m7a_corpus_copy(tmp_path, b"\n"), m7a_corpus_copy(tmp_path, b"\r\n")
+    lf_bytes = human.m7a_files(lf)["lumen-bench.md"]
+    crlf_bytes = lf_bytes.replace(b"\n", b"\r\n")
+    for corpus in (lf, crlf):
+        assert human.m7a_files(corpus, human.sha256_bytes(crlf_bytes))["lumen-bench.md"] == crlf_bytes
+        assert human.m7a_files(corpus, human.sha256_bytes(lf_bytes))["lumen-bench.md"] == lf_bytes
+        assert human.m7a_files(corpus, "0" * 64)["lumen-bench.md"] == lf_bytes  # no match: never guessed
+        assert human.m7a_files(corpus)["harbor-sensor.pdf"] == human.m7a_files(lf)["harbor-sensor.pdf"]
+
+
+def test_committed_bundle_is_current_and_holds_no_fixture_verdicts(tmp_path, m4c_parts):
     if not (human.DEFAULT_BUNDLE / "manifest.json").is_file():
         pytest.skip("no committed bundle")
     snap = (human.DEFAULT_BUNDLE / human.SNAPSHOT_FILE).read_bytes()
     assert human_bundle.check(human.DEFAULT_BUNDLE, human_bundle.build(DEFAULT_ROOT, snap)) == []
+    # Same bundle whether git checked the M7a corpus out with LF or CRLF.
+    for newline in (b"\n", b"\r\n"):
+        corpus = m7a_corpus_copy(tmp_path, newline)
+        outputs = human_bundle.build(DEFAULT_ROOT, snap, corpus, m4c_parts=m4c_parts)
+        assert human_bundle.check(human.DEFAULT_BUNDLE, outputs) == [], newline
+    assert json.loads(snap)["corpus"] and json.loads((human.DEFAULT_BUNDLE / "manifest.json").read_text(
+        encoding="utf-8"))["m7a"]["corpus_matches_run"] is True
     for path in human.DEFAULT_RECORDS.glob("*.json") if human.DEFAULT_RECORDS.is_dir() else []:
         reviewers = {r["reviewer"] for r in json.loads(path.read_text(encoding="utf-8"))["records"]}
         assert not reviewers & set(FIXTURE_REVIEWERS), path

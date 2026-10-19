@@ -219,8 +219,17 @@ def render_harbor_pdf(text: str) -> bytes:
     return out.getvalue()
 
 
-def m7a_files(corpus: Path = M7A_CORPUS) -> dict[str, bytes]:
-    return {"lumen-bench.md": (corpus / "lumen-bench.md").read_bytes(),
+def m7a_files(corpus: Path = M7A_CORPUS, lumen_sha256: str | None = None) -> dict[str, bytes]:
+    """The M7a files as the run uploaded them.
+
+    Git stores ``lumen-bench.md`` with LF, but a Windows checkout (autocrlf) hands the drill CRLF
+    bytes, and that is what the run hashed and uploaded. Both line endings are tried and only an
+    exact match with the run's recorded SHA-256 is used; otherwise the LF text stays (and the
+    corpus is reported as not matching the run).
+    """
+    text = (corpus / "lumen-bench.md").read_bytes().replace(b"\r\n", b"\n")
+    lumen = next((data for data in (text, text.replace(b"\n", b"\r\n")) if sha256_bytes(data) == lumen_sha256), text)
+    return {"lumen-bench.md": lumen,
             "harbor-sensor.pdf": render_harbor_pdf((corpus / "harbor-sensor.txt").read_text(encoding="utf-8"))}
 
 
@@ -407,7 +416,7 @@ def m7a_binding(snapshot_bytes: bytes, corpus: Path = M7A_CORPUS) -> tuple[dict,
     snapshot = json.loads(snapshot_bytes)
     if snapshot.get("format") != SNAPSHOT_FORMAT:
         raise ReviewError([f"M7a snapshot format {snapshot.get('format')!r} is not {SNAPSHOT_FORMAT}"])
-    files = m7a_files(corpus)
+    files = m7a_files(corpus, (snapshot.get("corpus") or {}).get("lumen-md_sha256"))
     texts = m7a_texts(files)
     responses = m7a_responses(snapshot, files, texts)
     binding = {"run_id": snapshot["run_id"], "snapshot_sha256": sha256_bytes(snapshot_bytes),

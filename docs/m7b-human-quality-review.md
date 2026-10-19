@@ -30,7 +30,8 @@ Rubric ở `bundle/README.md` và trang `index.html#guide`: nhãn `accepted`/`ch
   câu/mode không bị gộp; phiếu M4c cũ vẫn nhóm theo `question_id/mode`. Bất biến cũ giữ nguyên: grounded
   chỉ vào mẫu số khi response chấm đủ; incomplete/conflicting/unreviewed tách riêng; mẫu số 0 → `value: null`.
 - Bundle commit tại `evaluation/human-review/bundle/` (124 file, ~0,8 MB; manifest
-  `737748e2…`). `.gitattributes` giữ LF/binary cho bundle và corpus M7a vì chúng được bind bằng SHA-256.
+  `737748e2…`). `.gitattributes` đặt `-text` cho `evaluation/human-review/**`: bundle được bind bằng SHA-256
+  với đúng bytes đã build, git không đổi line ending.
 
 ### Nhãn M4c (80 câu, 16 holdout, 6 nhóm)
 
@@ -69,7 +70,9 @@ chuẩn hóa nằm trong bundle (`sources/m7a-snapshot.json`, `8e83bd48…`) đ�
 - File được dẫn: harbor theo `targets.json` (`recorded`); lumen suy từ kế hoạch upload của drill — A chỉ có một
   file Markdown, bản B cùng bytes không thấy với A (`derived:drill_upload_plan_user_a`). Không suy từ title.
 - Corpus M7a render lại đúng như drill; SHA-256 khớp `corpus.json` của run (`lumen e4015acd…`, `harbor
-  e060b84c…`). Kiểm máy chỉ cấu trúc: quote nguyên văn trong chunk Markdown bắt đầu ở dòng ghi / trang PDF ghi
+  e060b84c…`). **Phát hiện:** run đã upload `lumen-bench.md` dạng CRLF (working copy Windows, autocrlf), còn
+  blob git là LF (`2c22bc01…`). Bundle thử cả hai line ending và chỉ dùng biến thể khớp đúng SHA của run, nên
+  checkout LF hay CRLF cho cùng bundle; không khớp thì ghi corpus lệch run, không đoán. Kiểm máy chỉ cấu trúc: quote nguyên văn trong chunk Markdown bắt đầu ở dòng ghi / trang PDF ghi
   (3/3 `yes`). `machine_id_in_evidence` và `machine_locator_covers_gold` là `not_available` (run không lưu
   evidence pack; M7a không có gold). Corpus lệch run → kiểm quote cũng `not_available`.
 - Mẫu Chrome không chuyển text màn hình thành claim/citation; bản `chrome` trong
@@ -94,15 +97,18 @@ lệch thì report ghi `conflicting` và loại khỏi mẫu số (citation accu
 
 ## Kiểm chứng (evidence `C:/Users/ADMIN/AppData/Local/Temp/ras-m7b-20261019`)
 
-- Selection theo rủi ro tại `HEAD 2df77d0` + working tree, `RAS_TEST_DATABASE_ADMIN_URL` trỏ cổng chặn để
-  không fixture nào rơi về `.env`: **54 pass / 0 fail / 0 skip**, 4 deselect (`selection.xml`
-  `30f6bf25…`): `tests/test_human_review.py` 36 (gồm bundle commit đồng bộ, không chứa reviewer fixture) +
-  `tests/test_evaluation.py` 18. Bốn test evaluation cần DB/MinIO (`api`/`upload_api`: embedder, settings,
-  runner session, ACL runner) **not-run**: không đổi runner/ACL/DB. 560 source hash trước/sau trùng.
+- Selection theo rủi ro trên source cuối (evidence `final/`), `RAS_TEST_DATABASE_ADMIN_URL` trỏ cổng chặn để
+  không fixture nào rơi về `.env`: **55 pass / 0 fail / 0 skip**, collect 59, 4 deselect (`selection.xml`
+  `540905b9…`): `tests/test_human_review.py` 37 (gồm bundle commit đồng bộ với corpus LF và CRLF, không chứa
+  reviewer fixture) + `tests/test_evaluation.py` 18. Bốn test evaluation cần DB/MinIO (`api`/`upload_api`:
+  embedder, settings, runner session, ACL runner) **not-run**: không đổi runner/ACL/DB. 561 source hash
+  trước/sau trùng. Lượt sớm hơn (54 pass, trước sửa line ending) giữ ở thư mục gốc evidence, không cộng dồn.
 - CLI: `validate` (80 câu, 16 holdout, 15 paper OK), `build-pdfs --check`, `human-prepare --check` (up to
   date), `human-report` (`awaiting_human_review`) đều exit 0.
-- Đối chứng đột biến 9/9 bị test bắt, file khôi phục đúng hash: nhóm `response_id`, ghi một phần, stale
-  label, escape HTML, tiền tố công thức, cột hiển thị bị sửa, đoán ledger call (2 nhánh), conflict khác reviewer.
+- Đối chứng đột biến 10/10 bị test bắt, file khôi phục đúng hash: nhóm `response_id`, ghi một phần, stale
+  label, escape HTML, tiền tố công thức, cột hiển thị bị sửa, đoán ledger call (2 nhánh), line ending corpus
+  run, conflict khác reviewer. Lượt đầu có một ca đột biến nhầm bảo vệ không được test phủ; đã thêm test và
+  tách ca.
 - Chrome 155 cục bộ, context offline, chặn mọi request không phải `file:`: 85 trang render, 0 request ngoài,
   0 dialog; bundle chèn `<script>`/`onerror` không chạy và hiện thành text; liên kết bản đọc tới `#L19`.
 - Không chạy: full API >5.000, test DB/restore/Chrome production, web (không đổi). Không provider/arXiv/
