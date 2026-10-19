@@ -1,5 +1,9 @@
 # Kế hoạch hoàn thành MVP
 
+**Sửa review M7b PR #65, 2026-10-19 (chờ review lại):** verdict bind nguồn/parser đầy đủ, report `source_mismatch` khi lệch, import preflight bundle; [handoff](m7b-human-quality-review.md#sửa-review-pr-65-tại-44e3bd3--chờ-review-lại). 0 verdict thật; M7b/D chưa nghiệm thu, không live/ngân sách mới.
+
+**Review M7b PR #65 tại `44e3bd3`, 2026-10-19:** [hai P2 ở provenance/report/import](reviews/pr65-m7b-human-quality-review.md) cần [sửa cùng PR](tasks/fix-pr65-human-review-provenance.md). Phần bundle đã tạo nhưng chưa nghiệm thu binding, 0 verdict thật; không đánh dấu M7b/D hoàn tất. Sửa offline, không thêm live hoặc mở scope E; reviewer đã tái hiện lỗi bằng fixture ngoài repo.
+
 **M7b trên nhánh review, 2026-10-19 (chưa merge):** phần coding/bundle xong — [handoff](m7b-human-quality-review.md): bundle offline 80 nhãn M4c + answer live M7a (tập riêng), CLI prepare → validate/import → report, verdict overlay bind nội dung. **0 phiếu thật, `awaiting_human_review`**; D chưa nghiệm thu. Còn: chủ dự án điền/nhập phiếu; cache-write live, policy và paper thật có quyền; E riêng. Không inference, pricing vẫn tắt.
 
 **Sau merge PR #64, 2026-10-19:** M7a đã merge `2df77d0`, tree khớp `285fd37`, source **0052**; không có pass mới tại merge. Tiếp [M7b — chuẩn bị và nhập/chấm phiếu người đọc](tasks/m7b-human-quality-review.md), một PR offline trên nhãn/answer đã có, mới giao/chưa triển khai. Không mở thêm live khi trần gốc hết; cache-write live và policy/paper thật còn điều kiện riêng. Người đọc chưa duyệt thì phần coding có thể bàn giao nhưng D chưa nghiệm thu; E vẫn riêng. Các mốc review bên dưới giữ lịch sử.

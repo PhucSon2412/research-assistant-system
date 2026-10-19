@@ -299,7 +299,9 @@ def test_label_import_is_all_or_nothing_and_idempotent(tmp_path, bundle):
     assert stored["attribution"] == human.ATTRIBUTION and {r["attribution"] for r in stored["records"]} == {"self_reported"}
     _, qset = load(DEFAULT_ROOT)
     sp01 = next(q for q in qset.questions if q.id == "SP-01")
-    assert stored["records"][0]["label_sha256"] == human.label_hash(sp01)
+    binding = stored["records"][0]["binding"]
+    assert binding["label_sha256"] == human.label_hash(sp01) and binding["version"] == human.BINDING_VERSION
+    assert stored["records"][0]["binding_sha256"] == human.digest(binding)
 
 
 def copy_root(tmp_path):
@@ -336,6 +338,134 @@ def test_stale_label_corpus_or_parser_blocks_import_and_voids_records(tmp_path, 
     errors = import_labels(sheet, bundle, records)["errors"]
     assert any("parsers changed" in e for e in errors)
     assert report(bundle, records)["m4c_labels"]["counts"]["unreviewed"] == 80
+
+
+def full_labels(bundle, tmp_path):
+    return fill(bundle, tmp_path, "labels", {r["question_id"]: accept() for r in rows_of(bundle, "labels")}, "all.csv")
+
+
+def full_answers(bundle, tmp_path):
+    return fill(bundle, tmp_path, "answers", {k: grade(k) for k in (SINGLE, COMPARE1, COMPARE2, INSUFFICIENT)},
+                "all-answers.csv")
+
+
+def copy_bundle_sources(tmp_path, bundle):
+    root, corpus = copy_root(tmp_path), tmp_path / "m7a"
+    shutil.copytree(human.M7A_CORPUS, corpus)
+    return root, corpus
+
+
+def test_control_full_review_of_unchanged_sources_is_reviewed(tmp_path, bundle):
+    records = tmp_path / "records"
+    assert import_labels(full_labels(bundle, tmp_path), bundle, records)["counts"] == {"added": 80}
+    assert import_answers(full_answers(bundle, tmp_path), bundle, records)["counts"] == {"added": 4}
+    data = report(bundle, records)
+    assert data["status"] == "reviewed" and data["m4c_labels"]["status"] == "accepted_all"
+    assert data["m7a_answers"]["metrics"]["grounded_answer_rate"] == {"numerator": 2, "denominator": 2, "value": 1.0}
+    assert data["m7a_answers"]["metrics"]["abstention_appropriateness"]["denominator"] == 1
+
+
+def test_changed_corpus_bytes_void_every_label_verdict(tmp_path, bundle):
+    records = tmp_path / "records"
+    root, _ = copy_bundle_sources(tmp_path, bundle)
+    assert import_labels(full_labels(bundle, tmp_path), bundle, records, root=root)["written"]
+    paper = root / "corpus" / "markdown" / "p01-gated-sparse-routing.md"
+    paper.write_bytes(paper.read_bytes() + b"\nchanged after review\n")  # manifest still declares the old hash
+    data = report(bundle, records, root)
+    labels = data["m4c_labels"]
+    assert labels["status"] == "source_mismatch" and data["status"] == "source_mismatch"
+    assert labels["counts"]["accepted"] == 0 and labels["counts"]["unreviewed"] == 80
+    assert labels["stale_records"] == 80 and labels["bundle_current"] is False and labels["corpus_errors"]
+    assert "Lỗi nguồn" in human.render_report(data) and "source_mismatch" in human.render_report(data)
+    paper.write_bytes(paper.read_bytes().replace(b"\nchanged after review\n", b""))
+    assert report(bundle, records, root)["m4c_labels"]["status"] == "accepted_all"  # exact bytes back
+
+
+def test_parser_change_voids_answer_verdicts_before_and_after_rebuild(tmp_path, bundle, monkeypatch):
+    records = tmp_path / "records"
+    assert import_answers(full_answers(bundle, tmp_path), bundle, records)["written"]
+    changed = human.parsers() | {"markdown": "markdown-lines-v99"}
+    monkeypatch.setattr(human, "parsers", lambda: changed)
+    data = report(bundle, records)["m7a_answers"]
+    assert data["status"] == "source_mismatch" and data["live_records"] == 0 and data["stale_records"] == 4
+    for name in ("grounded_answer_rate", "citation_accuracy", "abstention_appropriateness"):
+        assert data["metrics"][name] == {"numerator": 0, "denominator": 0, "value": None}, name
+    fresh = tmp_path / "fresh"
+    human_bundle.write(fresh, human_bundle.build(DEFAULT_ROOT, (bundle / human.SNAPSHOT_FILE).read_bytes()))
+    data = report(fresh, records)["m7a_answers"]
+    assert data["bundle_current"] is True and data["status"] == "awaiting_human_review"
+    assert data["live_records"] == 0 and data["metrics"]["abstention_appropriateness"]["denominator"] == 0
+
+
+def test_m7a_corpus_change_voids_abstention_and_blocks_import(tmp_path, bundle):
+    records = tmp_path / "records"
+    _, corpus = copy_bundle_sources(tmp_path, bundle)
+    assert import_answers(full_answers(bundle, tmp_path), bundle, records, corpus=corpus)["written"]
+    before = human.records_path(records, "answers").read_bytes()
+    paper = corpus / "lumen-bench.md"
+    paper.write_bytes(paper.read_bytes() + b"\nThe purchase price was 42 dollars.\n")
+    data = human.build_report(bundle=bundle, records=records, corpus=corpus, today=TODAY)["m7a_answers"]
+    assert data["corpus_matches_run"] is False and data["status"] == "source_mismatch" and data["live_records"] == 0
+    assert data["metrics"]["abstention_appropriateness"] == {"numerator": 0, "denominator": 0, "value": None}
+    errors = import_answers(full_answers(bundle, tmp_path), bundle, records, corpus=corpus)["errors"]
+    assert any("does not reproduce the run" in e for e in errors)
+    assert human.records_path(records, "answers").read_bytes() == before
+
+
+def test_records_without_current_binding_never_count(tmp_path, bundle):
+    records = tmp_path / "records"
+    import_labels(fill(bundle, tmp_path, "labels", {"SP-01": accept()}), bundle, records)
+    import_answers(fill(bundle, tmp_path, "answers", {INSUFFICIENT: grade(INSUFFICIENT)}), bundle, records)
+    for kind in ("labels", "answers"):
+        path = human.records_path(records, kind)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        legacy = {k: v for k, v in data["records"][0].items() if k not in ("binding", "binding_sha256")}
+        forged = data["records"][0] | {"binding_sha256": "0" * 64}
+        data["records"] = [legacy, forged]
+        path.write_text(json.dumps(data), encoding="utf-8")
+    data = report(bundle, records)
+    assert data["m4c_labels"]["counts"]["accepted"] == 0 and data["m4c_labels"]["stale_records"] == 2
+    assert data["m7a_answers"]["live_records"] == 0 and data["m7a_answers"]["stale_records"] == 2
+    assert data["status"] == "awaiting_human_review"
+
+
+@pytest.mark.parametrize("kind, path, change", [
+    ("labels", "labels/SP-01.html", "edit"),
+    ("labels", "papers/P01.html", "delete"),
+    ("labels", "files/markdown/p01-gated-sparse-routing.md", "edit"),
+    ("labels", "manifest.json", "edit"),
+    ("answers", "answers/01-single.html", "edit"),
+    ("answers", "papers/m7a-lumen-bench.html", "delete"),
+    ("answers", "files/m7a/harbor-sensor.pdf", "edit"),
+])
+def test_import_refuses_a_bundle_whose_displayed_content_drifted(tmp_path, bundle, kind, path, change):
+    records = tmp_path / "records"
+    sheet = fill(bundle, tmp_path, kind, {"SP-01": accept()} if kind == "labels" else {SINGLE: grade(SINGLE)})
+    # Earlier valid import: a refused import must leave these bytes untouched.
+    seed = fill(bundle, tmp_path, kind, {"SP-02": accept()} if kind == "labels" else {COMPARE1: grade(COMPARE1)},
+                "seed.csv")
+    assert (import_labels if kind == "labels" else import_answers)(seed, bundle, records)["written"]
+    before = human.records_path(records, kind).read_bytes()
+    target = bundle / path
+    if change == "delete":
+        target.unlink()
+    elif path.endswith(".html"):
+        target.write_bytes(target.read_bytes().replace(b"<mark>", b"<mark>WRONG ", 1))
+    else:
+        target.write_bytes(target.read_bytes() + b" ")
+    for dry_run in (True, False):
+        result = (import_labels if kind == "labels" else import_answers)(sheet, bundle, records, dry_run=dry_run)
+        assert any(e.startswith("bundle drift:") and path in e for e in result["errors"]), result["errors"]
+        assert not result["written"]
+    assert human.records_path(records, kind).read_bytes() == before
+
+
+def test_filled_bundle_sheet_and_extra_files_are_not_drift(tmp_path, bundle):
+    records = tmp_path / "records"
+    in_place = fill(bundle, bundle, "labels", {"SP-01": accept()}, name=human.LABEL_SHEET)
+    (bundle / "~$label-review.csv").write_bytes(b"spreadsheet lock file")
+    result = import_labels(in_place, bundle, records)
+    assert result["errors"] == [] and result["counts"] == {"added": 1} and len(result["pending"]) == 79
 
 
 def test_reviewer_conflicts_and_explicit_replace(tmp_path, bundle):

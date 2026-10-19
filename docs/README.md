@@ -1,5 +1,9 @@
 # Tài liệu dự án
 
+**Sửa review PR #65, 2026-10-19 (chờ review lại):** hai P2 binding/preflight đã sửa offline ([handoff](m7b-human-quality-review.md#sửa-review-pr-65-tại-44e3bd3--chờ-review-lại)); 0 verdict thật, chưa merge.
+
+**Review M7b PR #65 tại `44e3bd3`, 2026-10-19:** còn [hai P2 về hiệu lực verdict và integrity của bundle được xem](reviews/pr65-m7b-human-quality-review.md); [sửa trên cùng PR](tasks/fix-pr65-human-review-provenance.md). Reviewer 55 repo + 1 control pass/6 repro fail, không ghi phiếu thật. PR chưa merge; human review vẫn pending, không inference/key/ngân sách mới.
+
 **M7b trên nhánh review, 2026-10-19 (chưa merge):** [handoff bộ duyệt nhãn/answer và nhập phiếu](m7b-human-quality-review.md) · [inventory](m7b-test-inventory.json) · [bundle](../evaluation/human-review/README.md). 0 verdict thật, `awaiting_human_review`; không inference, pricing tắt.
 
 **Sau merge PR #64 (`2df77d0`, 2026-10-19):** tiếp [M7b — bộ duyệt 80 nhãn và answer M7a, nhập/chấm phiếu human](tasks/m7b-human-quality-review.md), mới giao/chưa triển khai. Không thêm inference hoặc đọc key; trần cũ hết, default pricing off. Thiếu phiếu thật thì giữ human review pending; cache-write live/policy và E còn riêng. [Kế hoạch MVP](mvp-delivery-plan.md) là trạng thái hiện hành; các kết luận OPEN bên dưới giữ lịch sử.

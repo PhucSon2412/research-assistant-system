@@ -1,6 +1,6 @@
 {
   "task": "M7b human quality review bundle, sheet import and report (offline, no inference)",
-  "status": "coding_and_bundle_complete_awaiting_human_review_not_merged",
+  "status": "pr65_review_fixed_offline_awaiting_rereview_and_human_review_not_merged",
   "branch": "feat/m7b-human-quality-review",
   "base": "2df77d0ac2b3e9371aa33753f4ab591fb09d1fa3",
   "base_check": "fetched origin/main; review head 285fd37 is ancestor; git diff 285fd37 origin/main empty",
@@ -197,5 +197,74 @@
   "evidence_root": "C:/Users/ADMIN/AppData/Local/Temp/ras-m7b-20261019",
   "seal_sha256": "1847253548fad3526b747505a3ff716126778d53a77468796979df1b5269d3c5",
   "seal_file": "final/seal.json",
-  "gitattributes": "evaluation/human-review/** -text (exact bytes); no rule added for evaluation/m7a-synthetic"
+  "gitattributes": "evaluation/human-review/** -text (exact bytes); no rule added for evaluation/m7a-synthetic",
+  "pr65_review_fix": {
+    "review_head": "44e3bd3efe76ca2ae9f1e071bd31d6209be3834a",
+    "findings": [
+      "P2-1 report counted verdicts after actual corpus/parser/run changed",
+      "P2-2 validate/import did not check displayed bundle files"
+    ],
+    "changed": [
+      "api/app/evaluation/human.py",
+      "api/app/evaluation/human_bundle.py",
+      "api/app/evaluation/__main__.py",
+      "api/tests/test_human_review.py",
+      "evaluation/human-review/bundle (regenerated)",
+      "evaluation/human-review/report.*"
+    ],
+    "binding_version": 2,
+    "bundle_manifest_sha256": "aecd381e5f81099c813df9d74d6c3e13b4628f0a0fdef7b751a25b06966ff87d",
+    "reviewer_repro": {
+      "script": "C:/Users/ADMIN/AppData/Local/Temp/ras-pr65-review-20261019/test_bindings.py",
+      "before": "6 failed / 1 passed (exit 1)",
+      "after": "7 passed (exit 0)",
+      "before_log_sha256": "a82b6c65d1a36efd94f01aba297057e0a26895ffca52d8a9780a8d469ae8446d",
+      "after_log_sha256": "b4a0553a55c074ab16fc7a663d7c396a918be3e4584a7c8931821b2b19cf1cf0"
+    },
+    "selection": {
+      "collected": 72,
+      "passed": 68,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 4,
+      "by_file": {
+        "tests/test_human_review.py": 50,
+        "tests/test_evaluation.py": 18
+      },
+      "junit_sha256": "92a2c09080a1296ab35653a8582ad989a2c6750aa5299eeea9f5e4e3cf816a01",
+      "deselect_node_ids": "tests/test_evaluation.py::<4 DB tests> (root api/)",
+      "source_hashes": {
+        "files": 561,
+        "unchanged_before_after": true
+      },
+      "seal_sha256": "2fcc85c31aa9d43bfc6858480610da5324cf203287e70b7bfe8f9aad3d964608"
+    },
+    "counterchecks": {
+      "cases": 13,
+      "caught": 13,
+      "restored": 13,
+      "sha256": "631652d5e6f83927977901e9a8f22395dafcb642b8377cd91e9fc4ced8fbf020",
+      "new": [
+        "stale label binding (is_live)",
+        "actual corpus bytes (gate + file hash, combined: defense in depth)",
+        "answer binding without parser",
+        "import preflight disabled (7 drift cases fail)"
+      ]
+    },
+    "browser": {
+      "chrome": "155.0.8059.80",
+      "pages": 85,
+      "outside_requests": 0,
+      "injected_script_ran": false,
+      "sha256": "613785cab19320301976dd50194adf92277d3b8292542801a10f714e56c12310"
+    },
+    "cli": "validate, build-pdfs --check, human-prepare --check, human-report exit 0 (awaiting_human_review)",
+    "not_run": "4 DB evaluation tests, full API >5000, DB/MinIO/web/restore/live",
+    "evidence_root": "C:/Users/ADMIN/AppData/Local/Temp/ras-m7b-20261019/fix-pr65",
+    "real_human_verdicts": {
+      "labels": 0,
+      "answers": 0
+    }
+  }
 }

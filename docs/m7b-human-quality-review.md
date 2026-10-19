@@ -5,6 +5,39 @@ Source migration giữ **0052**, không migration/grant, không đổi productio
 [Task](tasks/m7b-human-quality-review.md) · [inventory](m7b-test-inventory.json) ·
 [bundle](../evaluation/human-review/README.md). Chưa merge.
 
+## Sửa review PR #65 tại `44e3bd3` — chờ review lại
+
+[Review](reviews/pr65-m7b-human-quality-review.md) tìm hai P2; [prompt sửa](tasks/fix-pr65-human-review-provenance.md).
+Chỉ đổi `api/app/evaluation/human.py`, `human_bundle.py`, `__main__.py`, test và bundle tái tạo (manifest
+`aecd381e…`); không production/migration/inference.
+
+1. **Hiệu lực verdict theo binding đầy đủ.** Mỗi record lưu `binding` (version 2) + `binding_sha256`. Nhãn:
+   question/label hash, hash manifest corpus, **hash bytes thực trên đĩa** (`corpus_files_sha256`) và parser;
+   answer: row, cả response, snapshot, bytes corpus M7a và parser — kể cả dòng abstention không có quote.
+   Report chỉ tính record có binding đúng bằng binding hiện hành. Corpus M4c sai checksum/size, bundle M7a lệch
+   nguồn hoặc corpus M7a không tái lập run → trạng thái **`source_mismatch`** (cả section và tổng), 0 record
+   live, mọi mẫu số 0 → `null`; Markdown ghi lỗi nguồn. Record cũ thiếu/sai binding giữ trong file nhưng là
+   stale; dựng lại bundle với parser mới không kích hoạt lại verdict cũ — cần phiếu mới (thành record mới).
+   Import answer từ chối khi corpus M7a không tái lập run.
+2. **Preflight bundle ở cả `human-validate` và `human-import`.** Dựng lại bundle từ nguồn hiện tại (M4c root,
+   snapshot trong bundle, corpus M7a) và so mọi trang HTML, bản đọc, file nguồn copy, snapshot và
+   `manifest.json`; cột điền của phiếu và file thừa (ví dụ lock file của bảng tính) không tính là drift.
+   Lệch/thiếu → lỗi trước mọi mutation, record cũ giữ nguyên bytes. Build được cache theo nội dung đầu vào
+   trong một process.
+
+Trước sửa, repro của reviewer (`ras-pr65-review-20261019/test_bindings.py`) **6 fail / 1 pass**; sau sửa
+**7/7 pass** (control `reviewed`, 80 accepted, grounded 2/2). Regression trong repo: control đủ phiếu;
+bytes corpus đổi khi manifest giữ nguyên (và khôi phục bytes thì hiệu lực lại); parser đổi trước/sau rebuild;
+corpus M7a lệch run với dòng abstention; record thiếu/giả binding; 7 ca drift (trang nhãn, bản đọc bị xóa,
+file nguồn copy, manifest, trang answer, bản đọc M7a, PDF M7a) cả validate và import; phiếu điền tại chỗ +
+lock file vẫn nhận. Selection **68 pass / 0 fail**, collect 72, 4 DB deselect (`tests/test_evaluation.py::…`),
+561 source hash trước/sau trùng (`selection.xml` `92a2c090…`). Đối chứng đột biến **13/13** bắt được
+(thêm: bỏ `is_live`, bỏ gate+hash bytes corpus, bỏ parser khỏi binding answer, tắt preflight). Chrome 155
+offline 85 trang, 0 request ngoài, kết quả trùng lượt trước. Evidence
+`C:/Users/ADMIN/AppData/Local/Temp/ras-m7b-20261019/fix-pr65`. Vẫn **0 verdict thật, `awaiting_human_review`**.
+
+Các mục bên dưới là bàn giao lần đầu tại `44e3bd3`; phần binding/import đã được thay bằng mô tả trên.
+
 **Trạng thái: phần coding và bundle hoàn tất; `awaiting_human_review`.** Số verdict thật đã nhập: **0**
 (nhãn) và **0** (answer). Không agent/LLM nào điền cột human; test dùng reviewer giả chỉ trong `tmp_path`.
 M7b/gói D chưa nghiệm thu.

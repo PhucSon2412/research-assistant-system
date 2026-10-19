@@ -113,7 +113,7 @@ def _human_import(args, dry_run: bool) -> int:
             result = human.import_labels(args.sheet, bundle=args.bundle, records=args.records, root=args.root,
                                          dry_run=dry_run, replace=getattr(args, "replace", False))
         else:
-            result = human.import_answers(args.sheet, bundle=args.bundle, records=args.records,
+            result = human.import_answers(args.sheet, bundle=args.bundle, records=args.records, root=args.root,
                                           dry_run=dry_run, replace=getattr(args, "replace", False))
     except human.ReviewError as exc:
         return _human_errors(exc.errors)

@@ -34,6 +34,9 @@ from app.ingest import markdown, pdf
 FORMAT = "ras-m7b-human-review/1"
 RECORDS_FORMAT = "ras-m7b-review-records/1"
 SNAPSHOT_FORMAT = "ras-m7b-m7a-snapshot/1"
+# Version of what a verdict record binds to. Records without this exact binding (older formats,
+# changed label/row, corpus bytes, parser or run) never count; they stay in the file as stale.
+BINDING_VERSION = 2
 HUMAN_DIR = DEFAULT_ROOT.parent / "human-review"
 DEFAULT_BUNDLE = HUMAN_DIR / "bundle"
 DEFAULT_RECORDS = HUMAN_DIR / "records"
@@ -171,11 +174,25 @@ def label_hash(question: Question) -> str:
 
 
 def m4c_binding(root: Path = DEFAULT_ROOT) -> tuple[dict, QuestionSet]:
+    """``corpus_sha256`` hashes the manifest as declared; ``corpus_files_sha256`` the bytes on disk."""
     manifest, qset = load(root)
+    actual = {}
+    for paper in manifest.papers:
+        path = root / "corpus" / paper.file
+        actual[paper.file] = sha256_bytes(path.read_bytes()) if path.is_file() else None
     return {"dataset_id": qset.dataset_id, "corpus_id": manifest.corpus_id,
-            "corpus_sha256": digest(manifest.model_dump(mode="json")), "parsers": parsers(),
-            "corpus_errors": check_manifest(manifest, root),
+            "corpus_sha256": digest(manifest.model_dump(mode="json")), "corpus_files_sha256": digest(actual),
+            "parsers": parsers(), "corpus_errors": check_manifest(manifest, root),
             "labels": {question.id: label_hash(question) for question in qset.questions}}, qset
+
+
+def label_binding(current: dict, qid: str) -> dict | None:
+    """What a label verdict is about; ``None`` (nothing can be live) when the corpus fails its checks."""
+    if current["corpus_errors"] or qid not in current["labels"]:
+        return None
+    return {"version": BINDING_VERSION, "question_id": qid, "label_sha256": current["labels"][qid],
+            "corpus_sha256": current["corpus_sha256"], "corpus_files_sha256": current["corpus_files_sha256"],
+            "parsers": current["parsers"]}
 
 
 def scope_text(scope: Scope) -> str:
@@ -412,6 +429,38 @@ def row_hash(row: dict) -> str:
     return digest({column: row[column] for column in ANSWER_DISPLAY})
 
 
+def answer_binding(current: dict, row_key: str) -> dict | None:
+    """What an answer verdict is about: the row, its whole response, the run snapshot, the corpus bytes
+    and parsers. ``None`` when the corpus does not reproduce the run, so no verdict can be live."""
+    if current["corpus_matches_run"] is not True:
+        return None
+    response = next((r for r in current["responses"] if row_key in r["rows"]), None)
+    if response is None:
+        return None
+    return {"version": BINDING_VERSION, "row_key": row_key, "row_sha256": response["rows"][row_key],
+            "response_sha256": response["response_sha256"], "snapshot_sha256": current["snapshot_sha256"],
+            "corpus_sha256": current["corpus_sha256"], "parsers": current["parsers"]}
+
+
+def is_live(record: dict, binding: dict | None) -> bool:
+    return binding is not None and record.get("binding") == binding and record.get("binding_sha256") == digest(binding)
+
+
+def preflight_bundle(bundle: Path, root: Path, corpus: Path) -> list[str]:
+    """Every page, copied source, snapshot and the manifest must equal a fresh build from the sources,
+    so a verdict is only recorded for content that is what the reader was shown. Fill-in columns of the
+    sheets and extra files (e.g. a spreadsheet's lock file) are not drift."""
+    from app.evaluation import human_bundle  # imports this module
+
+    try:
+        outputs = human_bundle.build_cached(root, _snapshot_bytes(bundle), corpus)
+    except ReviewError as exc:
+        return [f"bundle sources: {error}" for error in exc.errors]
+    return [f"bundle drift: {problem}; the displayed content no longer matches its sources, run human-prepare "
+            "(keep filled sheets aside)" for problem in human_bundle.check(bundle, outputs)
+            if not problem.startswith("unexpected: ")]
+
+
 def m7a_binding(snapshot_bytes: bytes, corpus: Path = M7A_CORPUS) -> tuple[dict, list[dict], dict]:
     snapshot = json.loads(snapshot_bytes)
     if snapshot.get("format") != SNAPSHOT_FORMAT:
@@ -443,6 +492,10 @@ def load_manifest(bundle: Path) -> dict:
     if data.get("format") != FORMAT:
         raise ReviewError([f"{path}: format {data.get('format')!r} is not {FORMAT}"])
     return data
+
+
+def manifest_sha(bundle: Path) -> str:
+    return sha256_bytes((bundle / "manifest.json").read_bytes())
 
 
 def _snapshot_bytes(bundle: Path) -> bytes:
@@ -560,19 +613,19 @@ def _sheet_rows(path: Path, columns: list[str], display: list[str], expected: di
 
 
 def import_labels(sheet: Path, *, bundle: Path = DEFAULT_BUNDLE, records: Path = DEFAULT_RECORDS,
-                  root: Path = DEFAULT_ROOT, today: date | None = None, now: datetime | None = None,
-                  dry_run: bool = False, replace: bool = False) -> dict:
+                  root: Path = DEFAULT_ROOT, corpus: Path = M7A_CORPUS, today: date | None = None,
+                  now: datetime | None = None, dry_run: bool = False, replace: bool = False) -> dict:
     today = today or date.today()
-    errors: list[str] = []
     manifest = load_manifest(bundle)
     try:
         current, qset = m4c_binding(root)
     except (OSError, ValueError) as exc:
         raise ReviewError([f"M4c dataset unreadable: {exc}"]) from None
-    errors += [f"corpus: {e}" for e in current["corpus_errors"]]
+    errors = [f"corpus: {e}" for e in current["corpus_errors"]]
+    errors += preflight_bundle(bundle, root, corpus)
     shown = manifest["m4c"]
-    for field in ("dataset_id", "corpus_sha256", "parsers"):
-        if shown[field] != current[field]:
+    for field in ("dataset_id", "corpus_sha256", "corpus_files_sha256", "parsers"):
+        if shown.get(field) != current[field]:
             errors.append(f"stale bundle: M4c {field} changed since the bundle was prepared; run human-prepare")
     for qid in sorted(set(shown["labels"]) | set(current["labels"])):
         if shown["labels"].get(qid) != current["labels"].get(qid):
@@ -598,15 +651,17 @@ def import_labels(sheet: Path, *, bundle: Path = DEFAULT_BUNDLE, records: Path =
         if verdict != "accepted" and not notes:
             errors.append(f"line {line}: {qid}: {verdict} needs notes saying what to change or why")
             continue
+        binding = label_binding(current, qid)
+        if binding is None:
+            continue  # corpus errors are already reported
         new.append({"question_id": qid, "split": row["split"], "group": row["group"],
-                    "label_sha256": current["labels"][qid], "corpus_sha256": current["corpus_sha256"],
-                    "parsers": current["parsers"], "verdict": verdict, "reviewer": reviewer, "review_date": when,
-                    "notes": notes, "sheet_sha256": sheet_sha, "imported_at": imported_at,
-                    "attribution": "self_reported"})
+                    "binding": binding, "binding_sha256": digest(binding),
+                    "verdict": verdict, "reviewer": reviewer, "review_date": when, "notes": notes,
+                    "sheet_sha256": sheet_sha, "bundle_manifest_sha256": manifest_sha(bundle),
+                    "imported_at": imported_at, "attribution": "self_reported"})
     existing = [] if errors else load_records(records, "labels")
     merged, counts = _merge(existing, new,
-                            lambda r: (r["question_id"], r["label_sha256"], r["corpus_sha256"],
-                                       digest(r["parsers"]), r["reviewer"].casefold()),
+                            lambda r: (r["question_id"], r.get("binding_sha256") or "", r["reviewer"].casefold()),
                             lambda a, b: all(a[k] == b[k] for k in ("verdict", "review_date", "notes")),
                             replace, errors)
     written = False
@@ -681,16 +736,18 @@ def _bundle_m7a(bundle: Path, manifest: dict, corpus: Path) -> tuple[dict, list[
 
 
 def import_answers(sheet: Path, *, bundle: Path = DEFAULT_BUNDLE, records: Path = DEFAULT_RECORDS,
-                   corpus: Path = M7A_CORPUS, today: date | None = None, now: datetime | None = None,
-                   dry_run: bool = False, replace: bool = False) -> dict:
+                   root: Path = DEFAULT_ROOT, corpus: Path = M7A_CORPUS, today: date | None = None,
+                   now: datetime | None = None, dry_run: bool = False, replace: bool = False) -> dict:
     today = today or date.today()
     manifest = load_manifest(bundle)
     current, responses, errors = _bundle_m7a(bundle, manifest, corpus)
     if not current["available"]:
         errors.append("M7a answers were not available when the bundle was prepared; nothing to import")
+    elif current["corpus_matches_run"] is not True:
+        errors.append("M7a corpus does not reproduce the run's recorded files; verdicts cannot be bound to it")
+    errors += preflight_bundle(bundle, root, corpus)
     expected = {row["row_key"]: row for r in responses for row in r["rows"]}
     rows = _sheet_rows(sheet, ANSWER_COLUMNS, ANSWER_DISPLAY, expected, "row_key", errors)
-    hashes = {key: value for r in current["responses"] for key, value in r["rows"].items()}
     imported_at = (now or datetime.now(timezone.utc)).isoformat(timespec="seconds")
     sheet_sha = sha256_bytes(sheet.read_bytes()) if sheet.is_file() else None
     new, pending, graded = [], [], []
@@ -706,15 +763,19 @@ def import_answers(sheet: Path, *, bundle: Path = DEFAULT_BUNDLE, records: Path 
         if not _answer_judgements(row, line, errors):
             continue
         graded.append((line, row))
+        binding = answer_binding(current, row["row_key"])
+        if binding is None:
+            continue  # corpus mismatch is already reported
         new.append({"row_key": row["row_key"], "response_id": row["response_id"], "run_id": row["run_id"],
-                    "row_sha256": hashes[row["row_key"]], "snapshot_sha256": current["snapshot_sha256"],
+                    "binding": binding, "binding_sha256": digest(binding),
                     **{column: values[column] for column in ANSWER_HUMAN[:3]},
                     "reviewer": reviewer, "review_date": when, "notes": values["notes"],
-                    "sheet_sha256": sheet_sha, "imported_at": imported_at, "attribution": "self_reported"})
+                    "sheet_sha256": sheet_sha, "bundle_manifest_sha256": manifest_sha(bundle),
+                    "imported_at": imported_at, "attribution": "self_reported"})
     _answer_conflicts(graded, errors)
     existing = [] if errors else load_records(records, "answers")
     merged, counts = _merge(existing, new,
-                            lambda r: (r["row_key"], r["row_sha256"], r["snapshot_sha256"], r["reviewer"].casefold()),
+                            lambda r: (r["row_key"], r.get("binding_sha256") or "", r["reviewer"].casefold()),
                             lambda a, b: all(a[k] == b[k] for k in ANSWER_HUMAN[:3] + ["review_date", "notes"]),
                             replace, errors)
     written = False
@@ -733,8 +794,8 @@ def _label_section(manifest: dict, records: list[dict], root: Path) -> dict:
     stale_records = 0
     for question in qset.questions:
         mine = [r for r in records if r["question_id"] == question.id]
-        live = [r for r in mine if r["label_sha256"] == current["labels"][question.id]
-                and r["corpus_sha256"] == current["corpus_sha256"] and r["parsers"] == current["parsers"]]
+        binding = label_binding(current, question.id)
+        live = [r for r in mine if is_live(r, binding)]
         stale_records += len(mine) - len(live)
         verdicts = {r["verdict"] for r in live}
         state = ("unreviewed" if not verdicts else "conflicting" if len(verdicts) > 1 else verdicts.pop())
@@ -749,34 +810,39 @@ def _label_section(manifest: dict, records: list[dict], root: Path) -> dict:
                 for group in GROUP_MINIMUMS}
     total = len(by_question)
     reviewed = total - totals["unreviewed"]
-    status = ("awaiting_human_review" if reviewed == 0 else
+    status = ("source_mismatch" if current["corpus_errors"] else "awaiting_human_review" if reviewed == 0 else
               "accepted_all" if totals["accepted"] == total else "provisional")
     unknown = sorted({r["question_id"] for r in records} - set(by_question))
     return {"status": status, "questions": total,
             "holdout": sum(e["split"] == "holdout" for e in by_question.values()),
             "counts": {state: totals[state] for state in states}, "by_split": by_split, "by_group": by_group,
             "stale_records": stale_records, "records_for_unknown_questions": unknown,
-            "bundle_current": manifest["m4c"]["labels"] == current["labels"]
-                              and manifest["m4c"]["corpus_sha256"] == current["corpus_sha256"]
-                              and manifest["m4c"]["parsers"] == current["parsers"],
+            "bundle_current": not current["corpus_errors"]
+                              and all(manifest["m4c"].get(k) == current[k] for k in
+                                      ("labels", "corpus_sha256", "corpus_files_sha256", "parsers")),
             "corpus_errors": current["corpus_errors"],
             "reviewers": sorted({r for e in by_question.values() for r in e["reviewers"]}),
             "not_accepted": {qid: e["state"] for qid, e in sorted(by_question.items()) if e["state"] != "accepted"
                              and e["state"] != "unreviewed"},
-            "effect": "kết quả retrieval M4c vẫn provisional cho tới khi mọi nhãn hiện hành được accepted"
+            "effect": "corpus trên đĩa không khớp manifest: không verdict nào có hiệu lực" if current["corpus_errors"]
+                      else "kết quả retrieval M4c vẫn provisional cho tới khi mọi nhãn hiện hành được accepted"
                       if status != "accepted_all" else "mọi nhãn hiện hành có verdict human accepted"}
 
 
-def _score_rows(responses: list[dict], records: list[dict], snapshot_sha: str) -> tuple[list[dict], list[str], int]:
-    """Sheet rows with recorded judgements; rows where reviewers disagree mark their response conflicting."""
+def _score_rows(responses: list[dict], records: list[dict], current: dict,
+                valid: bool) -> tuple[list[dict], list[str], int]:
+    """Sheet rows with live judgements; rows where reviewers disagree mark their response conflicting.
+
+    Every row, including an abstention-only row, needs a record bound to the current row/response/
+    snapshot/corpus/parsers; when the bundle or corpus is not valid no record is live."""
     rows, conflicting, live_count = [], [], 0
     for response in responses:
         if not response["scoreable"]:
             continue
         filled, clash = [], False
         for row in response["rows"]:
-            live = [r for r in records if r["row_key"] == row["row_key"] and r["row_sha256"] == row_hash(row)
-                    and r["snapshot_sha256"] == snapshot_sha]
+            binding = answer_binding(current, row["row_key"]) if valid else None
+            live = [r for r in records if r["row_key"] == row["row_key"] and is_live(r, binding)]
             live_count += len(live)
             judgements = {tuple(r[c] for c in ANSWER_HUMAN[:3]) for r in live}
             if len(judgements) > 1:
@@ -808,7 +874,9 @@ def _answer_section(bundle: Path, manifest: dict, records: list[dict], corpus: P
         return {"status": NOT_AVAILABLE, "reason": "M7a answers artifact was missing when the bundle was prepared",
                 "run_id": shown["run_id"], "responses": []}
     current, responses, stale = _bundle_m7a(bundle, manifest, corpus)
-    rows, cross, live = _score_rows(responses, records, current["snapshot_sha256"])
+    problems = stale + ([] if current["corpus_matches_run"] is True else
+                        ["M7a corpus does not reproduce the run's recorded files"])
+    rows, cross, live = _score_rows(responses, records, current, valid=not problems)
     non_answer = {r["response_id"] for r in responses if r["drill"] and r["drill"]["expected_status"] != "answered"}
     groups = sorted({row["group"] for r in responses for row in r["rows"]})
     by_group = {}
@@ -823,8 +891,10 @@ def _answer_section(bundle: Path, manifest: dict, records: list[dict], corpus: P
     metrics = _answer_metrics(rows, cross, non_answer)
     complete = (metrics["answered_responses"]["complete"] + metrics["abstention_responses"]["graded"]
                 == len(scoreable))
-    status = "awaiting_human_review" if live == 0 else "reviewed" if complete and not cross else "provisional"
+    status = ("source_mismatch" if problems else "awaiting_human_review" if live == 0 else
+              "reviewed" if complete and not cross else "provisional")
     return {"status": status, "run_id": current["run_id"], "bundle_current": not stale, "stale": stale,
+            "source_problems": problems,
             "responses": len(responses), "scoreable_responses": len(scoreable),
             "rows": sum(len(r["rows"]) for r in scoreable), "live_records": live,
             "stale_records": len(records) - live,
@@ -844,7 +914,8 @@ def build_report(*, bundle: Path = DEFAULT_BUNDLE, records: Path = DEFAULT_RECOR
     labels = _label_section(manifest, load_records(records, "labels"), root)
     answers = _answer_section(bundle, manifest, load_records(records, "answers"), corpus)
     states = {labels["status"], answers["status"]} - {NOT_AVAILABLE}
-    overall = ("awaiting_human_review" if states <= {"awaiting_human_review"} else
+    overall = ("source_mismatch" if "source_mismatch" in states else
+               "awaiting_human_review" if states <= {"awaiting_human_review"} else
                "reviewed" if states <= {"accepted_all", "reviewed"} else "provisional")
     return {"format": FORMAT + "#report", "generated_on": (today or date.today()).isoformat(), "status": overall,
             "attribution": ATTRIBUTION,
@@ -886,6 +957,8 @@ def render_report(data: dict) -> str:
     lines += ["", "| Nhóm | " + " | ".join(labels["counts"]) + " |", "| --- |" + " ---: |" * len(labels["counts"])]
     lines += [f"| {group} | " + " | ".join(str(c.get(s, 0)) for s in labels["counts"]) + " |"
               for group, c in labels["by_group"].items()]
+    if labels["corpus_errors"]:
+        lines += ["", "**Lỗi nguồn (mọi verdict nhãn bị loại):** " + "; ".join(esc(e) for e in labels["corpus_errors"])]
     if labels["not_accepted"]:
         lines += ["", "Chưa accepted (đã có phiếu): " + ", ".join(f"{k} ({v})" for k, v in labels["not_accepted"].items())]
     lines += ["", "## Answer M4c", "", f"**{data['m4c_answers']['status']}** — {esc(data['m4c_answers']['reason'])}.",
@@ -897,8 +970,11 @@ def render_report(data: dict) -> str:
         lines += [f"Trạng thái: **{answers['status']}**, run `{esc(answers['run_id'])}`, bundle khớp: "
                   f"{answers['bundle_current']}. Response: {answers['responses']} (chấm được "
                   f"{answers['scoreable_responses']}), dòng phiếu {answers['rows']}, record hiện hành "
-                  f"{answers['live_records']}, record cũ {answers['stale_records']}.", "",
-                  "| Chỉ số | Tử/mẫu (giá trị) |", "| --- | --- |",
+                  f"{answers['live_records']}, record cũ {answers['stale_records']}.", ""]
+        if answers["source_problems"]:
+            lines += ["**Lỗi nguồn (mọi verdict answer bị loại, chỉ số not measured):** "
+                      + "; ".join(esc(p) for p in answers["source_problems"]), ""]
+        lines += ["| Chỉ số | Tử/mẫu (giá trị) |", "| --- | --- |",
                   f"| Grounded answer rate | {_rate(m['grounded_answer_rate'])} |",
                   f"| Citation accuracy | {_rate(m['citation_accuracy'])} |",
                   f"| Abstention appropriateness | {_rate(m['abstention_appropriateness'])} |", "",

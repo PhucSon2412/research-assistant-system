@@ -321,6 +321,7 @@
   "rows": 4,
   "run_id": "m7a-runtime-2026-10-18",
   "scoreable_responses": 3,
+  "source_problems": [],
   "stale": [],
   "stale_records": 0,
   "status": "awaiting_human_review"

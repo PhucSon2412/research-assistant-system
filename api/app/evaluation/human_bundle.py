@@ -454,6 +454,25 @@ def build(root: Path = DEFAULT_ROOT, snapshot_bytes: bytes | None = None,
     return out
 
 
+_BUILDS: dict[str, dict[str, bytes]] = {}
+
+
+def _tree(path: Path) -> dict[str, str]:
+    return {p.relative_to(path).as_posix(): human.sha256_bytes(p.read_bytes())
+            for p in sorted(path.rglob("*")) if p.is_file()} if path.is_dir() else {}
+
+
+def build_cached(root: Path, snapshot_bytes: bytes, corpus: Path = human.M7A_CORPUS) -> dict[str, bytes]:
+    """``build`` keyed by the content of every input (root, snapshot, M7a corpus, parsers), not paths."""
+    key = human.digest({"root": _tree(root), "snapshot": human.sha256_bytes(snapshot_bytes),
+                        "corpus": _tree(corpus), "parsers": human.parsers()})
+    if key not in _BUILDS:
+        if len(_BUILDS) >= 8:
+            _BUILDS.pop(next(iter(_BUILDS)))
+        _BUILDS[key] = build(root, snapshot_bytes, corpus)
+    return _BUILDS[key]
+
+
 def _sheet_cells(data: bytes, columns: list[str], keep: list[str]) -> list[dict] | None:
     rows, errors = human.parse_sheet(data, columns)
     return None if errors else [{c: row[c] for c in keep} for _, row in rows]
