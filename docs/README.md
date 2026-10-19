@@ -1,5 +1,9 @@
 # Tài liệu dự án
 
+**Sửa review PR #64, 2026-10-19:** ba P2 cap/cost/polling của tooling M7a đã sửa và kiểm offline + repro Linux; chờ review lại, chưa merge. [Handoff](m7a-openrouter-live-verification.md#sửa-review-pr-64--chờ-review-lại).
+
+**Review M7a, 2026-10-19:** PR #64 tại `5dc8947`, source **0052**, còn [ba P2 cap/receipt cost/polling](reviews/pr64-m7a-openrouter-live-verification.md); [sửa cùng PR](tasks/fix-pr64-m7a-experiment-cap-and-polling.md) trước merge. Reviewer 31 repo + 2 control pass/4 repro failure; selection 652 và 19 live charge được audit riêng, không bị phủ nhận bởi monitor hết hạn. Không key/provider/dev/Dify hoặc bật pricing trong review; giữ docs reviewer cho lượt sửa.
+
 **M7a trên nhánh review, 2026-10-19 (chưa merge):** [handoff OpenRouter live/đối soát](m7a-openrouter-live-verification.md) · [inventory](m7a-test-inventory.json). 19 request tổng hợp, billed $0,0194; ba route đã chạy live, routing pin ZDR; generation còn chờ xác nhận live sau sửa cache-write. Pricing mặc định tắt, chưa gửi paper thật.
 
 **Sau merge PR #63, 2026-10-18:** merge `5362ace`, tree khớp `c1f7bcc`, source **0052**; chưa có pass mới tại merge. Gói tiếp là [M7a — kiểm chứng OpenRouter và charge bằng dữ liệu tổng hợp](tasks/m7a-openrouter-live-verification.md), một PR có cap/key/routing/outcome và smoke runtime thật; **mới giao/chưa triển khai hoặc kiểm live**. M7b chấm chất lượng bằng người đọc và E vận hành nhóm thử còn riêng. Giữ [review M6e](reviews/pr63-m6e-private-duplicate-retry.md) chưa commit; không coi merge là mở pricing/cutover dev. Các mốc OPEN bên dưới là lịch sử.

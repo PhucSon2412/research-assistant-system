@@ -5,6 +5,38 @@ Source migration giữ **0052**, không migration/grant. [Task](tasks/m7a-openro
 [inventory](m7a-test-inventory.json). Chưa merge. Dữ liệu chỉ tổng hợp tự viết
 ([corpus](../evaluation/m7a-synthetic/README.md)); không dev/Dify/arXiv, không paper thật.
 
+## Sửa review PR #64 — chờ review lại
+
+[Review tại `5dc8947`](reviews/pr64-m7a-openrouter-live-verification.md) tìm ba P2 ở tooling experiment; đã
+sửa trên cùng PR, chỉ trong `scripts/m7a_*.py` và test. Không đổi production/migration/grant; key chỉ được nạp vào bộ nhớ một lần cho lượt quét vắng secret cuối (lệch với prompt sửa),
+không gửi inference mới.
+
+1. **Permit/serialization runtime:** `Gate` giữ ledger lock từ admission qua action, đóng permit và settlement,
+   nên hai action không chạy chồng; crash để lại lock (fail closed). Mỗi slot có một token permit
+   `open/<batch>.<k>.<family>` tạo sau khi slot đã ghi bền. Observer chỉ gửi khi giành được token bằng
+   `rename` nguyên tử sang `claimed/`; host đóng bằng `rename` sang `revoked/`, mỗi token chỉ một bên thắng
+   (không flock xuyên Windows/Linux). Token host thu hồi được mới là `not_sent` (có `proof`); token đã bị lấy
+   mà chưa có receipt trong thời gian ân hạn là `uncertain`, giữ đủ request/trần. Receipt gắn token nên
+   response muộn không gán sang action khác; response sau ân hạn vẫn giữ trần. Family route giới hạn
+   permit (embedding không dùng được token generation). Slot mở hoặc token cũ từ lượt chết → từ chối.
+2. **Cost receipt:** `valid_cost` dùng chung cho probe, runtime và mọi lần đọc ledger: chỉ int/float hữu hạn,
+   không âm, không bool mới giải phóng trần; âm/NaN/Infinity/bool/chuỗi/thiếu giữ trần, không clip về 0.
+3. **Deadline polling:** kiểm thời gian còn lại trước từng GET và sleep, timeout từng GET ≤ phần còn lại,
+   bỏ `/key` khi hết hạn (`key_status=skipped_deadline`), báo `deadline_reached` và pending.
+
+Trước sửa (source review): test repo mới **17 fail / 7 pass** (control all-found fail chỉ vì thiếu trường
+`deadline_reached`); harness Linux `--network none` tái hiện slot 21 được admit, 2 delegate, action chồng.
+Sau sửa: seal **67/67 pass** (4 file offline), 484 source hash trước/sau trùng; harness Linux cùng kịch bản
+từ chối slot 21 trước delegate, đúng 1 delegate, action thứ hai bị chặn. Ba lượt tranh chấp host Windows thu
+hồi/container Linux lấy token trên bind mount: không token nào ở cả hai phía, không claim trùng; chưa quan sát
+va chạm cùng token cùng lúc, nên tính nguyên tử ở đúng thời điểm đó dựa vào ngữ nghĩa `rename` của bind mount.
+Lượt đầu không tranh chấp giữ riêng, không tính là chứng cứ.
+
+Đọc lại ledger lịch sử theo quy tắc mới: slot `not_sent` cũ (seq 19) không có proof nên tính đủ trần →
+**20 request, $0,11675 cam kết**; không còn lượt live trong trần gốc. Dữ kiện đã audit (19 call gửi,
+$0,01941006 billed) không đổi. Settlement cache-write vẫn chưa xác nhận live; M7b/E giữ nguyên giới hạn.
+Evidence: `C:/Users/ADMIN/AppData/Local/Temp/ras-pr64-fix-20261019`.
+
 ## Trần và kết quả chi tiêu
 
 Trần do orchestrator chọn: **$0,50 và 20 request inference**, concurrency 1, ledger ngoài repo

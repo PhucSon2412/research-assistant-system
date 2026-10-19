@@ -1,6 +1,6 @@
 {
   "task": "M7a OpenRouter live verification and charge reconciliation (synthetic data)",
-  "status": "live_smoke_done_ready_for_review_not_merged",
+  "status": "pr64_review_p2_fixed_offline_ready_for_rereview_not_merged",
   "base": "5362ace04d0d211005753aecddd760a4ad7d548b",
   "source_migration": "0052",
   "migration_added": false,
@@ -1845,7 +1845,8 @@
     "Provider contractual ZDR terms and account privacy settings not verified; region SIN reported for generation.",
     "Common copy live path not exercised (cap); covered by simulated tests.",
     "M6d historical unexplained failures untouched; full >5,000 inventory not rerun.",
-    "Answers are pending human review (M7b); no grounding judgement."
+    "Answers are pending human review (M7b); no grounding judgement.",
+    "Late provider response after the gate grace period stays uncertain at full ceiling; it is kept in receipts but never re-settles the ledger."
   ],
   "evidence_root": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-m7a-20261018",
   "artifact_hashes": {
@@ -1980,5 +1981,271 @@
     "state\\runtime\\targets.json": "cc4889ebec8cc295cf2abd8e8562c4b687279a0dd6405669d37745a724f66254",
     "state\\zdr-endpoints.json": "bbb53fc4e322322be86ee6a61f9185aa9cca473eec820b6b8a4cdc64f6f2074f",
     "up-1.log": "1f738ea852c657bc96bf771b2e38df1983d0f0f719cf134f8ed16d2d70e3b03d"
+  },
+  "pr64_review_fix": {
+    "review_head": "5dc8947051c4d5e3e320118608d0c56ce9ef1ec8",
+    "review_report": "docs/reviews/pr64-m7a-openrouter-live-verification.md",
+    "scope": "scripts/m7a_live.py, scripts/m7a_observer.py, scripts/m7a_runtime_drill.py and tests; no product/migration/grant change; no live inference; key read only for the final absence scan",
+    "before_fix": {
+      "repo_guard_tests_on_review_source": {
+        "counts": {
+          "pass": 7,
+          "failure": 17
+        },
+        "nodes": {
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[0.001-True]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[0-True]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[0.0-True]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[-1-False]": "failure",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[-0.0001-False]": "failure",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[nan-False]": "failure",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[inf-False]": "failure",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[True-False]": "failure",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[False-False]": "failure",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[0.001-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[None-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[missing-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[-1]": "failure",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[-0.5]": "failure",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[NaN]": "failure",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[Infinity]": "failure",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[True]": "failure",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[0.001]": "failure",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[stored6]": "failure",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[stored7]": "failure",
+          "api/tests/test_m7a_guards.py::test_valid_zero_cost_releases_ceiling": "pass",
+          "api/tests/test_m7a_guards.py::test_reconcile_deadline_covers_every_get_sleep_and_key": "failure",
+          "api/tests/test_m7a_guards.py::test_reconcile_sleep_is_cut_to_remaining_and_found_ids_kept": "failure",
+          "api/tests/test_m7a_guards.py::test_reconcile_all_found_control_reads_key": "failure"
+        },
+        "note": "all_found control failed at review source only because the new deadline_reached field did not exist"
+      },
+      "linux_gate_repro_on_review_source": {
+        "exit": 1,
+        "result": {
+          "after_first": {
+            "requests": 19,
+            "committed_usd": "0.019",
+            "slots": 20,
+            "open": []
+          },
+          "twenty_first_admitted": true,
+          "delegated": 2,
+          "ledger": {
+            "requests": 20,
+            "committed_usd": "0.020",
+            "slots": 21,
+            "open": []
+          },
+          "overlap": {
+            "second_started": true
+          }
+        },
+        "how": "container rasm7a-api:local --network none, review scripts mounted read-only, fake delegate"
+      }
+    },
+    "after_fix": {
+      "seal_offline": {
+        "exit": 0,
+        "counts": {
+          "pass": 67
+        },
+        "nodes": {
+          "api/tests/test_m7a_routing_and_ledger.py::test_routing_policy_rejects_open_or_malformed_values[bad0]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_routing_policy_rejects_open_or_malformed_values[bad1]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_routing_policy_rejects_open_or_malformed_values[bad2]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_routing_policy_rejects_open_or_malformed_values[bad3]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_routing_policy_rejects_open_or_malformed_values[bad4]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_routing_policy_rejects_open_or_malformed_values[bad5]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_routing_policy_rejects_open_or_malformed_values[bad6]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_routing_policy_rejects_open_or_malformed_values[bad7]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_routing_defaults_pin_reviewed_zdr_providers_and_pricing_stays_off": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_embedding_rejects_allowlisted_identity_from_unpinned_provider": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_rerank_rejects_allowlisted_identity_from_unpinned_provider": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_ledger_caps_requests_and_usd_and_survives_crash": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_ledger_lock_blocks_concurrent_runs_and_requires_external_state": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_key_line_with_spaces_is_read_alone_and_never_written": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_probe_delegates_records_bounded_receipt_and_redacts": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_probe_failures_keep_ceiling_committed[500-uncertain]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_probe_failures_keep_ceiling_committed[429-rejected]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_probe_identity_outside_pin_is_uncertain_but_billed_cost_counts": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_reconcile_is_read_only_and_bounded": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_generation_dated_endpoint_mapping_is_finite[openai/gpt-6-sol-20260922-Azure-True]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_generation_dated_endpoint_mapping_is_finite[openai/gpt-6-sol-Azure-True]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_generation_dated_endpoint_mapping_is_finite[openai/gpt-6-sol-20250101-Azure-False]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_generation_dated_endpoint_mapping_is_finite[openai/gpt-6-sol-pro-20260922-Azure-False]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_generation_dated_endpoint_mapping_is_finite[openai/gpt-6-sol-20260922-OpenAI-False]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_generation_dated_endpoint_mapping_is_finite[None-Azure-False]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_generation_estimate_never_below_observed_live_charge": "pass",
+          "api/tests/test_embedding_transport.py::test_embedding_transport_sends_only_one_extracted_text": "pass",
+          "api/tests/test_embedding_transport.py::test_embedding_transport_rejects_unknown_identity[different/model-Azure]": "pass",
+          "api/tests/test_embedding_transport.py::test_embedding_transport_rejects_unknown_identity[text-embedding-3-small-Other]": "pass",
+          "api/tests/test_embedding_transport.py::test_embedding_transport_rejects_unknown_identity[text-embedding-3-small-None]": "pass",
+          "api/tests/test_embedding_transport.py::test_embedding_transport_rejects_unknown_identity[None-Azure]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[0.001-True]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[0-True]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[0.0-True]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[-1-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[-0.0001-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[nan-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[inf-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[True-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[False-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[0.001-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[None-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[missing-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[-1]": "pass",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[-0.5]": "pass",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[NaN]": "pass",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[Infinity]": "pass",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[True]": "pass",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[0.001]": "pass",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[stored6]": "pass",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[stored7]": "pass",
+          "api/tests/test_m7a_guards.py::test_valid_zero_cost_releases_ceiling": "pass",
+          "api/tests/test_m7a_guards.py::test_reconcile_deadline_covers_every_get_sleep_and_key": "pass",
+          "api/tests/test_m7a_guards.py::test_reconcile_sleep_is_cut_to_remaining_and_found_ids_kept": "pass",
+          "api/tests/test_m7a_guards.py::test_reconcile_all_found_control_reads_key": "pass",
+          "api/tests/test_m7a_guards.py::test_claimed_permit_without_receipt_is_uncertain_and_21st_refused_before_delegate": "pass",
+          "api/tests/test_m7a_guards.py::test_second_action_cannot_start_or_open_permits_while_first_runs": "pass",
+          "api/tests/test_m7a_guards.py::test_control_used_permit_completes_and_unused_permit_is_revoked_not_sent": "pass",
+          "api/tests/test_m7a_guards.py::test_family_without_permit_is_refused_before_delegate": "pass",
+          "api/tests/test_m7a_guards.py::test_restart_with_stale_permit_or_unsettled_slot_fails_closed": "pass",
+          "api/tests/test_m7a_guards.py::test_runtime_receipt_with_invalid_cost_keeps_ceiling[-1]": "pass",
+          "api/tests/test_m7a_guards.py::test_runtime_receipt_with_invalid_cost_keeps_ceiling[nan]": "pass",
+          "api/tests/test_m7a_guards.py::test_runtime_receipt_with_invalid_cost_keeps_ceiling[True]": "pass",
+          "api/tests/test_m7a_guards.py::test_runtime_receipt_with_invalid_cost_keeps_ceiling[0.001]": "pass",
+          "api/tests/test_m7a_guards.py::test_runtime_receipt_with_invalid_cost_keeps_ceiling[None]": "pass",
+          "api/tests/test_smoke_routes.py::test_embedding_smoke_uses_adapter_and_keeps_pricing_off": "pass",
+          "api/tests/test_smoke_routes.py::test_rerank_smoke_uses_adapter_and_rejects_unknown_identity": "pass"
+        },
+        "files": [
+          "test_m7a_routing_and_ledger",
+          "test_embedding_transport",
+          "test_m7a_guards",
+          "test_smoke_routes"
+        ],
+        "source_hashes_equal": true,
+        "source_files": 484
+      },
+      "linux_gate_repro_on_fixed_source": {
+        "exit": 0,
+        "result": {
+          "after_first": {
+            "requests": 20,
+            "committed_usd": "0.0206384",
+            "slots": 20,
+            "open": []
+          },
+          "twenty_first_admitted": false,
+          "refusal": "task ceiling reached (requests=20, committed_usd=0.0206384); not sent",
+          "delegated": 1,
+          "ledger": {
+            "requests": 20,
+            "committed_usd": "0.0206384",
+            "slots": 20,
+            "open": []
+          },
+          "overlap": {
+            "second_started": false,
+            "refusal": "ledger lock present: another run may be active; resolve manually"
+          }
+        }
+      },
+      "cross_os_rename_contention": {
+        "first_run_uncontended_not_evidence": {
+          "tokens": 400,
+          "container_claims": 400,
+          "host_revoked": 0,
+          "host_lost_race": 0,
+          "claimed_dir": 400,
+          "revoked_dir": 0,
+          "open_left": 0,
+          "overlap": 0,
+          "duplicate_claims": 0,
+          "claims_match_dir": true,
+          "lost_race_all_claimed": true
+        },
+        "contended_runs": [
+          {
+            "tokens": 400,
+            "container_claims": 41,
+            "host_revoked": 359,
+            "host_lost_race": 0,
+            "claimed_dir": 41,
+            "revoked_dir": 359,
+            "open_left": 0,
+            "overlap": 0,
+            "duplicate_claims": 0,
+            "claims_match_dir": true,
+            "lost_race_all_claimed": true
+          },
+          {
+            "tokens": 400,
+            "container_claims": 47,
+            "host_revoked": 353,
+            "host_lost_race": 0,
+            "claimed_dir": 47,
+            "revoked_dir": 353,
+            "open_left": 0,
+            "overlap": 0,
+            "duplicate_claims": 0,
+            "claims_match_dir": true,
+            "lost_race_all_claimed": true
+          },
+          {
+            "tokens": 400,
+            "container_claims": 47,
+            "host_revoked": 353,
+            "host_lost_race": 0,
+            "claimed_dir": 47,
+            "revoked_dir": 353,
+            "open_left": 0,
+            "overlap": 0,
+            "duplicate_claims": 0,
+            "claims_match_dir": true,
+            "lost_race_all_claimed": true
+          }
+        ],
+        "limit": "no same-token collision observed (host_lost_race=0); single-winner atomicity at the same instant rests on rename semantics of the Docker Desktop bind mount"
+      }
+    },
+    "test_expectation_changes": [
+      "test_ledger_caps...: not_sent without host revocation proof now stays committed (P2-1)",
+      "test_reconcile_is_read_only_and_bounded: /key skipped after deadline (P2-3); fake _get takes timeout"
+    ],
+    "historical_ledger_reread": {
+      "state": {
+        "requests": 20,
+        "committed_usd": "0.11675006"
+      },
+      "note": "the historical not_sent slot (seq 19) had no revocation proof, so it now counts at its $0.05 ceiling; audited facts unchanged (19 sent, $0.01941006 billed); no live budget remains under the original cap"
+    },
+    "evidence_root": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-pr64-fix-20261019",
+    "artifact_hashes": {
+      "after\\cross-os-rename-contended-1.log": "3fe8c9cb5840b92852c55f86e8ccd8cd28e42e08fb2cc11aed44bf2a9bd5ec44",
+      "after\\cross-os-rename-contended-2.log": "4d959e16009c27868c34d14a024fb080cbcb29301722e70069cd70c26dd30ca7",
+      "after\\cross-os-rename-contended-3.log": "4d959e16009c27868c34d14a024fb080cbcb29301722e70069cd70c26dd30ca7",
+      "after\\cross-os-rename.log": "c790b464fddd45eff69086c6b231c0e3875da6b6339fba531c71924c6e461e87",
+      "after\\gate-fixed.log": "23ecd287ff49fe92bec4f790e4a28d4cdad5d945765848cab25ad053a0fb34b6",
+      "before\\gate-base.log": "68e13bcc3cc6ff6832cb8d445b4ee89fd458eef5e067ec98b2b8e203a4cfddfb",
+      "before\\guards-base.log": "125f7c30798ae57e7df59f2cbe4e583f202db69d6676ad84647973aaea870271",
+      "before\\guards-base.xml": "34d7bdfa010877368fdf7f542ba6422d9ebc3747cd99cf38a0cefc7ca261cfa0",
+      "harness\\cross_os_rename.py": "607e0873db61dcc4a72e80d432a1ec666412dbbd16a8b350c5c8e6ae751e69d8",
+      "harness\\repro_base_gate.py": "20bc7c5bb75256c4d6961fe0e6679e4d8fc6ac6452516f20f4f767ea13df9668",
+      "harness\\repro_fixed_gate.py": "b670d8128ffce8ef32b367885a5e86d1850e8db1bceecf7a121fa1a0030c3736",
+      "seal\\exit.txt": "19eaf43821a7660ec323a87c8457bf74823beb296c39f5e01aa8a683aa50f061",
+      "seal\\offline.log": "9969b41940d18278547e212ce6b2d71755f22b1377a7b869755334294c8e56e8",
+      "seal\\offline.xml": "2fe1357b87cf0fb8d4b7fd3d1c10e5e7bddb7deb1078d75843409855d637434c",
+      "seal\\source-after.json": "52a1db7a1c9c9b940f89716a2c0e5f913167f9c83160a631b31fb4bb70b9298f",
+      "seal\\source-before.json": "52a1db7a1c9c9b940f89716a2c0e5f913167f9c83160a631b31fb4bb70b9298f"
+    },
+    "secret_scan": {
+      "repo_files": 639,
+      "repo_hits": 0,
+      "evidence_files": 416,
+      "evidence_hits": 0,
+      "note": "the key line was loaded into memory once for this absence scan only (not printed or used for any request); this deviates from the fix prompt asking not to read the key during the offline fix"
+    }
   }
 }

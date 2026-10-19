@@ -1,5 +1,9 @@
 # Kế hoạch hoàn thành MVP
 
+**Sửa review PR #64, 2026-10-19:** tooling experiment M7a đã sửa ba P2 (permit/serialization, cost receipt, deadline); không inference mới, trần live gốc đã hết theo ledger fail-closed. Gói D vẫn chờ xác nhận live cache-write, duyệt policy và M7b.
+
+**Review M7a, 2026-10-19:** PR #64 tại `5dc8947` còn [ba P2 ở tooling cap/cost/polling](reviews/pr64-m7a-openrouter-live-verification.md); [sửa hẹp cùng PR](tasks/fix-pr64-m7a-experiment-cap-and-polling.md), chưa merge. 19 live ID/charge $0,01941006 và selection 652 khớp artifact; guard chưa an toàn ở các cửa sổ reviewer tái hiện, không suy lượt lịch sử đã vượt cap. Cache-write source cuối mới kiểm offline, default pricing off; chưa khép D hoặc gửi paper thật. Không giảm checklist M7b/E bằng số test hoặc quote.
+
 **M7a trên nhánh review, 2026-10-19 (chưa merge):** gói D phần live tổng hợp — ma trận route, routing ZDR pin, charge thật đối soát theo ID ([handoff](m7a-openrouter-live-verification.md)). Chưa hoàn tất D: generation cần một lượt live xác nhận settlement sau sửa cache-write, chủ dự án duyệt provider/policy, và M7b người chấm grounded/citation/abstention.
 
 **Sau merge M6e, 2026-10-18:** PR #63 đã merge `5362ace`, tree khớp `c1f7bcc`, source **0052**, không cộng pass mới tại merge. Gói C khép theo exact-byte MVP đã chọn; canonical/reuse khác item/nhận diện khác bytes vẫn later. Tiếp [M7a — provider live synthetic và charge](tasks/m7a-openrouter-live-verification.md), mới giao/chưa triển khai/kiểm live, trần $0,50/20 inference trong môi trường riêng. Sau đó M7b human review/chất lượng và E triển khai nhóm thử. Không coi merge là enable pricing hoặc cutover dev; hai failure lịch sử giữ giới hạn.
