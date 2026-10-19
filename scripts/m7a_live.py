@@ -14,6 +14,7 @@ process; a record without an outcome counts at its full ceiling forever.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import contextlib
 import json
 import math
@@ -201,12 +202,33 @@ def observed(sink: list):
         httpx.Client.__init__ = original
 
 
+class DeadlineExceeded(httpx.TimeoutException):
+    """The absolute bound of one read-only GET passed; the request was cancelled."""
+
+
 def _get(client, path, key, params=None, timeout=30.0):
-    response = client.get(BASE + path, params=params, headers={'Authorization': f'Bearer {key}'}, timeout=timeout)
+    """Read-only GET whose ``timeout`` bounds the whole exchange: connect, headers and body.
+
+    HTTPX phase timeouts bound each wait, so a server trickling bytes below the read timeout
+    can hold a sync request far past them. The request runs on a short-lived event loop and
+    is cancelled at the bound; cancellation closes the connection, and a response completing
+    after the bound is never returned. ``client`` is kept for caller compatibility only.
+    """
+    async def fetch():
+        async with httpx.AsyncClient(timeout=timeout) as session:
+            response = await session.get(BASE + path, params=params, headers={'Authorization': f'Bearer {key}'})
+            try:
+                return response.status_code, response.json()
+            except ValueError:
+                return response.status_code, None
+    loop = asyncio.new_event_loop()
     try:
-        return response.status_code, response.json()
-    except ValueError:
-        return response.status_code, None
+        return loop.run_until_complete(asyncio.wait_for(fetch(), timeout=max(timeout, 0.001)))
+    except (asyncio.TimeoutError, TimeoutError):
+        raise DeadlineExceeded('read-only GET deadline reached; request cancelled') from None
+    finally:
+        loop.run_until_complete(loop.shutdown_asyncgens())
+        loop.close()  # never waits on executor threads
 
 
 def catalog(state: Path, key: str) -> dict:
@@ -350,39 +372,47 @@ def reconcile(state: Path, key: str, deadline_s: int) -> dict:
     remaining = lambda: end - time.monotonic()
     expired = False
     status, info = None, None
-    # Every GET and sleep fits inside the deadline: each starts only with time left and
-    # gets at most that time; /key is skipped once the deadline passed.
-    with httpx.Client(timeout=30) as client:
-        while ids and not expired and len(found) < len(ids):
-            for gid in [i for i in ids if i not in found]:
-                if remaining() <= 0:
-                    expired = True
-                    break
-                try:
-                    status, body = _get(client, '/generation', key, {'id': gid}, timeout=min(30.0, remaining()))
-                except httpx.TransportError:
-                    continue
-                data = body.get('data') if isinstance(body, dict) else None
-                if status == 200 and isinstance(data, dict):
-                    found[gid] = {k: bounded(data.get(k)) for k in ('model', 'provider_name', 'total_cost', 'usage',
-                        'upstream_inference_cost', 'tokens_prompt', 'tokens_completion', 'native_tokens_prompt',
-                        'native_tokens_completion', 'native_tokens_reasoning', 'api_type', 'finish_reason',
-                        'cancelled', 'is_byok', 'created_at')}
-            if expired or len(found) == len(ids):
-                break
+    # Every GET and sleep fits inside the deadline: each starts only with time left, is
+    # cancelled when that time runs out (headers/body included); /key is skipped after it.
+    client = None  # every GET opens its own deadline-bounded connection
+    while ids and not expired and len(found) < len(ids):
+        for gid in [i for i in ids if i not in found]:
             if remaining() <= 0:
                 expired = True
                 break
-            time.sleep(min(delay, remaining()))
-            delay = min(delay * 2, 30)
-        status = None
-        if remaining() > 0:
             try:
-                status, info = _get(client, '/key', key, timeout=min(30.0, remaining()))
+                status, body = _get(client, '/generation', key, {'id': gid}, timeout=min(30.0, remaining()))
+            except DeadlineExceeded:
+                if remaining() <= 0:
+                    expired = True
+                    break
+                continue
             except httpx.TransportError:
-                status = 'transport_error'
-        else:
-            expired, status = True, 'skipped_deadline'
+                continue
+            data = body.get('data') if isinstance(body, dict) else None
+            if status == 200 and isinstance(data, dict):
+                found[gid] = {k: bounded(data.get(k)) for k in ('model', 'provider_name', 'total_cost', 'usage',
+                    'upstream_inference_cost', 'tokens_prompt', 'tokens_completion', 'native_tokens_prompt',
+                    'native_tokens_completion', 'native_tokens_reasoning', 'api_type', 'finish_reason',
+                    'cancelled', 'is_byok', 'created_at')}
+        if expired or len(found) == len(ids):
+            break
+        if remaining() <= 0:
+            expired = True
+            break
+        time.sleep(min(delay, remaining()))
+        delay = min(delay * 2, 30)
+    status = None
+    if remaining() > 0:
+        try:
+            status, info = _get(client, '/key', key, timeout=min(30.0, remaining()))
+        except DeadlineExceeded:
+            status, info = 'deadline', None
+            expired = expired or remaining() <= 0
+        except httpx.TransportError:
+            status = 'transport_error'
+    else:
+        expired, status = True, 'skipped_deadline'
     data = info.get('data') if isinstance(info, dict) else {}
     out = {'event': 'reconcile', 'at': now(), 'generation_ids': ids, 'found': found,
            'pending': [i for i in ids if i not in found], 'deadline_s': min(deadline_s, 300), 'deadline_reached': expired,
