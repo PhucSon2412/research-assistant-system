@@ -89,7 +89,11 @@ def test_ledger_caps_requests_and_usd_and_survives_crash(tmp_path):
     slot = m7a_live.Ledger(tmp_path / 'other')
     unused = slot.admit('generation', Decimal('0.05'), 'runtime allowance')
     slot.append({'event': 'outcome', 'seq': unused, 'status': 'not_sent', 'provider_cost_usd': None})
-    assert slot.state()['requests'] == 0 and slot.state()['committed_usd'] == 0 and slot.state()['slots'] == 1
+    # PR #64 P2-1: not_sent inferred from silence (no host revocation proof) stays committed.
+    assert slot.state()['requests'] == 1 and slot.state()['committed_usd'] == Decimal('0.05')
+    proven = slot.admit('generation', Decimal('0.05'), 'runtime allowance')
+    slot.append({'event': 'outcome', 'seq': proven, 'status': 'not_sent', 'proof': 'permit_revoked_by_host'})
+    assert slot.state()['requests'] == 1 and slot.state()['slots'] == 2
     for bad in (Decimal(0), Decimal('NaN')):
         with pytest.raises(SystemExit, match='ceiling unknown'):
             again.admit('rerank', bad, 'test')
@@ -157,7 +161,7 @@ def test_reconcile_is_read_only_and_bounded(tmp_path, monkeypatch):
     ledger.append({'event': 'outcome', 'seq': 1, 'observed': [{'id': 'gen-synthetic-1'}]})
     calls = []
 
-    def fake_get(client, path, key, params=None):
+    def fake_get(client, path, key, params=None, timeout=30.0):
         calls.append(path)
         return (404, None) if path == '/generation' else (200, {'data': {'usage': 1.0, 'usage_daily': 0.01}})
     monkeypatch.setattr(m7a_live, '_get', fake_get)
@@ -166,7 +170,9 @@ def test_reconcile_is_read_only_and_bounded(tmp_path, monkeypatch):
     monkeypatch.setattr(m7a_live.time, 'monotonic', lambda: next(clock))
     out = m7a_live.reconcile(tmp_path / 'state', SECRET, 9999)
     assert out['pending'] == ['gen-synthetic-1'] and out['found'] == {}
-    assert set(calls) == {'/generation', '/key'} and len(calls) <= 5
+    # PR #64 P2-3: the deadline also bounds /key; it is skipped once time ran out.
+    assert set(calls) == {'/generation'} and len(calls) <= 5
+    assert out['deadline_reached'] is True and out['key_status'] == 'skipped_deadline'
 
 
 def _chat(selected_model, provider='Azure'):

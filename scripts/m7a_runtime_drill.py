@@ -6,7 +6,7 @@ The key reaches containers only through this process's environment (compose
 interpolation); it is never written to the context. Pricing flags are enabled
 only in this synthetic context. App containers keep the internal network; a
 CONNECT proxy allows openrouter.ai:443 and nothing else. The test-only observer
-(scripts/m7a_observer.py) refuses any provider request beyond the allowance the
+(scripts/m7a_observer.py) sends a provider request only with a per-slot permit token the
 host ledger admitted for the current action.
 """
 import argparse
@@ -19,6 +19,7 @@ import shutil
 import subprocess
 import sys
 import time
+import uuid
 
 import httpx
 
@@ -40,6 +41,102 @@ server.on('connect',(req,client,head)=>{
 server.listen(3128,'0.0.0.0');
 """
 CEILING = {'embedding': 'embedding-document', 'query': 'embedding-query', 'rerank': 'rerank', 'generation': 'generation'}
+FAMILY = {'embedding': 'embeddings', 'query': 'embeddings', 'rerank': 'rerank', 'generation': 'chat'}
+
+
+class Gate:
+    """One runtime action at a time, each possible provider call bound to its own permit token.
+
+    The ledger lock is held from admission through the action, permit revocation and
+    settlement, so actions never overlap and a crash leaves the lock (fail closed). Every
+    slot is admitted durably before its token exists. Closing renames each still-open token
+    to ``revoked``; a token the observer already claimed cannot be revoked, and its slot is
+    settled only from a receipt carrying that token. Claimed without a terminal receipt by
+    the end of the grace period stays ``uncertain`` with its full request and ceiling; only a
+    token the host revoked itself is ``not_sent``. Silence or a returned client never is.
+    """
+
+    def __init__(self, ledger, permits: Path, receipts: Path, grace_s: float = 90.0, poll_s: float = 0.5):
+        self.ledger, self.permits, self.receipts_path = ledger, permits, receipts
+        self.grace_s, self.poll_s = grace_s, poll_s
+
+    def prepare(self):
+        for name in ('open', 'claimed', 'revoked'):
+            (self.permits / name).mkdir(parents=True, exist_ok=True)
+        self.receipts_path.touch()
+
+    def receipts(self):
+        rows = []
+        for line in self.receipts_path.read_text(encoding='utf-8').splitlines():
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue  # a torn line proves nothing; its permit stays uncertain
+            if isinstance(row, dict):
+                rows.append(row)
+        return rows
+
+    def run(self, label, plan, action, settings):
+        self.prepare()
+        with self.ledger.exclusive():
+            self.ledger.require_settled()
+            stale = sorted(p.name for p in (self.permits / 'open').iterdir())
+            if stale:
+                for name in stale:
+                    try:
+                        os.replace(self.permits / 'open' / name, self.permits / 'revoked' / name)
+                    except FileNotFoundError:
+                        pass
+                raise SystemExit('stale open permits of an unsettled action were revoked; resolve manually, not sent')
+            batch = uuid.uuid4().hex[:12]
+            slots = []
+            for index, route in enumerate(plan):
+                ceiling, source = m7a_live.ceiling_for(CEILING[route], settings)
+                seq = self.ledger.admit('runtime:' + label + ':' + CEILING[route], ceiling, source)
+                slots.append((seq, f'{batch}.{index}.{FAMILY[route]}'))
+            for seq, token in slots:
+                (self.permits / 'open' / token).write_text(str(seq), encoding='utf-8')
+            try:
+                result = action()
+            finally:
+                responses = self.close(label, slots)
+        return result, responses
+
+    def close(self, label, slots):
+        revoked, claimed = set(), set()
+        for _, token in slots:
+            try:
+                os.rename(self.permits / 'open' / token, self.permits / 'revoked' / token)
+                revoked.add(token)
+            except (FileNotFoundError, FileExistsError, PermissionError):
+                claimed.add(token)  # the observer won this token (or it vanished): never not_sent
+        deadline = time.monotonic() + self.grace_s
+        while True:
+            terminal = {r.get('permit'): r for r in self.receipts()
+                        if r.get('event') in ('response', 'transport_error') and r.get('permit') in claimed}
+            if set(terminal) >= claimed or time.monotonic() >= deadline:
+                break
+            time.sleep(min(self.poll_s, max(0.0, deadline - time.monotonic())))
+        responses = []
+        for seq, token in slots:
+            row = terminal.get(token)
+            if token in revoked:
+                outcome = {'status': 'not_sent', 'proof': 'permit_revoked_by_host', 'permit': token, 'observed': []}
+            elif row is None:
+                outcome = {'status': 'uncertain', 'error_code': 'permit_claimed_no_receipt', 'permit': token, 'observed': []}
+            elif row['event'] == 'transport_error':
+                outcome = {'status': 'uncertain', 'error_code': 'transport_error', 'permit': token, 'observed': [row]}
+            else:
+                cost = m7a_live.valid_cost((row.get('usage') or {}).get('cost'))
+                outcome = {'status': 'completed' if row.get('status') == 200 and cost is not None else 'uncertain',
+                           'permit': token, 'observed': [row]}
+                responses.append(row)
+            cost = m7a_live.valid_cost((row or {}).get('usage', {}).get('cost')) if row and row['event'] == 'response' else None
+            outcome['provider_cost_usd'] = float(cost) if cost is not None else None
+            self.ledger.append({'event': 'outcome', 'seq': seq, 'route': 'runtime:' + label, 'at': m7a_live.now(), **outcome})
+        print(json.dumps({'action': label, 'admitted': len(slots), 'claimed': len(claimed), 'revoked': len(revoked),
+                          'responses': len(responses), 'ledger': self.ledger.state()}, default=str), flush=True)
+        return responses
 
 
 def corpus():
@@ -94,6 +191,7 @@ class Drill:
         self.origin, self.api = 'http://127.0.0.1:' + e['WEB_HOST_PORT'], 'http://127.0.0.1:' + e['API_HOST_PORT']
         self.fixture = root / 'm7a-fixture'
         self.ledger = m7a_live.Ledger(state)
+        self.gate = Gate(self.ledger, self.fixture / 'permits', self.fixture / 'receipts.jsonl')
         self.log = state / 'runtime'
         self.log.mkdir(exist_ok=True)
         self.checks = []
@@ -120,13 +218,12 @@ class Drill:
         self.fixture.mkdir(exist_ok=True)
         shutil.copyfile(REPO / 'scripts/m7a_observer.py', self.fixture / 'sitecustomize.py')
         (self.fixture / 'egress.cjs').write_text(EGRESS, encoding='utf-8')
-        (self.fixture / 'allowance').write_text('0', encoding='utf-8')
-        (self.fixture / 'receipts.jsonl').touch()
+        self.gate.prepare()
         config = json.loads((self.root / 'override.json').read_text(encoding='utf-8'))
         config['services']['egress'] = {'image': 'node:24-alpine', 'command': ['node', '/m7a/egress.cjs'],
             'volumes': [self.fixture.as_posix() + ':/m7a:ro'], 'networks': ['default', 'exposure']}
         environment = {'PYTHONPATH': '/m7a-fixture:/srv/api', 'M7A_RECEIPTS': '/m7a-fixture/receipts.jsonl',
-            'M7A_ALLOWANCE': '/m7a-fixture/allowance', 'HTTPS_PROXY': 'http://egress:3128',
+            'M7A_PERMITS': '/m7a-fixture/permits', 'M7A_OBSERVER': '1', 'HTTPS_PROXY': 'http://egress:3128',
             'NO_PROXY': 'api,web,db,minio,redis,egress,localhost,127.0.0.1',
             'RAS_EMBEDDING__API_KEY': '${M7A_OPENROUTER_KEY:-}'}
         for route in ('EMBEDDING', 'RERANK', 'GENERATION'):
@@ -146,39 +243,7 @@ class Drill:
         return [json.loads(line) for line in path.read_text(encoding='utf-8').splitlines() if line.strip()]
 
     def gated(self, label, plan, action):
-        """Admit every possible call of one action before it starts; settle from receipts after."""
-        s = m7a_live.settings_for('unused-key-for-ceiling')
-        seqs = []
-        with self.ledger.exclusive():
-            for route in plan:
-                ceiling, source = m7a_live.ceiling_for(CEILING[route], s)
-                seqs.append((self.ledger.admit('runtime:' + label + ':' + CEILING[route], ceiling, source), route))
-        before = len(self.receipts())
-        (self.fixture / 'allowance').write_text(str(len(seqs)), encoding='utf-8')
-        try:
-            result = action()
-        finally:
-            (self.fixture / 'allowance').write_text('0', encoding='utf-8')
-            time.sleep(1)
-            rows = self.receipts()[before:]
-            sent = [r for r in rows if r['event'] == 'sending']
-            responses = [r for r in rows if r['event'] == 'response']
-            errors = [r for r in rows if r['event'] == 'transport_error']
-            for index, (seq, route) in enumerate(seqs):
-                if index < len(responses):
-                    r = responses[index]
-                    cost = r.get('usage', {}).get('cost')
-                    outcome = {'status': 'completed' if r.get('status') == 200 and isinstance(cost, (int, float)) else 'uncertain',
-                               'provider_cost_usd': cost if isinstance(cost, (int, float)) else None, 'observed': [r]}
-                elif index < len(sent):
-                    outcome = {'status': 'uncertain', 'provider_cost_usd': None, 'observed': errors[-1:]}
-                else:
-                    outcome = {'status': 'not_sent', 'provider_cost_usd': None, 'observed': []}
-                self.ledger.append({'event': 'outcome', 'seq': seq, 'route': 'runtime:' + label, 'at': m7a_live.now(), **outcome})
-            refused = [r for r in rows if r['event'] == 'refused']
-            print(json.dumps({'action': label, 'admitted': len(seqs), 'sent': len(sent), 'responses': len(responses),
-                              'refused': len(refused), 'ledger': self.ledger.state()}, default=str), flush=True)
-        return result, [r for r in rows if r['event'] == 'response']
+        return self.gate.run(label, plan, action, m7a_live.settings_for('unused-key-for-ceiling'))
 
     def client(self, key):
         accounts = json.loads((self.root / 'synthetic-accounts.json').read_text())

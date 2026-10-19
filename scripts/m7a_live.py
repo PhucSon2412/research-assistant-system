@@ -60,6 +60,20 @@ def redact(text: str, key: str) -> str:
     return text.replace(key, '<redacted>') if key else text
 
 
+def valid_cost(value) -> Decimal | None:
+    """Provider-reported USD usable to release a ceiling: finite, non-negative, int/float, never bool.
+
+    One contract for probe/runtime producers and for every ledger read; anything else is
+    unknown, so the full ceiling stays committed (never clipped to zero)."""
+    if type(value) not in (int, float):
+        return None
+    try:
+        amount = Decimal(str(value))
+    except ArithmeticError:
+        return None
+    return amount if amount.is_finite() and amount >= 0 else None
+
+
 def bounded(value, limit=255):
     return value if isinstance(value, (str, int, float, bool)) and len(str(value)) <= limit else None
 
@@ -104,16 +118,23 @@ class Ledger:
         spent, requests = Decimal(0), 0
         for seq, row in sent.items():
             outcome = outcomes.get(seq)
-            if outcome and outcome['status'] == 'not_sent':
-                # Only a runtime slot the observer proved unused (allowance closed, no receipt).
+            if outcome and outcome['status'] == 'not_sent' and outcome.get('proof') == 'permit_revoked_by_host':
+                # Only a runtime permit the host itself revoked unclaimed was provably never usable.
                 continue
             requests += 1
             ceiling = Decimal(row['ceiling_usd'])
-            billed = outcome and outcome.get('provider_cost_usd')
-            # Known provider-reported cost counts as is; anything else at the full ceiling.
-            spent += Decimal(str(billed)) if billed is not None and outcome['status'] == 'completed' else ceiling
+            billed = valid_cost(outcome.get('provider_cost_usd')) if outcome else None
+            # A valid provider-reported cost of a completed call counts as is; anything else
+            # (missing, negative, NaN/Infinity, bool, wrong type, uncertain) at the full ceiling.
+            spent += billed if billed is not None and outcome['status'] == 'completed' else ceiling
         return {'requests': requests, 'committed_usd': spent, 'slots': len(sent),
                 'open': sorted(seq for seq in sent if seq not in outcomes)}
+
+    def require_settled(self) -> None:
+        """Fail closed when an earlier request of this experiment has no outcome yet."""
+        current = self.state()
+        if current['open']:
+            raise SystemExit(f"unsettled earlier request(s) {current['open']}; resolve manually, not sent")
 
     def admit(self, route: str, ceiling: Decimal, source: str) -> int:
         if not isinstance(ceiling, Decimal) or not ceiling.is_finite() or ceiling <= 0:
@@ -180,8 +201,8 @@ def observed(sink: list):
         httpx.Client.__init__ = original
 
 
-def _get(client, path, key, params=None):
-    response = client.get(BASE + path, params=params, headers={'Authorization': f'Bearer {key}'})
+def _get(client, path, key, params=None, timeout=30.0):
+    response = client.get(BASE + path, params=params, headers={'Authorization': f'Bearer {key}'}, timeout=timeout)
     try:
         return response.status_code, response.json()
     except ValueError:
@@ -300,6 +321,7 @@ def probe(state: Path, key: str, route: str) -> dict:
     s = settings_for(key)
     ceiling, source = ceiling_for(route, s)
     with ledger.exclusive():
+        ledger.require_settled()
         seq = ledger.admit(route, ceiling, source)
         sink: list = []
         started = time.monotonic()
@@ -309,12 +331,12 @@ def probe(state: Path, key: str, route: str) -> dict:
         except BaseException as exc:  # unknown outcome: the ceiling stays committed
             outcome = {'status': 'uncertain', 'error_code': 'probe_' + type(exc).__name__}
         seen = [r for r in sink if r['path'].startswith('/api/v1/') and r['path'] != '/api/v1/generation']
-        cost = None
-        if len(seen) == 1 and isinstance(seen[0].get('usage', {}).get('cost'), (int, float)):
-            cost = seen[0]['usage']['cost']
+        reported = seen[0].get('usage', {}).get('cost') if len(seen) == 1 else None
+        cost = valid_cost(reported)
         record = {'event': 'outcome', 'seq': seq, 'route': route, 'at': now(), 'elapsed_s': round(time.monotonic() - started, 2),
-                  'http_requests': len(seen), 'observed': seen, 'provider_cost_usd': cost,
-                  **outcome}
+                  'http_requests': len(seen), 'observed': seen,
+                  'provider_cost_usd': float(cost) if cost is not None else None,
+                  'provider_cost_valid': cost is not None, **outcome}
         ledger.append(json.loads(redact(json.dumps(record, default=str), key)))
     return record
 
@@ -325,24 +347,45 @@ def reconcile(state: Path, key: str, deadline_s: int) -> dict:
     ids = sorted({r.get('id') for row in ledger.records() if row['event'] == 'outcome'
                   for r in row.get('observed', []) if isinstance(r.get('id'), str) and r['id'].startswith('gen-')})
     found, delay, end = {}, 2.0, time.monotonic() + min(deadline_s, 300)
+    remaining = lambda: end - time.monotonic()
+    expired = False
+    status, info = None, None
+    # Every GET and sleep fits inside the deadline: each starts only with time left and
+    # gets at most that time; /key is skipped once the deadline passed.
     with httpx.Client(timeout=30) as client:
-        while ids and time.monotonic() < end:
+        while ids and not expired and len(found) < len(ids):
             for gid in [i for i in ids if i not in found]:
-                status, body = _get(client, '/generation', key, {'id': gid})
+                if remaining() <= 0:
+                    expired = True
+                    break
+                try:
+                    status, body = _get(client, '/generation', key, {'id': gid}, timeout=min(30.0, remaining()))
+                except httpx.TransportError:
+                    continue
                 data = body.get('data') if isinstance(body, dict) else None
                 if status == 200 and isinstance(data, dict):
                     found[gid] = {k: bounded(data.get(k)) for k in ('model', 'provider_name', 'total_cost', 'usage',
                         'upstream_inference_cost', 'tokens_prompt', 'tokens_completion', 'native_tokens_prompt',
                         'native_tokens_completion', 'native_tokens_reasoning', 'api_type', 'finish_reason',
                         'cancelled', 'is_byok', 'created_at')}
-            if len(found) == len(ids):
+            if expired or len(found) == len(ids):
                 break
-            time.sleep(delay)
+            if remaining() <= 0:
+                expired = True
+                break
+            time.sleep(min(delay, remaining()))
             delay = min(delay * 2, 30)
-        status, info = _get(client, '/key', key)
+        status = None
+        if remaining() > 0:
+            try:
+                status, info = _get(client, '/key', key, timeout=min(30.0, remaining()))
+            except httpx.TransportError:
+                status = 'transport_error'
+        else:
+            expired, status = True, 'skipped_deadline'
     data = info.get('data') if isinstance(info, dict) else {}
     out = {'event': 'reconcile', 'at': now(), 'generation_ids': ids, 'found': found,
-           'pending': [i for i in ids if i not in found],
+           'pending': [i for i in ids if i not in found], 'deadline_s': min(deadline_s, 300), 'deadline_reached': expired,
            'key': {k: data.get(k) for k in ('usage', 'usage_daily', 'limit_remaining')}, 'key_status': status}
     (state / f'reconcile-{int(time.time())}.json').write_text(redact(json.dumps(out, indent=2, default=str), key),
                                                                encoding='utf-8')
