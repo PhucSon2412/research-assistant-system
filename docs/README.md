@@ -1,5 +1,9 @@
 # Tài liệu dự án
 
+**Sửa review lại PR #64 (DNS treo khi thoát), 2026-10-19:** đã sửa và kiểm bằng subprocess thật + fault injection Linux; chờ review lại, chưa merge.
+
+**Review lại PR #64 tại `9b64901`, 2026-10-19:** 71 test repo và HTTP nhỏ giọt đã qua; còn [P2-3 thoát process khi DNS treo](reviews/pr64-m7a-openrouter-live-verification.md#review-lại-tại-9b64901--http-đã-hủy-đúng-còn-p2-3-ở-thoát-tiến-trình-khi-dns-treo), tái hiện bằng fault injection và stack. [Sửa tiếp cùng PR](tasks/fix-pr64-m7a-experiment-cap-and-polling.md), chưa merge; không inference/ngân sách mới.
+
 **Sửa review lại PR #64, 2026-10-19:** deadline tổng cho HTTP polling M7a đã sửa và kiểm bằng loopback thật; chờ review lại, chưa merge.
 
 **Review lại PR #64 tại `f538ddf`, 2026-10-19:** P2-1/P2-2 qua kiểm, còn [P2-3 deadline của HTTP đang đọc body](reviews/pr64-m7a-openrouter-live-verification.md#review-lại-tại-f538ddf--còn-p2-3-ở-deadline-http). [Sửa tiếp cùng PR](tasks/fix-pr64-m7a-experiment-cap-and-polling.md) bằng local HTTP, không inference/key/ngân sách mới; chưa merge. Các báo cáo “đã sửa ba P2” bên dưới giữ lịch sử trước review lại.

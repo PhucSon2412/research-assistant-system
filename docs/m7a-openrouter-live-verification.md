@@ -5,6 +5,21 @@ Source migration giữ **0052**, không migration/grant. [Task](tasks/m7a-openro
 [inventory](m7a-test-inventory.json). Chưa merge. Dữ liệu chỉ tổng hợp tự viết
 ([corpus](../evaluation/m7a-synthetic/README.md)); không dev/Dify/arXiv, không paper thật.
 
+## Sửa review lại PR #64 tại `9b64901` — thoát tiến trình khi DNS treo
+
+Reviewer tái hiện bằng fault injection: `reconcile` trả pending đúng hạn nhưng interpreter join thread
+executor kẹt trong `getaddrinfo` và không thoát. Sửa: mọi GET read-only chạy trong **một process con**
+(`subprocess`, worker chỉ dùng thư viện chuẩn + httpx); key chỉ qua stdin. Parent chờ mỗi reply tối đa
+thời gian còn lại, quá hạn thì kill và reap process con; `reconcile`/`catalog` đóng fetcher trong `finally`.
+Bản thử đầu dùng `multiprocessing` spawn đòi caller có guard `__main__`, đã thay trước khi seal.
+
+Trước sửa (`9b64901`, `api/tests/test_m7a_poll_exit.py`): ca DNS treo trả kết quả ở 3,016 s nhưng process
+không thoát trong 20 s (**1 fail / 1 pass**). Sau sửa seal **73/73 pass** (71 cũ + 2 subprocess), 486 source
+hash trùng. Linux `--network none`, tiêm lỗi vào mọi interpreter: DNS treo trả pending ở 1,005 s và process
+thoát; control thoát. Harness gốc của reviewer chỉ tiêm lỗi vào process gọi nên fail ở khẳng định `dns-started`
+trên source mới — ghi riêng, không tính là pass. Đây là fault injection, không phải DNS thật. Không đọc key/`.env`,
+không inference. Evidence: `C:/Users/ADMIN/AppData/Local/Temp/ras-pr64-fix3-20261019`.
+
 ## Sửa review lại PR #64 tại `f538ddf` — deadline HTTP
 
 [Review lại](reviews/pr64-m7a-openrouter-live-verification.md) xác nhận P2-1/P2-2 và còn nhánh P2-3: timeout HTTPX
@@ -16,8 +31,8 @@ giới hạn từng lần chờ, không giới hạn cả request. `_get` nay ch
 Regression HTTP loopback thật (`api/tests/test_m7a_poll_http.py`, deadline 1 s): tại `f538ddf` **3 fail / 1 pass**
 (5,3–7,2 s với body/header nhỏ giọt và `/key` chậm; control nhanh pass). Sau sửa seal **71/71 pass** (67 cũ + 4 mới),
 485 source hash trùng; repro unittest của reviewer trong Linux `--network none`: nhỏ giọt dừng ở 1,003 s, control
-0,108 s. Image không có pytest nên test repo chạy trên host. Giới hạn: luồng DNS treo trong executor vẫn có thể
-làm chậm lúc thoát interpreter (chưa tái hiện). Evidence: `C:/Users/ADMIN/AppData/Local/Temp/ras-pr64-fix2-20261019`.
+0,108 s. Image không có pytest nên test repo chạy trên host. Giới hạn DNS treo khi thoát đã được reviewer tái hiện tại `9b64901` và sửa ở mục
+bên trên. Evidence: `C:/Users/ADMIN/AppData/Local/Temp/ras-pr64-fix2-20261019`.
 
 ## Sửa review PR #64 — chờ review lại
 

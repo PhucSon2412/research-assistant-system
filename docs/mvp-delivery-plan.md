@@ -1,5 +1,7 @@
 # Kế hoạch hoàn thành MVP
 
+**Review lại PR #64 tại `9b64901`, 2026-10-19:** body/header nhỏ giọt và `/key` chậm đã qua; còn [P2-3 shutdown chờ DNS executor](reviews/pr64-m7a-openrouter-live-verification.md#review-lại-tại-9b64901--http-đã-hủy-đúng-còn-p2-3-ở-thoát-tiến-trình-khi-dns-treo), đã tái hiện chứ không còn là giới hạn giả định. Sửa hẹp tooling trong cùng PR, không thêm milestone hoặc live; cache-write live/M7b/E giữ riêng, pricing mặc định tắt.
+
 **Review lại PR #64 tại `f538ddf`, 2026-10-19:** cap/permit và cost đã qua review, còn một nhánh [P2-3 deadline HTTP body nhỏ giọt](reviews/pr64-m7a-openrouter-live-verification.md#review-lại-tại-f538ddf--còn-p2-3-ở-deadline-http). Chưa merge; sửa hẹp polling trên cùng PR, không chia milestone hoặc thêm live calls. Trần gốc đã hết; cache-write live/M7b/E vẫn riêng, không mở pricing.
 
 **Sửa review PR #64, 2026-10-19:** tooling experiment M7a đã sửa ba P2 (permit/serialization, cost receipt, deadline); không inference mới, trần live gốc đã hết theo ledger fail-closed. Gói D vẫn chờ xác nhận live cache-write, duyệt policy và M7b.

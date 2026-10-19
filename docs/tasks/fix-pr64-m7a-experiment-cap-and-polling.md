@@ -1,5 +1,19 @@
 # Sửa PR #64 — cap experiment, receipt cost và polling
 
+## Review lại tại `9b64901`: chỉ còn deadline thoát tiến trình khi DNS treo
+
+Body/header nhỏ giọt và `/key` chậm **đã được reviewer xác nhận sửa**: 71 repo pass và repro Linux body 1,003 s với deadline 1 s. P2-1/P2-2 giữ kết luận đã sửa. Chỉ sửa tiếp nhánh shutdown của P2-3, cùng PR #64/source **0052**.
+
+Giới hạn DNS trong handoff nay đã tái hiện: fault injection làm `socket.getaddrinfo` chờ vô hạn, `reconcile` trả pending sau 1,023 s nhưng Python không exit. Stack main nằm ở `_python_exit → threading.join`, worker kẹt trong resolver; control resolver bình thường exit. `loop.close()` không đợi tại chỗ nhưng interpreter vẫn join thread executor. [Report mới](../reviews/pr64-m7a-openrouter-live-verification.md#review-lại-tại-9b64901--http-đã-hủy-đúng-còn-p2-3-ở-thoát-tiến-trình-khi-dns-treo) và evidence `C:/Users/ADMIN/AppData/Local/Temp/ras-pr64-rereview2-20261019` có helper subprocess và stack, không provider/key thật.
+
+- Deadline cần bao **kết thúc lệnh và thu hồi worker có thể kẹt**, không chỉ coroutine trả kết quả. Chọn thay đổi nhỏ ở tooling read-only; một worker process có thể terminate/reap là phương án nếu cần. Không thêm framework auth/accounting, không private executor hook/daemon-thread để lách shutdown, không hard-code provider IP hoặc nới TLS/routing.
+- Nếu dùng process/IPC, không đưa key vào argv/log/file/ledger; giữ truyền secret tối thiểu trong bộ nhớ và kiểm redaction bằng key tổng hợp. Lượt sửa vẫn **không đọc key/`.env` hoặc inference**. Không thay producer inference/probe, production/grants/migration/pricing/cap.
+- Thêm test **subprocess thực**: resolver treo không trả, resolver trả bình thường; cả hai phải có kết quả/deadline và process exit trong bound. Parent kiểm/kill/reap để regression không làm suite treo. Chỉ assert elapsed của hàm hoặc không còn thread ở caller chưa đủ. Giữ bốn test HTTP loopback thật và 67 test cũ.
+- Chạy lại 71 ca + regression mới và repro Linux tương ứng, chứng cứ exit/source/JUnit rõ. Không cần full 652/>5.000/web/Chrome/restore/live, không reset ledger. Trần gốc vẫn hết: 20 request/$0,11675006 cam kết.
+- Giữ report/prompt reviewer và mọi docs modified/untracked, đưa vào cùng PR sửa. Cập nhật PR tiếng Việt/handoff/inventory, phân biệt fault injection với DNS thật; không gọi giới hạn này là “chưa tái hiện”. Không merge/AI trailer/promo, không tác động dev/Dify/provider/account.
+
+## Prompt lượt trước — HTTP body/header đã qua review tại `9b64901`
+
 ## Review lại tại `f538ddf`: chỉ còn deadline HTTP của P2-3
 
 **P2-1/P2-2 đã qua review độc lập; không mở lại hai phần đó.** Sửa tiếp trên cùng PR #64, source **0052**, chỉ tooling HTTP polling/test/docs. [Report mới](../reviews/pr64-m7a-openrouter-live-verification.md#review-lại-tại-f538ddf--còn-p2-3-ở-deadline-http) giữ 67 repo + 8 independent pass, một repro fail.

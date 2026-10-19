@@ -1,6 +1,6 @@
 {
   "task": "M7a OpenRouter live verification and charge reconciliation (synthetic data)",
-  "status": "pr64_rereview_p2_3_http_deadline_fixed_offline_ready_for_rereview_not_merged",
+  "status": "pr64_rereview2_dns_exit_fixed_offline_ready_for_rereview_not_merged",
   "base": "5362ace04d0d211005753aecddd760a4ad7d548b",
   "source_migration": "0052",
   "migration_added": false,
@@ -2372,7 +2372,7 @@
       }
     },
     "scope": "scripts/m7a_live.py and api/tests/test_m7a_poll_http.py only; no product/migration/grant change, no key or .env read, no inference",
-    "limit": "a hung DNS resolution in the executor could still delay interpreter exit (not reproduced); loopback tests ran on the Windows host because the image has no pytest; the reviewer unittest ran in Linux",
+    "limit": "a hung DNS resolution in the executor could still delay interpreter exit (not reproduced); loopback tests ran on the Windows host because the image has no pytest; the reviewer unittest ran in Linux (superseded: the DNS hang was reproduced by the reviewer at 9b64901 and fixed in pr64_rereview2_fix)",
     "evidence_root": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-pr64-fix2-20261019",
     "artifact_hashes": {
       "after\\reviewer-drip-linux.log": "c60235b7a98b1ccd2a72bcf0f366d280c42c0c9169ae694d3f872c99467fc941",
@@ -2383,6 +2383,162 @@
       "seal\\offline.xml": "9b6fb9b8e12833793d5c2edfd0cebfc313fb4fcd876243900893214d13546907",
       "seal\\source-after.json": "f4b441d1cf0d510c9e0f0bdd441ed2a84009942ad0d8d3e552501e32b38536d6",
       "seal\\source-before.json": "f4b441d1cf0d510c9e0f0bdd441ed2a84009942ad0d8d3e552501e32b38536d6"
+    }
+  },
+  "pr64_rereview2_fix": {
+    "review_head": "9b64901",
+    "finding": "P2-3 shutdown: reconcile returned at the deadline but the interpreter joined an executor thread stuck in getaddrinfo and never exited",
+    "fix": "read-only GETs run in one child interpreter (subprocess, stdlib+httpx worker); key on stdin only; parent waits for each reply at most the remaining time, otherwise kills and reaps the child; reconcile/catalog close the fetcher in finally",
+    "attempt_note": "a first multiprocessing(spawn) version passed on Windows but required callers to guard __main__; replaced by plain subprocess before sealing",
+    "before": {
+      "source": "9b64901",
+      "counts": {
+        "failure": 1,
+        "pass": 1
+      },
+      "nodes": {
+        "api/tests/test_m7a_poll_exit.py::test_hanging_resolver_returns_pending_by_deadline_and_process_exits": "failure",
+        "api/tests/test_m7a_poll_exit.py::test_normal_resolver_control_finds_id_and_exits": "pass"
+      },
+      "note": "hang case: RESULT at 3.016 s, process did not exit within 20 s; normal resolver control passed"
+    },
+    "after": {
+      "seal": {
+        "exit": 0,
+        "counts": {
+          "pass": 73
+        },
+        "nodes": {
+          "api/tests/test_m7a_routing_and_ledger.py::test_routing_policy_rejects_open_or_malformed_values[bad0]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_routing_policy_rejects_open_or_malformed_values[bad1]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_routing_policy_rejects_open_or_malformed_values[bad2]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_routing_policy_rejects_open_or_malformed_values[bad3]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_routing_policy_rejects_open_or_malformed_values[bad4]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_routing_policy_rejects_open_or_malformed_values[bad5]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_routing_policy_rejects_open_or_malformed_values[bad6]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_routing_policy_rejects_open_or_malformed_values[bad7]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_routing_defaults_pin_reviewed_zdr_providers_and_pricing_stays_off": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_embedding_rejects_allowlisted_identity_from_unpinned_provider": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_rerank_rejects_allowlisted_identity_from_unpinned_provider": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_ledger_caps_requests_and_usd_and_survives_crash": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_ledger_lock_blocks_concurrent_runs_and_requires_external_state": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_key_line_with_spaces_is_read_alone_and_never_written": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_probe_delegates_records_bounded_receipt_and_redacts": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_probe_failures_keep_ceiling_committed[500-uncertain]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_probe_failures_keep_ceiling_committed[429-rejected]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_probe_identity_outside_pin_is_uncertain_but_billed_cost_counts": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_reconcile_is_read_only_and_bounded": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_generation_dated_endpoint_mapping_is_finite[openai/gpt-6-sol-20260922-Azure-True]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_generation_dated_endpoint_mapping_is_finite[openai/gpt-6-sol-Azure-True]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_generation_dated_endpoint_mapping_is_finite[openai/gpt-6-sol-20250101-Azure-False]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_generation_dated_endpoint_mapping_is_finite[openai/gpt-6-sol-pro-20260922-Azure-False]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_generation_dated_endpoint_mapping_is_finite[openai/gpt-6-sol-20260922-OpenAI-False]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_generation_dated_endpoint_mapping_is_finite[None-Azure-False]": "pass",
+          "api/tests/test_m7a_routing_and_ledger.py::test_generation_estimate_never_below_observed_live_charge": "pass",
+          "api/tests/test_embedding_transport.py::test_embedding_transport_sends_only_one_extracted_text": "pass",
+          "api/tests/test_embedding_transport.py::test_embedding_transport_rejects_unknown_identity[different/model-Azure]": "pass",
+          "api/tests/test_embedding_transport.py::test_embedding_transport_rejects_unknown_identity[text-embedding-3-small-Other]": "pass",
+          "api/tests/test_embedding_transport.py::test_embedding_transport_rejects_unknown_identity[text-embedding-3-small-None]": "pass",
+          "api/tests/test_embedding_transport.py::test_embedding_transport_rejects_unknown_identity[None-Azure]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[0.001-True]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[0-True]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[0.0-True]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[-1-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[-0.0001-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[nan-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[inf-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[True-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[False-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[0.001-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[None-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_probe_receipt_cost_contract_never_lowers_committed[missing-False]": "pass",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[-1]": "pass",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[-0.5]": "pass",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[NaN]": "pass",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[Infinity]": "pass",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[True]": "pass",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[0.001]": "pass",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[stored6]": "pass",
+          "api/tests/test_m7a_guards.py::test_resumed_ledger_line_with_invalid_cost_keeps_ceiling[stored7]": "pass",
+          "api/tests/test_m7a_guards.py::test_valid_zero_cost_releases_ceiling": "pass",
+          "api/tests/test_m7a_guards.py::test_reconcile_deadline_covers_every_get_sleep_and_key": "pass",
+          "api/tests/test_m7a_guards.py::test_reconcile_sleep_is_cut_to_remaining_and_found_ids_kept": "pass",
+          "api/tests/test_m7a_guards.py::test_reconcile_all_found_control_reads_key": "pass",
+          "api/tests/test_m7a_guards.py::test_claimed_permit_without_receipt_is_uncertain_and_21st_refused_before_delegate": "pass",
+          "api/tests/test_m7a_guards.py::test_second_action_cannot_start_or_open_permits_while_first_runs": "pass",
+          "api/tests/test_m7a_guards.py::test_control_used_permit_completes_and_unused_permit_is_revoked_not_sent": "pass",
+          "api/tests/test_m7a_guards.py::test_family_without_permit_is_refused_before_delegate": "pass",
+          "api/tests/test_m7a_guards.py::test_restart_with_stale_permit_or_unsettled_slot_fails_closed": "pass",
+          "api/tests/test_m7a_guards.py::test_runtime_receipt_with_invalid_cost_keeps_ceiling[-1]": "pass",
+          "api/tests/test_m7a_guards.py::test_runtime_receipt_with_invalid_cost_keeps_ceiling[nan]": "pass",
+          "api/tests/test_m7a_guards.py::test_runtime_receipt_with_invalid_cost_keeps_ceiling[True]": "pass",
+          "api/tests/test_m7a_guards.py::test_runtime_receipt_with_invalid_cost_keeps_ceiling[0.001]": "pass",
+          "api/tests/test_m7a_guards.py::test_runtime_receipt_with_invalid_cost_keeps_ceiling[None]": "pass",
+          "api/tests/test_smoke_routes.py::test_embedding_smoke_uses_adapter_and_keeps_pricing_off": "pass",
+          "api/tests/test_smoke_routes.py::test_rerank_smoke_uses_adapter_and_rejects_unknown_identity": "pass",
+          "api/tests/test_m7a_poll_http.py::test_fast_control_finds_ids_and_reads_key": "pass",
+          "api/tests/test_m7a_poll_http.py::test_trickling_generation_response_is_cut_at_deadline[drip_body]": "pass",
+          "api/tests/test_m7a_poll_http.py::test_trickling_generation_response_is_cut_at_deadline[drip_headers]": "pass",
+          "api/tests/test_m7a_poll_http.py::test_slow_key_after_ids_found_is_cut_and_found_ids_kept": "pass",
+          "api/tests/test_m7a_poll_exit.py::test_hanging_resolver_returns_pending_by_deadline_and_process_exits": "pass",
+          "api/tests/test_m7a_poll_exit.py::test_normal_resolver_control_finds_id_and_exits": "pass"
+        },
+        "source_hashes_equal": true,
+        "source_files": 486
+      },
+      "linux_network_none_fault_injection_all_interpreters": {
+        "exit": 0,
+        "facts": [
+          {
+            "elapsed_s": 1.0046731710008316,
+            "returned": true,
+            "pending": [
+              "gen-synthetic"
+            ],
+            "key_status": "skipped_deadline",
+            "exited_after_result": true,
+            "mode": "blocked"
+          },
+          {
+            "elapsed_s": 1.0064729039995655,
+            "returned": true,
+            "pending": [
+              "gen-synthetic"
+            ],
+            "key_status": "skipped_deadline",
+            "exited_after_result": true,
+            "mode": "fast"
+          }
+        ]
+      },
+      "reviewer_harness_on_fixed_source": {
+        "exit": 1,
+        "reason": "its fault injection patches getaddrinfo only in the calling process; resolution now happens in the child, so its dns-started assertion fails; reconcile itself returned in about 1.007 s",
+        "not_counted_as_pass": true
+      },
+      "unguarded_multiprocessing_attempt_log": "after/dns-exit-linux-harness-unguarded-multiprocessing.log"
+    },
+    "fault_injection": "DNS hang is injected (sitecustomize getaddrinfo that never returns), not a real DNS outage",
+    "scope": "scripts/m7a_live.py and api/tests/test_m7a_poll_exit.py; no product/migration/grant, no key/.env read, no inference",
+    "evidence_root": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-pr64-fix3-20261019",
+    "artifact_hashes": {
+      "after\\dns-exit-linux-fixed.log": "b9a97e3fb1cb9f3e52c7e9a56f8acd1d737faad819b0b0a39941c66e2dba5b76",
+      "after\\dns-exit-linux-harness-unguarded-multiprocessing.log": "a3181bfe3841fefd1fa3e915475051ecf69942538108f8224122f773e646cbf7",
+      "after\\reviewer-copy\\dns-child-blocked.log": "02580722627c47dfd5792f0056001be8b8973288b77ab69899f89715e92a9188",
+      "after\\reviewer-copy\\dns-child-fast.log": "7061a87d8d04c486f8244d1e045f816ee1f5fea1eb7341c2b9b8ce692b8595de",
+      "after\\reviewer-copy\\dns_child.py": "2a6a6e57fddd4793ddbe58599777554eb28198fc7c74ea82b4f842f02db28910",
+      "after\\reviewer-copy\\test_dns_exit.py": "9e2a22b27b43113b1d25c72016c425166158c4451de0d75da6bc91d41c478593",
+      "after\\reviewer-dns-exit-on-fixed.log": "03e795d73b734755020d6ecd22a6ffef25416061a1497dc784fe6ef08a41dbfd",
+      "before\\poll-exit-base.log": "87d6734b80681bed0c7f6e764ac3cd197f6111ffb657a7cf760878ca830a1ac9",
+      "before\\poll-exit-base.xml": "cd2f5985f94cb29d8d0cd3db8fa3175b7d71ef1a9c2daaad91b616329c32e0f0",
+      "harness\\dns_child.py": "a9bc9b9fe157053aeed7895ab02afac145632542068018472b6bb45124bc3c8e",
+      "harness\\site\\sitecustomize.py": "3959702086629376b867eeb9ff3fe0b6ce0f9274df8a8a53717e46d52ba77df6",
+      "harness\\test_dns_exit_fixed.py": "a107dbd5e13d2c41b251525e6ab11e2bdc1105cf0ffa4051d3acab8551e9c5a6",
+      "seal\\exit.txt": "19eaf43821a7660ec323a87c8457bf74823beb296c39f5e01aa8a683aa50f061",
+      "seal\\offline.log": "76dd35514f24bdca586fe955777c76546ad7a1dbac5a0cad3be9bf37c64bddbc",
+      "seal\\offline.xml": "62352deffe44e38aad3711595c21046531507eda7055c826295a51762db68679",
+      "seal\\source-after.json": "a9bf18281612fa155efb377d02fb701718a450ce4b0a3c1bc8606e86d75ad40e",
+      "seal\\source-before.json": "a9bf18281612fa155efb377d02fb701718a450ce4b0a3c1bc8606e86d75ad40e"
     }
   }
 }

@@ -1,5 +1,35 @@
 # Review PR #64 — OpenRouter live và chi phí
 
+## Review lại tại `9b64901` — HTTP đã hủy đúng, còn P2-3 ở thoát tiến trình khi DNS treo
+
+Ngày **2026-10-19**, head **`9b649015395330ca96e580dce1e2df9aa544f6f3`**, code **`959441c`**, source **0052**, PR **OPEN/chưa merge**. Body/header nhỏ giọt và `/key` chậm đã qua kiểm. **Còn một nhánh P2-3: deadline của hàm không bảo đảm lệnh kết thúc khi DNS bị kẹt trong executor.** Giới hạn được agent ghi là “chưa tái hiện” nay đã tái hiện độc lập; cần sửa cùng PR theo điều kiện không chờ thread treo lúc thoát đã nêu trong prompt trước. P2-1/P2-2 giữ kết luận đã sửa, không mở lại scope.
+
+### P2-3 — `loop.close()` không bỏ được bước join executor lúc Python thoát
+
+Vị trí: [`scripts/m7a_live.py:224`](../../scripts/m7a_live.py), `_get` tạo event loop, `wait_for` rồi `loop.close()` ở dòng 231.
+
+`asyncio.wait_for` hủy coroutine HTTP nhưng không dừng được `socket.getaddrinfo` đã chạy trong thread của default executor. `loop.close()` trả về, song interpreter vẫn join thread executor ở shutdown ([tài liệu Python 3.12](https://docs.python.org/3.12/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor)). Vì vậy `reconcile` có thể in kết quả pending rồi lệnh CLI vẫn không thoát; comment “never waits on executor threads” chỉ đúng tại lệnh `loop.close`, không chứng minh process đã kết thúc trong deadline.
+
+**Tái hiện độc lập có giới hạn:** container Linux `--network none --rm`, một child Python dùng chính `reconcile` của source này. Chỉ thay `socket.getaddrinfo` bằng fault injection chờ event vô hạn; không DNS/HTTP ngoài, không key thật. Deadline 1 s: `reconcile` trả pending sau **1,015 s**, lượt xác nhận **1,023 s**, nhưng child không exit sau thêm 0,8 s. Parent chụp stack rồi kill/reap child thử, không để thread/process treo. Stack của main dừng tại **`concurrent.futures.thread._python_exit → threading.join`**, worker nằm trong `blocked_dns`. Control cùng entry, resolver trả địa chỉ loopback ngay, kết thúc bình thường. Đây là fault injection chứng minh đường shutdown, **không phải** lỗi DNS hệ điều hành/provider đã quan sát trên môi trường thật.
+
+**Cần sửa:** deadline bao cả kết thúc lệnh và thu hồi worker có thể kẹt, không chỉ thời gian trả của coroutine. Chọn giải pháp nhỏ trong tooling read-only; nếu dùng process riêng, parent phải terminate/reap được nó khi hết hạn, không vô tình chờ process đó ở teardown. Không dùng private executor hook/daemon-thread để né shutdown, không tắt kiểm TLS/routing hoặc hard-code IP provider. Thêm regression subprocess có resolver treo và control resolver bình thường; assert process exit trong bound, không chỉ `reconcile` trả về. Giữ các ca HTTP thật đang xanh.
+
+### Kiểm reviewer tại source này
+
+| Nhóm | Kết quả |
+| --- | --- |
+| Năm file offline trong repo | **71/71 pass**, exit 0, 6,42 s, HTTP ngoài bị chặn; loopback được phép |
+| Repro body nhỏ giọt độc lập Linux | **2/2 pass**: control 0,075 s; deadline 1 s kết thúc 1,003 s, ID chưa hoàn tất giữ pending |
+| Subprocess resolver/shutdown độc lập Linux | **1 control pass / 1 failure P2-3**, failure xác nhận hai lượt, không đếm lặp |
+
+Tổng **71 repo + 3 ca độc lập pass / 1 ca độc lập fail**. Không rerun selection 652, web/Chrome/restore hoặc live; test repo đã bao header nhỏ giọt và `/key` chậm. Hai P2 khác không thay code nên giữ chứng cứ review trước, không cộng thành pass mới.
+
+**Audit:** **8 artifact hash** khớp; **485 source hash** agent trước/sau bằng nhau và khớp source hiện tại; JUnit/inventory/reviewer khớp đủ **71 ID pass**. Không đọc/sửa ledger lịch sử trong lượt này; giữ mốc đã audit 20 request/$0,11675006 cam kết và 19 physical call/$0,01941006 billed, không cấp thêm lượt inference.
+
+Evidence `C:\Users\ADMIN\AppData\Local\Temp\ras-pr64-rereview2-20261019`: `offline.xml/log`, `poll-drip.log`, `dns-exit-first.log`, `dns-exit.log`, `dns-child-blocked.log` (stack), `dns-child-fast.log`, các helper/exit JSON, `audit-result.json`, source/baseline/cleanup. **455 tracked source hash reviewer** trước/sau trùng. Container thử tự gỡ; child fault bị parent kill/reap; không tạo volume/credentials. **24 container có sẵn giữ ID/name/image/mount/label**; dev worker/beat đã restarting, RestartCount 97→100, không can thiệp. Không key/`.env`, inference, DB/dev/Dify/pricing hoặc account setting. Report/prompt và cập nhật trạng thái để **chưa commit**, dành cho cùng PR sửa; reviewer không merge/gửi comment GitHub.
+
+## Lịch sử review lại tại `f538ddf`
+
 ## Review lại tại `f538ddf` — còn P2-3 ở deadline HTTP
 
 Ngày **2026-10-19**, head **`f538ddfa534a87132cb4e2b095da9e2c6ce7d2bb`**, code **`37684c6`**, source **0052**, PR **OPEN/chưa merge**. **P2-1 và P2-2 đã sửa qua kiểm độc lập; P2-3 mới sửa phần điều phối batch, còn thiếu deadline bao trọn HTTP đang đọc body. Chưa nên merge.** Phần review tại `5dc8947` bên dưới là lịch sử, không phải ba finding còn mở ở head này.
