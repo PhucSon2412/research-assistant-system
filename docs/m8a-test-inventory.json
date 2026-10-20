@@ -143,14 +143,15 @@
   "web": "not rerun (no web change in the fix); reviewer 79/79 + typecheck",
   "not_run": [
    "full API suite and restore drills (no schema/journal change)",
-   "Windows web rerun",
-   "GitHub Actions on the fix commit at the time of writing (see PR)"
-  ]
+   "Windows web rerun (no web change)",
+   "CI run on the docs/timeout-only commit after 96bd196 (not waited for)"
+  ],
+  "github_ci": "run 39372151281 at 96bd196d7f46df153c8d49b0eb7eb5392138a74c: API 1122/1122 (4871.6 s, scanned + published JUnit, 0 #token=), web pass, deploy-config pass with --check-registry"
  },
  "source": {
   "base": "3b59a1db4e784df0891a844ba968ba85e2797746",
   "changed_files": {
-   ".github/workflows/ci.yml": "cafd1b97fff36d303767fcf395232f65d9a73c569fa946093e2cb63ad484d931",
+   ".github/workflows/ci.yml": "f85d5615c89eaf14b80f323767255573ec14c420a6b158150c8f2739f0d7cc57",
    "AGENTS.md": "9e663abdea36a2cc89470438a3df609e4206ceda5b6835ccd127d98ba1c14445",
    "README.md": "f8346b5639887597f37b5cbba3dd12f7a1de626acda20e44197f0284c0f82f6f",
    "api/Dockerfile": "36e07f93b2a86f0a7a45bf142dea19553a0bcedc6df23172793f37b4de64f2c3",
@@ -182,7 +183,7 @@
    "docs/README.md": "c298ca83e7fdba6d6b839fe0194d6b20ac2b9920c42b3e9b86826c497eb3df61",
    "docs/decisions.md": "d3dea77f543ec63e011e497eada5669c66da0edae9d11395ff9bca0a989b7718",
    "docs/dev-setup.md": "628cca90c0a5667d5e08718efa061479fbb5bd0633dcde4e38d0d8f95b0b55f2",
-   "docs/m8a-pilot-entry-hardening.md": "62ed12a6bf2f102920b8956e3c7cbf7a32e144824e737f4914ead83c0c165568",
+   "docs/m8a-pilot-entry-hardening.md": "4c8224fd80a9e67c88860639b67c32a7b8cc94362e5e7620ca446d2d36b77ee2",
    "docs/mvp-delivery-plan.md": "26f52708066e7c53a6a71894aa8c23a1f0cc47e30b90273db8eba5756a6e8cb1",
    "docs/reviews/pr65-m7b-human-quality-review.md": "39a14f4c3914492361687821b035c45a481c70599766e66b3a3d0b1d116f71ca",
    "docs/reviews/pr66-m8a-pilot-entry-hardening.md": "1b8430529840272f5f303f3f1778483936d1eb61c63ec4f8ec057b49fdfa5322",
@@ -877,6 +878,85 @@
    "per_file": {
     "tests/test_m8a_ci_guard.py": {
      "pass": 11
+    }
+   }
+  },
+  "pr66-github-run": {
+   "sha256": "2856e7677ff47cad437281f5650046265c704c822234144b0bee481c40686bef",
+   "total": 1122,
+   "pass": 1122,
+   "per_file": {
+    "tests/test_auth_safety_foundation.py": {
+     "pass": 154
+    },
+    "tests/test_auth_secrets.py": {
+     "pass": 1
+    },
+    "tests/test_auth_sessions.py": {
+     "pass": 19
+    },
+    "tests/test_c2a_login_sessions.py": {
+     "pass": 68
+    },
+    "tests/test_c2a_origin.py": {
+     "pass": 66
+    },
+    "tests/test_c2b_reset_status.py": {
+     "pass": 103
+    },
+    "tests/test_c2c1_bootstrap.py": {
+     "pass": 74
+    },
+    "tests/test_c2c2_invitations.py": {
+     "pass": 151
+    },
+    "tests/test_c4_contract.py": {
+     "pass": 23
+    },
+    "tests/test_config.py": {
+     "pass": 61
+    },
+    "tests/test_csrf_and_cookies.py": {
+     "pass": 8
+    },
+    "tests/test_health.py": {
+     "pass": 6
+    },
+    "tests/test_invitation_journal.py": {
+     "pass": 88
+    },
+    "tests/test_invitations.py": {
+     "pass": 20
+    },
+    "tests/test_m8a_auth_delivery.py": {
+     "pass": 11
+    },
+    "tests/test_m8a_ci_guard.py": {
+     "pass": 11
+    },
+    "tests/test_m8a_rate_limit.py": {
+     "pass": 26
+    },
+    "tests/test_m8a_smtp_deadline.py": {
+     "pass": 9
+    },
+    "tests/test_m8a_smtp_delivery.py": {
+     "pass": 25
+    },
+    "tests/test_migrations.py": {
+     "pass": 28
+    },
+    "tests/test_password_reset.py": {
+     "pass": 10
+    },
+    "tests/test_pre_c4_initial_receipts.py": {
+     "pass": 18
+    },
+    "tests/test_reset_token_journal.py": {
+     "pass": 92
+    },
+    "tests/test_session_revocation_journal.py": {
+     "pass": 50
     }
    }
   }

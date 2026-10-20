@@ -22,7 +22,7 @@ jobs:
   api:
     name: API selection (config, auth, invitation/reset/delivery, limiter, migrations, C4 contract)
     runs-on: ubuntu-24.04
-    timeout-minutes: 100
+    timeout-minutes: 130
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

@@ -288,7 +288,9 @@ GitHub sẽ làm job fail không upload. Đã đặt id tường minh; file CI g
 (`len(clean) != len(files)`), đột biến không làm guard hỏng thật; sửa đột biến (coi file thiếu là sạch, ghi rỗng
 vào publish) và chạy lại riêng: HOLDS. Các đột biến mới khác HOLDS: bỏ deadline ở parent, tính kết quả muộn là
 thành công, upload `always()`, MinIO về tag quay cũ (checker `--check-registry` FAIL). Source gốc không đổi. Web không đổi trong bản sửa nên không chạy lại (reviewer: 79/79 + typecheck). GitHub Actions trên
-commit sửa: CI_RESULT.
+commit sửa `96bd196` (run `39372151281`): **cả ba job pass** — API 1122/1122 (4872 s; scan sạch, JUnit
+được publish qua thư mục scan, 0 `#token=`), web, deploy contract kèm `--check-registry`. Bước test mất ~81 phút, sát
+timeout 100 phút, nên nâng timeout job API lên 130 phút ở commit docs sau đó (chưa chờ run lại).
 
 **Failure trong lượt sửa (giữ lịch sử):** selection lượt 1 lỗi 948 error vì harness truyền `--basetemp` mà chưa tạo
 thư mục cha (sửa harness, không đổi test); regression deadline lần chạy đầu trên `c0b20aa` fail cả hai control vì
