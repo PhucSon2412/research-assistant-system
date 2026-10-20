@@ -580,12 +580,12 @@ Thời hạn nằm ở `Settings.auth` (M1a): `RAS_AUTH__SESSION_IDLE` (mặc đ
 
 ### Trước khi đưa lên server
 
-M1b **chưa** sẵn sàng triển khai ngoài máy dev. Điều kiện tối thiểu, đều chưa có trong repo:
+`docker-compose.yml` này chỉ là stack dev (HTTP, cookie không Secure, dev outbox, limiter tắt). M8a thêm cấu hình triển khai nhóm thử **riêng** ở [`deploy/`](../deploy/compose.yaml): Caddy HTTPS là điểm vào duy nhất, `RAS_ENVIRONMENT=production`, cookie Secure/`__Host-`, Origin/`PUBLIC_BASE_URL` HTTPS tường minh, SMTP qua TLS có xác minh certificate và rate limit auth bằng Redis. Cách chạy, topology, secret và giới hạn ở [handoff M8a](m8a-pilot-entry-hardening.md). M8a chỉ được kiểm trên project cô lập với CA/SMTP thử; **chưa** có domain, host, SMTP account, operator hay nơi lưu journal độc lập thật, chưa cutover/nghiệm thu production (M8b và cutover còn riêng). Điều kiện cũ:
 
-1. Một cấu hình triển khai riêng (không dùng `docker-compose.yml` này), đã kiểm chứng, chạy sau HTTPS với cookie `Secure` (`RAS_ENVIRONMENT=production`, `RAS_HTTP__COOKIE_SECURE=true` — settings từ chối cookie không Secure khi `production`) và origin/`PUBLIC_BASE_URL` thật.
-2. Không dùng `dev_outbox`; có delivery adapter cho kênh gửi invite/reset thật (kênh còn là quyết định mở).
-3. Rate limit/khóa tạm cho login và yêu cầu reset.
-4. Kiểm và xử lý **timing enumeration** của yêu cầu reset: hiện response cho email tồn tại và không tồn tại giống nhau về status/body, và việc gửi link chạy sau response, nhưng nhánh email tồn tại còn làm thêm việc DB (khóa dòng user, thu hồi token cũ, ghi token và audit), nên **chưa chứng minh** không phân biệt được qua thời gian phản hồi. Cần đo, rồi cân bằng (ví dụ xử lý nền cho cả hai nhánh) trước khi mở ra ngoài.
+1. ~~Cấu hình triển khai riêng sau HTTPS với cookie `Secure`~~ — M8a `deploy/compose.yaml` (kiểm cô lập, chưa chạy trên host thật).
+2. ~~Delivery adapter thật~~ — M8a `RAS_DELIVERY__MODE=smtp`; production từ chối `dev_outbox`.
+3. ~~Rate limit login/reset~~ — M8a limiter Redis (429/`Retry-After`), giá trị khởi đầu chưa benchmark.
+4. **Còn mở:** kiểm và xử lý **timing enumeration** của yêu cầu reset: hiện response cho email tồn tại và không tồn tại giống nhau về status/body, và việc gửi link chạy sau response, nhưng nhánh email tồn tại còn làm thêm việc DB (khóa dòng user, thu hồi token cũ, ghi token và audit), nên **chưa chứng minh** không phân biệt được qua thời gian phản hồi. Cần đo, rồi cân bằng (ví dụ xử lý nền cho cả hai nhánh) trước khi mở ra ngoài.
 
 Theo dõi ở [decisions](decisions.md#cần-xác-nhận-hoặc-đo-trước-phần-phụ-thuộc).
 

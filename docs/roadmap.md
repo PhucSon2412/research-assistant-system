@@ -1,5 +1,9 @@
 # Roadmap đề xuất
 
+**M8a trên nhánh review, 2026-10-19:** phần đầu E đã triển khai và kiểm cô lập ([handoff](m8a-pilot-entry-hardening.md)); chưa merge/cutover. Tiếp M8b (journal độc lập, backup/retention/alert, nghiệm thu vận hành) sau review; D vẫn chờ phiếu human.
+
+**Sau merge PR #65, 2026-10-19:** source **0052**, merge `3b59a1d` chứa head review `8799216`, tree khớp; không có test mới tại merge. M7b xong tooling, vẫn chờ phiếu thật. Giao [M8a — bản triển khai nhóm thử có HTTPS/delivery/rate limit/CI](tasks/m8a-pilot-entry-hardening.md) trong một PR, mới giao/chưa triển khai. M8b đóng journal độc lập/backup/alert và nghiệm thu vận hành sau đó; không thêm tính năng ngoài checklist MVP. D còn human review, cache-write live cần ủy quyền/ngân sách riêng, policy/paper thật; không bật pricing.
+
 **M7b trên nhánh review (2026-10-19):** bộ duyệt/nhập/chấm phiếu người đọc offline xong phần coding; chờ chủ dự án điền phiếu ([handoff](m7b-human-quality-review.md)). D còn cache-write live, policy và paper thật; E riêng.
 
 **Sau merge PR #64, 2026-10-19:** M7a đã merge `2df77d0`, tree khớp `285fd37`, source **0052**, không cộng kiểm mới tại merge. Giao [M7b — bộ duyệt/nhập/chấm phiếu người đọc](tasks/m7b-human-quality-review.md) một PR offline, dùng nhãn/answer tổng hợp đã có; mới giao/chưa triển khai. D chưa khép tới khi có duyệt thật và các điều kiện provider còn thiếu; E vẫn riêng. Không cấp lại trần live đã hết hoặc bật pricing/dev/Dify.

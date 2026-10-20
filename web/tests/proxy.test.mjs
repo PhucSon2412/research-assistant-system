@@ -164,12 +164,12 @@ test("timeout config: defaults, overrides and invalid values fail closed", () =>
   assert.deepEqual(loadProxyConfig({ API_INTERNAL_URL: base }),
     { base, timeoutMs: DEFAULT_TIMEOUT_SECONDS * 1000, providerTimeoutMs: DEFAULT_PROVIDER_TIMEOUT_SECONDS * 1000,
       approvalTimeoutMs: DEFAULT_REVIEW_APPROVAL_TIMEOUT_SECONDS * 1000,
-      publicationTimeoutMs: DEFAULT_PUBLICATION_TIMEOUT_SECONDS * 1000 });
+      publicationTimeoutMs: DEFAULT_PUBLICATION_TIMEOUT_SECONDS * 1000, edgeToken: null });
   assert.equal(DEFAULT_TIMEOUT_SECONDS, 15);
   assert.equal(DEFAULT_PROVIDER_TIMEOUT_SECONDS, 120);
   assert.deepEqual(loadProxyConfig({ API_INTERNAL_URL: `${base}/`, WEB_PROXY_TIMEOUT_SECONDS: "20",
     WEB_PROXY_PROVIDER_TIMEOUT_SECONDS: " 300 " }), { base, timeoutMs: 20_000, providerTimeoutMs: 300_000,
-      approvalTimeoutMs: 120_000, publicationTimeoutMs: 120_000 });
+      approvalTimeoutMs: 120_000, publicationTimeoutMs: 120_000, edgeToken: null });
   for (const [timeout, provider] of [["0", "120"], ["abc", "120"], ["15", "301"], ["15", "1.5"],
     ["15", "-5"], ["30", "20"], ["15", "1e2"]]) {
     assert.equal(loadProxyConfig({ API_INTERNAL_URL: base, WEB_PROXY_TIMEOUT_SECONDS: timeout,

@@ -1,0 +1,1867 @@
+{
+ "task": "M8a pilot entry hardening",
+ "base": "3b59a1db4e784df0891a844ba968ba85e2797746",
+ "migration_head": "0052",
+ "status": "PR #66 review fixes applied on the same PR (three P2); verified on isolated projects; not merged, no cutover, no production acceptance",
+ "python": "C:\\Users\\ADMIN\\.conda\\envs\\ras\\python.exe (3.12)",
+ "evidence_root": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-m8a-20261019",
+ "commands_run": [
+  "scripts/m8a_test_host.py --context <ctx>/api-host setup | test --junit <xml> -- <22 files, --deselect 1> | cleanup",
+  "scripts/m8a_smoke.py --context <ctx>/smoke3 setup | compose build migrate web | compose up -d --wait | http | browser | cleanup",
+  "docker build -t rasm8a-browser:local -f scripts/m8a_browser.Dockerfile scripts",
+  "scripts/m8a_counterchecks.py --host-context <ctx>/api-host --out <ctx>/counterchecks",
+  "scripts/m8a_deploy_check.py --settings-image rasm8a426c22e7-api:local",
+  "caddy:2.10.2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile (placeholder token, --network none)",
+  "npm test --prefix web; npm run typecheck --prefix web; npm run build --prefix web",
+  "scripts/m8a_ci_scan.py --context <ctx>/api-host <selection-6.xml>"
+ ],
+ "api_selection": {
+  "files": [
+   "tests/test_config.py",
+   "tests/test_m8a_smtp_delivery.py",
+   "tests/test_m8a_rate_limit.py",
+   "tests/test_m8a_auth_delivery.py",
+   "tests/test_csrf_and_cookies.py",
+   "tests/test_c2a_origin.py",
+   "tests/test_auth_sessions.py",
+   "tests/test_c2a_login_sessions.py",
+   "tests/test_auth_secrets.py",
+   "tests/test_invitations.py",
+   "tests/test_invitation_journal.py",
+   "tests/test_c2c2_invitations.py",
+   "tests/test_password_reset.py",
+   "tests/test_c2b_reset_status.py",
+   "tests/test_reset_token_journal.py",
+   "tests/test_session_revocation_journal.py",
+   "tests/test_pre_c4_initial_receipts.py",
+   "tests/test_auth_safety_foundation.py",
+   "tests/test_c2c1_bootstrap.py",
+   "tests/test_migrations.py",
+   "tests/test_c4_contract.py",
+   "tests/test_health.py"
+  ],
+  "deselected": [
+   "tests/test_pre_c4_initial_receipts.py::test_two_dump_restore_rounds_keep_valid_provenance_and_restrict_forgery (needs the C3 host container fixture)"
+  ],
+  "final": "selection-6: 1102 passed, 0 failed/error/skip, 1 deselected, exit 0, 3776.99 s",
+  "history": [
+   "selection-1: exit 4 usage error (harness argparse swallowed --junit), no tests ran",
+   "selection-2: 344 passed, 49 failed, 709 errors (autouse fixture set RAS_RATE_LIMIT__MODE=disabled via env; production settings refused it) -> fixture replaced the limiter factory instead",
+   "selection-3: 646 passed, 63 failed, 393 errors (harness lacked RAS_C3_OPERATOR_PASSWORD and default RAS_DB__*)",
+   "selection-4: stopped mid-run (harness lacked MINIO_ROOT_*/MINIO_API_HOST_PORT for upload fixtures)",
+   "selection-5: 1067 passed, 35 failed only in tests/test_c2a_origin.py (production now refuses http:// origins; fixture moved to https://web.test)",
+   "limiter window test: 1 of 4 repeats failed with a fixed sleep (Redis VM clock ~3% fast vs host); now bounded 5 s poll",
+   "SMTP transport first run 20/25: wrong rcpt expectation, smtplib wraps reply timeouts as SMTPServerDisconnected (adapter now maps via __context__), Windows refused-port delay"
+  ]
+ },
+ "smoke": {
+  "final_context": "smoke3, project rasm8a426c22e7",
+  "images": {
+   "api": "sha256:841566bab15b5de590c9ef0251aeecfe4ad44409dc4b2d7f64a97dcfaf84bdcb",
+   "web": "sha256:5dbcbce3d473af1c774482ecb769d03e8b3a5ff18fef59109d36e3244d5b4c49"
+  },
+  "image_source_match": "211 files under api/app and api/migrations in the image match host bytes",
+  "chrome": "Google Chrome 155.0.8059.84 (Linux container, NSS trusts only the throwaway test CA)",
+  "history": [
+   "smoke1: stopped at a wrong hybrid expectation (real: no vector scope -> 200, 0 hits, no provider call)",
+   "smoke2: HTTP 65/65; Chrome run 1 failed (capture overwrote msg-0001 after SMTP restart), run 2 failed (read state before client render), run 3 16/16"
+  ]
+ },
+ "web": {
+  "tests": "79/79 (first run 78/79: old proxy config deepEqual lacked edgeToken)",
+  "typecheck": "exit 0",
+  "build": "exit 0"
+ },
+ "deploy_contract": "ok; production Settings validated inside rasm8a426c22e7-api:local; Caddyfile valid",
+ "not_run": [
+  "full API suite (>5,000 nodes) and the five restore drills (no journal/restore/schema change)",
+  "real domain/ACME, real SMTP relay/account/deliverability, real host/operator, independent journal storage",
+  "STARTTLS through the smoke image (pytest only; smoke uses SMTPS)",
+  "multiple API replicas in the smoke (cross-process sharing shown by two pytest processes on real Redis)",
+  "reset timing-enumeration measurement",
+  "a CI run on the final docs-only commit (not waited for)",
+  "Windows selection rerun after the harness MinIO-image and C3 chmod fixture changes (covered by GitHub run 3 on Linux)"
+ ],
+ "docker_inventory": {
+  "before": {
+   "containers": 24,
+   "volumes": 188,
+   "networks": 9,
+   "images": 140
+  },
+  "after": {
+   "containers": 24,
+   "same_container_ids": true,
+   "volumes": 188,
+   "networks": 9,
+   "images": 138
+  },
+  "removed_task_images": [
+   "rasm8a-browser:local",
+   "caddy:2.10.2-alpine",
+   "mcr.microsoft.com/playwright/python:v1.63.0-noble",
+   "rasm8a*-api:local",
+   "rasm8a*-web:local"
+  ],
+  "note": "baseline snapshot was taken after the caddy/playwright pulls had started; only rasm8a*/rasm8at* projects were removed after label checks; dev ras and Dify untouched"
+ },
+ "incident": "while stopping selection-4 a broad 'taskkill //F //IM python.exe' was issued on the host; afterwards no python.exe was running and it cannot be shown whether a Python process outside the task was stopped; containers were not affected",
+ "github_ci": {
+  "run_1": "39266920892: web pass, deploy-config pass, API failed at infra setup (quay.io MinIO tag unauthorized)",
+  "run_2": "39268774452: web pass, deploy-config pass, API 908 pass / 26 failure / 168 error, all case_file_permissions (C3 fixture wrote case files 0644; POSIX guard refused)",
+  "run_3": "39284225688 at 6cb52537d6169e8e405f14250facfb88f55c63df: API 1102/1102 pass (2943 s, scanned JUnit), web pass, deploy-config pass",
+  "linux_container_check": "python:3.12-slim against isolated infra: 2 affected files 91/91 after fix; full selection 877 pass / 225 error, all EndpointConnectionError to 127.0.0.1 MinIO (upload fixture hardcodes loopback; container artefact)",
+  "after": "docs/inventory-only commit after 6cb5253 not re-verified by waiting for CI"
+ },
+ "pr66_fix": {
+  "review_head": "c0b20aa201c52820a7921534ab68620fe4597e16",
+  "evidence_root": "C:/Users/ADMIN/AppData/Local/Temp/ras-pr66-fix-20261020",
+  "p2_1_smtp_deadline": {
+   "fix": "whole send in child process app.smtp_transport; parent communicate(timeout=remaining), kill+reap own PID, late result -> smtp_timeout; job/password only on stdin; minimal child env",
+   "before_c0b20aa": "tests/test_m8a_smtp_deadline.py 6 failed / 2 control passed (late-result case added later)",
+   "after": "tests/test_m8a_smtp_deadline.py 9/9; with tests/test_m8a_smtp_delivery.py 33/33 at that point",
+   "reviewer_repro_after": "control 0.094 s success; drip SMTPS/STARTTLS smtp_timeout 0.594 s; cumulative smtp_timeout 0.609 s (deadline 0.6); reviewer DNS repro patches the parent and no longer reaches the child (smtp_connection_failed 0.141 s); in-child DNS slow 2 s / hung 3600 s -> smtp_timeout < 1.1 s, child reaped, 0 connections"
+  },
+  "p2_2_storage_image": {
+   "image": "cgr.dev/chainguard/minio@sha256:709099319add48dfb44aa596a7070d3ddd8dd04d7ae881765719aec29df9e510",
+   "facts": "MinIO RELEASE.2026-09-22T19-25-18Z (commit df34868a), AGPLv3, UID 65532, ships mc and bash, image created 2026-10-17, binary from chainguard-forks/minio",
+   "checker_before": "2 FAIL (not digest-pinned; quay.io tag not resolvable)",
+   "checker_after": "ok; caddy, minio digest, pgvector, redis resolve",
+   "fresh_pull_and_new_install": "m8a_minio_check --fresh-pull: removed task-pulled digest, pulled by digest, 9/9 steps (health, put/readback SHA-256 x3, list, delete, restart readback, upgrade after ownership step)",
+   "upgrade_without_ownership_step": "new image exits 1: unable to rename /data/.minio.sys/tmp ... file access denied (volume created by the root-run legacy image)",
+   "deploy_smoke": "smoke4 project rasm8a1971d1c2: HTTP 68/68 (incl. pinned digest running, MinIO restart readback), Chrome 16/16; API image sha256:3662b43951040865fe3c5468bbe4ece0024f7e10d0e581c4c6311c808b28a36f (212 files match host), web sha256:3240f59dca7bde417f2a21594e835fc26d0c5456670b168b24690052cbf4e238; app images built with this host's layer cache",
+   "dev_compose": "default left on the old cached tag on purpose (no dev data migration); RAS_MINIO_IMAGE override documented"
+  },
+  "p2_3_ci_artifact": {
+   "fix": "scan reads each file once, writes the scanned bytes to a fresh publish dir and emits clean=true; upload if !cancelled() && steps.scan.outputs.clean == 'true', path = publish dir, if-no-files-found error",
+   "before_c0b20aa": "tests/test_m8a_ci_guard.py 7 failed / 4 passed",
+   "after": "11/11; reviewer test_ci_guard.py 4/4 OK",
+   "real_catch": "the local selection JUnit was refused (link token fragment) because a CI-guard parametrize id held a synthetic link token; ids made explicit, file rerun 11/11, new JUnit has no #token="
+  },
+  "selection": "selection-fix-1: 948 errors (harness passed --basetemp without creating its parent); selection-fix-2: 1122/1122 pass, 1 deselected, exit 0, 3926.63 s",
+  "counterchecks": "run 1: 11/12 (scan_missing_is_clean MISSED: second guard len(clean) != len(files) kept the scan failing); mutation strengthened and rerun: HOLDS; sources unchanged",
+  "web": "not rerun (no web change in the fix); reviewer 79/79 + typecheck",
+  "not_run": [
+   "full API suite and restore drills (no schema/journal change)",
+   "Windows web rerun (no web change)",
+   "CI run on the docs/timeout-only commit after 96bd196 (not waited for)"
+  ],
+  "github_ci": "run 39372151281 at 96bd196d7f46df153c8d49b0eb7eb5392138a74c: API 1122/1122 (4871.6 s, scanned + published JUnit, 0 #token=), web pass, deploy-config pass with --check-registry"
+ },
+ "source": {
+  "base": "3b59a1db4e784df0891a844ba968ba85e2797746",
+  "changed_files": {
+   ".github/workflows/ci.yml": "f85d5615c89eaf14b80f323767255573ec14c420a6b158150c8f2739f0d7cc57",
+   "AGENTS.md": "9e663abdea36a2cc89470438a3df609e4206ceda5b6835ccd127d98ba1c14445",
+   "README.md": "f8346b5639887597f37b5cbba3dd12f7a1de626acda20e44197f0284c0f82f6f",
+   "api/Dockerfile": "36e07f93b2a86f0a7a45bf142dea19553a0bcedc6df23172793f37b4de64f2c3",
+   "api/app/api/auth_limits.py": "94724a23c21c2210109b96ecd2bc6bbfef5ce7361d24ffac342222c7e6a4e5a0",
+   "api/app/api/errors.py": "6968e6dbccdb84f5d5bae15f29e92736fe666ca7253cc8ab524b7ba813cff25e",
+   "api/app/api/routes/auth.py": "57391d149a0fb1a9695a4b4a5ec6019f452c7543f49957dd959388965e63aa06",
+   "api/app/config.py": "f3d625d1ee0c1e972bcfc489399d652ecb0ae46437c6d2597dc472c75fa58066",
+   "api/app/delivery.py": "5cfa75f9f02ceeaf9574cc04db8ac93c4acdf5fa5136af5ef4e2b78f518e47f1",
+   "api/app/identity/invitations.py": "ac3171a62d3e0741dcff4b30ec8acef89184910d2711249f5088de8cd92c9d15",
+   "api/app/rate_limit.py": "cc98ae58c353cde660a885998d50853f818d8e3b2a12cfaff2c12219b3dcd98b",
+   "api/app/smtp_transport.py": "c901b14423556f23570f90c2be8b9245b67c0da1fc52d9212ca75f450b2d7d8b",
+   "api/pyproject.toml": "4005594bd52ba2a323b43b88328e9292627f22a42794725adf2faf3ff4ad5256",
+   "api/tests/conftest.py": "18f38a983e0af2b6cf9838eadc4339fdb91d6d7156842c9dbf9a2aba8936d8f0",
+   "api/tests/m8a_tls.py": "0e5af6029818a333c7cc333e79fed96311de964d95048c4683afc85ac384d97d",
+   "api/tests/smtp_capture.py": "57aea98780331ec78a522b8f4164a8eb924c4bb36562b4cc8529b4cccd3ee7ff",
+   "api/tests/test_c2a_origin.py": "e6334ad9c631b41ef0e7c1fa9bea5dbc430f9303bf7af725ce66ef4ef8eddabe",
+   "api/tests/test_c3_operator_recovery.py": "9224e08b7ec60540dc2336fbb7c25399dc07129fe781401a58c3f4f3399dba4b",
+   "api/tests/test_m8a_auth_delivery.py": "770a4c73a404a5824ee5a888e3c24576965e4c268ff4909af71a2352175b1e6f",
+   "api/tests/test_m8a_ci_guard.py": "6002ab5d3fd78fb9c72f59e2ee2b258a1c8b06853839488914de66a2861b8582",
+   "api/tests/test_m8a_rate_limit.py": "338e4cd6d6a10c97c6beebf426e66f75c4e2dd66d6887337be9bb28cdfa71ec4",
+   "api/tests/test_m8a_smtp_deadline.py": "96dc1996fa3dc2f9f4ba8469f204c9e340c4aa09b1a83bb51418e960b3afc151",
+   "api/tests/test_m8a_smtp_delivery.py": "065e6d477c45ac03dd570d65e0a7681b36e1492d97be957d33a492ada42ceae7",
+   "deploy/Caddyfile": "9a3978a660f8195834248187d937b60e2fb2ba0b7ebe1073f7f47b671a79d6f8",
+   "deploy/caddy/tls.d/README.md": "77a25c8b1813947bae6f9ea5944bc984d63a0ed0a3d46a464f22b13115ed88bc",
+   "deploy/compose.yaml": "6be05d848b1a8ae040085d70c3bc4157cb070a2e527a6f71c4719077d8cf31a3",
+   "deploy/pilot.env.example": "d768a5b21ca598ed6431ebea0383c434cd74e00028a97d87bfabcea3d1245d90",
+   "deploy/trust/README.md": "4302f9e23178fbf44bd5c58682e47daf5df9e9e73a41c4b6143eceea80cd7130",
+   "docker-compose.yml": "f79def489c14058ac9077f9f6842b1c157bb0637f976a89a4c792bc0becf3b78",
+   "docs/README.md": "c298ca83e7fdba6d6b839fe0194d6b20ac2b9920c42b3e9b86826c497eb3df61",
+   "docs/decisions.md": "d3dea77f543ec63e011e497eada5669c66da0edae9d11395ff9bca0a989b7718",
+   "docs/dev-setup.md": "628cca90c0a5667d5e08718efa061479fbb5bd0633dcde4e38d0d8f95b0b55f2",
+   "docs/m8a-pilot-entry-hardening.md": "4c8224fd80a9e67c88860639b67c32a7b8cc94362e5e7620ca446d2d36b77ee2",
+   "docs/mvp-delivery-plan.md": "26f52708066e7c53a6a71894aa8c23a1f0cc47e30b90273db8eba5756a6e8cb1",
+   "docs/reviews/pr65-m7b-human-quality-review.md": "39a14f4c3914492361687821b035c45a481c70599766e66b3a3d0b1d116f71ca",
+   "docs/reviews/pr66-m8a-pilot-entry-hardening.md": "1b8430529840272f5f303f3f1778483936d1eb61c63ec4f8ec057b49fdfa5322",
+   "docs/roadmap.md": "957fb518b94088f8aaef60219c9b7fa196d4b1cd469b7f5ad20b1aac8f49ccc1",
+   "docs/tasks/fix-pr65-human-review-provenance.md": "a7c7da6c39ea23bb9d9c2dd7566976fae70ae2ba7f211d7de84aa799419861a0",
+   "docs/tasks/fix-pr66-smtp-deadline-deploy-image-ci-artifacts.md": "1e1a5086f372a69c8f4eafa7951a9f52ba88dbfbc15bb51982e5bda6e2e41d56",
+   "docs/tasks/m8a-pilot-entry-hardening.md": "d31da3c786f52074a0778956921374af6f016703202792ab1f11e7e7bd19fd0e",
+   "scripts/m8a_browser.Dockerfile": "a209dca55448c708f1da8a5fad22c48b21211e3e676b169624ec3754f621441c",
+   "scripts/m8a_browser.py": "337b0845b88c516888a1c1786b7573459bd99a5fa1a8d98f939a0da3b278a680",
+   "scripts/m8a_ci_scan.py": "12643126faacc6279611d50b12f2bc80c4d19895571c1a5792d8a6ed1ad738aa",
+   "scripts/m8a_counterchecks.py": "ea17ea101c1a95e20b6e7187ec6b0fac907e350e5aaefc27833dea74c11ed569",
+   "scripts/m8a_deploy_check.py": "6eb3878fc594f209dfddefbaee2fb561ffa1f98d337eb67b2a814bfd0bca9b78",
+   "scripts/m8a_inventory.py": "85a3ca45014b602559f1f10938af32e0ed8f984b8a17893782819992f0dfef40",
+   "scripts/m8a_minio_check.py": "5482328b630262da6c664277513fbb94a2a463bdef0147e93c1c11d7d0683c51",
+   "scripts/m8a_probe.py": "36cbb4d96ca7273f86998cac4e4cb61eafcaaef0a57958aff17c9444a6560286",
+   "scripts/m8a_smoke.py": "883b89bd04ccee63b964cba449771ac0813a0637bb58a0091e0144bb636df871",
+   "scripts/m8a_test_host.py": "7961df3e912e30cdf584f5acfbd50f64fd517188e4788fd5d530932bbccc58f8",
+   "web/app/admin/page.tsx": "35c3917baf03f8aa3a3d0880604af952575ea51cfb10fc6c8987019e7e5143a0",
+   "web/lib/api.ts": "62b9f6d6b153c3be8817da0ae455f79a83c38cf210dbb219a491469f722f234b",
+   "web/lib/proxy.ts": "2f72003bd0d61d2eb9827a72ccef675ceecb6c2463d23c7e0c4effa6b1efc3d3",
+   "web/tests/edge-trust.test.mjs": "0590b9585b1fabef6e7e12590e4cb7a3e31a71c593f16a2b3824996f60cf8d4a",
+   "web/tests/proxy.test.mjs": "200fb5d4547a3d65b02729d2a8e9f378dac433844f26aaf4d53779c3d33997e6"
+  }
+ },
+ "junit": {
+  "selection-6": {
+   "sha256": "b07a2204dbcf6855a02c24d629fa63e20432e1e5afe560f2fb93550485b9cb43",
+   "total": 1102,
+   "pass": 1102,
+   "per_file": {
+    "tests/test_auth_safety_foundation.py": {
+     "pass": 154
+    },
+    "tests/test_auth_secrets.py": {
+     "pass": 1
+    },
+    "tests/test_auth_sessions.py": {
+     "pass": 19
+    },
+    "tests/test_c2a_login_sessions.py": {
+     "pass": 68
+    },
+    "tests/test_c2a_origin.py": {
+     "pass": 66
+    },
+    "tests/test_c2b_reset_status.py": {
+     "pass": 103
+    },
+    "tests/test_c2c1_bootstrap.py": {
+     "pass": 74
+    },
+    "tests/test_c2c2_invitations.py": {
+     "pass": 151
+    },
+    "tests/test_c4_contract.py": {
+     "pass": 23
+    },
+    "tests/test_config.py": {
+     "pass": 61
+    },
+    "tests/test_csrf_and_cookies.py": {
+     "pass": 8
+    },
+    "tests/test_health.py": {
+     "pass": 6
+    },
+    "tests/test_invitation_journal.py": {
+     "pass": 88
+    },
+    "tests/test_invitations.py": {
+     "pass": 20
+    },
+    "tests/test_m8a_auth_delivery.py": {
+     "pass": 11
+    },
+    "tests/test_m8a_rate_limit.py": {
+     "pass": 26
+    },
+    "tests/test_m8a_smtp_delivery.py": {
+     "pass": 25
+    },
+    "tests/test_migrations.py": {
+     "pass": 28
+    },
+    "tests/test_password_reset.py": {
+     "pass": 10
+    },
+    "tests/test_pre_c4_initial_receipts.py": {
+     "pass": 18
+    },
+    "tests/test_reset_token_journal.py": {
+     "pass": 92
+    },
+    "tests/test_session_revocation_journal.py": {
+     "pass": 50
+    }
+   }
+  },
+  "selection-5": {
+   "sha256": "803340d2c525cc1a34fa23591f0adad58cc786f74fa168ebd100eac2ce2ac19d",
+   "total": 1102,
+   "pass": 1067,
+   "failure": 35,
+   "per_file": {
+    "tests/test_auth_safety_foundation.py": {
+     "pass": 154
+    },
+    "tests/test_auth_secrets.py": {
+     "pass": 1
+    },
+    "tests/test_auth_sessions.py": {
+     "pass": 19
+    },
+    "tests/test_c2a_login_sessions.py": {
+     "pass": 68
+    },
+    "tests/test_c2a_origin.py": {
+     "pass": 31,
+     "failure": 35
+    },
+    "tests/test_c2b_reset_status.py": {
+     "pass": 103
+    },
+    "tests/test_c2c1_bootstrap.py": {
+     "pass": 74
+    },
+    "tests/test_c2c2_invitations.py": {
+     "pass": 151
+    },
+    "tests/test_c4_contract.py": {
+     "pass": 23
+    },
+    "tests/test_config.py": {
+     "pass": 61
+    },
+    "tests/test_csrf_and_cookies.py": {
+     "pass": 8
+    },
+    "tests/test_health.py": {
+     "pass": 6
+    },
+    "tests/test_invitation_journal.py": {
+     "pass": 88
+    },
+    "tests/test_invitations.py": {
+     "pass": 20
+    },
+    "tests/test_m8a_auth_delivery.py": {
+     "pass": 11
+    },
+    "tests/test_m8a_rate_limit.py": {
+     "pass": 26
+    },
+    "tests/test_m8a_smtp_delivery.py": {
+     "pass": 25
+    },
+    "tests/test_migrations.py": {
+     "pass": 28
+    },
+    "tests/test_password_reset.py": {
+     "pass": 10
+    },
+    "tests/test_pre_c4_initial_receipts.py": {
+     "pass": 18
+    },
+    "tests/test_reset_token_journal.py": {
+     "pass": 92
+    },
+    "tests/test_session_revocation_journal.py": {
+     "pass": 50
+    }
+   }
+  },
+  "selection-3": {
+   "sha256": "a865582be3827ee75801356d7bc33e5951bc31231d54210e69c61be492e18198",
+   "total": 1102,
+   "pass": 646,
+   "failure": 63,
+   "error": 393,
+   "per_file": {
+    "tests/test_auth_safety_foundation.py": {
+     "pass": 131,
+     "failure": 23
+    },
+    "tests/test_auth_secrets.py": {
+     "pass": 1
+    },
+    "tests/test_auth_sessions.py": {
+     "pass": 19
+    },
+    "tests/test_c2a_login_sessions.py": {
+     "error": 68
+    },
+    "tests/test_c2a_origin.py": {
+     "pass": 31,
+     "failure": 35
+    },
+    "tests/test_c2b_reset_status.py": {
+     "error": 100,
+     "failure": 2,
+     "pass": 1
+    },
+    "tests/test_c2c1_bootstrap.py": {
+     "pass": 74
+    },
+    "tests/test_c2c2_invitations.py": {
+     "pass": 151
+    },
+    "tests/test_c4_contract.py": {
+     "pass": 22,
+     "failure": 1
+    },
+    "tests/test_config.py": {
+     "pass": 61
+    },
+    "tests/test_csrf_and_cookies.py": {
+     "pass": 8
+    },
+    "tests/test_health.py": {
+     "pass": 6
+    },
+    "tests/test_invitation_journal.py": {
+     "error": 87,
+     "pass": 1
+    },
+    "tests/test_invitations.py": {
+     "pass": 20
+    },
+    "tests/test_m8a_auth_delivery.py": {
+     "pass": 11
+    },
+    "tests/test_m8a_rate_limit.py": {
+     "pass": 26
+    },
+    "tests/test_m8a_smtp_delivery.py": {
+     "pass": 25
+    },
+    "tests/test_migrations.py": {
+     "pass": 27,
+     "failure": 1
+    },
+    "tests/test_password_reset.py": {
+     "pass": 10
+    },
+    "tests/test_pre_c4_initial_receipts.py": {
+     "pass": 17,
+     "failure": 1
+    },
+    "tests/test_reset_token_journal.py": {
+     "error": 90,
+     "pass": 2
+    },
+    "tests/test_session_revocation_journal.py": {
+     "error": 48,
+     "pass": 2
+    }
+   }
+  },
+  "selection-2": {
+   "sha256": "6dee0c85c441ccef797b32491d62620e110de276763e8171da813fe73ce6bd3b",
+   "total": 1102,
+   "pass": 344,
+   "failure": 49,
+   "error": 709,
+   "per_file": {
+    "tests/test_auth_safety_foundation.py": {
+     "pass": 76,
+     "error": 71,
+     "failure": 7
+    },
+    "tests/test_auth_secrets.py": {
+     "pass": 1
+    },
+    "tests/test_auth_sessions.py": {
+     "pass": 19
+    },
+    "tests/test_c2a_login_sessions.py": {
+     "error": 68
+    },
+    "tests/test_c2a_origin.py": {
+     "pass": 31,
+     "failure": 35
+    },
+    "tests/test_c2b_reset_status.py": {
+     "error": 103
+    },
+    "tests/test_c2c1_bootstrap.py": {
+     "error": 74
+    },
+    "tests/test_c2c2_invitations.py": {
+     "error": 151
+    },
+    "tests/test_c4_contract.py": {
+     "pass": 22,
+     "failure": 1
+    },
+    "tests/test_config.py": {
+     "pass": 61
+    },
+    "tests/test_csrf_and_cookies.py": {
+     "pass": 8
+    },
+    "tests/test_health.py": {
+     "pass": 6
+    },
+    "tests/test_invitation_journal.py": {
+     "error": 87,
+     "failure": 1
+    },
+    "tests/test_invitations.py": {
+     "pass": 20
+    },
+    "tests/test_m8a_auth_delivery.py": {
+     "pass": 11
+    },
+    "tests/test_m8a_rate_limit.py": {
+     "pass": 26
+    },
+    "tests/test_m8a_smtp_delivery.py": {
+     "pass": 25
+    },
+    "tests/test_migrations.py": {
+     "pass": 27,
+     "failure": 1
+    },
+    "tests/test_password_reset.py": {
+     "pass": 10
+    },
+    "tests/test_pre_c4_initial_receipts.py": {
+     "error": 17,
+     "pass": 1
+    },
+    "tests/test_reset_token_journal.py": {
+     "error": 90,
+     "failure": 2
+    },
+    "tests/test_session_revocation_journal.py": {
+     "error": 48,
+     "failure": 2
+    }
+   }
+  },
+  "github-run-3": {
+   "sha256": "341d6d89acda64d09fbfd3ecb42f42345d311451011f2b1731a52efba962852f",
+   "total": 1102,
+   "pass": 1102,
+   "per_file": {
+    "tests/test_auth_safety_foundation.py": {
+     "pass": 154
+    },
+    "tests/test_auth_secrets.py": {
+     "pass": 1
+    },
+    "tests/test_auth_sessions.py": {
+     "pass": 19
+    },
+    "tests/test_c2a_login_sessions.py": {
+     "pass": 68
+    },
+    "tests/test_c2a_origin.py": {
+     "pass": 66
+    },
+    "tests/test_c2b_reset_status.py": {
+     "pass": 103
+    },
+    "tests/test_c2c1_bootstrap.py": {
+     "pass": 74
+    },
+    "tests/test_c2c2_invitations.py": {
+     "pass": 151
+    },
+    "tests/test_c4_contract.py": {
+     "pass": 23
+    },
+    "tests/test_config.py": {
+     "pass": 61
+    },
+    "tests/test_csrf_and_cookies.py": {
+     "pass": 8
+    },
+    "tests/test_health.py": {
+     "pass": 6
+    },
+    "tests/test_invitation_journal.py": {
+     "pass": 88
+    },
+    "tests/test_invitations.py": {
+     "pass": 20
+    },
+    "tests/test_m8a_auth_delivery.py": {
+     "pass": 11
+    },
+    "tests/test_m8a_rate_limit.py": {
+     "pass": 26
+    },
+    "tests/test_m8a_smtp_delivery.py": {
+     "pass": 25
+    },
+    "tests/test_migrations.py": {
+     "pass": 28
+    },
+    "tests/test_password_reset.py": {
+     "pass": 10
+    },
+    "tests/test_pre_c4_initial_receipts.py": {
+     "pass": 18
+    },
+    "tests/test_reset_token_journal.py": {
+     "pass": 92
+    },
+    "tests/test_session_revocation_journal.py": {
+     "pass": 50
+    }
+   }
+  },
+  "github-run-2": {
+   "sha256": "af60b7b4ecfc7e5fc3ee4b38765160ad0c57b279d4ed8be4ce6c6af3fd891743",
+   "total": 1102,
+   "pass": 908,
+   "error": 168,
+   "failure": 26,
+   "per_file": {
+    "tests/test_auth_safety_foundation.py": {
+     "pass": 131,
+     "failure": 23
+    },
+    "tests/test_auth_secrets.py": {
+     "pass": 1
+    },
+    "tests/test_auth_sessions.py": {
+     "pass": 19
+    },
+    "tests/test_c2a_login_sessions.py": {
+     "error": 68
+    },
+    "tests/test_c2a_origin.py": {
+     "pass": 66
+    },
+    "tests/test_c2b_reset_status.py": {
+     "error": 100,
+     "failure": 2,
+     "pass": 1
+    },
+    "tests/test_c2c1_bootstrap.py": {
+     "pass": 74
+    },
+    "tests/test_c2c2_invitations.py": {
+     "pass": 151
+    },
+    "tests/test_c4_contract.py": {
+     "pass": 22,
+     "failure": 1
+    },
+    "tests/test_config.py": {
+     "pass": 61
+    },
+    "tests/test_csrf_and_cookies.py": {
+     "pass": 8
+    },
+    "tests/test_health.py": {
+     "pass": 6
+    },
+    "tests/test_invitation_journal.py": {
+     "pass": 88
+    },
+    "tests/test_invitations.py": {
+     "pass": 20
+    },
+    "tests/test_m8a_auth_delivery.py": {
+     "pass": 11
+    },
+    "tests/test_m8a_rate_limit.py": {
+     "pass": 26
+    },
+    "tests/test_m8a_smtp_delivery.py": {
+     "pass": 25
+    },
+    "tests/test_migrations.py": {
+     "pass": 28
+    },
+    "tests/test_password_reset.py": {
+     "pass": 10
+    },
+    "tests/test_pre_c4_initial_receipts.py": {
+     "pass": 18
+    },
+    "tests/test_reset_token_journal.py": {
+     "pass": 92
+    },
+    "tests/test_session_revocation_journal.py": {
+     "pass": 50
+    }
+   }
+  },
+  "linux-container": {
+   "sha256": "7f7d91feca6274547f4e1b77d3298ab2836f3d0965b0f4f66a3f8d81810e9d30",
+   "total": 1102,
+   "pass": 877,
+   "error": 225,
+   "per_file": {
+    "tests/test_auth_safety_foundation.py": {
+     "pass": 154
+    },
+    "tests/test_auth_secrets.py": {
+     "pass": 1
+    },
+    "tests/test_auth_sessions.py": {
+     "pass": 19
+    },
+    "tests/test_c2a_login_sessions.py": {
+     "pass": 68
+    },
+    "tests/test_c2a_origin.py": {
+     "pass": 66
+    },
+    "tests/test_c2b_reset_status.py": {
+     "pass": 103
+    },
+    "tests/test_c2c1_bootstrap.py": {
+     "pass": 74
+    },
+    "tests/test_c2c2_invitations.py": {
+     "pass": 151
+    },
+    "tests/test_c4_contract.py": {
+     "pass": 23
+    },
+    "tests/test_config.py": {
+     "pass": 61
+    },
+    "tests/test_csrf_and_cookies.py": {
+     "pass": 8
+    },
+    "tests/test_health.py": {
+     "pass": 6
+    },
+    "tests/test_invitation_journal.py": {
+     "error": 87,
+     "pass": 1
+    },
+    "tests/test_invitations.py": {
+     "pass": 20
+    },
+    "tests/test_m8a_auth_delivery.py": {
+     "pass": 11
+    },
+    "tests/test_m8a_rate_limit.py": {
+     "pass": 26
+    },
+    "tests/test_m8a_smtp_delivery.py": {
+     "pass": 25
+    },
+    "tests/test_migrations.py": {
+     "pass": 28
+    },
+    "tests/test_password_reset.py": {
+     "pass": 10
+    },
+    "tests/test_pre_c4_initial_receipts.py": {
+     "pass": 18
+    },
+    "tests/test_reset_token_journal.py": {
+     "error": 90,
+     "pass": 2
+    },
+    "tests/test_session_revocation_journal.py": {
+     "error": 48,
+     "pass": 2
+    }
+   }
+  },
+  "pr66-selection-fix-2": {
+   "sha256": "e323d5825d51cba87a780efbfda1cd3b79e89c2da961762bbd4ebfe406c242ab",
+   "total": 1122,
+   "pass": 1122,
+   "per_file": {
+    "tests/test_auth_safety_foundation.py": {
+     "pass": 154
+    },
+    "tests/test_auth_secrets.py": {
+     "pass": 1
+    },
+    "tests/test_auth_sessions.py": {
+     "pass": 19
+    },
+    "tests/test_c2a_login_sessions.py": {
+     "pass": 68
+    },
+    "tests/test_c2a_origin.py": {
+     "pass": 66
+    },
+    "tests/test_c2b_reset_status.py": {
+     "pass": 103
+    },
+    "tests/test_c2c1_bootstrap.py": {
+     "pass": 74
+    },
+    "tests/test_c2c2_invitations.py": {
+     "pass": 151
+    },
+    "tests/test_c4_contract.py": {
+     "pass": 23
+    },
+    "tests/test_config.py": {
+     "pass": 61
+    },
+    "tests/test_csrf_and_cookies.py": {
+     "pass": 8
+    },
+    "tests/test_health.py": {
+     "pass": 6
+    },
+    "tests/test_invitation_journal.py": {
+     "pass": 88
+    },
+    "tests/test_invitations.py": {
+     "pass": 20
+    },
+    "tests/test_m8a_auth_delivery.py": {
+     "pass": 11
+    },
+    "tests/test_m8a_ci_guard.py": {
+     "pass": 11
+    },
+    "tests/test_m8a_rate_limit.py": {
+     "pass": 26
+    },
+    "tests/test_m8a_smtp_deadline.py": {
+     "pass": 9
+    },
+    "tests/test_m8a_smtp_delivery.py": {
+     "pass": 25
+    },
+    "tests/test_migrations.py": {
+     "pass": 28
+    },
+    "tests/test_password_reset.py": {
+     "pass": 10
+    },
+    "tests/test_pre_c4_initial_receipts.py": {
+     "pass": 18
+    },
+    "tests/test_reset_token_journal.py": {
+     "pass": 92
+    },
+    "tests/test_session_revocation_journal.py": {
+     "pass": 50
+    }
+   }
+  },
+  "pr66-deadline-before": {
+   "sha256": "9c15bbea134163ca0f100bfd1360f7b1fccd53f6ebe048e4e7422a4fda82e00e",
+   "total": 8,
+   "pass": 2,
+   "failure": 6,
+   "per_file": {
+    "tests/test_m8a_smtp_deadline.py": {
+     "pass": 2,
+     "failure": 6
+    }
+   }
+  },
+  "pr66-deadline-after": {
+   "sha256": "7b0aef00e4760a76993eda38654ad64350ad46dcefae4da18ca2db4e6d33f235",
+   "total": 33,
+   "pass": 33,
+   "per_file": {
+    "tests/test_m8a_smtp_deadline.py": {
+     "pass": 8
+    },
+    "tests/test_m8a_smtp_delivery.py": {
+     "pass": 25
+    }
+   }
+  },
+  "pr66-ci-guard-before": {
+   "sha256": "a9270512051679ba4365d1c3ef79df75a7a14a069fe452d59936fb032128f127",
+   "total": 11,
+   "failure": 7,
+   "pass": 4,
+   "per_file": {
+    "tests/test_m8a_ci_guard.py": {
+     "failure": 7,
+     "pass": 4
+    }
+   }
+  },
+  "pr66-ci-guard-final": {
+   "sha256": "ec9a9f495e3e0dad64fa8948852679b3993acbbe0516dc4f3067464b428a36b9",
+   "total": 11,
+   "pass": 11,
+   "per_file": {
+    "tests/test_m8a_ci_guard.py": {
+     "pass": 11
+    }
+   }
+  },
+  "pr66-github-run": {
+   "sha256": "2856e7677ff47cad437281f5650046265c704c822234144b0bee481c40686bef",
+   "total": 1122,
+   "pass": 1122,
+   "per_file": {
+    "tests/test_auth_safety_foundation.py": {
+     "pass": 154
+    },
+    "tests/test_auth_secrets.py": {
+     "pass": 1
+    },
+    "tests/test_auth_sessions.py": {
+     "pass": 19
+    },
+    "tests/test_c2a_login_sessions.py": {
+     "pass": 68
+    },
+    "tests/test_c2a_origin.py": {
+     "pass": 66
+    },
+    "tests/test_c2b_reset_status.py": {
+     "pass": 103
+    },
+    "tests/test_c2c1_bootstrap.py": {
+     "pass": 74
+    },
+    "tests/test_c2c2_invitations.py": {
+     "pass": 151
+    },
+    "tests/test_c4_contract.py": {
+     "pass": 23
+    },
+    "tests/test_config.py": {
+     "pass": 61
+    },
+    "tests/test_csrf_and_cookies.py": {
+     "pass": 8
+    },
+    "tests/test_health.py": {
+     "pass": 6
+    },
+    "tests/test_invitation_journal.py": {
+     "pass": 88
+    },
+    "tests/test_invitations.py": {
+     "pass": 20
+    },
+    "tests/test_m8a_auth_delivery.py": {
+     "pass": 11
+    },
+    "tests/test_m8a_ci_guard.py": {
+     "pass": 11
+    },
+    "tests/test_m8a_rate_limit.py": {
+     "pass": 26
+    },
+    "tests/test_m8a_smtp_deadline.py": {
+     "pass": 9
+    },
+    "tests/test_m8a_smtp_delivery.py": {
+     "pass": 25
+    },
+    "tests/test_migrations.py": {
+     "pass": 28
+    },
+    "tests/test_password_reset.py": {
+     "pass": 10
+    },
+    "tests/test_pre_c4_initial_receipts.py": {
+     "pass": 18
+    },
+    "tests/test_reset_token_journal.py": {
+     "pass": 92
+    },
+    "tests/test_session_revocation_journal.py": {
+     "pass": 50
+    }
+   }
+  }
+ },
+ "results": {
+  "smoke3-http": {
+   "sha256": "558a1247c08db0a25a0a714fbfbda5de7ebee1d06d27d49d0979a7f96841961b",
+   "checks": [
+    {
+     "check": "deploy contract on the smoke env, Settings validated inside the API image",
+     "pass": true
+    },
+    {
+     "check": "only the edge publishes host ports (127.0.0.1)",
+     "pass": true
+    },
+    {
+     "check": "api/worker/beat run one API image digest",
+     "pass": true
+    },
+    {
+     "check": "API image code/migrations match host bytes (211 files)",
+     "pass": true
+    },
+    {
+     "check": "public network reaches only the edge",
+     "pass": true
+    },
+    {
+     "check": "egress network reaches only api (no db/redis/minio/web)",
+     "pass": true
+    },
+    {
+     "check": "API readiness passes on real postconditions",
+     "pass": true
+    },
+    {
+     "check": "HTTP redirects to HTTPS",
+     "pass": true
+    },
+    {
+     "check": "HTTP write is only redirected, never served",
+     "pass": true
+    },
+    {
+     "check": "system trust store does not trust the test CA",
+     "pass": true
+    },
+    {
+     "check": "unknown SNI/host gets no certificate",
+     "pass": true
+    },
+    {
+     "check": "HTTPS with the test CA serves the web app with HSTS",
+     "pass": true
+    },
+    {
+     "check": "dev outbox, API docs and health are not public",
+     "pass": true
+    },
+    {
+     "check": "one-time bootstrap through the runtime CLI",
+     "pass": true
+    },
+    {
+     "check": "HTTPS login sets __Host- session cookie Secure/HttpOnly/SameSite=Lax/Path=/ without Domain",
+     "pass": true
+    },
+    {
+     "check": "write with Origin 'http://ras.test' is refused",
+     "pass": true
+    },
+    {
+     "check": "write with Origin 'https://evil.test' is refused",
+     "pass": true
+    },
+    {
+     "check": "write with Origin None is refused",
+     "pass": true
+    },
+    {
+     "check": "Admin session still live after refused writes",
+     "pass": true
+    },
+    {
+     "check": "Admin invites a over HTTPS",
+     "pass": true
+    },
+    {
+     "check": "invite mail for a went over verified TLS with AUTH; link is HTTPS fragment",
+     "pass": true
+    },
+    {
+     "check": "a inspects then accepts the invitation",
+     "pass": true
+    },
+    {
+     "check": "a logs in",
+     "pass": true
+    },
+    {
+     "check": "Admin invites b over HTTPS",
+     "pass": true
+    },
+    {
+     "check": "invite mail for b went over verified TLS with AUTH; link is HTTPS fragment",
+     "pass": true
+    },
+    {
+     "check": "b inspects then accepts the invitation",
+     "pass": true
+    },
+    {
+     "check": "b logs in",
+     "pass": true
+    },
+    {
+     "check": "A uploads a private Markdown file through the proxy",
+     "pass": true
+    },
+    {
+     "check": "private ACL matrix: owner 200, other User and Admin 404",
+     "pass": true
+    },
+    {
+     "check": "worker extracts the upload and stops before paid embedding (pricing false)",
+     "pass": true
+    },
+    {
+     "check": "RAG answers the unverified-pricing 503, not an answer",
+     "pass": true
+    },
+    {
+     "check": "hybrid search over unindexed scope: 200, 0 hits, no provider cost",
+     "pass": true
+    },
+    {
+     "check": "reset request answers the same for existing and unknown email",
+     "pass": true
+    },
+    {
+     "check": "no mail for the unknown address",
+     "pass": true
+    },
+    {
+     "check": "A confirms the reset link",
+     "pass": true
+    },
+    {
+     "check": "old password no longer logs in",
+     "pass": true
+    },
+    {
+     "check": "A's earlier session ended",
+     "pass": true
+    },
+    {
+     "check": "used reset token is refused",
+     "pass": true
+    },
+    {
+     "check": "A logs in with the new password",
+     "pass": true
+    },
+    {
+     "check": "source limit through edge ignores forged IP/edge-token headers: 429 + Retry-After after the quota",
+     "pass": true
+    },
+    {
+     "check": "same source is blocked even with the right password",
+     "pass": true
+    },
+    {
+     "check": "another source is not blocked by this source's quota",
+     "pass": true
+    },
+    {
+     "check": "after Retry-After the window ends and login works again",
+     "pass": true
+    },
+    {
+     "check": "direct API connection outside the topology: forged client headers ignored, keyed by its own peer",
+     "pass": true
+    },
+    {
+     "check": "direct web connection with a forged edge token: client header not forwarded (one bucket)",
+     "pass": true
+    },
+    {
+     "check": "account bucket limits one email",
+     "pass": true
+    },
+    {
+     "check": "reset limit is identical for an existing and an unknown email",
+     "pass": true
+    },
+    {
+     "check": "limited reset requests sent no extra mail",
+     "pass": true
+    },
+    {
+     "check": "Admin logs in again",
+     "pass": true
+    },
+    {
+     "check": "SMTP reject: 503 delivery_failed and the invitation is revoked (compensated)",
+     "pass": true
+    },
+    {
+     "check": "SMTP reject during reset: same generic 202, nothing captured",
+     "pass": true
+    },
+    {
+     "check": "SMTP down: 503 delivery_failed (no retry, no token in response)",
+     "pass": true
+    },
+    {
+     "check": "Redis down: auth answers 503 rate_limit_unavailable with Retry-After, no cookie",
+     "pass": true
+    },
+    {
+     "check": "Redis down: API readiness (liveness of gate) stays 200",
+     "pass": true
+    },
+    {
+     "check": "Redis down: an existing session still reads",
+     "pass": true
+    },
+    {
+     "check": "Redis back: login works, no account lockout",
+     "pass": true
+    },
+    {
+     "check": "connections/slots released after failures: 25 reads succeed",
+     "pass": true
+    },
+    {
+     "check": "recovery hold CLI ran",
+     "pass": true
+    },
+    {
+     "check": "hold closes the gate for traffic through the edge",
+     "pass": true
+    },
+    {
+     "check": "hold makes readiness fail",
+     "pass": true
+    },
+    {
+     "check": "recover reopens after postconditions",
+     "pass": true
+    },
+    {
+     "check": "missing journal closes the gate",
+     "pass": true
+    },
+    {
+     "check": "journal back: gate open",
+     "pass": true
+    },
+    {
+     "check": "torn journal closes the gate",
+     "pass": true
+    },
+    {
+     "check": "journal restored byte-for-byte: gate open",
+     "pass": true
+    },
+    {
+     "check": "compose logs contain no token, password, secret, email or link",
+     "pass": true
+    }
+   ]
+  },
+  "smoke3-chrome": {
+   "sha256": "3afde6d296f51cf050b52d00a1f96a6da7014913e58ce9bde5c4bc5095e04184",
+   "chrome": "155.0.8059.84",
+   "checks": [
+    {
+     "check": "control: Chrome without the test CA refuses the site (ERR_CERT_AUTHORITY_INVALID)",
+     "pass": true
+    },
+    {
+     "check": "Chrome verifies the test CA chain and logs the Admin in over HTTPS",
+     "pass": true
+    },
+    {
+     "check": "browser holds __Host-ras_session Secure, HttpOnly, SameSite=Lax",
+     "pass": true
+    },
+    {
+     "check": "Admin invites from the UI; the notice does not promise receipt",
+     "pass": true
+    },
+    {
+     "check": "invite link from the SMTP capture activates the account in Chrome",
+     "pass": true
+    },
+    {
+     "check": "new User logs in",
+     "pass": true
+    },
+    {
+     "check": "reset link from the capture changes the password in Chrome",
+     "pass": true
+    },
+    {
+     "check": "old password is refused in the UI",
+     "pass": true
+    },
+    {
+     "check": "per-upload consent then upload over HTTPS",
+     "pass": true
+    },
+    {
+     "check": "item page shows extraction done, waiting for index (pricing false)",
+     "pass": true
+    },
+    {
+     "check": "library lists the upload",
+     "pass": true
+    },
+    {
+     "check": "collection created and the upload added",
+     "pass": true
+    },
+    {
+     "check": "hybrid search over unindexed uploads shows 0 passages (no provider call; not a quality result)",
+     "pass": true
+    },
+    {
+     "check": "keyword search request completes (unindexed upload is not searchable)",
+     "pass": true
+    },
+    {
+     "check": "429 is shown with the wait time and the page does not resubmit",
+     "pass": true
+    },
+    {
+     "check": "no request left the HTTPS origin",
+     "pass": true
+    }
+   ],
+   "outbound_denied": 0
+  },
+  "counterchecks": {
+   "sha256": "1b3041942dee5a98ebb6be9f8608e57133a57f98022848fafaf34f7ddcccf668",
+   "source_files": 287,
+   "source_unchanged": true,
+   "results": [
+    {
+     "mutation": "tls_verify",
+     "file": "app/delivery.py",
+     "tests": [
+      "tests/test_m8a_smtp_delivery.py::test_unknown_ca_is_refused_before_any_mail_command",
+      "tests/test_m8a_smtp_delivery.py::test_hostname_mismatch_is_refused"
+     ],
+     "exit": 1,
+     "holds": true
+    },
+    {
+     "mutation": "https_origin",
+     "file": "app/config.py",
+     "tests": [
+      "tests/test_m8a_smtp_delivery.py::test_smtp_mode_requires_settings_and_https_link_base_in_production"
+     ],
+     "exit": 1,
+     "holds": true
+    },
+    {
+     "mutation": "trusted_ip",
+     "file": "app/rate_limit.py",
+     "tests": [
+      "tests/test_m8a_rate_limit.py::test_untrusted_peer_header_is_ignored",
+      "tests/test_m8a_rate_limit.py::test_spoofed_client_headers_from_an_untrusted_peer_do_not_change_the_bucket"
+     ],
+     "exit": 1,
+     "holds": true
+    },
+    {
+     "mutation": "atomic_limiter",
+     "file": "app/rate_limit.py",
+     "tests": [
+      "tests/test_m8a_rate_limit.py::test_threads_never_admit_more_than_the_limit",
+      "tests/test_m8a_rate_limit.py::test_two_processes_share_one_bucket"
+     ],
+     "exit": 1,
+     "holds": true
+    },
+    {
+     "mutation": "fail_open",
+     "file": "app/rate_limit.py",
+     "tests": [
+      "tests/test_m8a_rate_limit.py::test_secret_problems_and_unreachable_redis_fail_closed",
+      "tests/test_m8a_rate_limit.py::test_redis_outage_is_a_controlled_503_and_health_stays_up"
+     ],
+     "exit": 1,
+     "holds": true
+    },
+    {
+     "mutation": "send_after_lost_proof",
+     "file": "app/identity/invitations.py",
+     "tests": [
+      "tests/test_m8a_auth_delivery.py::test_no_mail_when_the_proof_is_lost_before_sending"
+     ],
+     "exit": 1,
+     "holds": true
+    },
+    {
+     "mutation": "web_edge_token",
+     "file": "lib/proxy.ts",
+     "tests": [
+      "tests/edge-trust.test.mjs"
+     ],
+     "exit": 1,
+     "holds": true
+    }
+   ]
+  },
+  "pr66-minio-check": {
+   "sha256": "2bf3a850085f2669df5209fbf50f2c55e8ed2527f8e91609237e06e824682d98"
+  },
+  "pr66-counterchecks-run1": {
+   "sha256": "7065bbe5b195c858fcee20f092b4f75d2b40cc995247d094699f151adceb5764",
+   "source_files": 377,
+   "source_unchanged": true,
+   "results": [
+    {
+     "mutation": "smtp_deadline",
+     "file": "app/delivery.py",
+     "tests": [
+      "tests/test_m8a_smtp_deadline.py::test_dripped_data_reply_cannot_succeed_after_the_deadline",
+      "tests/test_m8a_smtp_deadline.py::test_slow_or_hung_dns_is_inside_the_deadline[2]"
+     ],
+     "exit": 1,
+     "holds": true
+    },
+    {
+     "mutation": "late_success",
+     "file": "app/delivery.py",
+     "tests": [
+      "tests/test_m8a_smtp_deadline.py::test_a_result_after_the_deadline_is_never_success"
+     ],
+     "exit": 1,
+     "holds": true
+    },
+    {
+     "mutation": "ci_upload_always",
+     "file": ".github/workflows/ci.yml",
+     "tests": [
+      "tests/test_m8a_ci_guard.py::test_workflow_upload_depends_on_a_clean_scan_of_the_published_file"
+     ],
+     "exit": 1,
+     "holds": true
+    },
+    {
+     "mutation": "scan_missing_is_clean",
+     "file": "scripts/m8a_ci_scan.py",
+     "tests": [
+      "tests/test_m8a_ci_guard.py::test_missing_file_is_not_clean"
+     ],
+     "exit": 0,
+     "holds": false
+    },
+    {
+     "mutation": "minio_unpullable_tag",
+     "file": "deploy/compose.yaml",
+     "tests": [
+      "!deploy-check"
+     ],
+     "exit": 1,
+     "holds": true
+    },
+    {
+     "mutation": "tls_verify",
+     "file": "app/smtp_transport.py",
+     "tests": [
+      "tests/test_m8a_smtp_delivery.py::test_unknown_ca_is_refused_before_any_mail_command",
+      "tests/test_m8a_smtp_delivery.py::test_hostname_mismatch_is_refused"
+     ],
+     "exit": 1,
+     "holds": true
+    },
+    {
+     "mutation": "https_origin",
+     "file": "app/config.py",
+     "tests": [
+      "tests/test_m8a_smtp_delivery.py::test_smtp_mode_requires_settings_and_https_link_base_in_production"
+     ],
+     "exit": 1,
+     "holds": true
+    },
+    {
+     "mutation": "trusted_ip",
+     "file": "app/rate_limit.py",
+     "tests": [
+      "tests/test_m8a_rate_limit.py::test_untrusted_peer_header_is_ignored",
+      "tests/test_m8a_rate_limit.py::test_spoofed_client_headers_from_an_untrusted_peer_do_not_change_the_bucket"
+     ],
+     "exit": 1,
+     "holds": true
+    },
+    {
+     "mutation": "atomic_limiter",
+     "file": "app/rate_limit.py",
+     "tests": [
+      "tests/test_m8a_rate_limit.py::test_threads_never_admit_more_than_the_limit",
+      "tests/test_m8a_rate_limit.py::test_two_processes_share_one_bucket"
+     ],
+     "exit": 1,
+     "holds": true
+    },
+    {
+     "mutation": "fail_open",
+     "file": "app/rate_limit.py",
+     "tests": [
+      "tests/test_m8a_rate_limit.py::test_secret_problems_and_unreachable_redis_fail_closed",
+      "tests/test_m8a_rate_limit.py::test_redis_outage_is_a_controlled_503_and_health_stays_up"
+     ],
+     "exit": 1,
+     "holds": true
+    },
+    {
+     "mutation": "send_after_lost_proof",
+     "file": "app/identity/invitations.py",
+     "tests": [
+      "tests/test_m8a_auth_delivery.py::test_no_mail_when_the_proof_is_lost_before_sending"
+     ],
+     "exit": 1,
+     "holds": true
+    },
+    {
+     "mutation": "web_edge_token",
+     "file": "lib/proxy.ts",
+     "tests": [
+      "tests/edge-trust.test.mjs"
+     ],
+     "exit": 1,
+     "holds": true
+    }
+   ]
+  },
+  "pr66-counterchecks-rerun": {
+   "sha256": "b077f0ad580746d81c861572fb78743f49f0c499308cca6348b73992d6fff7f4",
+   "source_files": 377,
+   "source_unchanged": true,
+   "results": [
+    {
+     "mutation": "scan_missing_is_clean",
+     "file": "scripts/m8a_ci_scan.py",
+     "tests": [
+      "tests/test_m8a_ci_guard.py::test_missing_file_is_not_clean"
+     ],
+     "exit": 1,
+     "holds": true
+    }
+   ]
+  },
+  "pr66-smoke4-http": {
+   "sha256": "d96c666808b08802b6ab3c6ed236c2e8ca50d3c07add7cf30f859dcc99c2ba51",
+   "checks": [
+    {
+     "check": "deploy contract on the smoke env, Settings validated inside the API image",
+     "pass": true
+    },
+    {
+     "check": "only the edge publishes host ports (127.0.0.1)",
+     "pass": true
+    },
+    {
+     "check": "api/worker/beat run one API image digest",
+     "pass": true
+    },
+    {
+     "check": "API image code/migrations match host bytes (212 files)",
+     "pass": true
+    },
+    {
+     "check": "public network reaches only the edge",
+     "pass": true
+    },
+    {
+     "check": "egress network reaches only api (no db/redis/minio/web)",
+     "pass": true
+    },
+    {
+     "check": "API readiness passes on real postconditions",
+     "pass": true
+    },
+    {
+     "check": "HTTP redirects to HTTPS",
+     "pass": true
+    },
+    {
+     "check": "HTTP write is only redirected, never served",
+     "pass": true
+    },
+    {
+     "check": "system trust store does not trust the test CA",
+     "pass": true
+    },
+    {
+     "check": "unknown SNI/host gets no certificate",
+     "pass": true
+    },
+    {
+     "check": "HTTPS with the test CA serves the web app with HSTS",
+     "pass": true
+    },
+    {
+     "check": "dev outbox, API docs and health are not public",
+     "pass": true
+    },
+    {
+     "check": "one-time bootstrap through the runtime CLI",
+     "pass": true
+    },
+    {
+     "check": "HTTPS login sets __Host- session cookie Secure/HttpOnly/SameSite=Lax/Path=/ without Domain",
+     "pass": true
+    },
+    {
+     "check": "write with Origin 'http://ras.test' is refused",
+     "pass": true
+    },
+    {
+     "check": "write with Origin 'https://evil.test' is refused",
+     "pass": true
+    },
+    {
+     "check": "write with Origin None is refused",
+     "pass": true
+    },
+    {
+     "check": "Admin session still live after refused writes",
+     "pass": true
+    },
+    {
+     "check": "Admin invites a over HTTPS",
+     "pass": true
+    },
+    {
+     "check": "invite mail for a went over verified TLS with AUTH; link is HTTPS fragment",
+     "pass": true
+    },
+    {
+     "check": "a inspects then accepts the invitation",
+     "pass": true
+    },
+    {
+     "check": "a logs in",
+     "pass": true
+    },
+    {
+     "check": "Admin invites b over HTTPS",
+     "pass": true
+    },
+    {
+     "check": "invite mail for b went over verified TLS with AUTH; link is HTTPS fragment",
+     "pass": true
+    },
+    {
+     "check": "b inspects then accepts the invitation",
+     "pass": true
+    },
+    {
+     "check": "b logs in",
+     "pass": true
+    },
+    {
+     "check": "A uploads a private Markdown file through the proxy",
+     "pass": true
+    },
+    {
+     "check": "private ACL matrix: owner 200, other User and Admin 404",
+     "pass": true
+    },
+    {
+     "check": "worker extracts the upload and stops before paid embedding (pricing false)",
+     "pass": true
+    },
+    {
+     "check": "storage runs the digest-pinned MinIO image",
+     "pass": true
+    },
+    {
+     "check": "after a MinIO restart the original reads back byte-for-byte",
+     "pass": true
+    },
+    {
+     "check": "RAG answers the unverified-pricing 503, not an answer",
+     "pass": true
+    },
+    {
+     "check": "hybrid search over unindexed scope: 200, 0 hits, no provider cost",
+     "pass": true
+    },
+    {
+     "check": "reset request answers the same for existing and unknown email",
+     "pass": true
+    },
+    {
+     "check": "no mail for the unknown address",
+     "pass": true
+    },
+    {
+     "check": "A confirms the reset link",
+     "pass": true
+    },
+    {
+     "check": "old password no longer logs in",
+     "pass": true
+    },
+    {
+     "check": "A's earlier session ended",
+     "pass": true
+    },
+    {
+     "check": "used reset token is refused",
+     "pass": true
+    },
+    {
+     "check": "A logs in with the new password",
+     "pass": true
+    },
+    {
+     "check": "source limit through edge ignores forged IP/edge-token headers: 429 + Retry-After after the quota",
+     "pass": true
+    },
+    {
+     "check": "same source is blocked even with the right password",
+     "pass": true
+    },
+    {
+     "check": "another source is not blocked by this source's quota",
+     "pass": true
+    },
+    {
+     "check": "after Retry-After the window ends and login works again",
+     "pass": true
+    },
+    {
+     "check": "direct API connection outside the topology: forged client headers ignored, keyed by its own peer",
+     "pass": true
+    },
+    {
+     "check": "direct web connection with a forged edge token: client header not forwarded (one bucket)",
+     "pass": true
+    },
+    {
+     "check": "account bucket limits one email",
+     "pass": true
+    },
+    {
+     "check": "reset limit is identical for an existing and an unknown email",
+     "pass": true
+    },
+    {
+     "check": "limited reset requests sent no extra mail",
+     "pass": true
+    },
+    {
+     "check": "Admin logs in again",
+     "pass": true
+    },
+    {
+     "check": "SMTP reject: 503 delivery_failed and the invitation is revoked (compensated)",
+     "pass": true
+    },
+    {
+     "check": "SMTP reject during reset: same generic 202, nothing captured",
+     "pass": true
+    },
+    {
+     "check": "SMTP down: 503 delivery_failed (no retry, no token in response)",
+     "pass": true
+    },
+    {
+     "check": "Redis down: auth answers 503 rate_limit_unavailable with Retry-After, no cookie",
+     "pass": true
+    },
+    {
+     "check": "Redis down: API readiness (liveness of gate) stays 200",
+     "pass": true
+    },
+    {
+     "check": "Redis down: an existing session still reads",
+     "pass": true
+    },
+    {
+     "check": "Redis back: login works, no account lockout",
+     "pass": true
+    },
+    {
+     "check": "connections/slots released after failures: 25 reads succeed",
+     "pass": true
+    },
+    {
+     "check": "recovery hold CLI ran",
+     "pass": true
+    },
+    {
+     "check": "hold closes the gate for traffic through the edge",
+     "pass": true
+    },
+    {
+     "check": "hold makes readiness fail",
+     "pass": true
+    },
+    {
+     "check": "recover reopens after postconditions",
+     "pass": true
+    },
+    {
+     "check": "missing journal closes the gate",
+     "pass": true
+    },
+    {
+     "check": "journal back: gate open",
+     "pass": true
+    },
+    {
+     "check": "torn journal closes the gate",
+     "pass": true
+    },
+    {
+     "check": "journal restored byte-for-byte: gate open",
+     "pass": true
+    },
+    {
+     "check": "compose logs contain no token, password, secret, email or link",
+     "pass": true
+    }
+   ]
+  },
+  "pr66-smoke4-chrome": {
+   "sha256": "99f8dd7155ab070f05cb8df364c91782000ff9092676303739fb6704a944d80d",
+   "chrome": "155.0.8059.84",
+   "checks": [
+    {
+     "check": "control: Chrome without the test CA refuses the site (ERR_CERT_AUTHORITY_INVALID)",
+     "pass": true
+    },
+    {
+     "check": "Chrome verifies the test CA chain and logs the Admin in over HTTPS",
+     "pass": true
+    },
+    {
+     "check": "browser holds __Host-ras_session Secure, HttpOnly, SameSite=Lax",
+     "pass": true
+    },
+    {
+     "check": "Admin invites from the UI; the notice does not promise receipt",
+     "pass": true
+    },
+    {
+     "check": "invite link from the SMTP capture activates the account in Chrome",
+     "pass": true
+    },
+    {
+     "check": "new User logs in",
+     "pass": true
+    },
+    {
+     "check": "reset link from the capture changes the password in Chrome",
+     "pass": true
+    },
+    {
+     "check": "old password is refused in the UI",
+     "pass": true
+    },
+    {
+     "check": "per-upload consent then upload over HTTPS",
+     "pass": true
+    },
+    {
+     "check": "item page shows extraction done, waiting for index (pricing false)",
+     "pass": true
+    },
+    {
+     "check": "library lists the upload",
+     "pass": true
+    },
+    {
+     "check": "collection created and the upload added",
+     "pass": true
+    },
+    {
+     "check": "hybrid search over unindexed uploads shows 0 passages (no provider call; not a quality result)",
+     "pass": true
+    },
+    {
+     "check": "keyword search request completes (unindexed upload is not searchable)",
+     "pass": true
+    },
+    {
+     "check": "429 is shown with the wait time and the page does not resubmit",
+     "pass": true
+    },
+    {
+     "check": "no request left the HTTPS origin",
+     "pass": true
+    }
+   ],
+   "outbound_denied": 0
+  }
+ }
+}

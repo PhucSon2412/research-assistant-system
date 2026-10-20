@@ -19,7 +19,7 @@ from urllib.parse import quote, urlsplit
 import re
 import ipaddress
 
-from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
 
@@ -515,11 +515,18 @@ class HttpSecurity(BaseModel):
     state-changing requests are accepted (``Origin`` header check, on top of
     the CSRF token). ``public_base_url`` is the web origin used to build
     invitation/reset links.
+
+    ``trusted_proxy_cidrs`` (M8a) lists the exact proxy addresses (the web
+    container in the pilot deployment) whose single ``X-RAS-Client-IP`` header
+    names the browser address for auth rate limiting. A request from any other
+    peer is keyed by its own TCP address and the header is ignored; the API
+    never reads ``X-Forwarded-For``. Empty means trust no proxy.
     """
 
     cookie_secure: bool = True
     allowed_origins: list[str] = Field(default_factory=list)
     public_base_url: str | None = None
+    trusted_proxy_cidrs: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _check_urls(self) -> "HttpSecurity":
@@ -528,19 +535,134 @@ class HttpSecurity(BaseModel):
             if not self.public_base_url.startswith(("http://", "https://")):
                 raise ValueError("public_base_url must start with http:// or https://")
             self.public_base_url = self.public_base_url.rstrip("/")
+        networks = []
+        for raw in self.trusted_proxy_cidrs:
+            try:
+                network = ipaddress.ip_network(raw.strip(), strict=False)
+            except (ValueError, TypeError, AttributeError):
+                raise ValueError("trusted_proxy_cidrs entries must be IP networks") from None
+            if network.prefixlen == 0:
+                raise ValueError("trusted_proxy_cidrs must not trust every address")
+            networks.append(str(network))
+        self.trusted_proxy_cidrs = list(dict.fromkeys(networks))
+        return self
+
+
+class SmtpSettings(BaseModel):
+    """M8a SMTP channel. TLS is mandatory and always verified: ``implicit_tls``
+    (SMTPS, usually 465) or ``starttls`` (usually 587, refused when the server
+    does not offer it). There is no plaintext mode and no switch to skip
+    certificate or hostname verification. ``ca_file`` replaces the system trust
+    store (a private relay CA, or the isolated test CA); without it the image's
+    system CAs are used. The password is read from ``password_file`` at each
+    send, never from argv or a plain variable. Timeouts are initial operational
+    values, not measured SLOs; ``total_timeout_seconds`` bounds the whole send.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    host: str = Field(min_length=1, max_length=253)
+    port: int = Field(gt=0, le=65535)
+    security: Literal["implicit_tls", "starttls"]
+    sender: str = Field(min_length=3, max_length=320)
+    sender_name: str | None = Field(default=None, max_length=120)
+    username: str | None = Field(default=None, min_length=1, max_length=320)
+    password_file: Path | None = None
+    ca_file: Path | None = None
+    helo_name: str | None = Field(default=None, max_length=253)
+    connect_timeout_seconds: float = Field(default=5, gt=0, le=60)
+    total_timeout_seconds: float = Field(default=10, gt=0, le=60)
+    password_max_bytes: int = Field(default=4096, ge=16, le=65536)
+
+    @field_validator("password_file", "ca_file", "username", "sender_name", "helo_name", mode="before")
+    @classmethod
+    def _empty_is_absent(cls, value):
+        return None if value == "" else value
+
+    @model_validator(mode="after")
+    def _check(self) -> "SmtpSettings":
+        for name in ("host", "sender", "sender_name", "username", "helo_name"):
+            value = getattr(self, name)
+            if value is not None and any(c in value for c in "\r\n\0"):
+                raise ValueError(f"smtp {name} must be a single line")
+        if not re.fullmatch(r"[^@\s<>,;\"]+@[^@\s<>,;\"]+", self.sender):
+            raise ValueError("smtp sender must be a bare email address")
+        if self.helo_name is not None and not re.fullmatch(r"[A-Za-z0-9.-]+", self.helo_name):
+            raise ValueError("smtp helo_name must be a hostname")
+        if (self.username is None) != (self.password_file is None):
+            raise ValueError("smtp username and password_file go together")
+        for name in ("password_file", "ca_file"):
+            path = getattr(self, name)
+            if path is not None and not path.is_absolute():
+                raise ValueError(f"smtp {name} must be an absolute path")
+        if self.connect_timeout_seconds > self.total_timeout_seconds:
+            raise ValueError("smtp connect timeout must not exceed the total timeout")
         return self
 
 
 class Delivery(BaseModel):
-    """How invitation/reset links reach people (M1b).
+    """How invitation/reset links reach people (M1b, M8a).
 
     ``disabled``: nothing is sent; creating an invitation is refused.
     ``dev_outbox``: links are kept in API process memory for an Admin to read
-    (development only; the real channel is still an open decision).
+    (development only).
+    ``smtp`` (M8a): one message per link through ``smtp`` over verified TLS.
+    The server accepting a message is not proof the recipient received it.
     """
 
-    mode: Literal["disabled", "dev_outbox"] = "disabled"
+    mode: Literal["disabled", "dev_outbox", "smtp"] = "disabled"
     dev_outbox_max_entries: int = Field(default=200, gt=0, le=10_000)
+    smtp: SmtpSettings | None = None
+
+    @model_validator(mode="after")
+    def _check_smtp(self) -> "Delivery":
+        if self.mode == "smtp" and self.smtp is None:
+            raise ValueError("RAS_DELIVERY__MODE=smtp needs RAS_DELIVERY__SMTP__* settings")
+        return self
+
+
+class RateRule(BaseModel):
+    """At most ``limit`` requests per fixed ``window_seconds`` window."""
+
+    limit: int = Field(gt=0, le=100_000)
+    window_seconds: int = Field(gt=0, le=86_400)
+
+
+class RateLimitPolicy(BaseModel):
+    """M8a auth rate limits, shared by every API process through Redis.
+
+    Buckets are per source address (IPv6 by ``ipv6_prefix``) and, where an
+    account is named, per HMAC of the normalised email, whether or not that
+    account exists. Keys hold only HMAC digests made with the secret read from
+    ``key_secret_file``. Defaults are initial operational values for a small
+    pilot (sized so a shared NAT is not throttled by one quota), not a
+    benchmark or SLO. ``disabled`` is refused in production; a missing secret
+    or an unreachable Redis makes the protected auth routes answer 503, never
+    an unlimited pass.
+    """
+
+    mode: Literal["disabled", "redis"] = "redis"
+    key_secret_file: Path | None = None
+    key_secret_min_bytes: int = Field(default=32, ge=32, le=1024)
+    redis_db: int = Field(default=1, ge=0, le=15)
+    redis_timeout_seconds: float = Field(default=0.5, gt=0, le=5)
+    ipv6_prefix: int = Field(default=64, ge=32, le=128)
+    login_source: RateRule = RateRule(limit=30, window_seconds=300)
+    login_account: RateRule = RateRule(limit=10, window_seconds=900)
+    reset_request_source: RateRule = RateRule(limit=10, window_seconds=900)
+    reset_request_account: RateRule = RateRule(limit=3, window_seconds=3600)
+    token_source: RateRule = RateRule(limit=20, window_seconds=900)
+
+    @field_validator("key_secret_file", mode="before")
+    @classmethod
+    def _empty_path_is_absent(cls, value):
+        return None if value == "" else value
+
+    @model_validator(mode="after")
+    def _check_path(self) -> "RateLimitPolicy":
+        if self.key_secret_file is not None and not self.key_secret_file.is_absolute():
+            raise ValueError("rate_limit key_secret_file must be an absolute path")
+        return self
 
 
 class Settings(BaseSettings):
@@ -580,6 +702,7 @@ class Settings(BaseSettings):
     generation: GenerationPolicy = GenerationPolicy()
     http: HttpSecurity = HttpSecurity()
     delivery: Delivery = Delivery()
+    rate_limit: RateLimitPolicy = RateLimitPolicy()
     storage: ObjectStorage | None = None
     redis_host: str = "redis"
     redis_port: int = Field(default=6379, gt=0, le=65535)
@@ -606,6 +729,19 @@ class Settings(BaseSettings):
                 raise ValueError("production requires RAS_HTTP__COOKIE_SECURE=true")
             if self.delivery.mode == "dev_outbox":
                 raise ValueError("the dev outbox is only allowed with RAS_ENVIRONMENT=development")
+            if self.rate_limit.mode == "disabled":
+                raise ValueError("production requires the Redis auth rate limiter")
+            # M8a: browser origins and the link base are explicit HTTPS origins.
+            if any(not o.startswith("https://") for o in self.http.allowed_origins):
+                raise ValueError("production allowed_origins must all be https://")
+            if self.http.public_base_url is not None:
+                try:
+                    canonical = normalise_origin(self.http.public_base_url)
+                except ValueError:
+                    raise ValueError("production public_base_url must be an https:// origin") from None
+                if not canonical.startswith("https://") or canonical not in self.http.allowed_origins:
+                    raise ValueError("production public_base_url must be an https:// origin listed in allowed_origins")
+                self.http.public_base_url = canonical
         if self.delivery.mode != "disabled" and self.http.public_base_url is None:
             raise ValueError("RAS_HTTP__PUBLIC_BASE_URL is required to deliver invitation/reset links")
         return self

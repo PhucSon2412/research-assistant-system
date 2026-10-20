@@ -5,6 +5,7 @@ no transaction. Journal intent is not evidence of account/delivery commit.
 """
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass, field
 
@@ -27,6 +28,8 @@ from app.identity.session_commit import AUTH_PENDING, commit_auth, _check_actor
 from app.identity.tokens import generate_token, hash_token, plausible_token
 from app.models import Invitation, User, AuthChangeReceipt
 from app.models.enums import AuditActorType, AuditOutcome
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -273,7 +276,9 @@ def deliver_invitation(db, created, *, actor_id, actor_session_id, csrf_token, d
         raise
     try:
         delivery.send(message, now=at)
-    except Exception:
+    except Exception as exc:
+        # Code/type only: the message holds the link (token) and the recipient.
+        log.warning("invitation delivery failed (%s)", getattr(exc, "code", type(exc).__name__))
         _compensate_delivery(db, created, clock)
         raise ApiError(503, "delivery_failed") from None
     try:

@@ -1,5 +1,15 @@
 # Tài liệu dự án
 
+**Sửa review PR #66, 2026-10-20 (chờ review lại):** [mục sửa trong handoff M8a](m8a-pilot-entry-hardening.md#sửa-review-pr-66) · [inventory](m8a-test-inventory.json). SMTP deadline, image MinIO cài mới và gate artifact CI đã sửa; chưa merge.
+
+**Review M8a PR #66 tại `c0b20aa`, 2026-10-20:** [ba P2 ở SMTP deadline, image cài mới và gate artifact CI](reviews/pr66-m8a-pilot-entry-hardening.md) cần [sửa cùng PR](tasks/fix-pr66-smtp-deadline-deploy-image-ci-artifacts.md). Reviewer 136 API + 79 web/typecheck pass nhưng repro vẫn fail; chưa merge, chưa chuyển M8b/cutover. M7b tiếp tục chờ phiếu thật; không thêm live/ngân sách.
+
+**M8a trên nhánh review, 2026-10-19 (chưa merge):** [handoff HTTPS/SMTP TLS/rate limit/CI](m8a-pilot-entry-hardening.md) · [inventory](m8a-test-inventory.json) · [deploy](../deploy/compose.yaml) · [CI](../.github/workflows/ci.yml). Kiểm cô lập (image thật, Chrome HTTPS với CA thử, SMTP capture); chưa domain/host/SMTP/operator/journal độc lập thật, chưa cutover. CI GitHub pass trên `6cb5253` (run `39284225688`, selection API 1102/1102, không phải full suite). M8b tiếp sau.
+
+**Sau merge PR #65 (`3b59a1d`, 2026-10-19):** M7b tooling đã merge, phiếu thật vẫn **0/awaiting_human_review**. Tiếp [M8a — HTTPS, SMTP TLS, rate limit auth và CI](tasks/m8a-pilot-entry-hardening.md), phần đầu gói E, mới giao/chưa triển khai. Làm độc lập lúc chủ dự án duyệt phiếu; M8b vận hành journal/backup/alert theo sau. Không cutover dev/provider/pricing hoặc tự cấp ngân sách live.
+
+**Review lại PR #65 tại `8799216`, 2026-10-19:** [hai P2 đã sửa, không có điểm chặn merge mới trong scope M7b](reviews/pr65-m7b-human-quality-review.md#review-lại-tại-8799216--hai-p2-đã-sửa). Reviewer 68 repo + 7 independent pass; PR chưa merge. Tooling có thể bàn giao người đọc sau merge, nhưng **0 verdict thật/awaiting_human_review**, D chưa nghiệm thu; không thêm live/ngân sách hoặc mở pricing. Các mốc dưới giữ lịch sử.
+
 **Sửa review PR #65, 2026-10-19 (chờ review lại):** hai P2 binding/preflight đã sửa offline ([handoff](m7b-human-quality-review.md#sửa-review-pr-65-tại-44e3bd3--chờ-review-lại)); 0 verdict thật, chưa merge.
 
 **Review M7b PR #65 tại `44e3bd3`, 2026-10-19:** còn [hai P2 về hiệu lực verdict và integrity của bundle được xem](reviews/pr65-m7b-human-quality-review.md); [sửa trên cùng PR](tasks/fix-pr65-human-review-provenance.md). Reviewer 55 repo + 1 control pass/6 repro fail, không ghi phiếu thật. PR chưa merge; human review vẫn pending, không inference/key/ngân sách mới.

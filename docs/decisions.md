@@ -1,5 +1,38 @@
 # Nhật ký quyết định
 
+## Sửa ba P2 PR #66 (2026-10-20)
+
+Agent chọn trong phạm vi prompt sửa; chi tiết và chứng cứ ở [handoff M8a](m8a-pilot-entry-hardening.md#sửa-review-pr-66).
+
+- **Deadline SMTP:** cả lượt gửi chạy trong process con `app.smtp_transport`; parent giữ một deadline, hết hạn thì kill + reap đúng PID con, kết quả muộn không tính thành công. Job/mật khẩu chỉ qua stdin, env con tối thiểu. Hợp đồng outcome giữ nguyên: timeout có thể sau khi server nhận DATA → bù lời mời, reset generic, không retry.
+- **Storage image:** deploy và harness test dùng digest Chainguard orchestrator đã chọn, healthcheck `mc ready local` (đã kiểm trong digest), checker `--check-registry` tra manifest mọi image được kéo. Volume do image root cũ tạo cần đổi chủ một lần sang 65532 (đã tái hiện lỗi và bước sửa). Dev compose giữ mặc định cũ, chỉ cho override, để không tự đổi dữ liệu dev — đây là lựa chọn bảo thủ, không phải nghiệm thu dev mới.
+- **CI artifact:** scanner đọc một lần, chỉ ghi đúng bytes đã quét sạch vào thư mục publish mới và phát `clean=true`; upload chỉ chạy khi output đó có. Thiếu/không đọc được/context lỗi = không sạch.
+
+## Review PR #66 và baseline image pilot (2026-10-20)
+
+PR #66 tại `c0b20aa` còn [ba P2](reviews/pr66-m8a-pilot-entry-hardening.md); giao [sửa trong cùng PR](tasks/fix-pr66-smtp-deadline-deploy-image-ci-artifacts.md), không chuyển M8b hoặc đổi scope auth/journal. Tag quay.io trong deploy không trả manifest ở lượt kiểm reviewer; cài từ cache không chứng minh máy sạch.
+
+Theo ủy quyền hoàn thành MVP, **orchestrator chọn** baseline pilot MinIO `cgr.dev/chainguard/minio@sha256:709099319add48dfb44aa596a7070d3ddd8dd04d7ae881765719aec29df9e510`, digest hiện dùng CI và tra manifest thành công. Coding agent phải kiểm provenance/version/license, image tối giản/health, new install và compatibility dữ liệu tổng hợp trước khi thay baseline. Đây không phải xác nhận trực tiếp mới của chủ dự án, không có entitlement production/support hoặc cam kết image retention. Không mua account hay chạm storage/dev thật. Giữ M7b phiếu thật pending, pricing off và giới hạn journal độc lập trước cutover.
+
+## Quyết định triển khai M8a (2026-10-19)
+
+Các lựa chọn dưới do **agent chọn trong phạm vi ủy quyền của task M8a**, không phải chủ dự án trực tiếp chọn nhà cung cấp/host. Chi tiết và kết quả kiểm ở [handoff M8a](m8a-pilot-entry-hardening.md).
+
+- **Topology:** `deploy/compose.yaml` riêng; Caddy là cổng publish duy nhất; mạng `edge`/`backend` internal, `egress` chỉ cho API/worker. Không chuyển `docker-compose.yml` dev thành production bằng biến.
+- **Chuỗi proxy tin cậy:** Caddy ghi đè `X-RAS-Client-IP` bằng TCP peer và thêm token edge từ file secret; web chỉ chuyển địa chỉ khi token khớp; API chỉ tin header từ IP cố định của web (`RAS_HTTP__TRUSTED_PROXY_CIDRS`, cấm `/0`), không đọc `X-Forwarded-For`; uvicorn `--no-proxy-headers`. Peer tin cậy thiếu header → dùng IP peer (chặt hơn, không mở thêm quota).
+- **SMTP:** chỉ `implicit_tls` hoặc `starttls` bắt buộc, luôn xác minh certificate/hostname, TLS ≥ 1.2; không có mode plaintext hay tắt verify (khóa lạ bị từ chối). Mật khẩu đọc từ file mỗi lần gửi. Một deadline tổng cho cả lượt gửi (mặc định 10 s, khởi đầu chưa đo). Lỗi chỉ mang mã ổn định; không retry. Timeout sau DATA có thể đã được server xếp hàng: lời mời vẫn bị bù (thu hồi) nên link đó không dùng được.
+- **Rate limit:** Redis db 1, một script Lua INCR/PTTL/PEXPIRE nguyên tử, cửa sổ cố định; bucket nguồn (IPv6 gộp `/64`) và bucket tài khoản theo HMAC email chuẩn hóa dù account có hay không; key chỉ chứa HMAC với secret file. Request bị từ chối vẫn được đếm, thành công không xóa bộ đếm. Redis/secret lỗi → 503 `rate_limit_unavailable`; production từ chối `disabled`. Giá trị mặc định (login 30/5 phút theo nguồn, 10/15 phút theo tài khoản; reset 10/15 phút nguồn, 3/giờ tài khoản; token 20/15 phút nguồn) là giá trị vận hành khởi đầu, chưa benchmark/SLO. Env lồng nhau thay cả rule: đặt đủ `LIMIT` và `WINDOW_SECONDS`.
+- **CI:** GitHub Actions dùng cùng harness `scripts/m8a_test_host.py` (container cô lập, credential ngẫu nhiên, chặn HTTP ra ngoài trong pytest); selection có lý do, không phải full suite.
+- **Còn mở, không quyết thay chủ dự án:** domain/host, nhà cung cấp/account SMTP, operator thật, nơi lưu journal độc lập, HSTS dài hạn/preload, timing enumeration của reset (chưa đo), mirror/registry do người vận hành kiểm soát cho image storage (baseline pilot đã chọn ở mục sửa PR #66).
+
+## Giao M8a sau merge PR #65 (2026-10-19)
+
+Fetch xác minh `origin/main = 3b59a1db4e784df0891a844ba968ba85e2797746`, head review `8799216` là ancestor và tree khớp, source **0052**. Không kiểm app/DB/test mới tại merge. M7b đã merge phần tooling; người đọc chưa nộp verdict thật, D chưa nghiệm thu.
+
+Theo ủy quyền hoàn thành MVP, **orchestrator chọn** [M8a](tasks/m8a-pilot-entry-hardening.md) là phần đầu E: cấu hình deploy riêng với Caddy/HTTPS và Secure cookie/Origin; adapter SMTP qua TLS trên interface delivery sẵn có; limiter auth Redis chia sẻ với lỗi 429/Retry-After và lỗi backend có kiểm soát; CI cho hợp đồng liên quan. SMTP test/certificate local và project cô lập đủ để triển khai/kiểm coding, không cần mua nhà cung cấp hoặc đợi domain thật. Không dùng dev-outbox cho production, không gửi mail thật, không deploy host/DNS/dev. Chưa chọn nhà cung cấp SMTP/host/domain/operator hoặc xác minh privacy/account thật thay chủ dự án.
+
+Gom luồng HTTPS → invite/reset/login thành một PR thay vì chia endpoint. M8b tiếp journal độc lập, lịch/retention/alert/backup và nghiệm thu vận hành; không ghi storage cùng máy là độc lập. Không thay C4/auth/outcome/ACL/provider, không thêm inference/ngân sách mới; human review và các điều kiện live của D đi riêng. Task mới giao/chưa triển khai/kiểm. Giữ mọi docs reviewer/orchestrator chưa commit cho PR kế tiếp.
+
 ## Quyết định triển khai M7b (2026-10-19)
 
 Theo [task M7b](tasks/m7b-human-quality-review.md), coding agent chọn (chủ dự án chưa trực tiếp xác nhận): verdict người đọc là **record overlay** trong `evaluation/human-review/records/`, không sửa `questions.json`/schema nhãn; nhãn bind JSON chuẩn hóa toàn câu + hash manifest corpus + phiên bản parser, answer bind mọi cột hiển thị của dòng + hash snapshot M7a. Import all-or-nothing; cùng reviewer đổi phán đoán phải `--replace`, reviewer khác lệch thì `conflicting` và ra khỏi mẫu số. Attribution là tên người điền tự ghi, không xác thực danh tính. `review.score` nhóm theo `response_id` khi có (M7a), giữ `question_id/mode` cho phiếu M4c. M7a: kỳ vọng lấy từ ý định drill (không phải gold), file của citation lumen suy từ kế hoạch upload user A (ghi basis), ledger chỉ gán khi đúng một call/answer cho route, mẫu Chrome chỉ có text màn hình không chấm. Bundle commit vào repo để mở ngay; `human-prepare --check` giữ đồng bộ. [Handoff](m7b-human-quality-review.md). Sửa review PR #65: record lưu `binding` v2 đầy đủ (gồm bytes corpus thực và parser cho mọi dòng), report chỉ tính binding hiện hành và báo `source_mismatch` khi nguồn lệch; validate/import tự preflight bundle so với bản dựng lại từ nguồn, không cần lệnh kiểm riêng.

@@ -1,0 +1,42 @@
+# M8a edge: the only public entry. HTTPS for {$RAS_PUBLIC_HOST}; HTTP on :80
+# only redirects to HTTPS (Caddy automatic redirects), so no write is served
+# over HTTP. Without a snippet in tls.d Caddy obtains a public ACME
+# certificate for the host (needs real DNS + reachable :80/:443). A snippet
+# such as `tls /etc/caddy/tls.d/site.crt /etc/caddy/tls.d/site.key` uses a
+# given certificate instead (the smoke's throwaway test CA does this).
+{
+	admin off
+	servers {
+		protocols h1 h2
+	}
+}
+
+{$RAS_PUBLIC_HOST} {
+	import /etc/caddy/tls.d/*.caddy
+
+	header {
+		Strict-Transport-Security "max-age={$RAS_HSTS_MAX_AGE}"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy same-origin
+		-Server
+	}
+
+	# Development/administration surfaces never leave the private networks.
+	@internal path /api/admin/dev-outbox /api/admin/dev-outbox/* /docs /docs/* /redoc /openapi.json /healthz /readyz
+	respond @internal 404
+
+	reverse_proxy web:3000 {
+		# Trust boundary: whatever the client sent is replaced or removed.
+		header_up X-RAS-Client-IP {remote_host}
+		header_up X-RAS-Edge-Token {file./run/secrets/edge_token}
+		header_up -X-Forwarded-For
+		header_up -X-Forwarded-Host
+		header_up -X-Forwarded-Proto
+		header_up -X-Real-IP
+		header_up -Forwarded
+		header_up -X-Client-IP
+		header_up -True-Client-IP
+		header_up -CF-Connecting-IP
+	}
+}

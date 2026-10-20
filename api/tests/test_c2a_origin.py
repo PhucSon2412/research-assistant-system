@@ -32,7 +32,7 @@ def origin_client(monkeypatch):
     for key in ('HOST','PORT','USER','PASSWORD','NAME'):
         monkeypatch.delenv('RAS_DB__'+key,raising=False)
     monkeypatch.setenv('RAS_DATABASE_URL','postgresql+psycopg://origin:synthetic@127.0.0.1:58435/postgres')
-    monkeypatch.setenv('RAS_HTTP__ALLOWED_ORIGINS','["http://web.test"]')
+    monkeypatch.setenv('RAS_HTTP__ALLOWED_ORIGINS','["https://web.test"]')
     get_settings.cache_clear()
     app=FastAPI();install_error_handlers(app);install_csrf_middleware(app)
     @app.api_route('/write',methods=['POST','PUT','PATCH','DELETE'])
@@ -48,30 +48,30 @@ def origin_client(monkeypatch):
 
 
 @pytest.mark.parametrize('method',['POST','PUT','PATCH','DELETE'])
-@pytest.mark.parametrize('origin',[None,'null','http://evil.test','https://web.test','http://web.test:3000',
-                                 'http://web.test.evil','http://evil-web.test','http://web.test/path','http://web.test'])
+@pytest.mark.parametrize('origin',[None,'null','http://evil.test','http://web.test','https://web.test:3000',
+                                 'https://web.test.evil','http://evil-web.test','https://web.test/path','https://web.test'])
 def test_all_write_methods_explicit_origin(origin_client,method,origin):
-    headers={'x-csrf-token':'synthetic-csrf','referer':'http://web.test','x-forwarded-host':'web.test','host':'web.test'}
+    headers={'x-csrf-token':'synthetic-csrf','referer':'https://web.test','x-forwarded-host':'web.test','host':'web.test'}
     if origin is not None:headers['origin']=origin
     response=origin_client.request(method,'/write',headers=headers)
-    assert response.status_code==(200 if origin=='http://web.test' else 403)
+    assert response.status_code==(200 if origin=='https://web.test' else 403)
 
 
 @pytest.mark.parametrize('token',[None,'wrong'])
 def test_allowed_origin_still_requires_csrf(origin_client,token):
-    headers={'origin':'http://web.test'}
+    headers={'origin':'https://web.test'}
     if token:headers['x-csrf-token']=token
     assert origin_client.post('/write',headers=headers).status_code==403
 
 
 def test_safe_methods_and_duplicate_origin(origin_client):
     for method in ['GET','HEAD','OPTIONS']:assert origin_client.request(method,'/safe').status_code==200
-    assert origin_client.post('/write',headers=[('origin','http://web.test'),('origin','http://web.test'),
+    assert origin_client.post('/write',headers=[('origin','https://web.test'),('origin','https://web.test'),
                                               ('x-csrf-token','synthetic-csrf')]).status_code==403
 
 
 def test_dependency_same_rule(origin_client):
-    assert origin_client.post('/dependency',headers={'origin':'http://web.test','x-csrf-token':'synthetic-csrf'}).status_code==200
+    assert origin_client.post('/dependency',headers={'origin':'https://web.test','x-csrf-token':'synthetic-csrf'}).status_code==200
     assert origin_client.post('/dependency',headers={'x-csrf-token':'synthetic-csrf'}).status_code==403
 
 

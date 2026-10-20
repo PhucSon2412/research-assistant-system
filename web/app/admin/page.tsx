@@ -5,7 +5,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { api, ApiError, describeError } from "../../lib/api";
+import { api, ApiError, describeError, invitationError } from "../../lib/api";
 import { ErrorText, Shell, useSession } from "../components/session";
 
 type Invitation = { id: string; email: string; status: string; created_at: string; expires_at: string };
@@ -45,7 +45,7 @@ export default function AdminPage() {
     if (user) load();
   }, [user, load]);
 
-  async function run(action: () => Promise<unknown>, done: string) {
+  async function run(action: () => Promise<unknown>, done: string, explain: (err: unknown) => string = describeError) {
     setError(null);
     setNotice(null);
     try {
@@ -53,7 +53,7 @@ export default function AdminPage() {
       setNotice(done);
       await load();
     } catch (err) {
-      setError(describeError(err));
+      setError(explain(err));
     }
   }
 
@@ -63,7 +63,9 @@ export default function AdminPage() {
     const form = new FormData(formEl);
     run(
       () => api("/admin/invitations", { method: "POST", body: { email: form.get("email") } }),
-      "Đã tạo lời mời (vai trò User). Liên kết được chuyển qua kênh gửi đã cấu hình.",
+      // The channel accepting a message is not proof the invitee received it.
+      "Đã tạo lời mời (vai trò User) và kênh gửi đã nhận liên kết. Đây chưa xác nhận người nhận đã nhận được email.",
+      invitationError,
     ).then(() => formEl.reset());
   }
 
