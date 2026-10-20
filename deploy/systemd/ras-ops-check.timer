@@ -1,0 +1,12 @@
+# Every 5 minutes. A host that is down cannot alert about itself: an external
+# probe/dead-man check is still required at cutover.
+[Unit]
+Description=RAS pilot alert check every 5 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,12 @@
+# Daily backup at the agreed maintenance hour (placeholder: 02:30 Asia/Ho_Chi_Minh).
+# The owner chooses the hour before cutover; Persistent catches up a missed run.
+[Unit]
+Description=Daily RAS pilot backup window
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 Asia/Ho_Chi_Minh
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

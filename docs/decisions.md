@@ -1,5 +1,31 @@
 # Nhật ký quyết định
 
+## Quyết định triển khai M8b (2026-10-20)
+
+Agent chọn trong phạm vi các lựa chọn orchestrator đã chốt cho [M8b](tasks/m8b-pilot-operations.md); không phải chủ dự án chọn nhà cung cấp/host/người trực. Chi tiết, runbook và kết quả ở [handoff M8b](m8b-pilot-operations.md).
+
+- **Không đổi đường ghi/gate/schema:** journal append + `fsync`, gate và readiness giữ nguyên, không migration; replica, backup, alert là thành phần ngoài request. Không phải chạy năm drill C4 vì không chạm các phần đó; hồi quy theo rủi ro + diễn tập M8b.
+- **Replica:** segment bất biến theo seq đầu, ghi `If-None-Match: *`, đọc lại hash; `install.json` ghim journal_id/genesis theo prefix (một cài đặt một prefix); `head.json` là con trỏ có versioning. Không cần trạng thái "halt" dính: mỗi chu kỳ chỉ ghi khi đích là prefix đã kiểm của local, nên fork/rollback luôn không ghi. Credential replicator không có quyền xóa (đích thử), replica không prune.
+- **Chặn traffic khi phát hiện rollback mà không cho gate phụ thuộc remote:** gate/readiness vẫn chỉ local. Phát hiện ở restore (chọn chuỗi), ở replicator (không ghi) và ở `check`; khi `check` thấy `journal_rollback` thì **dựng cờ bảo trì ở edge** (503) và alert. Cờ chỉ được operator gỡ (`ras_ops.py open`, kiểm lại replica). Giới hạn: một rollback ngoài runbook (snapshot VM tự khởi động) có thể phục vụ trạng thái cũ tới lượt `check`/chu kỳ replicator kế tiếp (đo ở diễn tập d2).
+- **Restore chọn journal:** local và replica; chuỗi dài hơn chỉ khi chuỗi kia là prefix; không splice. `--without-replica` chỉ là lựa chọn operator khi mất đích replica (ghi trong report), và `open` cũng phải có cờ đó.
+- **Backup:** dump bằng `pg_dump` **trong container db** (khớp major 16, không cổng DB ra host), snapshot giữ bởi one-shot `ops`; host chuyển dump qua stdin theo frame có trailer SHA-256 (không dùng file plaintext trên host). Mã hóa `age` bằng `pyrage==1.4.0` (binding của `rage`, pin hash wheel) trong ops image riêng (API image không đổi); private key không bao giờ trên server (recipients chứa secret key bị từ chối). Plaintext bị xóa **ngay sau khi ciphertext ghi xong** (sớm hơn yêu cầu "sau upload"), ciphertext local xóa sau khi đọc lại hash từ đích. Metadata `verified` chỉ ghi sau đọc lại: thiếu metadata = không phải backup tốt.
+- **Cửa sổ bảo trì:** một lock O_EXCL không tự phá; writer luôn được khởi động lại ở mọi đường lỗi; cờ edge chỉ gỡ khi readiness 200, không thì giữ cờ + alert. Upload/retention chạy sau khi mở lại writer (cửa sổ chỉ gồm capture).
+- **Alert:** dùng `SmtpDelivery.send_email` (tách `_transmit` dùng chung với invite/reset, cùng process con/deadline); mọi giá trị qua lọc mã/số/thời gian. Dữ kiện DB lấy bằng probe runtime trong api; `ops-check` không có secret DB/MinIO và dùng credential chỉ-đọc của hai đích.
+- **Scheduler:** `scripts/ras_ops.py` chỉ thư viện chuẩn + unit/timer systemd mẫu (đã `systemd-analyze verify`, chưa chạy thật). Múi giờ mẫu `Asia/Ho_Chi_Minh` (tên `Asia/Saigon` cũ không parse khi thiếu tzdata-legacy).
+- **Sửa review PR #67:** drill xác định quyền sở hữu bằng preflight chỉ đọc (journal/torn file/cờ/staging/project phải trống trước lượt) thay vì ghi marker; cờ bảo trì chỉ gỡ khi lý do `restore` và thời điểm sau khi lượt bắt đầu. Alert dedupe theo hash địa chỉ người nhận, đọc được state cũ dạng `active`. Chưa làm công cụ nạp replica làm journal local tại chỗ (P3, ghi đánh đổi trong runbook) và upload multipart (> 5 GB).
+- **Giá trị khởi đầu, không phải SLO:** retention 30 ngày, `min_keep` 7, lag 900 s, backup cũ 26 h, drill 31 ngày, đĩa 1/5 GiB, interval replicator 15 s, timer check 5 phút.
+
+## Giao M8b sau merge PR #66 (2026-10-20)
+
+Fetch xác minh `origin/main = 0de10f4c7d119bd0190a673a52cc99b0e98ca99f`, parent `3b59a1d` + head review `5ca3e4c`, tree khớp; CI run `39379651177` trên head pass ba job. Source **0052**; không kiểm app/DB mới tại merge.
+
+Theo ủy quyền hoàn thành MVP, **orchestrator chọn** cho [M8b](tasks/m8b-pilot-operations.md), chủ dự án chưa trực tiếp chọn nhà cung cấp/host:
+
+- **Journal:** giữ nguyên đường ghi local append + `fsync` và gate; thêm replica bất đồng bộ chỉ-thêm tới đích S3-compatible riêng (versioning, object lock nếu có), kiểm chain, phát hiện fork, không ship torn tail. Restore đối chiếu backup manifest, journal local và replica; phân kỳ thì từ chối. Không đưa network I/O vào đường ghi; mất host vẫn có cửa sổ mất record sau lần ship cuối (đo và alert, không phải zero-RPO).
+- **Backup:** cửa sổ bảo trì dừng writer (giữ hợp đồng M6c-2a) thay online backup; chạy trong mạng deploy, không đọc `.env`; mã hóa `age` public key trước khi rời host, private key do operator giữ; đích ngoài máy riêng, retention mặc định 30 ngày, không prune bản tốt cuối. Scheduler: entrypoint host + unit `systemd` timer mẫu.
+- **Alert:** lệnh kiểm định kỳ, gửi qua adapter SMTP TLS hiện có, chỉ mã/số đếm; không dashboard/metrics stack. Dead-man/probe ngoài host là điều kiện cutover.
+- Hai đích storage, khóa, người nhận alert, giờ bảo trì, host/domain là thông tin chủ dự án cấp khi cutover; M8b chỉ kiểm cô lập với đích mô phỏng.
+
 ## Sửa ba P2 PR #66 (2026-10-20)
 
 Agent chọn trong phạm vi prompt sửa; chi tiết và chứng cứ ở [handoff M8a](m8a-pilot-entry-hardening.md#sửa-review-pr-66).

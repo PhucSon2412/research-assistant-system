@@ -1,5 +1,17 @@
 # Tài liệu dự án
 
+**Model tiếp quản orchestrator:** bắt đầu từ [handover chung cho ChatGPT/Codex và Claude](orchestrator-handover.md), sau đó [AGENTS.md](../AGENTS.md), [CLAUDE.md](../CLAUDE.md) và kế hoạch MVP. Snapshot 2026-10-20 giữ trạng thái PR #66 cùng việc chưa commit; phải đối chiếu Git/PR khi tiếp quản, không giả PR đã merge hoặc các mốc pending cũ còn hiện hành.
+
+**Sửa review PR #67, 2026-10-20 (chờ review lại):** [mục sửa trong handoff M8b](m8b-pilot-operations.md#sửa-review-pr-67) · [inventory](m8b-test-inventory.json). Drill chỉ dọn đồ của chính nó; alert gửi/dedupe theo từng người nhận; chưa merge.
+
+**Review PR #67 tại `41d07d4`, 2026-10-20:** [hai P2 — drill xóa journal không do nó tạo, alert dừng ở người nhận lỗi đầu](reviews/pr67-m8b-pilot-operations.md); [prompt sửa cùng PR](tasks/fix-pr67-drill-teardown-alert-recipients.md). Chưa merge/cutover.
+
+**M8b trên nhánh `feat/m8b-pilot-operations`, 2026-10-20 (chờ review, chưa merge):** [handoff journal replica/backup mã hóa/alert/diễn tập + runbook](m8b-pilot-operations.md) · [inventory](m8b-test-inventory.json) · [`scripts/ras_ops.py`](../scripts/ras_ops.py) · [systemd mẫu](../deploy/systemd/). Kiểm cô lập với hai MinIO mô phỏng đích ngoài máy (cùng máy), SMTP capture, khóa `age` thử; source **0052**, không đổi đường ghi journal/gate. Chưa host/đích/khóa/người trực thật, chưa cutover; danh sách chủ dự án cần cấp ở handoff.
+
+**Sau merge PR #66 (`0de10f4`, 2026-10-20):** M8a vào main, chưa cutover. Tiếp [M8b — journal replica ngoài máy, backup lịch/mã hóa, alert, diễn tập restore](tasks/m8b-pilot-operations.md), mới giao/chưa triển khai. Phiếu human M7b vẫn 0; pricing/live tắt.
+
+**Review lại PR #66 tại `5ca3e4c`, 2026-10-20:** [ba P2 đã sửa, không còn điểm chặn merge mới trong scope M8a](reviews/pr66-m8a-pilot-entry-hardening.md#review-lại-tại-5ca3e4c--ba-p2-đã-sửa). Reviewer 156 repo + 10 independent pass, storage 7 checks; PR chưa merge. Bản triển khai được kiểm cô lập, chưa cutover thật; M8b vận hành và phiếu human M7b còn riêng. Các mốc P2 bên dưới giữ lịch sử.
+
 **Sửa review PR #66, 2026-10-20 (chờ review lại):** [mục sửa trong handoff M8a](m8a-pilot-entry-hardening.md#sửa-review-pr-66) · [inventory](m8a-test-inventory.json). SMTP deadline, image MinIO cài mới và gate artifact CI đã sửa; chưa merge.
 
 **Review M8a PR #66 tại `c0b20aa`, 2026-10-20:** [ba P2 ở SMTP deadline, image cài mới và gate artifact CI](reviews/pr66-m8a-pilot-entry-hardening.md) cần [sửa cùng PR](tasks/fix-pr66-smtp-deadline-deploy-image-ci-artifacts.md). Reviewer 136 API + 79 web/typecheck pass nhưng repro vẫn fail; chưa merge, chưa chuyển M8b/cutover. M7b tiếp tục chờ phiếu thật; không thêm live/ngân sách.

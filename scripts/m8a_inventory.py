@@ -62,7 +62,8 @@ def main() -> int:
         # Labels and outcomes only: smoke "detail" may hold synthetic cookies/headers.
         if isinstance(data, list):
             data = {"checks": data}
-        summary = {k: v for k, v in data.items() if k in ("chrome", "source_files", "source_unchanged")}
+        # M8b drills also record "metrics" (timings/counts/codes measured, never secrets).
+        summary = {k: v for k, v in data.items() if k in ("chrome", "source_files", "source_unchanged", "metrics")}
         if "checks" in data:
             summary["checks"] = [{"check": c["check"], "pass": c["pass"]} for c in data["checks"]]
         if "results" in data:

@@ -36,7 +36,8 @@ jobs:
       - name: Run API selection
         # Why each file: config and new M8a modules; session/CSRF/Origin/cookies;
         # invitation and reset runtime/journal/compensation (delivery boundary);
-        # provenance/receipts and auth safety; migrations/ORM; C4 contract/health.
+        # provenance/receipts and auth safety; migrations/ORM; C4 contract/health;
+        # M8b journal replica, encrypted backups/retention, alerts, host entrypoint, real MinIO.
         # Deselected: one dump/restore round that needs the C3 host container fixture.
         run: >-
           python scripts/m8a_test_host.py --context "$RUNNER_TEMP/m8a-api" test
@@ -50,6 +51,8 @@ jobs:
           tests/test_session_revocation_journal.py tests/test_pre_c4_initial_receipts.py
           tests/test_auth_safety_foundation.py tests/test_c2c1_bootstrap.py tests/test_migrations.py
           tests/test_c4_contract.py tests/test_health.py
+          tests/test_m8b_replica.py tests/test_m8b_artifacts.py tests/test_m8b_alerts.py
+          tests/test_m8b_ops_host.py tests/test_m8b_s3_minio.py
           --deselect tests/test_pre_c4_initial_receipts.py::test_two_dump_restore_rounds_keep_valid_provenance_and_restrict_forgery
       - name: Scan JUnit for context secrets before upload
         # Runs even when tests failed, so clean failure evidence stays available.
@@ -104,10 +107,14 @@ jobs:
         run: docker build -t ras-ci-api:check api
       - name: Compose contract, production Settings in the image, registry resolution of pulled images
         run: python scripts/m8a_deploy_check.py --settings-image ras-ci-api:check --check-registry
+      - name: M8b ops image installs the hash-pinned age library on top of the API image
+        run: |
+          docker build --build-arg RAS_API_IMAGE=ras-ci-api:check -t ras-ci-ops:check deploy/ops
+          docker run --rm --network none ras-ci-ops:check python -c "import pyrage, app.ops.artifacts, app.cli.ops; print('ops image ok')"
       - name: Caddyfile validates with a placeholder edge token
         run: |
           mkdir -p "$RUNNER_TEMP/edge" && printf 'placeholder-edge-token-for-validate-only' > "$RUNNER_TEMP/edge/edge_token"
           docker run --rm --network none -e RAS_PUBLIC_HOST=ras.example.org -e RAS_HSTS_MAX_AGE=86400 \
             -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" -v "$PWD/deploy/caddy/tls.d:/etc/caddy/tls.d:ro" \
-            -v "$RUNNER_TEMP/edge/edge_token:/run/secrets/edge_token:ro" \
+            -v "$RUNNER_TEMP/edge/edge_token:/run/secrets/edge_token:ro" -v "$RUNNER_TEMP/edge:/etc/caddy/maintenance:ro" \
             caddy:2.10.2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile

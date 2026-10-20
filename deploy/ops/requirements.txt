@@ -1,0 +1,4 @@
+# pyrage 1.4.0 (age encryption), abi3 manylinux wheels; hashes from PyPI (M8b).
+pyrage==1.4.0 \
+    --hash=sha256:7f4eb0cbc2b4aee5deac9862c47b3895866df5554153951af822e9c581e68558 \
+    --hash=sha256:f868b360ccd3f836326d42b532fae3e8eb8340a88cca0a39c0ae10fce68f6cc5
