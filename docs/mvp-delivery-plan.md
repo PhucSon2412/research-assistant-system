@@ -1,5 +1,7 @@
 # Kế hoạch hoàn thành MVP
 
+**Review M8b PR #67 tại `41d07d4`, 2026-10-20:** phần lõi journal replica/backup mã hóa/retention/cửa sổ bảo trì đúng hướng, còn [hai P2 ở công cụ vận hành](reviews/pr67-m8b-pilot-operations.md): drill xóa journal không do nó tạo, alert dừng ở người nhận lỗi đầu tiên. [Sửa hẹp cùng PR](tasks/fix-pr67-drill-teardown-alert-recipients.md), ước lượng thêm khoảng 0,5–1 ngày. E chưa nghiệm thu, chưa cutover; D giữ nguyên.
+
 **Sau merge PR #66, 2026-10-20:** M8a đã vào main `0de10f4` (tree khớp `5ca3e4c`, CI head pass ba job), source **0052**; chưa cutover. Tiếp [M8b — journal replica ngoài máy, backup lịch/mã hóa/retention, alert và diễn tập restore](tasks/m8b-pilot-operations.md), một PR, mới giao/chưa triển khai. Ước lượng **4–6 ngày coding** gồm một lượt sửa review; cutover thật cần chủ dự án cấp host, hai đích storage ngoài máy, khóa `age`, người nhận alert/operator, SMTP relay và domain. D vẫn chờ phiếu human, ngân sách live mới và policy/paper thật.
 
 **Review lại M8a PR #66 tại `5ca3e4c`, 2026-10-20:** [SMTP deadline, dependency cài mới và gate artifact CI đã qua review lại](reviews/pr66-m8a-pilot-entry-hardening.md#review-lại-tại-5ca3e4c--ba-p2-đã-sửa), reviewer 156 repo + 10 independent pass, 7 storage checks. Có thể merge phần M8a trong scope đã kiểm; hiện PR chưa merge, không coi đã cutover hoặc E hoàn tất. Tiếp M8b journal độc lập/backup/alert và nghiệm thu vận hành sau merge; D vẫn chờ human/policy/paper thật và ủy quyền live riêng. Các mốc P2 dưới đây là lịch sử trước sửa.

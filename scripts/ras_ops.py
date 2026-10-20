@@ -622,7 +622,33 @@ def latest_good(d: Deploy) -> str:
     return sorted(good)[-1]
 
 
-def teardown_drill(d: Deploy) -> None:
+def _journal_files(d: Deploy) -> list[Path]:
+    return [d.journal_dir / "revocations.jsonl", *d.journal_dir.glob("revocations.jsonl.torn-*")]
+
+
+def drill_preflight(d: Deploy, record_state_dir: str | None) -> None:
+    """Read-only checks before the drill touches anything (PR #67 P2-1).
+
+    A drill env copied from the serving env may still name its journal, maintenance or state
+    directories. Anything already there is not the drill's: refuse instead of restoring over
+    it or cleaning it up afterwards.
+    """
+    if any(path.exists() for path in _journal_files(d)):
+        raise OpsFailure("target_journal_exists")
+    if (d.maintenance_dir / "enabled").exists():
+        raise OpsFailure("drill_maintenance_flag_present")
+    if d.staging_dir.exists() and any(d.staging_dir.iterdir()):
+        raise OpsFailure("drill_staging_not_empty")
+    if record_state_dir is not None:
+        record = Path(record_state_dir).resolve()
+        if record in {p.resolve() for p in (d.state_dir, d.staging_dir, d.maintenance_dir, d.journal_dir)}:
+            raise OpsFailure("drill_dirs_shared")  # the serving deploy's state dir must not be the drill's own
+    if not target_is_fresh(d):
+        raise OpsFailure("drill_project_not_fresh")  # never `down -v` resources a drill did not create
+
+
+def teardown_drill(d: Deploy, started_at: str) -> None:
+    """Remove only what this drill created: preflight proved journal/flag/project absent at start."""
     ids = subprocess.run(["docker", "ps", "-aq", "--filter", f"label=com.docker.compose.project={d.project}"],
                          capture_output=True, text=True, env=clean_env()).stdout.split()
     for identifier in ids:
@@ -632,15 +658,18 @@ def teardown_drill(d: Deploy) -> None:
         if project != d.project:
             raise OpsFailure("drill_teardown_label_mismatch")
     d.compose("--profile", "ops", "down", "-v", "--remove-orphans", timeout=d.window["start_timeout_seconds"])
-    (d.journal_dir / "revocations.jsonl").unlink(missing_ok=True)
-    for torn in d.journal_dir.glob("revocations.jsonl.torn-*"):
-        torn.unlink()
+    for path in _journal_files(d):
+        path.unlink(missing_ok=True)
+    flag = d.maintenance()
+    if flag is not None and flag.get("reason") == "restore" and str(flag.get("since", "")) >= started_at:
+        d.clear_maintenance()  # the flag this drill's restore set; any other flag stays
 
 
 def do_drill(d: Deploy, args) -> int:
     if "drill" not in d.project:
         raise OpsFailure("drill_project_name")  # a drill never runs against a serving project
-    t0 = time.monotonic()
+    drill_preflight(d, args.record_state_dir)
+    t0, started_at = time.monotonic(), iso()
     with d.lock("drill"):
         backup_id = args.backup_id if args.backup_id != "latest" else latest_good(d)
         try:
@@ -654,7 +683,7 @@ def do_drill(d: Deploy, args) -> int:
             seconds = round(time.monotonic() - t0, 2)
         finally:
             if not args.keep:
-                teardown_drill(d)
+                teardown_drill(d, started_at)
     result = {"drill": "ok", "backup_id": backup_id, "restore_seconds": seconds, "restore": restored,
               "open": opened, "probe": probe, "finished_at": iso()}
     if args.record_state_dir:

@@ -12,6 +12,7 @@ Agent chọn trong phạm vi các lựa chọn orchestrator đã chốt cho [M8b
 - **Cửa sổ bảo trì:** một lock O_EXCL không tự phá; writer luôn được khởi động lại ở mọi đường lỗi; cờ edge chỉ gỡ khi readiness 200, không thì giữ cờ + alert. Upload/retention chạy sau khi mở lại writer (cửa sổ chỉ gồm capture).
 - **Alert:** dùng `SmtpDelivery.send_email` (tách `_transmit` dùng chung với invite/reset, cùng process con/deadline); mọi giá trị qua lọc mã/số/thời gian. Dữ kiện DB lấy bằng probe runtime trong api; `ops-check` không có secret DB/MinIO và dùng credential chỉ-đọc của hai đích.
 - **Scheduler:** `scripts/ras_ops.py` chỉ thư viện chuẩn + unit/timer systemd mẫu (đã `systemd-analyze verify`, chưa chạy thật). Múi giờ mẫu `Asia/Ho_Chi_Minh` (tên `Asia/Saigon` cũ không parse khi thiếu tzdata-legacy).
+- **Sửa review PR #67:** drill xác định quyền sở hữu bằng preflight chỉ đọc (journal/torn file/cờ/staging/project phải trống trước lượt) thay vì ghi marker; cờ bảo trì chỉ gỡ khi lý do `restore` và thời điểm sau khi lượt bắt đầu. Alert dedupe theo hash địa chỉ người nhận, đọc được state cũ dạng `active`. Chưa làm công cụ nạp replica làm journal local tại chỗ (P3, ghi đánh đổi trong runbook) và upload multipart (> 5 GB).
 - **Giá trị khởi đầu, không phải SLO:** retention 30 ngày, `min_keep` 7, lag 900 s, backup cũ 26 h, drill 31 ngày, đĩa 1/5 GiB, interval replicator 15 s, timer check 5 phút.
 
 ## Giao M8b sau merge PR #66 (2026-10-20)

@@ -923,12 +923,28 @@ def phase_drill(root: Path) -> None:
     c = ctx(root)
     check = Checks(root, "drill")
     data = load_run(root)
-    live = Project(root, c, data["live"])
+    live = Project(root, c, data.get("live", "p1"))
+    # PR #67 P2-1: a drill env copied from the serving env (journal dir not changed) is refused untouched.
+    bad = new_project(root, c, "drillbad", installation="i1")
+    lines = [line for line in bad.env.read_text(encoding="utf-8").splitlines() if not line.startswith("RAS_JOURNAL_DIR=")]
+    bad.env.write_text("\n".join(lines + [f"RAS_JOURNAL_DIR={(live.dir / 'journal').as_posix()}"]) + "\n",
+                       encoding="utf-8")
+    journal_before = live.journal.read_bytes()
+    code, out = bad.ras_ops("drill", "--identity-file", str(root / "operator" / "identity.txt"), "--record-state-dir",
+                            str(live.dir / "ops-state"), timeout=600)
+    created = run(["docker", "ps", "-aq", "--filter", f"label=com.docker.compose.project={bad.name}"]).stdout.split()
+    check("[drill] env sharing the serving journal dir: refused target_journal_exists before any side effect, "
+          "serving journal intact (or only grown), serving deploy still ready, no flag",
+          code != 0 and out.get("refused") == "target_journal_exists" and not created
+          and live.journal.read_bytes().startswith(journal_before) and live.readyz() == "200"
+          and not (live.dir / "maintenance" / "enabled").exists()
+          and not (bad.dir / "maintenance" / "enabled").exists(), out)
     p = new_project(root, c, "drill", installation="i1")
     code, out = p.ras_ops("drill", "--identity-file", str(root / "operator" / "identity.txt"), "--record-state-dir",
                           str(live.dir / "ops-state"), timeout=3600)
     check("[drill] monthly drill: latest good backup restored into a scratch project, recovered, ready, torn down",
           code == 0 and out.get("drill") == "ok" and out["probe"].get("gate") == "open", out)
+    check("[drill] the drill lifted its own maintenance flag", not (p.dir / "maintenance" / "enabled").exists())
     check.metric("drill_restore_seconds", out.get("restore_seconds"))
     left = run(["docker", "ps", "-aq", "--filter", f"label=com.docker.compose.project={p.name}"]).stdout.split()
     vols = run(["docker", "volume", "ls", "-q", "--filter", f"label=com.docker.compose.project={p.name}"]).stdout.split()

@@ -214,7 +214,10 @@ def test_failed_alert_delivery_exits_nonzero_and_retries_next_time(ops_env):
     server.stop()
     code, summary = ops_cli.check(cfg, settings, host_ok())
     assert code == 5 and summary["delivery_error"] in ("smtp_connection_failed", "smtp_timeout")
-    assert state_file.read(cfg.state_dir / "alerts-state.json") is None  # nothing marked as sent
+    saved = state_file.read(cfg.state_dir / "alerts-state.json")
+    assert summary["failed"] == 2 and saved["recipients"] and all(v == {} for v in saved["recipients"].values())
+    # nothing marked as sent: both recipients are tried again next run
+    assert "@" not in json.dumps(saved)  # recipients are keyed by hash, not address
 
 
 def test_ops_check_needs_no_database_settings(tmp_path, monkeypatch):
@@ -225,3 +228,66 @@ def test_ops_check_needs_no_database_settings(tmp_path, monkeypatch):
     with pytest.raises(ops_cli.Refused) as refused:
         ops_cli._journal_path()
     assert refused.value.code == "journal_not_configured"
+
+
+# --- PR #67 P2-2: every recipient independently, dedupe per recipient -------------------------------
+
+def _flaky_send(monkeypatch, failing: set, log: list):
+    from app import delivery
+
+    def send(self, msg, recipient):
+        log.append((recipient, str(msg["Subject"])))
+        if recipient in failing:
+            raise delivery.DeliveryFailed("smtp_rejected")
+    monkeypatch.setattr(delivery.SmtpDelivery, "send_email", send)
+
+
+def test_a_rejected_recipient_does_not_silence_the_others(ops_env, monkeypatch):
+    cfg, settings, buckets, server, journal_path, state, clock = ops_env
+    a, b = cfg.alerts.recipients
+    log = []
+    _flaky_send(monkeypatch, {a}, log)
+    code, summary = ops_cli.check(cfg, settings, host_ok())
+    assert code == 5 and summary["mailed"] == 1 and summary["failed"] == 1
+    assert summary["delivery_errors"] == {"smtp_rejected": 1}
+    assert [r for r, _ in log] == [a, b]
+    clock["now"] = T0 + timedelta(minutes=5)
+    log.clear()
+    code, summary = ops_cli.check(cfg, settings, host_ok())
+    assert code == 5 and [r for r, _ in log] == [a]  # A retried, B not mailed again
+
+
+def test_a_failing_second_recipient_does_not_repeat_mail_to_the_first(ops_env, monkeypatch):
+    cfg, settings, buckets, server, journal_path, state, clock = ops_env
+    a, b = cfg.alerts.recipients
+    log = []
+    _flaky_send(monkeypatch, {b}, log)
+    ops_cli.check(cfg, settings, host_ok())
+    for minutes in (5, 10):
+        clock["now"] = T0 + timedelta(minutes=minutes)
+        log.clear()
+        code, _ = ops_cli.check(cfg, settings, host_ok())
+        assert code == 5 and [r for r, _ in log] == [b]
+
+
+def test_resolved_goes_only_to_recipients_who_were_alerted(ops_env, monkeypatch):
+    cfg, settings, buckets, server, journal_path, state, clock = ops_env
+    a, b = cfg.alerts.recipients
+    log = []
+    _flaky_send(monkeypatch, {b}, log)
+    ops_cli.check(cfg, settings, host_ok())  # A alerted, B failed
+    # Every condition clears; B's relay works again.
+    clock["now"] = T0 + timedelta(minutes=1)
+    target = ops_cli.Target(cfg.journal_replica)
+    replica.record_status(cfg.state_dir, clock["now"], replica.ship_once(journal_path, target, clock["now"]), None)
+    state_file.write(cfg.state_dir / "drill-state.json", {"last_success_at": clock["now"].isoformat()})
+    buckets["ras-backups"].objects["pilot/backups/20261020T085900Z-00000001.tar.age"] = b"c" * 10
+    buckets["ras-backups"].objects["pilot/backups/20261020T085900Z-00000001.json"] = json.dumps(
+        {"format": "ras-backup-offsite/1", "backup_id": "20261020T085900Z-00000001", "verified": True,
+         "ciphertext_bytes": 10}).encode()
+    state_file.write(cfg.state_dir / "backup-state.json", {"last_run": {"status": "ok", "reopen": "ok"}})
+    log.clear()
+    _flaky_send(monkeypatch, set(), log)
+    code, summary = ops_cli.check(cfg, settings, host_ok())
+    assert code == 0 and summary["conditions"] == []
+    assert [r for r, _ in log] == [a] and "resolved" in log[0][1]  # B never got the alert, so no RESOLVED

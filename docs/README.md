@@ -2,6 +2,10 @@
 
 **Model tiếp quản orchestrator:** bắt đầu từ [handover chung cho ChatGPT/Codex và Claude](orchestrator-handover.md), sau đó [AGENTS.md](../AGENTS.md), [CLAUDE.md](../CLAUDE.md) và kế hoạch MVP. Snapshot 2026-10-20 giữ trạng thái PR #66 cùng việc chưa commit; phải đối chiếu Git/PR khi tiếp quản, không giả PR đã merge hoặc các mốc pending cũ còn hiện hành.
 
+**Sửa review PR #67, 2026-10-20 (chờ review lại):** [mục sửa trong handoff M8b](m8b-pilot-operations.md#sửa-review-pr-67) · [inventory](m8b-test-inventory.json). Drill chỉ dọn đồ của chính nó; alert gửi/dedupe theo từng người nhận; chưa merge.
+
+**Review PR #67 tại `41d07d4`, 2026-10-20:** [hai P2 — drill xóa journal không do nó tạo, alert dừng ở người nhận lỗi đầu](reviews/pr67-m8b-pilot-operations.md); [prompt sửa cùng PR](tasks/fix-pr67-drill-teardown-alert-recipients.md). Chưa merge/cutover.
+
 **M8b trên nhánh `feat/m8b-pilot-operations`, 2026-10-20 (chờ review, chưa merge):** [handoff journal replica/backup mã hóa/alert/diễn tập + runbook](m8b-pilot-operations.md) · [inventory](m8b-test-inventory.json) · [`scripts/ras_ops.py`](../scripts/ras_ops.py) · [systemd mẫu](../deploy/systemd/). Kiểm cô lập với hai MinIO mô phỏng đích ngoài máy (cùng máy), SMTP capture, khóa `age` thử; source **0052**, không đổi đường ghi journal/gate. Chưa host/đích/khóa/người trực thật, chưa cutover; danh sách chủ dự án cần cấp ở handoff.
 
 **Sau merge PR #66 (`0de10f4`, 2026-10-20):** M8a vào main, chưa cutover. Tiếp [M8b — journal replica ngoài máy, backup lịch/mã hóa, alert, diễn tập restore](tasks/m8b-pilot-operations.md), mới giao/chưa triển khai. Phiếu human M7b vẫn 0; pricing/live tắt.

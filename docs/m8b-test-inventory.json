@@ -2,7 +2,7 @@
  "task": "M8b pilot operations (journal replica off-host, scheduled encrypted backups, alerts, restore drills)",
  "base": "0de10f4c7d119bd0190a673a52cc99b0e98ca99f",
  "migration_head": "0052",
- "status": "implemented and verified on isolated Docker projects with simulated off-host S3 (two MinIO on the same machine), SMTP capture and a test age key; not merged, no cutover, no real host/storage/operator, systemd timers not run for real",
+ "status": "PR #67 review fixes applied on the same PR (two P2: drill teardown ownership, per-recipient alerts); verified on isolated projects; not merged, no cutover",
  "python": "C:\\Users\\ADMIN\\.conda\\envs\\ras\\python.exe (3.12); pyrage 1.4.0 and pyflakes installed into this env for M8b",
  "evidence_root": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-m8b-20261020",
  "images_final": {
@@ -84,14 +84,30 @@
   "same_container_ids": true
  },
  "credential_scan": "62 synthetic credential values vs 839 repo files (tracked+untracked): 0 matches",
+ "pr67_fix": {
+  "review": "docs/reviews/pr67-m8b-pilot-operations.md (head 41d07d4)",
+  "before_fix": "new regressions 11 fail / 3 pass (3 controls); reviewer repros 2 fail / 1 pass (P3 description)",
+  "after_fix": "test_m8b_ops_host + test_m8b_alerts 53/53; reviewer repros 3/3; M8b 5 files + SMTP M8a 117/117 on an isolated test host; countercheck round 5 16/16 HOLDS; drill context install 19 + backup 17 + drill 6 = 42/42",
+  "ci_41d07d4": "run 39422883314: web, deploy contract, API selection success (API 1193 passed, 1 deselected)",
+  "ci_fix_commit": "pending at time of writing",
+  "unchanged": "journal write path, gate, readiness, schema, restore(), replica, backup, encryption",
+  "commands_run": [
+   "pytest tests/test_m8b_ops_host.py tests/test_m8b_alerts.py -k 'drill or recipient or resolved_goes' on 41d07d4 code",
+   "pytest <rv67>/test_rv67_drill.py <rv67>/test_rv67_repro.py before and after the fix",
+   "scripts/m8b_drill.py --context <fix67>/drill setup | build | run install backup drill | cleanup",
+   "scripts/m8a_test_host.py --context <fix67>/testhost setup | test (5 M8b files + 2 SMTP files) | cleanup",
+   "scripts/m8b_counterchecks.py --host-context <fix67>/testhost --out <fix67>/counterchecks-5"
+  ],
+  "docker": "baseline 24/188/9/140 before and after (same container IDs)"
+ },
  "source": {
   "base": "0de10f4c7d119bd0190a673a52cc99b0e98ca99f",
   "changed_files": {
    ".github/workflows/ci.yml": "ce1304341381a87d2c7760b32c493556c45b50e9e315fc2416a58311d6ee9142",
-   "AGENTS.md": "78aaa435f7af3b3978abe365206a0f667108d268c9f564514de3a194ce048665",
-   "CLAUDE.md": "810bc6cff5737aa73dc20b8fc3828853c722fd6336467ab89b6c9a3bfcacd61c",
+   "AGENTS.md": "63bfe2592ba4f8cd91fedad02b19c420df6f1f83032f019cc743f8967fd41694",
+   "CLAUDE.md": "3fe627548c5f3d6c31d46d72782c471e5d70d9cd25505d57e1442871e43ce158",
    "api/app/cli/journal_replica.py": "427d147479bda56a3fdc1b402b24b217c77e45e630c687df8d568a4ffb0c0748",
-   "api/app/cli/ops.py": "bbcdbdc3a3283c0e8f5edf91fd4f9e55138d81cac2006fb6c04f75cd2df40aeb",
+   "api/app/cli/ops.py": "9e33357c5f4324f2a3aca87d70dd260aa0d4eba25396c9ba733fbe170754fd03",
    "api/app/cli/ops_probe.py": "a6ca8e0c81bc91147fc82e63fa17e641f0d4142bd21d8469307ca5e7e8eabcb1",
    "api/app/delivery.py": "bf5dc6ce861459f53ed02b54a999146a697ddb8c9bcfc6a780ce6e3fb4565a9a",
    "api/app/ops/__init__.py": "0559c89b029b8ce51a999163675e030663f6633a0004a237c642e291595b4cc8",
@@ -103,9 +119,9 @@
    "api/app/ops/state.py": "b20afe6bf23cc5e83f7a54f39dfcd3af92cd85b3d9d3292a16f26f0e6a75aaec",
    "api/pyproject.toml": "f1a36fd72457d2cc1e08a5ce0f6813c5f3887c39c624285e0d1ba18c4da50782",
    "api/tests/m8b_fakes.py": "2a1e3bf3b9c6ac6cbcac93fbe16d6222c2712d8019d458e3064e466d0c11d484",
-   "api/tests/test_m8b_alerts.py": "7f57655f6137baa804a02ab6c9bf8c8238c92cbe399006ff9cbf71112ddd2fb5",
+   "api/tests/test_m8b_alerts.py": "f3fc9daa81cec3f20df7f2b7b628d7eaf63f950659d07d94af25dfd50e21643c",
    "api/tests/test_m8b_artifacts.py": "fe353fc0431350107b47c551ab2aaa5b393899087c7d8ae20557305259b90a8d",
-   "api/tests/test_m8b_ops_host.py": "6e70ca49e9fdd665a50e2c711ce642d5704b2ad29d50974b91e6532cf986bbe0",
+   "api/tests/test_m8b_ops_host.py": "33e3c1d836bcb8819864e2073cfd67241652b43cd9052f4ec9ed53de30e0408b",
    "api/tests/test_m8b_replica.py": "ee728eb6d910f9caae443cc43ca57fd883da10bd452114c0116fd6bd1f84d0f6",
    "api/tests/test_m8b_s3_minio.py": "afbbfda48a4cfb29b19b30d6cd752a620405ec137da73f72623a0c7a13c7e1d0",
    "deploy/Caddyfile": "af2729076ec3201158bf716f518ddcb499e34becbc0f98f5b54b2f29bf059e1a",
@@ -118,24 +134,26 @@
    "deploy/systemd/ras-ops-backup.timer": "0f4437645e7831623d9e67b64425161b9216e1031fcee451904e36f48798a6e6",
    "deploy/systemd/ras-ops-check.service": "71c1fc138fc7b9afcd2d41e141583d940e0a5a9982b15520d7328e5c799332c7",
    "deploy/systemd/ras-ops-check.timer": "06bae1169e04dd6c5dd7628e9b88b940d93a2006b269b2f4d1e56cb6390a7efd",
-   "docs/README.md": "ca61e8c294adabed4320145928e27b4275318f348c050be085fbf932effe06a5",
+   "docs/README.md": "c89bef2ccb2c8b2e5f81eef15cdb8c874affbc603a5894d19d510a7691f37cbf",
    "docs/access-and-data.md": "a22d75e966de8280c8e57d75563f3498e70a01dbe63ac1d1bf929c2ee1f31ed2",
-   "docs/decisions.md": "d07760388c34cc2cbba08bf1e239ed3fee9756c4d71437d6e3a9205c7f77b6df",
-   "docs/m8b-pilot-operations.md": "144ab299048b5d08e983d8f479a368ff84a94ffbe98e68faece58b848d034bfa",
-   "docs/mvp-delivery-plan.md": "72add0113c02dfee993ef4b9cf4462b9b1ac8793b80508b6a4968b9b80dca153",
+   "docs/decisions.md": "c7acab0110057609063dd82a1c49498f1f752ddd652ea9daf01357005b74fc18",
+   "docs/m8b-pilot-operations.md": "bfd53d0c53d9b3644c073a3bb770a971abd3d38d83e2114de5fe2857d69ae2a0",
+   "docs/mvp-delivery-plan.md": "1ede3b92bb9019df687515baad0487957f8a05473e476089ab2da9ad68e37297",
    "docs/nonfunctional.md": "386db51228923d0f01d1dca6adfddba4950abf47a4531182052325a757949a84",
    "docs/orchestrator-handover.md": "a4cfe1d665057597fc46cffed1d899de29dc27292e8f4f69dc006eedcef041e3",
    "docs/reviews/pr66-m8a-pilot-entry-hardening.md": "ed078d972f2da58302311c3207661134a8faf09bccced62d04c047928ab36095",
+   "docs/reviews/pr67-m8b-pilot-operations.md": "9c0c5358fa1c03189197ad3f1697dce00863ec77f9fc89220bd7f1c02f1ac7e2",
    "docs/roadmap.md": "c48ee2e3fb3cf90adcb7d2924b12c21ca5076861d6ad24efc24c667b85eea920",
    "docs/tasks/fix-pr66-smtp-deadline-deploy-image-ci-artifacts.md": "d02ffe62a76082c5410775e674173b7467477c1b97fa8718ff3df67ffbf6a607",
+   "docs/tasks/fix-pr67-drill-teardown-alert-recipients.md": "38c0df08cc7a698d24d061d9eb1ca5548b1d934fc48039b3b5faa46dc3ef2d2c",
    "docs/tasks/m8b-pilot-operations.md": "9e5de4d4dd77f095dd182066663ea46f07fd89fb0da9dbf5c64ca1b42a694ae8",
    "scripts/m8a_deploy_check.py": "8d3ceafdcecf570f75d6ed114a621d34fdf7876eeaaa990c4bed51b0026d182b",
    "scripts/m8a_inventory.py": "37e7dc26798ead667936223941e91d5ec16a4bb2b71f796feb3f0809eb39bff2",
    "scripts/m8b_browser.py": "1eaebf3419292f96344e596d10d8a65e74df0a61b2a6cb22398736e159eb1406",
-   "scripts/m8b_counterchecks.py": "f8196fa55c5a86b49fcc86b2990f65c2e475ebd685df158baff3371a9f7be95c",
+   "scripts/m8b_counterchecks.py": "03dbf61528fbbd5593334610c8c2db39d0afd7cb8f407bfbb289088da0f486d1",
    "scripts/m8b_drill.py": "c2ab290e515089b10ed813bad544fa9f51517346ed825b9ed522d1b6737caa04",
-   "scripts/m8b_phases.py": "f41727ece679ec276bdf8e25d07356ee81a8340045ba7e9ed4b117e3a54cbded",
-   "scripts/ras_ops.py": "7d9bb2e166f3a4f6d97c1e44f442be33b6052120960387ee6f328bd2632193ca"
+   "scripts/m8b_phases.py": "33410304f66bec5cd468446cdc730896cc09f69be169c3438b86c9f2a11150c1",
+   "scripts/ras_ops.py": "03bea1db035f51d9c81526cf4e5a6cd1e4679afc358aa705b8e88cc94c758d2a"
   }
  },
  "junit": {
@@ -310,6 +328,85 @@
    "per_file": {
     "tests/test_m8a_smtp_delivery.py": {
      "pass": 25
+    }
+   }
+  },
+  "pr67 before fix (new regressions, 41d07d4 code)": {
+   "sha256": "372fca3ca78603fc5564a5f324c2568187f5d4bb3572fe71e56fcd18e4f72b54",
+   "total": 14,
+   "pass": 3,
+   "failure": 11,
+   "per_file": {
+    "tests/test_m8b_alerts.py": {
+     "pass": 1,
+     "failure": 3
+    },
+    "tests/test_m8b_ops_host.py": {
+     "pass": 2,
+     "failure": 8
+    }
+   }
+  },
+  "pr67 before fix (reviewer repros)": {
+   "sha256": "87720af1e5f77787c9e71c5c01335bc49ae05f8c8bc02dc428509581ce1fe74d",
+   "total": 3,
+   "failure": 2,
+   "pass": 1,
+   "per_file": {
+    ".py": {
+     "failure": 2,
+     "pass": 1
+    }
+   }
+  },
+  "pr67 after fix (ops_host + alerts)": {
+   "sha256": "d87ec46503b80df3a9f2265ba3416b36c80781b0727543fb6d084368db70a241",
+   "total": 53,
+   "pass": 53,
+   "per_file": {
+    "tests/test_m8b_alerts.py": {
+     "pass": 29
+    },
+    "tests/test_m8b_ops_host.py": {
+     "pass": 24
+    }
+   }
+  },
+  "pr67 after fix (reviewer repros)": {
+   "sha256": "c97ec0a9d9a4070ebb487a4ed8d17d79545fec63d959300c57e1419ef530575c",
+   "total": 3,
+   "pass": 3,
+   "per_file": {
+    ".py": {
+     "pass": 3
+    }
+   }
+  },
+  "pr67 after fix (M8b 5 files + SMTP M8a, test host)": {
+   "sha256": "ea9ac4736674a7b420b6b5e27095256ddece33ade45d4b142d2f5ff58d41a1b8",
+   "total": 117,
+   "pass": 117,
+   "per_file": {
+    "tests/test_m8a_smtp_deadline.py": {
+     "pass": 9
+    },
+    "tests/test_m8a_smtp_delivery.py": {
+     "pass": 25
+    },
+    "tests/test_m8b_alerts.py": {
+     "pass": 29
+    },
+    "tests/test_m8b_artifacts.py": {
+     "pass": 10
+    },
+    "tests/test_m8b_ops_host.py": {
+     "pass": 24
+    },
+    "tests/test_m8b_replica.py": {
+     "pass": 16
+    },
+    "tests/test_m8b_s3_minio.py": {
+     "pass": 4
     }
    }
   }
@@ -2472,6 +2569,426 @@
     {
      "check": "[u1] upgrade project torn down (its own volumes only)",
      "pass": true
+    }
+   ]
+  },
+  "pr67-fix:backup-20261020T202418": {
+   "sha256": "313dc14e0090b36018ae5cb366f7b618de5a43d5efdd72c9609ab7df3976a49c",
+   "metrics": {
+    "b1_edge_statuses_during_run": [
+     [
+      200,
+      null
+     ],
+     [
+      503,
+      "maintenance"
+     ]
+    ],
+    "b1_window_seconds": 18.36,
+    "b1_total_seconds": 25.83,
+    "fail_minio_edge_statuses_during_run": [
+     [
+      200,
+      null
+     ],
+     [
+      503,
+      "maintenance"
+     ]
+    ],
+    "db_stopped_edge_statuses_during_run": [
+     [
+      200,
+      null
+     ],
+     [
+      503,
+      "maintenance"
+     ],
+     [
+      503,
+      "service_recovering"
+     ]
+    ],
+    "fail_reopen_edge_statuses_during_run": [
+     [
+      503,
+      "maintenance"
+     ],
+     [
+      503,
+      "service_recovering"
+     ]
+    ],
+    "fail_target_edge_statuses_during_run": [
+     [
+      200,
+      null
+     ]
+    ],
+    "b2_edge_statuses_during_run": [
+     [
+      200,
+      null
+     ],
+     [
+      503,
+      "maintenance"
+     ]
+    ],
+    "retention_kept_ids": [
+     "20261020T132418Z-8366aa13",
+     "20261020T132555Z-f9ca7261",
+     "20261020T133145Z-dd5b89a3"
+    ]
+   },
+   "checks": [
+    {
+     "check": "[p1] scheduled backup (same argv as the systemd unit) succeeds",
+     "pass": true
+    },
+    {
+     "check": "[p1] during the window the edge served 503 maintenance, never a 502",
+     "pass": true
+    },
+    {
+     "check": "[p1] writers back and ready, flag removed",
+     "pass": true
+    },
+    {
+     "check": "[p1] staging holds no plaintext or ciphertext after the run",
+     "pass": true
+    },
+    {
+     "check": "[p1] off-host object is age ciphertext, hash read back = metadata, no dump/object bytes in clear",
+     "pass": true
+    },
+    {
+     "check": "[p1] capture fails mid-window (MinIO down): run failed, writers reopened, flag cleared",
+     "pass": true
+    },
+    {
+     "check": "[p1] no plaintext left after the failed capture",
+     "pass": true
+    },
+    {
+     "check": "[p1] the failed run mailed backup_failed at once",
+     "pass": true
+    },
+    {
+     "check": "[p1] database stopped before the window: capture fails, start brings db back, writers ready, flag cleared",
+     "pass": true
+    },
+    {
+     "check": "[p1] recovery hold opened before the run (readiness will stay closed)",
+     "pass": true
+    },
+    {
+     "check": "[p1] readiness closed after the window: run failed, reopen failed, maintenance page stays (no silent outage)",
+     "pass": true
+    },
+    {
+     "check": "[p1] maintenance_reopen_failed mailed at once",
+     "pass": true
+    },
+    {
+     "check": "[p1] operator recovers, then ras_ops open lifts the page",
+     "pass": true
+    },
+    {
+     "check": "[p1] destination down: preflight refuses before any window, nothing pruned",
+     "pass": true
+    },
+    {
+     "check": "[p1] retention after a good run: every real (in-retention) backup kept, expired ones beyond the newest 3 good pruned, expired incomplete upload pruned",
+     "pass": true
+    },
+    {
+     "check": "[p1] backup alerts resolved after the good run",
+     "pass": true
+    },
+    {
+     "check": "[p1] compose logs, ops logs and recorded argv hold no secret value",
+     "pass": true
+    }
+   ]
+  },
+  "pr67-fix:drill-20261020T203217": {
+   "sha256": "b39b727e3e9657bcb22a00727b9f036de14b7d42d9edcd86aa943576e1ed2323",
+   "metrics": {
+    "drill_restore_seconds": 40.61
+   },
+   "checks": [
+    {
+     "check": "[drill] env sharing the serving journal dir: refused target_journal_exists before any side effect, serving journal intact (or only grown), serving deploy still ready, no flag",
+     "pass": true
+    },
+    {
+     "check": "[drill] monthly drill: latest good backup restored into a scratch project, recovered, ready, torn down",
+     "pass": true
+    },
+    {
+     "check": "[drill] the drill lifted its own maintenance flag",
+     "pass": true
+    },
+    {
+     "check": "[drill] scratch project left nothing behind (containers, volumes, journal)",
+     "pass": true
+    },
+    {
+     "check": "[drill] the scratch journal never shipped (replica head unchanged by the drill)",
+     "pass": true
+    },
+    {
+     "check": "[drill] restore_drill_overdue resolved on the live deployment",
+     "pass": true
+    }
+   ]
+  },
+  "pr67-fix:install-20261020T202122": {
+   "sha256": "9c5194b2651cc3f69111e6f984aac9c775c3ea790bcb8a17802fca443638e8c7",
+   "metrics": {
+    "install_up_seconds": 27.12,
+    "first_ship_seconds": 0.73,
+    "ship_after_data_seconds": 0.03
+   },
+   "checks": [
+    {
+     "check": "[p1] deploy contract (M8b services) on this env, Settings and ops example in image",
+     "pass": true
+    },
+    {
+     "check": "[p1] fresh install of the M8b deploy starts (incl. journal-replicator)",
+     "pass": true
+    },
+    {
+     "check": "[p1] readiness on real postconditions",
+     "pass": true
+    },
+    {
+     "check": "[p1] replicator runs; ops one-shots are not long-running services",
+     "pass": true
+    },
+    {
+     "check": "[p1] replicator: journal read-only, read-only rootfs, uid 10001, no DB/MinIO settings",
+     "pass": true
+    },
+    {
+     "check": "[p1] first check mails backup_stale + restore_drill_overdue to both recipients",
+     "pass": true
+    },
+    {
+     "check": "[p1] same conditions next run: deduplicated, no mail",
+     "pass": true
+    },
+    {
+     "check": "[p1] maintenance flag: edge answers 503 maintenance (JSON for /api, HTML page) with Retry-After",
+     "pass": true
+    },
+    {
+     "check": "[p1] flag removed: traffic again",
+     "pass": true
+    },
+    {
+     "check": "[p1] web down outside a window: clear 503 service_unavailable, not 502",
+     "pass": true
+    },
+    {
+     "check": "[p1] web back",
+     "pass": true
+    },
+    {
+     "check": "[p1] one-time bootstrap through the runtime CLI",
+     "pass": true
+    },
+    {
+     "check": "[p1] Admin logs in over HTTPS",
+     "pass": true
+    },
+    {
+     "check": "[p1] invite a via SMTP capture and accept",
+     "pass": true
+    },
+    {
+     "check": "[p1] invite b via SMTP capture and accept",
+     "pass": true
+    },
+    {
+     "check": "[p1] m8b-i1-a-970f logs in",
+     "pass": true
+    },
+    {
+     "check": "[p1] m8b-i1-b-eecf logs in",
+     "pass": true
+    },
+    {
+     "check": "[p1] open review request: the Admin may read that private file",
+     "pass": true
+    },
+    {
+     "check": "[p1] common copy approved + published; B downloads it",
+     "pass": true
+    }
+   ]
+  },
+  "pr67-fix:counterchecks-5": {
+   "sha256": "4581567fbce0537c86d7c3ced86a4f06bb5124fdc6cb589dc86276a5a7415eb0",
+   "source_files": 378,
+   "source_unchanged": true,
+   "results": [
+    {
+     "mutation": "none (clean copy)",
+     "exit": 0,
+     "result": "PASS"
+    },
+    {
+     "mutation": "ship_torn_tail",
+     "file": "api/app/ops/replica.py",
+     "tests": [
+      "tests/test_m8b_replica.py::test_torn_tail_is_never_shipped"
+     ],
+     "exit": 1,
+     "result": "HOLDS"
+    },
+    {
+     "mutation": "overwrite_replica",
+     "file": "api/app/ops/s3.py",
+     "tests": [
+      "tests/test_m8b_replica.py::test_existing_segment_is_never_overwritten",
+      "tests/test_m8b_s3_minio.py::test_conditional_create_never_overwrites"
+     ],
+     "exit": 1,
+     "result": "HOLDS"
+    },
+    {
+     "mutation": "skip_fork_check",
+     "file": "api/app/ops/replica.py",
+     "tests": [
+      "tests/test_m8b_replica.py::test_fork_stops_shipping_without_writing",
+      "tests/test_m8b_replica.py::test_rolled_back_local_journal_is_detected_not_shipped"
+     ],
+     "exit": 1,
+     "result": "HOLDS"
+    },
+    {
+     "mutation": "choose_shorter_chain",
+     "file": "api/app/ops/replica.py",
+     "tests": [
+      "tests/test_m8b_replica.py::test_choose_longer_only_when_prefix",
+      "tests/test_m8b_replica.py::test_db_and_local_journal_rolled_back_but_replica_newer_is_caught"
+     ],
+     "exit": 1,
+     "result": "HOLDS"
+    },
+    {
+     "mutation": "splice_diverged_chains",
+     "file": "api/app/ops/replica.py",
+     "tests": [
+      "tests/test_m8b_replica.py::test_choose_longer_only_when_prefix"
+     ],
+     "exit": 1,
+     "result": "HOLDS"
+    },
+    {
+     "mutation": "backup_reads_dotenv",
+     "file": "scripts/ras_ops.py",
+     "tests": [
+      "tests/test_m8b_ops_host.py::test_no_dotenv_is_ever_opened"
+     ],
+     "exit": 1,
+     "result": "HOLDS"
+    },
+    {
+     "mutation": "keep_plaintext_after_upload",
+     "file": "api/app/ops/artifacts.py",
+     "tests": [
+      "tests/test_m8b_artifacts.py::test_ship_encrypts_uploads_reads_back_and_leaves_no_plaintext"
+     ],
+     "exit": 1,
+     "result": "HOLDS"
+    },
+    {
+     "mutation": "private_key_accepted",
+     "file": "api/app/ops/artifacts.py",
+     "tests": [
+      "tests/test_m8b_artifacts.py::test_private_key_on_server_is_refused"
+     ],
+     "exit": 1,
+     "result": "HOLDS"
+    },
+    {
+     "mutation": "prune_last_good",
+     "file": "api/app/ops/artifacts.py",
+     "tests": [
+      "tests/test_m8b_artifacts.py::test_retention_keeps_good_backups_and_needs_a_successful_last_run"
+     ],
+     "exit": 1,
+     "result": "HOLDS"
+    },
+    {
+     "mutation": "prune_after_failed_run",
+     "file": "api/app/ops/artifacts.py",
+     "tests": [
+      "tests/test_m8b_artifacts.py::test_retention_keeps_good_backups_and_needs_a_successful_last_run"
+     ],
+     "exit": 1,
+     "result": "HOLDS"
+    },
+    {
+     "mutation": "forget_reopen_writers",
+     "file": "scripts/ras_ops.py",
+     "tests": [
+      "tests/test_m8b_ops_host.py::test_failure_mid_window_still_reopens_writers_and_alerts"
+     ],
+     "exit": 1,
+     "result": "HOLDS"
+    },
+    {
+     "mutation": "drill_skips_preflight",
+     "file": "scripts/ras_ops.py",
+     "tests": [
+      "tests/test_m8b_ops_host.py::test_drill_refuses_before_any_side_effect"
+     ],
+     "exit": 1,
+     "result": "HOLDS"
+    },
+    {
+     "mutation": "drill_clears_any_flag",
+     "file": "scripts/ras_ops.py",
+     "tests": [
+      "tests/test_m8b_ops_host.py::test_drill_keeps_a_flag_it_did_not_set"
+     ],
+     "exit": 1,
+     "result": "HOLDS"
+    },
+    {
+     "mutation": "alert_stops_at_first_failed_recipient",
+     "file": "api/app/cli/ops.py",
+     "tests": [
+      "tests/test_m8b_alerts.py::test_a_rejected_recipient_does_not_silence_the_others"
+     ],
+     "exit": 1,
+     "result": "HOLDS"
+    },
+    {
+     "mutation": "alert_failed_recipient_marked_sent",
+     "file": "api/app/cli/ops.py",
+     "tests": [
+      "tests/test_m8b_alerts.py::test_a_rejected_recipient_does_not_silence_the_others",
+      "tests/test_m8b_alerts.py::test_a_failing_second_recipient_does_not_repeat_mail_to_the_first"
+     ],
+     "exit": 1,
+     "result": "HOLDS"
+    },
+    {
+     "mutation": "alert_leaks_data",
+     "file": "api/app/ops/alerts.py",
+     "tests": [
+      "tests/test_m8b_alerts.py::test_rendered_mail_carries_codes_counts_and_times_only"
+     ],
+     "exit": 1,
+     "result": "HOLDS"
     }
    ]
   }

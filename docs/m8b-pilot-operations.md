@@ -85,6 +85,8 @@ nay lộ ra ở ba chỗ: restore chọn replica (`journal_relation=replica_ahea
 5. Ngoài cửa sổ: `ops backup-ship` đóng tar → mã hóa `age` (pyrage/rage) → **xóa plaintext ngay** → upload không ghi
    đè → đọc lại SHA-256 từ đích → mới ghi metadata `verified` → xóa ciphertext local. Lỗi bất kỳ: không metadata
    (không phải backup tốt), staging rỗng.
+   Upload là **một** `put_object`: S3 giới hạn 5 GB mỗi PUT; dữ liệu pilot nhỏ nên chưa ảnh hưởng, artifact lớn hơn cần
+   multipart (chưa làm, giới hạn đã biết).
 6. Retention `ops backup-prune`: chỉ khi lượt này thành công; luôn giữ `min_keep` bản tốt mới nhất; bản tốt chỉ bị xóa
    khi có bản tốt mới hơn; metadata xóa trước ciphertext. Versioning đích giữ bản noncurrent tới lifecycle của bucket
    (cấu hình ở nhà cung cấp, chưa có).
@@ -97,10 +99,12 @@ hành khởi đầu**, không phải SLO.
 ## Alert tối thiểu
 
 `ras_ops.py check` (timer 5 phút): probe runtime trong api + `ops-check`. Mail qua **adapter SMTP TLS hiện có**
-(`SmtpDelivery.send_email`, cùng process con/deadline M8a) tới `alerts.recipients`; dedupe trong
-`ops-state/alerts-state.json` (mail khi mới, nhắc lại sau `renotify_hours`, mail `RESOLVED` khi hết). Nội dung chỉ mã,
-số đếm, thời điểm: mọi giá trị qua `alerts.safe` (số/bool/ISO time/mã `[a-z0-9_:.-]`), còn lại thành `?`. Gửi lỗi →
-exit 5, không đánh dấu đã gửi (lượt sau gửi lại). **Cần thêm probe/dead-man ngoài host ở cutover**: host chết thì không
+(`SmtpDelivery.send_email`, cùng process con/deadline M8a) tới **từng** người nhận trong `alerts.recipients`, độc lập
+nhau (sửa review PR #67): lỗi ở một người không chặn người khác. Dedupe theo từng người nhận trong
+`ops-state/alerts-state.json` (khóa là hash địa chỉ, không lưu email): mail khi mới, nhắc lại sau `renotify_hours`, mail
+`RESOLVED` chỉ tới người đã được báo. Nội dung chỉ mã, số đếm, thời điểm: mọi giá trị qua `alerts.safe` (số/bool/ISO
+time/mã `[a-z0-9_:.-]`), còn lại thành `?`. Có người nhận gửi lỗi → exit 5, summary nêu `mailed`/`failed`/
+`delivery_errors` (mã); người lỗi giữ state cũ nên được gửi lại lượt sau, người đã nhận không bị gửi lặp. **Cần thêm probe/dead-man ngoài host ở cutover**: host chết thì không
 tự báo được; M8b không đăng ký dịch vụ ngoài.
 
 ### Alert runbook
@@ -118,7 +122,10 @@ tự báo được; M8b không đăng ký dịch vụ ngoài.
 - <a id="alert-journal-rollback"></a>**`journal_rollback:<reason>`** — local journal sau hoặc khác replica. Edge đã
   dựng cờ bảo trì. Dừng writer; **không** xóa cờ; xác định host/DB có bị quay về (snapshot VM, restore tay). Nếu replica
   là chuỗi đúng: lấy bản sao journal hiện tại ra ngoài, restore theo runbook "DB rollback" dưới đây (công cụ chọn replica
-  khi local là prefix). Phân kỳ thật: operator quyết định, không ghép chuỗi.
+  khi local là prefix). Phân kỳ thật: operator quyết định, không ghép chuỗi. **Đánh đổi:** restore từ backup làm mất mọi
+  thay đổi DB sau backup đó. Ca DB không bị quay về mà chỉ journal local thiếu đuôi (vd. replicator đã ship một dòng chưa
+  kịp `fsync` rồi máy mất điện) không có công cụ nạp replica làm journal local tại chỗ trong M8b; operator cân nhắc giữa
+  restore (mất thay đổi DB sau backup) và điều tra thủ công, không sửa tay journal/DB.
 - <a id="alert-replica-lag"></a>**`replica_lag`** — record chưa ship quá ngưỡng: xem `replica_error`; đây là cửa sổ mất
   dữ liệu nếu host mất lúc này.
 - <a id="alert-replica-stale"></a>**`replica_stale`** — `replica-status.json` không cập nhật: `compose ps
@@ -173,9 +180,16 @@ xóa-thu hồi → bật timer. Record sau lần ship cuối đã mất (xem s�
 và operator chấp nhận rủi ro; `open` cũng cần `--without-replica`, và replicator/`check` sẽ chặn nếu chuỗi phân kỳ.
 
 **Diễn tập tháng:** `ras_ops drill --env-file <env drill> --project <tên có "drill"> --compose-file … --identity-file
-<khóa> --record-state-dir <RAS_OPS_STATE_DIR của deploy thật>`: restore bản tốt mới nhất vào project scratch (env riêng:
-port/subnet/thư mục khác), recover, chỉ khởi động `api`, readiness + probe, hạ project (kiểm label) và ghi
-`drill-state.json`. Không chạy replicator/edge/worker trong drill: journal scratch không bao giờ được ship.
+<khóa> --record-state-dir <RAS_OPS_STATE_DIR của deploy thật>`: restore bản tốt mới nhất vào project scratch, recover,
+chỉ khởi động `api`, readiness + probe, hạ project (kiểm label) và ghi `drill-state.json`. Không chạy
+replicator/edge/worker trong drill: journal scratch không bao giờ được ship. **Env drill phải có project, port, subnet và
+thư mục journal/state/staging/maintenance riêng**, không copy nguyên env đang phục vụ. Trước mọi tác động, công cụ từ
+chối và thoát (không teardown) khi: thư mục journal đã có `revocations.jsonl` hoặc file `.torn-*`
+(`target_journal_exists`), cờ bảo trì đã bật (`drill_maintenance_flag_present`), staging không rỗng
+(`drill_staging_not_empty`), `--record-state-dir` trùng một thư mục của chính drill (`drill_dirs_shared`), hoặc project
+đã có container/volume (`drill_project_not_fresh`). Teardown chỉ xóa journal/torn file mà lượt này tạo (preflight chứng
+minh chúng chưa có), hạ project mà lượt này dựng, và gỡ cờ bảo trì do restore của lượt này đặt (lý do `restore`, thời
+điểm sau khi bắt đầu lượt); cờ khác được giữ.
 
 ## Kết quả
 
@@ -247,6 +261,44 @@ cũ phục vụ 6,1 s trước khi edge bị chặn.
 kiểm mất điện thật của DB/journal; CI GitHub trên commit M8b (chờ push).
 
 **Cleanup và baseline:** baseline trước khi tạo tài nguyên: 24 container, 188 volume, 9 network, 140 image. Sau khi dọn (mọi project `rasm8b*`/`rasm8at*` chỉ hạ sau kiểm label `ras.m8b.context`/project; worktree `0de10f4` gỡ; image `rasm8a-browser:local` và `debian:trixie-slim` do task tạo/kéo đã gỡ): cùng 24 container ID, 188 volume, 9 network, 140 image. Không query/restart container có sẵn, không đụng `ras`/Dify, không `taskkill`; chỉ dừng PID client do harness tự tạo và container one-shot đặt tên riêng. Context thử giữ evidence, journal/backup tổng hợp, khóa `age` thử và credential tổng hợp (ngoài repo).
+
+## Sửa review PR #67
+
+[Report reviewer](reviews/pr67-m8b-pilot-operations.md) tại `41d07d4`: hai P2, sửa trên cùng PR theo
+[prompt](tasks/fix-pr67-drill-teardown-alert-recipients.md). Không đổi đường ghi journal, gate, readiness, schema,
+`restore()`, replica, backup hay mã hóa. Chứng cứ thô: `C:\Users\ADMIN\AppData\Local\Temp\rv67b\` (regression trước/sau)
+và `C:\Users\ADMIN\AppData\Local\Temp\ras-m8b-fix67\` (diễn tập, test, countercheck).
+
+- **P2-1 drill dọn đồ không phải của nó.** `scripts/ras_ops.py`: `drill_preflight` chạy **trước mọi tác động** (trước cả
+  lock) và từ chối `target_journal_exists` (journal hoặc `.torn-*` đã có), `drill_maintenance_flag_present`,
+  `drill_staging_not_empty`, `drill_dirs_shared` (`--record-state-dir` trùng thư mục của drill),
+  `drill_project_not_fresh`; bị từ chối thì thoát, không teardown. `teardown_drill` chỉ xóa journal/torn file (preflight
+  chứng minh chưa có trước lượt), hạ project mà lượt này dựng (guard label/project giữ nguyên), và gỡ cờ bảo trì do
+  restore của lượt này đặt (lý do `restore`, thời điểm sau khi bắt đầu); drill thành công không còn để lại cờ.
+- **P2-2 một người nhận lỗi làm im các người khác.** `app/cli/ops.py check`: thử gửi cho **mọi** người nhận; dedupe/nhắc
+  lại/`RESOLVED` theo từng người nhận (khóa hash địa chỉ trong `alerts-state.json`, state cũ dạng `active` vẫn đọc được);
+  người lỗi giữ state cũ để lượt sau gửi lại, người đã nhận không bị gửi lặp; có lỗi → exit 5, summary `mailed`/`failed`/
+  `delivery_errors`.
+- **P3:** runbook `journal_rollback` ghi đánh đổi restore làm mất thay đổi DB sau backup và ca journal local thiếu đuôi
+  không có công cụ nạp replica tại chỗ (chưa làm); handoff ghi giới hạn một PUT ≤ 5 GB.
+
+**Kiểm chứng:**
+
+- Regression mới trên `41d07d4` (trước sửa): `test_m8b_ops_host` + `test_m8b_alerts` lọc theo drill/recipient →
+  **11 fail / 3 pass** (3 pass: test cũ "drill từ chối project đang phục vụ" và "giữ cờ không phải của drill" — code cũ vốn
+  không gỡ cờ — là đối chứng); repro reviewer `rv67\test_rv67_drill.py` + `test_rv67_repro.py` → **2 fail / 1 pass** (ca
+  P3). Sau sửa: hai file **53/53**, repro reviewer **3/3**.
+- Test M8b đủ 5 file + SMTP M8a trên test host cô lập (MinIO digest): **117/117 pass**.
+- Countercheck lượt 5: **16/16 HOLDS** (12 cũ + 4 mới: bỏ preflight drill, drill gỡ mọi cờ, dừng ở người nhận lỗi đầu, đánh
+  dấu người nhận lỗi là đã gửi), bản sạch exit 0, source trước/sau trùng.
+- Đường drill đổi nên chạy lại diễn tập trên context mới `ras-m8b-fix67` (`setup`, `build`, `run install backup drill`):
+  **42/42 pass** (install 19, backup 17, drill 6). Drill thêm ca env drill trỏ vào journal của deploy đang phục vụ: từ chối
+  `target_journal_exists` trước mọi tác động, không tạo container nào, journal đang phục vụ nguyên vẹn, deploy vẫn ready,
+  không cờ bảo trì; drill thật gỡ cờ của nó, hạ sạch, journal scratch không ship. `restore()` không đổi nên không chạy lại
+  phase disaster. Docker sau dọn trùng baseline (24/188/9/140).
+- CI run `39422883314` trên `41d07d4`: ba job **success**, API selection **1193 passed** / 1 deselected (gồm
+  `test_recipient_reject_is_a_failure` từng fail một lần ở máy này; vẫn không tái hiện, giữ là failure lịch sử chưa rõ
+  nguyên nhân). CI trên commit sửa: xem PR (chưa có lúc ghi).
 
 ## Thông tin chủ dự án phải cấp trước cutover
 

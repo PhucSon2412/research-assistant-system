@@ -221,3 +221,118 @@ def test_drill_refuses_a_serving_project(deploy_dirs):
     with pytest.raises(ras_ops.OpsFailure) as refused:
         ras_ops.do_drill(make(env), type("A", (), {"backup_id": "latest"})())
     assert refused.value.code == "drill_project_name"
+
+
+# --- PR #67 P2-1: a drill only ever cleans up what it created itself -------------------------------
+
+@pytest.fixture
+def drill_deploy(tmp_path, monkeypatch):
+    """A drill env (project contains "drill") with Docker replaced by recorders."""
+    dirs = {name: tmp_path / f"drill-{name}" for name in ("config", "state", "staging", "maintenance", "journal")}
+    for path in dirs.values():
+        path.mkdir()
+    (dirs["config"] / "ops.json").write_text(json.dumps({"window": {}}))
+    env = tmp_path / "drill.env"
+    env.write_text("\n".join([
+        "RAS_DEPLOY_PROJECT=ras-pilot-drill", f"RAS_OPS_CONFIG_DIR={dirs['config']}",
+        f"RAS_OPS_STATE_DIR={dirs['state']}", f"RAS_OPS_STAGING_DIR={dirs['staging']}",
+        f"RAS_MAINTENANCE_DIR={dirs['maintenance']}", f"RAS_JOURNAL_DIR={dirs['journal']}"]) + "\n",
+        encoding="utf-8")
+    calls = []
+
+    def compose(self, *args, **kw):
+        calls.append(args)
+        return type("R", (), {"returncode": 0, "stdout": b"", "stderr": b""})()
+    monkeypatch.setattr(ras_ops.Deploy, "compose", compose)
+    monkeypatch.setattr(ras_ops.subprocess, "run", lambda *a, **k: type("R", (), {
+        "returncode": 0, "stdout": "", "stderr": ""})())
+    identity = tmp_path / "identity.txt"
+    identity.write_text("AGE-SECRET-KEY-1SYNTHETIC\n")
+    d = ras_ops.Deploy(env, "ras-pilot-drill", [DEPLOY_COMPOSE])
+    args = type("A", (), {"backup_id": "20261020T020000Z-00000001", "identity_file": str(identity), "keep": False,
+                          "record_state_dir": None})()
+    return d, dirs, calls, args
+
+
+def downs(calls):
+    return [c for c in calls if "down" in c]
+
+
+@pytest.mark.parametrize("case,code", [("serving_journal", "target_journal_exists"),
+                                       ("torn_file", "target_journal_exists"),
+                                       ("flag_on", "drill_maintenance_flag_present"),
+                                       ("staging_used", "drill_staging_not_empty"),
+                                       ("record_is_own_state", "drill_dirs_shared")])
+def test_drill_refuses_before_any_side_effect(drill_deploy, case, code):
+    """Reviewer repro (env copied from the serving deploy): the guard refuses and nothing is touched."""
+    d, dirs, calls, args = drill_deploy
+    planted = {"serving_journal": dirs["journal"] / "revocations.jsonl",
+               "torn_file": dirs["journal"] / "revocations.jsonl.torn-20261020T000000",
+               "flag_on": dirs["maintenance"] / "enabled", "staging_used": dirs["staging"] / "restore-x"}.get(case)
+    if planted is not None:
+        planted.write_bytes(b'{"serving":"journal"}\n')
+    if case == "record_is_own_state":
+        args.record_state_dir = str(dirs["state"])
+    with pytest.raises(ras_ops.OpsFailure) as refused:
+        ras_ops.do_drill(d, args)
+    assert refused.value.code == code
+    if planted is not None:
+        assert planted.read_bytes() == b'{"serving":"journal"}\n'
+    assert calls == [] and not (dirs["state"] / "maintenance.lock").exists()
+
+
+def test_drill_refuses_a_project_that_already_has_resources(drill_deploy, monkeypatch):
+    d, dirs, calls, args = drill_deploy
+    monkeypatch.setattr(ras_ops, "target_is_fresh", lambda d_: False)
+    with pytest.raises(ras_ops.OpsFailure) as refused:
+        ras_ops.do_drill(d, args)
+    assert refused.value.code == "drill_project_not_fresh" and downs(calls) == []
+
+
+def _fake_restore(dirs, *, fail_after_journal=False):
+    def restore(d, backup_id, identity, local, without_replica):
+        d.set_maintenance("restore")
+        (dirs["journal"] / "revocations.jsonl").write_bytes(b"scratch journal\n")
+        (dirs["journal"] / "revocations.jsonl.torn-1").write_bytes(b"torn")
+        if fail_after_journal:
+            raise ras_ops.OpsFailure("pg_restore_failed")
+        return {"journal_relation": "replica_only"}
+    return restore
+
+
+def test_successful_drill_leaves_no_flag_journal_or_project(drill_deploy, monkeypatch, tmp_path):
+    d, dirs, calls, args = drill_deploy
+    live_state = tmp_path / "live-state"
+    live_state.mkdir()
+    args.record_state_dir = str(live_state)
+    monkeypatch.setattr(ras_ops, "target_is_fresh", lambda d_: True)
+    monkeypatch.setattr(ras_ops, "restore", _fake_restore(dirs))
+    monkeypatch.setattr(ras_ops, "open_service", lambda *a, **k: {"opened": "drill"})
+    monkeypatch.setattr(ras_ops, "last_json", lambda raw: {"gate": "open"})
+    assert ras_ops.do_drill(d, args) == 0
+    assert d.maintenance() is None and list(dirs["journal"].iterdir()) == []
+    assert len(downs(calls)) == 1 and (live_state / "drill-state.json").exists()
+
+
+def test_drill_failing_after_its_own_journal_still_cleans_up(drill_deploy, monkeypatch):
+    d, dirs, calls, args = drill_deploy
+    monkeypatch.setattr(ras_ops, "target_is_fresh", lambda d_: True)
+    monkeypatch.setattr(ras_ops, "restore", _fake_restore(dirs, fail_after_journal=True))
+    with pytest.raises(ras_ops.OpsFailure) as failed:
+        ras_ops.do_drill(d, args)
+    assert failed.value.code == "pg_restore_failed"
+    assert d.maintenance() is None and list(dirs["journal"].iterdir()) == [] and len(downs(calls)) == 1
+
+
+def test_drill_keeps_a_flag_it_did_not_set(drill_deploy, monkeypatch):
+    """A flag written by another operation during the drill (other reason) is not the drill's to lift."""
+    d, dirs, calls, args = drill_deploy
+    monkeypatch.setattr(ras_ops, "target_is_fresh", lambda d_: True)
+
+    def restore(d_, *a):
+        d_.set_maintenance("backup")  # e.g. a shared maintenance dir used by a serving backup window
+        raise ras_ops.OpsFailure("pg_restore_failed")
+    monkeypatch.setattr(ras_ops, "restore", restore)
+    with pytest.raises(ras_ops.OpsFailure):
+        ras_ops.do_drill(d, args)
+    assert d.maintenance()["reason"] == "backup"

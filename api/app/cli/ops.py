@@ -300,29 +300,45 @@ def check(cfg, settings, host_facts: dict) -> tuple[int, dict]:
         previous = state_file.read(cfg.state_dir / ALERT_STATE) or {}
     except (ValueError, OSError):
         previous = {}
-    new, repeat, resolved, nxt = alerts.plan(previous.get("active", {}), conditions, now,
-                                             timedelta(hours=cfg.alerts.renotify_hours))
-    sent_to, delivery_error = 0, None
-    if new or repeat or resolved:
-        from app.delivery import DeliveryFailed, SmtpDelivery  # noqa: PLC0415
-        adapter = SmtpDelivery(cfg.alerts.smtp)
-        installation = facts["replica"].get("journal_id") or "unknown"
-        for recipient in cfg.alerts.recipients:
-            msg = alerts.render(cfg.alerts, new, repeat, resolved, now, installation, recipient)
-            try:
-                adapter.send_email(msg, recipient)
-                sent_to += 1
-            except DeliveryFailed as exc:
-                delivery_error = exc.code
-                break
-    if delivery_error is None:
-        nxt = alerts.mark_sent(nxt, new + repeat, now)
-        state_file.write(cfg.state_dir / ALERT_STATE, {"active": nxt, "checked_at": now.isoformat()})
-    summary = {"conditions": sorted(c.key for c in conditions), "new": sorted(c.key for c in new),
-               "repeat": sorted(c.key for c in repeat), "resolved": sorted(resolved), "mailed": sent_to,
-               "delivery_error": delivery_error,
+    # PR #67 P2-2: every recipient is tried and deduplicated on its own. A recipient whose send
+    # failed keeps its previous state (retried next run); the others are marked as they succeed.
+    renotify = timedelta(hours=cfg.alerts.renotify_hours)
+    legacy = previous.get("active") if "recipients" not in previous else None  # state from before the split
+    before = previous.get("recipients", {})
+    after: dict = {}
+    due_new, due_repeat, due_resolved = set(), set(), set()
+    sent_to, failed, errors = 0, 0, {}
+    adapter = None
+    installation = facts["replica"].get("journal_id") or "unknown"
+    for recipient in cfg.alerts.recipients:
+        rid = hashlib.sha256(recipient.lower().encode("utf-8")).hexdigest()[:16]
+        prev = before.get(rid, legacy or {})
+        new, repeat, resolved, nxt = alerts.plan(prev, conditions, now, renotify)
+        if not (new or repeat or resolved):
+            after[rid] = nxt
+            continue
+        due_new |= {c.key for c in new}
+        due_repeat |= {c.key for c in repeat}
+        due_resolved |= set(resolved)
+        if adapter is None:
+            from app.delivery import SmtpDelivery  # noqa: PLC0415
+            adapter = SmtpDelivery(cfg.alerts.smtp)
+        from app.delivery import DeliveryFailed  # noqa: PLC0415
+        try:
+            adapter.send_email(alerts.render(cfg.alerts, new, repeat, resolved, now, installation, recipient), recipient)
+        except DeliveryFailed as exc:
+            failed += 1
+            errors[exc.code] = errors.get(exc.code, 0) + 1
+            after[rid] = prev
+            continue
+        sent_to += 1
+        after[rid] = alerts.mark_sent(nxt, new + repeat, now)
+    state_file.write(cfg.state_dir / ALERT_STATE, {"recipients": after, "checked_at": now.isoformat()})
+    summary = {"conditions": sorted(c.key for c in conditions), "new": sorted(due_new),
+               "repeat": sorted(due_repeat), "resolved": sorted(due_resolved), "mailed": sent_to, "failed": failed,
+               "delivery_errors": errors, "delivery_error": next(iter(errors), None),
                "fence": any(c.code == "journal_rollback" for c in conditions) and cfg.alerts.fence_on_journal_rollback}
-    return (5 if delivery_error else 0), summary
+    return (5 if failed else 0), summary
 
 
 def main(argv: list[str] | None = None) -> int:
