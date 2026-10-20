@@ -1,5 +1,46 @@
 # Review PR #66 — HTTPS, SMTP TLS, limiter và CI
 
+## Review lại tại `5ca3e4c` — ba P2 đã sửa
+
+Ngày **2026-10-20**, head **`5ca3e4c93a8f9a6e07da4afbe1cdf82ac01448fd`**, code sửa **`96bd196d7f46df153c8d49b0eb7eb5392138a74c`**, source **0052**. PR **OPEN/chưa merge**, đã kiểm GitHub. **Không phát hiện điểm chặn merge mới trong phạm vi M8a đã kiểm.** Ba P2 tại `c0b20aa` bên dưới là lịch sử trước sửa.
+
+### Kiểm lại từng P2
+
+- **P2-1 đã đóng:** parent `SmtpDelivery` giữ deadline chung, gửi job qua stdin tới `app.smtp_transport`, kill/reap đúng child khi hết hạn, không nhận kết quả thành công muộn. Child dùng TLS bắt buộc verify và environment tối thiểu, không nhận DB/service secret. Bốn repro SMTP cũ giữ nguyên: control success **0,125 s**, SMTPS/STARTTLS nhỏ giọt và lệnh cộng dồn đều `smtp_timeout` **0,609–0,610 s** với deadline 0,6 s. Repro DNS cũ patch parent không còn kiểm được đường gửi; reviewer thay bằng hook trong **child thật**, có marker PID khớp `last_child.pid` và khác PID parent. DNS chậm 2 s và treo 3.600 s đều timeout **0,609 s**, child đã reap, **0 kết nối SMTP**. Đây là lỗi DNS tiêm tổng hợp, không sự cố DNS thật. Không có retry; server có thể đã nhận DATA trước timeout, compensation vẫn áp dụng.
+- **P2-2 đã đóng trong scope deploy pilot:** deploy/test harness dùng cùng digest Chainguard đã chọn; health `mc ready local` có thật và `/minio/health/ready` đạt. Reviewer kiểm registry cả **4 image resolve**. Trên container/volume thử: **7 kiểm tra storage đạt**, gồm put/readback SHA-256, list/delete/restart và upgrade từ image cũ. Volume root cũ thực sự `not_ready` với image UID 65532; bước chown một lần trong runbook khôi phục đọc object cũ và ghi mới. Không chạm volume dev. Reviewer **không** xóa cache/fresh-pull hoặc rerun toàn image/Chrome; các phần đó chỉ đối chiếu artifact agent. Dev compose cố ý giữ default tag cũ cho dữ liệu dev có sẵn, máy dev mới cần override digest theo hướng dẫn; không coi default đó là đường pilot.
+- **P2-3 đã đóng:** scanner giữ đúng bytes vừa đọc và quét, chỉ ghi vào publish directory mới khi mọi input/context hợp lệ; thiếu file không còn clean. Workflow chỉ upload publish copy khi `steps.scan.outputs.clean == 'true'`, không upload raw. `!cancelled()` giữ khả năng publish JUnit sạch khi pytest thất bại; cleanup vẫn `always()`. Bốn repro CI cũ đạt. JUnit thật của reviewer cũng scan sạch, output **`clean=true`**, publish copy có **cùng SHA-256** với input. Không upload dữ liệu thử lên GitHub.
+
+### Reviewer thực chạy
+
+| Nhóm | Kết quả tại head review lại |
+| --- | --- |
+| Bảy file API: SMTP/deadline/CI guard/limiter/delivery + cookies/CSRF/Origin | **156/156 pass**, 0 fail/error/skip, exit 0, **160,09 s**; runtime/PG/Redis/MinIO/journal cô lập |
+| Repro SMTP cũ | **4/4 pass** |
+| DNS độc lập, hook PID trong child | **2/2 pass**, chậm và treo đều bị thu hồi |
+| Repro CI cũ | **4/4 pass** |
+| Storage new install/restart + legacy upgrade trên volume riêng | **7/7 checks pass**, có control upgrade thiếu chown không ready |
+| Deploy checker + registry | Exit 0, **4 registry resolve**; **Settings trong image NOT-RUN** trên Windows, checker ghi rõ |
+
+Tổng **156 repo + 10 test độc lập pass**, storage 7 checks ghi riêng, không cộng số request/check vào số test. Web không đổi trong bản sửa nên không chạy lại; kết quả reviewer trước là 79/79 + typecheck ở `c0b20aa`, không gọi đó là pass mới. Không rerun full inventory/restore, 12 countercheck, toàn image/Chrome hoặc fresh-pull. Phạm vi kiểm đủ cho ba bản sửa này; chưa là nghiệm thu triển khai thật.
+
+### Đối chiếu source, CI và artifact
+
+Đã trực tiếp kiểm GitHub run **39372151281** tại `96bd196`: **ba job success**. **11 hash artifact** khớp (các JUnit trước/sau/local/GitHub, storage, smoke và counterchecks metadata). Local và GitHub đều **1.122 pass**; khác đúng **hai parameter ID** của `test_leak_publishes_nothing` đã đổi từ payload sang ID tường minh để không lộ fixture token trong JUnit, không phải thêm/bỏ hai test. 156 ID reviewer là subset đúng của JUnit GitHub cuối. Không cộng các kết quả agent thành test reviewer.
+
+**54/55 changed-source hash** trong inventory khớp head hiện tại. Ngoại lệ duy nhất `AGENTS.md` khớp bytes Git tại `96bd196`, đã được sửa docs tiếp trong `5ca3e4c`; không phải source production lệch. Head cuối còn nâng timeout job CI 100→130 phút và cập nhật docs; không sửa code transport/guard/storage sau commit CI đã kiểm. Không chờ/rerun CI trên head docs/timeout cuối. **645 tracked source/data hash reviewer trước/sau trùng**, gồm phiếu/report/evaluation thật.
+
+### Tài nguyên, giới hạn và kết luận
+
+Evidence: `C:/Users/ADMIN/AppData/Local/Temp/ras-pr66-rereview-20261020`, gồm JUnit/log, repro cũ và hook DNS-child, registry/deploy output, `minio-check/minio-check.json`, publish copy/scanner output, audit và source/baseline/cleanup.
+
+Đã dọn **3 container infra reviewer** theo đúng project/label, cùng network, credential/config và pytest fixture dưới context riêng. Script storage dọn container/2 volume thử theo label. Không còn container mới; **24 container có sẵn giữ ID/name/image/mount/label**. Beat/worker đã restarting trước review, RestartCount **195→200**; không can thiệp. Không dừng process theo tên, không đọc key/`.env`, query/migrate/restart dev/Dify, provider/arXiv/email thật, đổi pricing hoặc nhập phiếu human.
+
+Có thể merge PR #66 trong scope M8a đã review. Các giới hạn còn nguyên: chưa domain/ACME/SMTP/account/operator/journal độc lập thật; chưa cutover, timing enumeration và benchmark chưa đo. Digest public cần kế hoạch mirror/cập nhật trước vận hành; chown volume cũ là bước operator có kiểm soát, không tự chạy trên dev. M8b journal/backup/alert/diễn tập vận hành và các điều kiện D/M7b còn riêng; **0 verdict human thật**, không mở pricing hoặc ngân sách live.
+
+Report, prompt đánh dấu đã xử lý và trạng thái docs để **chưa commit** cho PR kế tiếp; reviewer không merge hoặc gửi comment GitHub.
+
+## Lịch sử review tại `c0b20aa`
+
 Ngày **2026-10-20**, base `3b59a1db4e784df0891a844ba968ba85e2797746`, head **`c0b20aa201c52820a7921534ab68620fe4597e16`**, source **0052**, PR **OPEN/chưa merge** (đã kiểm GitHub). **Có ba P2 cần sửa trong cùng PR trước merge.** Không đổi production/migration/grants hoặc bật pricing trong review này.
 
 [Handoff agent](../m8a-pilot-entry-hardening.md) · [Inventory agent](../m8a-test-inventory.json) · [Prompt sửa cùng PR](../tasks/fix-pr66-smtp-deadline-deploy-image-ci-artifacts.md)

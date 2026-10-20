@@ -1,0 +1,15 @@
+# M8b alert check (gate/readiness, replica, backup age, cleanup, drill, disk).
+[Unit]
+Description=RAS pilot operational alert check
+Wants=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+User=ras-ops
+Group=ras-ops
+WorkingDirectory=/srv/ras/repo
+ExecStart=/usr/bin/python3 /srv/ras/repo/scripts/ras_ops.py check --env-file /srv/ras-pilot/pilot.env --project ras-pilot --compose-file /srv/ras/repo/deploy/compose.yaml
+TimeoutStartSec=10min
+NoNewPrivileges=true
+PrivateTmp=true

@@ -186,14 +186,23 @@ class SmtpDelivery:
         return value
 
     def send(self, message: OutgoingMessage, *, now: datetime) -> None:
+        deadline = time.monotonic() + self._cfg.total_timeout_seconds
+        self._transmit(compose_message(message, self._cfg, now=now), message.recipient, deadline)
+
+    def send_email(self, msg: EmailMessage, recipient: str) -> None:
+        """M8b operational alerts: an already composed message, same TLS transport and deadline."""
+        deadline = time.monotonic() + self._cfg.total_timeout_seconds
+        if not _RECIPIENT.fullmatch(recipient):
+            raise DeliveryFailed("smtp_invalid_message")
+        self._transmit(msg, recipient, deadline)
+
+    def _transmit(self, msg: EmailMessage, recipient: str, deadline: float) -> None:
         cfg = self._cfg
-        deadline = time.monotonic() + cfg.total_timeout_seconds
-        msg = compose_message(message, cfg, now=now)
         password = self._password() if cfg.username else None
         job = json.dumps({
             "host": cfg.host, "port": cfg.port, "security": cfg.security, "helo_name": cfg.helo_name,
             "ca_file": str(cfg.ca_file) if cfg.ca_file else None, "sender": cfg.sender,
-            "recipient": message.recipient, "username": cfg.username, "password": password,
+            "recipient": recipient, "username": cfg.username, "password": password,
             "connect_timeout_seconds": cfg.connect_timeout_seconds,
             "total_timeout_seconds": cfg.total_timeout_seconds,
             "message": base64.b64encode(msg.as_bytes(policy=email.policy.SMTP)).decode("ascii"),

@@ -1,5 +1,7 @@
 # Sửa PR #66 — deadline SMTP, image cài mới và gate artifact CI
 
+**Đã review lại tại `5ca3e4c` (2026-10-20): ba P2 đã sửa, không phát hiện điểm chặn merge mới trong scope M8a.** [Report hiện hành](../reviews/pr66-m8a-pilot-entry-hardening.md#review-lại-tại-5ca3e4c--ba-p2-đã-sửa) giữ 156 repo + 10 independent pass và 7 storage checks riêng. Nội dung dưới là prompt sửa lịch sử tại `c0b20aa`, không giao thêm coding. PR OPEN/chưa merge; cutover/M8b/M7b human vẫn riêng.
+
 Sửa **trên cùng PR #66**, head review `c0b20aa`, source **0052**. Đọc [report reviewer](../reviews/pr66-m8a-pilot-entry-hardening.md), [task M8a](m8a-pilot-entry-hardening.md) và [handoff](../m8a-pilot-entry-hardening.md). Giữ mọi docs reviewer/orchestrator chưa commit vào PR; không discard lịch sử lỗi hoặc đổi nhãn số pass.
 
 Đây là ba P2 đã có repro, không giao milestone mới hoặc chuyển M8b. Triển khai sửa ngay, không chỉ giải thích giới hạn hay hỏi lại quyền coding. Không thay auth/journal/ACL/role/outcome/pricing để né tích hợp.

@@ -1,0 +1,62 @@
+{
+  "journal_replica": {
+    "endpoint_url": "https://s3.journal-provider.example",
+    "region": "us-east-1",
+    "bucket": "ras-pilot-journal-replica",
+    "prefix": "ras-pilot",
+    "credentials_file": "/run/secrets/journal_replica_credentials",
+    "read_credentials_file": "/run/secrets/journal_replica_read_credentials",
+    "addressing_style": "path",
+    "require_versioning": true
+  },
+  "backup_target": {
+    "endpoint_url": "https://s3.backup-provider.example",
+    "region": "us-east-1",
+    "bucket": "ras-pilot-backups",
+    "prefix": "ras-pilot",
+    "credentials_file": "/run/secrets/backup_target_credentials",
+    "read_credentials_file": "/run/secrets/backup_target_read_credentials",
+    "addressing_style": "path",
+    "require_versioning": true
+  },
+  "backup": {
+    "recipients_file": "/etc/ras/ops/age-recipients.txt",
+    "retention_days": 30,
+    "min_keep": 7,
+    "staging_dir": "/var/lib/ras/staging"
+  },
+  "replicator": {"interval_seconds": 15, "max_segment_records": 1000, "max_segments_per_cycle": 20},
+  "alerts": {
+    "recipients": ["ops-oncall@example.org"],
+    "subject_prefix": "[RAS pilot]",
+    "renotify_hours": 24,
+    "smtp": {
+      "host": "smtp.example.org",
+      "port": 465,
+      "security": "implicit_tls",
+      "sender": "alerts@ras.example.org",
+      "sender_name": "RAS pilot alerts",
+      "username": "ras-alerts",
+      "password_file": "/run/secrets/smtp_password",
+      "connect_timeout_seconds": 5,
+      "total_timeout_seconds": 10
+    },
+    "replica_lag_seconds": 900,
+    "replica_status_stale_seconds": 300,
+    "backup_max_age_hours": 26,
+    "drill_max_age_days": 31,
+    "min_free_bytes_journal": 1073741824,
+    "min_free_bytes_staging": 5368709120,
+    "fence_on_journal_rollback": true
+  },
+  "window": {
+    "stop_timeout_seconds": 180,
+    "capture_timeout_seconds": 3600,
+    "start_timeout_seconds": 600,
+    "readiness_timeout_seconds": 300,
+    "ship_timeout_seconds": 7200,
+    "restore_timeout_seconds": 7200,
+    "step_timeout_seconds": 600
+  },
+  "state_dir": "/var/lib/ras/ops-state"
+}

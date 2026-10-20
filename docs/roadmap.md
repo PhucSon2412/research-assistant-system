@@ -1,5 +1,7 @@
 # Roadmap đề xuất
 
+**Sau merge PR #66, 2026-10-20:** M8a đã merge `0de10f4`, chưa cutover. Giao [M8b](tasks/m8b-pilot-operations.md) (journal replica ngoài máy, backup lịch/mã hóa/retention, alert, diễn tập restore), mới giao; sau đó cutover thật khi có hạ tầng/operator. D vẫn chờ phiếu human và điều kiện live riêng.
+
 **M8a trên nhánh review, 2026-10-19:** phần đầu E đã triển khai và kiểm cô lập ([handoff](m8a-pilot-entry-hardening.md)); chưa merge/cutover. Tiếp M8b (journal độc lập, backup/retention/alert, nghiệm thu vận hành) sau review; D vẫn chờ phiếu human.
 
 **Sau merge PR #65, 2026-10-19:** source **0052**, merge `3b59a1d` chứa head review `8799216`, tree khớp; không có test mới tại merge. M7b xong tooling, vẫn chờ phiếu thật. Giao [M8a — bản triển khai nhóm thử có HTTPS/delivery/rate limit/CI](tasks/m8a-pilot-entry-hardening.md) trong một PR, mới giao/chưa triển khai. M8b đóng journal độc lập/backup/alert và nghiệm thu vận hành sau đó; không thêm tính năng ngoài checklist MVP. D còn human review, cache-write live cần ủy quyền/ngân sách riêng, policy/paper thật; không bật pricing.

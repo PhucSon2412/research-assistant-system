@@ -1,0 +1,19 @@
+# M8b scheduled backup (maintenance window). Template: replace the paths and
+# project with the deployment's own; the user needs Docker access and the ops
+# state/staging/maintenance directories. Not run on a real host yet.
+[Unit]
+Description=RAS pilot backup window (stop writers, capture, reopen, encrypt, upload off-host)
+Wants=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+User=ras-ops
+Group=ras-ops
+WorkingDirectory=/srv/ras/repo
+ExecStart=/usr/bin/python3 /srv/ras/repo/scripts/ras_ops.py backup --env-file /srv/ras-pilot/pilot.env --project ras-pilot --compose-file /srv/ras/repo/deploy/compose.yaml
+# Longer than the configured window + upload timeouts; ras_ops.py enforces each step itself.
+TimeoutStartSec=4h
+Nice=5
+NoNewPrivileges=true
+PrivateTmp=true

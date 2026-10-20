@@ -19,6 +19,18 @@
 # password, rate-limit HMAC key and edge token are files in RAS_SECRETS_DIR,
 # mounted read-only. The journal directory is given explicitly by the
 # operator; it is never a default named volume.
+#
+# M8b operations (docs/m8b-pilot-operations.md):
+#   journal-replicator : API image, journal mounted read-only, only the replica
+#                        destination's write credential, egress only; ships
+#                        complete journal records off-host (never on the request path)
+#   ops       (profile): one-shot backup/restore (ops image = API image + pinned
+#                        pyrage): migrator DB + MinIO for the dump/objects, backup
+#                        destination write + replica read credentials, staging dir
+#   ops-check (profile): one-shot alert check: journal read-only, read-only
+#                        credentials of both destinations, SMTP; no DB/MinIO secret
+#   edge serves a maintenance 503 while RAS_MAINTENANCE_DIR/enabled exists.
+# Host entrypoint: scripts/ras_ops.py (backup|replicate|check|restore|open|drill).
 
 name: ${RAS_DEPLOY_PROJECT:?set RAS_DEPLOY_PROJECT}
 
@@ -45,6 +57,10 @@ x-storage-env: &storage-env
   RAS_STORAGE__ACCESS_KEY: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
   RAS_STORAGE__SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
   RAS_STORAGE__BUCKET: ras-originals
+x-ops-env: &ops-env
+  RAS_OPS_CONFIG: /etc/ras/ops/ops.json
+x-ops-config-volume: &ops-config-volume ${RAS_OPS_CONFIG_DIR:?set the ops config directory (ops.json, age recipients)}:/etc/ras/ops:ro
+x-ops-state-volume: &ops-state-volume ${RAS_OPS_STATE_DIR:?set the ops state directory}:/var/lib/ras/ops-state
 x-provider-env: &provider-env
   # Pricing stays a separate gate, default false; an empty key sends nothing.
   RAS_EMBEDDING__API_KEY: ${OPENROUTER_API_KEY:-}
@@ -64,6 +80,7 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ${RAS_CADDY_TLS_DIR:-./caddy/tls.d}:/etc/caddy/tls.d:ro
+      - ${RAS_MAINTENANCE_DIR:?set the maintenance flag directory}:/etc/caddy/maintenance:ro
       - caddy-data:/data
       - caddy-config:/config
     secrets:
@@ -286,6 +303,80 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  journal-replicator:
+    # M8b: asynchronous off-host copy of complete journal records. Read-only
+    # journal, no DB/MinIO/backup credential; a slow or failed destination only
+    # grows the lag (alerted), it never touches requests, gate or readiness.
+    <<: *api-image
+    command: ["python", "-m", "app.cli.journal_replica", "ship"]
+    environment:
+      <<: [*journal-env, *ops-env]
+    volumes:
+      - ${RAS_JOURNAL_DIR:?set an operator-provided journal directory outside DB/object storage and their backups}:/var/lib/ras/journal:ro
+      - *ops-config-volume
+      - *ops-state-volume
+    secrets:
+      - journal_replica_credentials
+    networks: [egress]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+
+  ops:
+    # M8b one-shot backup/restore, run only by scripts/ras_ops.py inside a
+    # maintenance window. The only service besides migrate/provision/recovery-init
+    # with the migrator password; never long-running.
+    image: ${RAS_OPS_IMAGE:?set the frozen ops image tag or digest}
+    build:
+      context: ./ops
+      args:
+        RAS_API_IMAGE: ${RAS_API_IMAGE:?set the frozen API image tag or digest}
+    pull_policy: never
+    profiles: ["ops"]
+    command: ["python", "-m", "app.cli.ops", "preflight"]
+    environment:
+      <<: [*migrator-env, *journal-env, *storage-env, *ops-env]
+    volumes:
+      - *journal-volume
+      - *ops-config-volume
+      - *ops-state-volume
+      - ${RAS_OPS_STAGING_DIR:?set a restricted staging directory for plaintext backup work}:/var/lib/ras/staging
+    secrets:
+      - backup_target_credentials
+      - journal_replica_read_credentials
+    networks: [backend, egress]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: "no"
+
+  ops-check:
+    # M8b one-shot alert check (timer). No database or object-store secret:
+    # DB facts come from the runtime probe inside the api container.
+    image: ${RAS_OPS_IMAGE:?set the frozen ops image tag or digest}
+    pull_policy: never
+    profiles: ["ops"]
+    command: ["python", "-m", "app.cli.ops", "check"]
+    environment:
+      <<: [*journal-env, *ops-env]
+    volumes:
+      - ${RAS_JOURNAL_DIR:?set an operator-provided journal directory outside DB/object storage and their backups}:/var/lib/ras/journal:ro
+      - *ops-config-volume
+      - *ops-state-volume
+      - ${RAS_OPS_STAGING_DIR:?set a restricted staging directory for plaintext backup work}:/var/lib/ras/staging:ro
+      - ${RAS_TRUST_DIR:-./trust}:/etc/ras/trust:ro
+    secrets:
+      - journal_replica_read_credentials
+      - backup_target_read_credentials
+      - smtp_password
+    networks: [egress]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: "no"
+
 secrets:
   edge_token:
     file: ${RAS_SECRETS_DIR:?set the operator secrets directory}/edge_token
@@ -293,6 +384,14 @@ secrets:
     file: ${RAS_SECRETS_DIR:?set the operator secrets directory}/rate_limit_key
   smtp_password:
     file: ${RAS_SECRETS_DIR:?set the operator secrets directory}/smtp_password
+  journal_replica_credentials:
+    file: ${RAS_SECRETS_DIR:?set the operator secrets directory}/journal_replica_credentials
+  journal_replica_read_credentials:
+    file: ${RAS_SECRETS_DIR:?set the operator secrets directory}/journal_replica_read_credentials
+  backup_target_credentials:
+    file: ${RAS_SECRETS_DIR:?set the operator secrets directory}/backup_target_credentials
+  backup_target_read_credentials:
+    file: ${RAS_SECRETS_DIR:?set the operator secrets directory}/backup_target_read_credentials
 
 networks:
   public: {}

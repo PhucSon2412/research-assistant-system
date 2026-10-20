@@ -22,6 +22,23 @@
 		-Server
 	}
 
+	# M8b maintenance window: scripts/ras_ops.py creates RAS_MAINTENANCE_DIR/enabled
+	# before it stops writers and removes it only after readiness passed again.
+	@maintenance file {
+		root /etc/caddy/maintenance
+		try_files /enabled
+	}
+	handle @maintenance {
+		header Retry-After 300
+		header Cache-Control no-store
+		@maintenance_api path /api/*
+		header @maintenance_api Content-Type application/json
+		respond @maintenance_api `{"error":"maintenance"}` 503
+		@maintenance_page not path /api/*
+		header @maintenance_page Content-Type "text/html; charset=utf-8"
+		respond `<!doctype html><html lang="vi"><meta charset="utf-8"><title>Bảo trì</title><p>Hệ thống đang bảo trì, vui lòng quay lại sau.</p></html>` 503
+	}
+
 	# Development/administration surfaces never leave the private networks.
 	@internal path /api/admin/dev-outbox /api/admin/dev-outbox/* /docs /docs/* /redoc /openapi.json /healthz /readyz
 	respond @internal 404
@@ -38,5 +55,17 @@
 		header_up -X-Client-IP
 		header_up -True-Client-IP
 		header_up -CF-Connecting-IP
+	}
+
+	# Web unreachable outside a planned window: a clear 503, not an opaque 502.
+	handle_errors 502 503 504 {
+		header Retry-After 60
+		header Cache-Control no-store
+		@unavailable_api path /api/*
+		header @unavailable_api Content-Type application/json
+		respond @unavailable_api `{"error":"service_unavailable"}` 503
+		@unavailable_page not path /api/*
+		header @unavailable_page Content-Type "text/html; charset=utf-8"
+		respond `<!doctype html><html lang="vi"><meta charset="utf-8"><title>Tạm ngưng</title><p>Dịch vụ tạm thời không khả dụng.</p></html>` 503
 	}
 }

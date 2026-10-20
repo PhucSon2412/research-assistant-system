@@ -31,6 +31,8 @@ dev = [
     "reportlab>=4,<5",
     "cryptography>=42",
     "pyyaml>=6",
+    # M8b: age encryption, same pin as deploy/ops/requirements.txt
+    "pyrage==1.4.0",
 ]
 
 [tool.setuptools.packages.find]
