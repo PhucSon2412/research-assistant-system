@@ -11,6 +11,10 @@ Mutations (one at a time, exact single-occurrence replacements):
   fail_open       an unavailable limiter lets the request through
   send_after_lost_proof  invitation mail sent although the pre-send proof failed
   web_edge_token  web forwards the client address without the edge token
+  PR #66: smtp_deadline (parent waits without the whole-send deadline),
+  late_success (a late child answer counts), ci_upload_always (upload ignores
+  the scan), scan_missing_is_clean, minio_unpullable_tag (deploy back on the
+  dead quay.io tag; checked by m8a_deploy_check --check-registry)
 A countercheck "holds" only when the mutated copy fails the named tests.
 """
 from __future__ import annotations
@@ -27,9 +31,31 @@ REPO = Path(__file__).resolve().parents[1]
 PY = sys.executable
 
 MUTATIONS = {
-    "tls_verify": ("api", "app/delivery.py",
-                   "        ctx.check_hostname = True\n        ctx.verify_mode = ssl.CERT_REQUIRED\n",
-                   "        ctx.check_hostname = False\n        ctx.verify_mode = ssl.CERT_NONE\n",
+    # PR #66 fixes: the parent no longer enforces the whole-send deadline.
+    "smtp_deadline": ("api", "app/delivery.py",
+                      "out, _ = child.communicate(job, timeout=max(0.0, deadline - time.monotonic()))",
+                      "out, _ = child.communicate(job)",
+                      ["tests/test_m8a_smtp_deadline.py::test_dripped_data_reply_cannot_succeed_after_the_deadline",
+                       "tests/test_m8a_smtp_deadline.py::test_slow_or_hung_dns_is_inside_the_deadline[2]"]),
+    "late_success": ("api", "app/delivery.py",
+                     '        if time.monotonic() > deadline:\n            raise DeliveryFailed("smtp_timeout")  # late answers are never a success\n',
+                     "",
+                     ["tests/test_m8a_smtp_deadline.py::test_a_result_after_the_deadline_is_never_success"]),
+    "ci_upload_always": ("repo", ".github/workflows/ci.yml",
+                         "        if: ${{ !cancelled() && steps.scan.outputs.clean == 'true' }}",
+                         "        if: always()",
+                         ["tests/test_m8a_ci_guard.py::test_workflow_upload_depends_on_a_clean_scan_of_the_published_file"]),
+    "scan_missing_is_clean": ("repo", "scripts/m8a_ci_scan.py",
+                              '            print(f"MISSING {path}")\n            problems += 1\n            continue\n',
+                              '            print(f"MISSING {path}")\n            clean[path.name] = b""\n            continue\n',
+                              ["tests/test_m8a_ci_guard.py::test_missing_file_is_not_clean"]),
+    "minio_unpullable_tag": ("repo", "deploy/compose.yaml",
+                             "image: ${RAS_MINIO_IMAGE:-cgr.dev/chainguard/minio@sha256:709099319add48dfb44aa596a7070d3ddd8dd04d7ae881765719aec29df9e510}",
+                             "image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z",
+                             ["!deploy-check"]),
+    "tls_verify": ("api", "app/smtp_transport.py",
+                   "    ctx.check_hostname = True\n    ctx.verify_mode = ssl.CERT_REQUIRED\n",
+                   "    ctx.check_hostname = False\n    ctx.verify_mode = ssl.CERT_NONE\n",
                    ["tests/test_m8a_smtp_delivery.py::test_unknown_ca_is_refused_before_any_mail_command",
                     "tests/test_m8a_smtp_delivery.py::test_hostname_mismatch_is_refused"]),
     "https_origin": ("api", "app/config.py",
@@ -87,7 +113,8 @@ def main() -> int:
     if out == REPO or REPO in out.parents:
         raise SystemExit("output must be outside the repository")
     out.mkdir(parents=True, exist_ok=True)
-    sources = [REPO / "api/app", REPO / "api/tests", REPO / "web/lib", REPO / "web/tests"]
+    sources = [REPO / "api/app", REPO / "api/tests", REPO / "web/lib", REPO / "web/tests", REPO / "deploy",
+               REPO / "scripts", REPO / ".github"]
     before = tree_hash(sources)
     results = []
     for name, (kind, rel, old, new, tests) in MUTATIONS.items():
@@ -98,6 +125,10 @@ def main() -> int:
             shutil.rmtree(copy)
         if kind == "api":
             shutil.copytree(REPO / "api", copy, ignore=shutil.ignore_patterns("__pycache__", "*.egg-info"))
+        elif kind == "repo":
+            for part in ("api", "scripts", "deploy", ".github"):
+                shutil.copytree(REPO / part, copy / part, ignore=shutil.ignore_patterns("__pycache__", "*.egg-info"))
+            shutil.copyfile(REPO / "docker-compose.yml", copy / "docker-compose.yml")
         else:
             shutil.copytree(REPO / "web", copy, ignore=shutil.ignore_patterns("node_modules", ".next"))
         target = copy / rel
@@ -107,6 +138,11 @@ def main() -> int:
         if kind == "api":
             cmd = [PY, str(REPO / "scripts/m8a_test_host.py"), "--context", str(a.host_context),
                    "--api-dir", str(copy), "test", "--", *tests]
+        elif tests == ["!deploy-check"]:
+            cmd = [PY, str(copy / "scripts/m8a_deploy_check.py"), "--check-registry"]
+        elif kind == "repo":
+            cmd = [PY, str(REPO / "scripts/m8a_test_host.py"), "--context", str(a.host_context),
+                   "--api-dir", str(copy / "api"), "test", "--", *tests]
         else:
             cmd = ["node", "--test", *tests]
         proc = subprocess.run(cmd, cwd=copy, capture_output=True, text=True, encoding="utf-8", errors="replace",
@@ -114,7 +150,9 @@ def main() -> int:
         (out / f"{name}.log").write_text(proc.stdout + proc.stderr, encoding="utf-8")
         text = proc.stdout + proc.stderr
         # A mutation "holds" only when the targeted tests ran and failed, not on import/usage errors.
-        if kind == "api":
+        if tests == ["!deploy-check"]:
+            holds = proc.returncode == 1 and "FAIL " in text
+        elif kind in ("api", "repo"):
             holds = proc.returncode == 1 and " failed" in text and "error" not in text.splitlines()[-1].lower()
         else:
             holds = proc.returncode != 0 and "ℹ fail 0" not in text and "ℹ fail" in text

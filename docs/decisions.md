@@ -1,5 +1,19 @@
 # Nhật ký quyết định
 
+## Sửa ba P2 PR #66 (2026-10-20)
+
+Agent chọn trong phạm vi prompt sửa; chi tiết và chứng cứ ở [handoff M8a](m8a-pilot-entry-hardening.md#sửa-review-pr-66).
+
+- **Deadline SMTP:** cả lượt gửi chạy trong process con `app.smtp_transport`; parent giữ một deadline, hết hạn thì kill + reap đúng PID con, kết quả muộn không tính thành công. Job/mật khẩu chỉ qua stdin, env con tối thiểu. Hợp đồng outcome giữ nguyên: timeout có thể sau khi server nhận DATA → bù lời mời, reset generic, không retry.
+- **Storage image:** deploy và harness test dùng digest Chainguard orchestrator đã chọn, healthcheck `mc ready local` (đã kiểm trong digest), checker `--check-registry` tra manifest mọi image được kéo. Volume do image root cũ tạo cần đổi chủ một lần sang 65532 (đã tái hiện lỗi và bước sửa). Dev compose giữ mặc định cũ, chỉ cho override, để không tự đổi dữ liệu dev — đây là lựa chọn bảo thủ, không phải nghiệm thu dev mới.
+- **CI artifact:** scanner đọc một lần, chỉ ghi đúng bytes đã quét sạch vào thư mục publish mới và phát `clean=true`; upload chỉ chạy khi output đó có. Thiếu/không đọc được/context lỗi = không sạch.
+
+## Review PR #66 và baseline image pilot (2026-10-20)
+
+PR #66 tại `c0b20aa` còn [ba P2](reviews/pr66-m8a-pilot-entry-hardening.md); giao [sửa trong cùng PR](tasks/fix-pr66-smtp-deadline-deploy-image-ci-artifacts.md), không chuyển M8b hoặc đổi scope auth/journal. Tag quay.io trong deploy không trả manifest ở lượt kiểm reviewer; cài từ cache không chứng minh máy sạch.
+
+Theo ủy quyền hoàn thành MVP, **orchestrator chọn** baseline pilot MinIO `cgr.dev/chainguard/minio@sha256:709099319add48dfb44aa596a7070d3ddd8dd04d7ae881765719aec29df9e510`, digest hiện dùng CI và tra manifest thành công. Coding agent phải kiểm provenance/version/license, image tối giản/health, new install và compatibility dữ liệu tổng hợp trước khi thay baseline. Đây không phải xác nhận trực tiếp mới của chủ dự án, không có entitlement production/support hoặc cam kết image retention. Không mua account hay chạm storage/dev thật. Giữ M7b phiếu thật pending, pricing off và giới hạn journal độc lập trước cutover.
+
 ## Quyết định triển khai M8a (2026-10-19)
 
 Các lựa chọn dưới do **agent chọn trong phạm vi ủy quyền của task M8a**, không phải chủ dự án trực tiếp chọn nhà cung cấp/host. Chi tiết và kết quả kiểm ở [handoff M8a](m8a-pilot-entry-hardening.md).
@@ -9,7 +23,7 @@ Các lựa chọn dưới do **agent chọn trong phạm vi ủy quyền của t
 - **SMTP:** chỉ `implicit_tls` hoặc `starttls` bắt buộc, luôn xác minh certificate/hostname, TLS ≥ 1.2; không có mode plaintext hay tắt verify (khóa lạ bị từ chối). Mật khẩu đọc từ file mỗi lần gửi. Một deadline tổng cho cả lượt gửi (mặc định 10 s, khởi đầu chưa đo). Lỗi chỉ mang mã ổn định; không retry. Timeout sau DATA có thể đã được server xếp hàng: lời mời vẫn bị bù (thu hồi) nên link đó không dùng được.
 - **Rate limit:** Redis db 1, một script Lua INCR/PTTL/PEXPIRE nguyên tử, cửa sổ cố định; bucket nguồn (IPv6 gộp `/64`) và bucket tài khoản theo HMAC email chuẩn hóa dù account có hay không; key chỉ chứa HMAC với secret file. Request bị từ chối vẫn được đếm, thành công không xóa bộ đếm. Redis/secret lỗi → 503 `rate_limit_unavailable`; production từ chối `disabled`. Giá trị mặc định (login 30/5 phút theo nguồn, 10/15 phút theo tài khoản; reset 10/15 phút nguồn, 3/giờ tài khoản; token 20/15 phút nguồn) là giá trị vận hành khởi đầu, chưa benchmark/SLO. Env lồng nhau thay cả rule: đặt đủ `LIMIT` và `WINDOW_SECONDS`.
 - **CI:** GitHub Actions dùng cùng harness `scripts/m8a_test_host.py` (container cô lập, credential ngẫu nhiên, chặn HTTP ra ngoài trong pytest); selection có lý do, không phải full suite.
-- **Còn mở, không quyết thay chủ dự án:** domain/host, nhà cung cấp/account SMTP, operator thật, nơi lưu journal độc lập, HSTS dài hạn/preload, timing enumeration của reset (chưa đo), nguồn image MinIO cho cài mới (tag quay.io đang pin không còn kéo ẩn danh được; CI test dùng Chainguard pin digest).
+- **Còn mở, không quyết thay chủ dự án:** domain/host, nhà cung cấp/account SMTP, operator thật, nơi lưu journal độc lập, HSTS dài hạn/preload, timing enumeration của reset (chưa đo), mirror/registry do người vận hành kiểm soát cho image storage (baseline pilot đã chọn ở mục sửa PR #66).
 
 ## Giao M8a sau merge PR #65 (2026-10-19)
 

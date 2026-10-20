@@ -1,5 +1,9 @@
 # Tài liệu dự án
 
+**Sửa review PR #66, 2026-10-20 (chờ review lại):** [mục sửa trong handoff M8a](m8a-pilot-entry-hardening.md#sửa-review-pr-66) · [inventory](m8a-test-inventory.json). SMTP deadline, image MinIO cài mới và gate artifact CI đã sửa; chưa merge.
+
+**Review M8a PR #66 tại `c0b20aa`, 2026-10-20:** [ba P2 ở SMTP deadline, image cài mới và gate artifact CI](reviews/pr66-m8a-pilot-entry-hardening.md) cần [sửa cùng PR](tasks/fix-pr66-smtp-deadline-deploy-image-ci-artifacts.md). Reviewer 136 API + 79 web/typecheck pass nhưng repro vẫn fail; chưa merge, chưa chuyển M8b/cutover. M7b tiếp tục chờ phiếu thật; không thêm live/ngân sách.
+
 **M8a trên nhánh review, 2026-10-19 (chưa merge):** [handoff HTTPS/SMTP TLS/rate limit/CI](m8a-pilot-entry-hardening.md) · [inventory](m8a-test-inventory.json) · [deploy](../deploy/compose.yaml) · [CI](../.github/workflows/ci.yml). Kiểm cô lập (image thật, Chrome HTTPS với CA thử, SMTP capture); chưa domain/host/SMTP/operator/journal độc lập thật, chưa cutover. CI GitHub pass trên `6cb5253` (run `39284225688`, selection API 1102/1102, không phải full suite). M8b tiếp sau.
 
 **Sau merge PR #65 (`3b59a1d`, 2026-10-19):** M7b tooling đã merge, phiếu thật vẫn **0/awaiting_human_review**. Tiếp [M8a — HTTPS, SMTP TLS, rate limit auth và CI](tasks/m8a-pilot-entry-hardening.md), phần đầu gói E, mới giao/chưa triển khai. Làm độc lập lúc chủ dự án duyệt phiếu; M8b vận hành journal/backup/alert theo sau. Không cutover dev/provider/pricing hoặc tự cấp ngân sách live.

@@ -15,9 +15,11 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import secrets
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -39,7 +41,13 @@ httpx.HTTPTransport.handle_request = guard(httpx.HTTPTransport.handle_request)
 """
 
 
-MINIO_IMAGE = "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z"
+def deploy_minio_image() -> str:
+    """The digest-pinned MinIO image of deploy/compose.yaml (one source for tests and deploy)."""
+    text = (REPO / "deploy" / "compose.yaml").read_text(encoding="utf-8")
+    match = re.search(r"\$\{RAS_MINIO_IMAGE:-([^}]+@sha256:[0-9a-f]{64})\}", text)
+    if not match:
+        raise SystemExit("deploy/compose.yaml does not pin the MinIO image by digest")
+    return match.group(1)
 
 
 def wait_http(url: str, seconds: float) -> bool:
@@ -97,10 +105,9 @@ def main() -> int:
             "redis": {"image": "redis:7-alpine", "labels": label,
                       "command": ["redis-server", "--save", "", "--appendonly", "no", "--requirepass", c["redis"]],
                       "ports": [f"127.0.0.1:{c['redis_port']}:6379"]},
-            # The repo's pinned quay.io tag is no longer anonymously pullable (seen 2026-10-19);
-            # CI passes a digest-pinned public image. Readiness is polled over HTTP below,
-            # since minimal images ship no `mc`.
-            "minio": {"image": os.environ.get("RAS_TEST_MINIO_IMAGE", MINIO_IMAGE), "labels": label,
+            # Same digest-pinned image as the pilot deploy (PR #66); readiness is the
+            # S3 ready endpoint polled below. RAS_TEST_MINIO_IMAGE may name another digest.
+            "minio": {"image": os.environ.get("RAS_TEST_MINIO_IMAGE") or deploy_minio_image(), "labels": label,
                       "command": ["server", "/data"], "tmpfs": ["/data"],
                       "environment": {"MINIO_ROOT_USER": "m8a_minio", "MINIO_ROOT_PASSWORD": c["minio"]},
                       "ports": [f"127.0.0.1:{c['minio_port']}:9000"]}}}
@@ -109,7 +116,7 @@ def main() -> int:
         (root / "guard").mkdir(exist_ok=True)
         (root / "guard" / "sitecustomize.py").write_text(GUARD, encoding="utf-8")
         code = compose(root, c, "up", "-d", "--wait")
-        if code == 0 and not wait_http(f"http://127.0.0.1:{c['minio_port']}/minio/health/live", 90):
+        if code == 0 and not wait_http(f"http://127.0.0.1:{c['minio_port']}/minio/health/ready", 90):
             code = 1
         print("isolated test infra " + c["project"] + (" up" if code == 0 else " FAILED"))
         return code
@@ -142,7 +149,10 @@ def main() -> int:
         print(json.dumps(sorted(k for k in env if k.startswith("RAS_"))))
         return 0
     args = [x for x in a.rest if x != "--"]
-    cmd = [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "-q", *args]
+    # Fixture files (journals, case files, synthetic credentials) stay under this context.
+    basetemp = root / "pytest-tmp" / str(time.time_ns())
+    basetemp.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "-q", "--basetemp", str(basetemp), *args]
     if a.junit:
         cmd += ["--junitxml", str(a.junit)]
     return subprocess.call(cmd, cwd=a.api_dir, env=env)

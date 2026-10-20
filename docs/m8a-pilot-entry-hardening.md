@@ -51,8 +51,16 @@ store thì **không** phải miền sự cố độc lập (M8b).
 `security` chỉ là `implicit_tls` (SMTPS) hoặc `starttls` (bắt buộc; server không mời STARTTLS → lỗi). Luôn
 `CERT_REQUIRED` + kiểm hostname, TLS ≥ 1.2; không có mode plaintext hay khóa tắt verify (khóa lạ như `verify`
 bị settings từ chối). `ca_file` thay trust store hệ thống (CA relay riêng hoặc CA thử); để trống dùng CA của
-image. Username đi cùng `password_file` (đọc mỗi lần gửi, giới hạn kích thước). Một deadline tổng
-`total_timeout_seconds` (mặc định 10 s; connect 5 s) — giá trị khởi đầu chưa đo; web proxy mặc định 15 s.
+image. Username đi cùng `password_file` (đọc mỗi lần gửi, giới hạn kích thước).
+
+**Deadline (sửa P2-1 PR #66):** cả lượt gửi — DNS, connect, greeting, TLS, EHLO, AUTH, MAIL/RCPT/DATA và mọi
+reply — chạy trong một process con `python -m app.smtp_transport` do adapter sở hữu. Parent chờ
+`communicate(timeout=còn lại)` theo **một** deadline `total_timeout_seconds` (mặc định 10 s; connect 5 s; giá trị
+khởi đầu chưa đo, web proxy mặc định 15 s); hết hạn thì kill + reap đúng PID con đó và trả `smtp_timeout`. Kết
+quả con báo về sau hạn cũng là `smtp_timeout`, không bao giờ thành công. Job (kể cả mật khẩu) chỉ đi qua stdin;
+argv chỉ là tên module, env của con chỉ gồm `PATH`/`SYSTEMROOT`/`PYTHONPATH`/biến TLS-temp (không secret DB/dịch
+vụ), stderr bỏ, stdout chỉ là `{"result": "<mã>"}`. Socket timeout trong con chỉ giúp con tự dừng sớm; quyết định
+là ở parent. Mỗi lượt gửi tốn thêm một lần khởi động Python (~0,1 s trên máy thử).
 
 Không đổi hợp đồng token/journal/compensation: lời mời chỉ gửi sau known commit và proof còn hiệu lực, không giữ
 DB/journal lock qua network; gửi lỗi (`DeliveryFailed` với mã `smtp_timeout`, `smtp_rejected`,
@@ -99,6 +107,19 @@ trong đó. Domain thật cần DNS trỏ về host và 80/443 mở để Caddy 
 `… run --rm --no-deps recovery-init python -m app.cli.recovery status` và readiness (`… exec api python -c`
 gọi `http://127.0.0.1:8000/readyz` nội bộ; edge không public `/readyz`) →
 `… exec api python -m app.cli.bootstrap_admin --email <email>` (TTY) → mở traffic.
+
+**Image storage (sửa P2-2 PR #66):** MinIO của deploy là
+`cgr.dev/chainguard/minio@sha256:709099319add48dfb44aa596a7070d3ddd8dd04d7ae881765719aec29df9e510` (orchestrator
+chọn cho pilot; MinIO `RELEASE.2026-09-22T19-25-18Z`, AGPLv3; label nguồn `github.com/chainguard-images/images`, binary build từ fork
+`chainguard-forks/minio` (thấy trong stack trace của chính image), image tạo 2026-10-17, chạy UID 65532, có `mc` cho healthcheck
+`mc ready local`). Đây là image public pin theo digest, không phải support/retention đã mua hay chứng minh
+durability; registry public có thể không giữ digest lâu dài — trước cutover nên mirror digest này vào registry
+do người vận hành kiểm soát. `RAS_MINIO_IMAGE` chỉ nên trỏ một digest khác đã kiểm. Tag `quay.io` cũ không còn
+manifest. **Volume do image cũ (chạy root) tạo** không mở được bằng image mới cho tới khi đổi chủ một lần (đã
+tái hiện: MinIO không ready; sau bước này đọc lại object cũ và ghi mới được):
+`docker run --rm --network none -u 0 --entrypoint /usr/bin/chown -v <volume>:/data <digest> -R 65532:65532 /data`
+khi `minio` đã dừng. Dev `docker-compose.yml` vẫn mặc định tag cũ (chạy từ cache) để không đổi dữ liệu dev; host dev
+mới đặt `RAS_MINIO_IMAGE` = digest trên, volume dev cũ cần bước đổi chủ trước.
 
 **Nâng cấp có dữ liệu:** theo [runbook C4](c4-integrated-runtime-cutover.md#runbook-cutover-có-dữ-liệu--chưa-chạy-trên-dev):
 dừng api/worker/beat/web/edge → `run --rm --no-deps recovery-init python -m app.cli.recovery hold` bằng image cũ
@@ -223,12 +244,62 @@ Baseline không so trạng thái chạy của container có sẵn; không query/
 chạy một lệnh `taskkill` theo tên `python.exe` quá rộng; sau đó host không còn process `python.exe` nào và không
 xác định được nó có dừng process Python ngoài task hay không. Container (process Linux) không bị ảnh hưởng.
 
+## Sửa review PR #66
+
+[Report reviewer](reviews/pr66-m8a-pilot-entry-hardening.md) tại `c0b20aa` có ba P2; sửa trên cùng PR theo
+[prompt](tasks/fix-pr66-smtp-deadline-deploy-image-ci-artifacts.md). Source vẫn **0052**, không đổi auth/journal/
+ACL/role/outcome/pricing. Chứng cứ thô: `C:\Users\ADMIN\AppData\Local\Temp\ras-pr66-fix-20261020\`.
+
+**P2-1 deadline SMTP.** `app/smtp_transport.py` (mới) + `SmtpDelivery.send` (process con, xem mục SMTP).
+Regression `tests/test_m8a_smtp_deadline.py` (9 ca) trên worktree `c0b20aa`: **6 fail / 2 control pass**
+(ca kết quả muộn chưa có lúc đó); sau sửa **9/9 pass**. Repro reviewer sau sửa: control 0,094 s; DATA nhỏ giọt
+SMTPS/STARTTLS `smtp_timeout` 0,594 s; MAIL/RCPT/DATA chậm cộng dồn `smtp_timeout` 0,609 s (deadline 0,6 s).
+Repro DNS của reviewer patch `getaddrinfo` trong process cha nên không còn tác động tới child (trả
+`smtp_connection_failed` sau 0,141 s); ca DNS chậm 2 s và treo 3 600 s được tiêm vào **chính process con** qua
+`sitecustomize` và đều `smtp_timeout` < 1,1 s, child đã reap, không có kết nối SMTP nào. Ca nhỏ giọt cho thấy server
+có thể đã giữ DATA (`captured: 1`) trong khi kết quả là timeout — đúng hợp đồng unknown outcome (bù lời mời).
+
+**P2-2 image cài mới.** Deploy và harness test dùng digest Chainguard (xem Runbook), CI không còn override;
+`m8a_deploy_check.py` buộc MinIO pin digest + healthcheck `mc ready local` + dependent chờ `service_healthy`, và
+`--check-registry` tra manifest mọi image cần kéo (CI deploy-config bật). Checker trên compose cũ: 2 FAIL (không pin
+digest, `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z` không resolve); compose mới: ok, 4 image resolve.
+`scripts/m8a_minio_check.py --fresh-pull`: gỡ bản digest do task kéo trước đó, **pull lại từ registry theo digest**,
+rồi cài mới trên volume riêng: healthcheck + `/minio/health/ready`, put 3 object qua `app.storage`, đọc lại
+SHA-256, list, delete, restart, đọc lại — **9/9 bước pass** (lượt cuối `minio-check-final`, lượt đầu cũng 9/9). Nâng cấp: volume do tag cũ (chạy root, chỉ có
+trong cache máy này) tạo → image mới **không ready** khi thiếu bước đổi chủ; sau `chown -R 65532:65532` đọc lại
+object cũ và ghi mới được (log khi thiếu bước: `unable to rename (/data/.minio.sys/tmp -> …) file access denied`,
+container exit 1). Smoke deploy `smoke4` cài mới với image API/web build lại và MinIO digest:
+**HTTP 68/68** (thêm: container storage đúng digest; restart MinIO rồi tải lại original khớp bytes) và
+**Chrome 16/16**; 212 file API trong image khớp host. Build API/web dùng cache layer của máy này; MinIO được kéo
+độc lập theo digest như trên.
+
+**P2-3 artifact CI.** `scripts/m8a_ci_scan.py` đọc mỗi file một lần, chỉ ghi đúng bytes đã quét sạch vào thư mục
+publish mới và phát `clean=true`; thiếu/không đọc được/leak/context lỗi/thư mục publish cũ không rỗng → exit ≠ 0,
+không publish. Upload `if: !cancelled() && steps.scan.outputs.clean == 'true'`, path chỉ thư mục publish,
+`if-no-files-found: error`. JUnit sạch của lượt pytest fail vẫn được upload; cleanup `always()`. Regression
+`tests/test_m8a_ci_guard.py` (11 ca, gồm đánh giá điều kiện workflow): trên `c0b20aa` **7 fail / 4 pass**, sau sửa
+**11/11**; repro reviewer 4/4 OK. Không thử upload secret thật lên GitHub.
+
+**Kiểm chung sau sửa:** selection API (danh sách CI, nay thêm hai file regression) **1122/1122 pass**, 1 deselected, exit 0,
+3926 s, PostgreSQL/Redis và MinIO digest pin cô lập. Scanner chạy trên JUnit này **từ chối publish** (`link token
+fragment`): id tham số của một ca CI guard chứa link token tổng hợp — đúng loại rò mà guard phải chặn, và trên
+GitHub sẽ làm job fail không upload. Đã đặt id tường minh; file CI guard chạy lại 11/11, JUnit mới không còn
+`#token=`. Hai ca đó đổi id sau lượt 1122 (nội dung không đổi). Countercheck 12 đột biến: lượt 1 **11/12** — `scan_missing_is_clean` MISSED vì scanner còn lớp kiểm thứ hai
+(`len(clean) != len(files)`), đột biến không làm guard hỏng thật; sửa đột biến (coi file thiếu là sạch, ghi rỗng
+vào publish) và chạy lại riêng: HOLDS. Các đột biến mới khác HOLDS: bỏ deadline ở parent, tính kết quả muộn là
+thành công, upload `always()`, MinIO về tag quay cũ (checker `--check-registry` FAIL). Source gốc không đổi. Web không đổi trong bản sửa nên không chạy lại (reviewer: 79/79 + typecheck). GitHub Actions trên
+commit sửa: CI_RESULT.
+
+**Failure trong lượt sửa (giữ lịch sử):** selection lượt 1 lỗi 948 error vì harness truyền `--basetemp` mà chưa tạo
+thư mục cha (sửa harness, không đổi test); regression deadline lần chạy đầu trên `c0b20aa` fail cả hai control vì
+thiếu thuộc tính quan sát `last_child` (làm test tương thích rồi chạy lại để so sánh công bằng).
+
 ## Giới hạn và phần chưa làm
 
 - CI chỉ chạy selection, không phải full suite (> 5.000 test) và không chạy browser, image smoke hay năm restore
   drill. Chặn outbound trong CI là guard httpx trong pytest, không phải firewall.
-- Image MinIO pin trong `docker-compose.yml`/`deploy/compose.yaml` không còn kéo ẩn danh được; host mới cần
-  mirror/registry có quyền hoặc chọn image khác (chưa đổi trong PR này vì là quyết định nguồn phần mềm).
+- Image MinIO pilot là build public pin digest (xem Runbook); availability lâu dài của digest trên registry public
+  chưa được bảo đảm, nên mirror trước cutover. Dev compose giữ tag cũ có chủ đích (không tự đổi dữ liệu dev).
 - Không có domain/ACME/certificate thật, SMTP relay/account thật, deliverability (SPF/DKIM/DMARC), host thật,
   operator thật hay journal độc lập. Server nhận mail không chứng minh người nhận nhận được.
 - Timing enumeration của reset chưa đo; giới hạn rate limit chưa benchmark; HSTS ngắn, chưa preload.

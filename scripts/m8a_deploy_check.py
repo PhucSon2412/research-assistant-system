@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import os
 import subprocess
 import sys
@@ -155,6 +156,13 @@ def check(cfg: dict, env: dict, failures: list[str], notes: list[str], settings_
     need({s["source"] for s in services["edge"].get("secrets", [])} == {"edge_token"}, "edge secret")
     need({s["source"] for s in services["web"].get("secrets", [])} == {"edge_token"}, "web secret")
     need(services["web"]["environment"].get("WEB_EDGE_TOKEN_FILE") == "/run/secrets/edge_token", "web token file")
+    # PR #66: storage image pinned by digest; its healthcheck was verified in that image.
+    minio = services["minio"]
+    need(re.fullmatch(r"[^\s@]+@sha256:[0-9a-f]{64}", minio["image"]) is not None, "minio image must be pinned by digest")
+    need(minio.get("healthcheck", {}).get("test") == ["CMD", "mc", "ready", "local"], "minio readiness healthcheck")
+    need(services["recovery-init"]["depends_on"].get("minio", {}).get("condition") == "service_healthy"
+         and services["api"]["depends_on"].get("minio", {}).get("condition") == "service_healthy",
+         "storage users wait for a ready MinIO")
 
     validate_settings({k: v for k, v in api.items() if k.startswith("RAS_")}, settings_image, failures, notes)
 
@@ -170,10 +178,22 @@ def check(cfg: dict, env: dict, failures: list[str], notes: list[str], settings_
          "dev compose must stay a development-only file")
 
 
+def registry_check(cfg: dict, failures: list[str], notes: list[str]) -> None:
+    """Every image the deployment pulls must resolve in its registry (not only in a local cache)."""
+    pulled = sorted({svc["image"] for svc in cfg["services"].values() if svc.get("pull_policy") != "never"})
+    for image in pulled:
+        r = subprocess.run(["docker", "manifest", "inspect", image], capture_output=True, text=True)
+        if r.returncode == 0:
+            notes.append(f"registry ok: {image}")
+        else:
+            failures.append(f"image not resolvable in its registry: {image}")
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--env-file", type=Path)
     p.add_argument("--settings-image")
+    p.add_argument("--check-registry", action="store_true", help="docker manifest inspect every pulled image")
     a = p.parse_args()
     failures: list[str] = []
     notes: list[str] = []
@@ -192,6 +212,8 @@ def main() -> int:
             env_file.write_text("".join(f"{k}={v}\n" for k, v in env.items()), encoding="utf-8")
             cfg = render(env_file)
     check(cfg, env, failures, notes, a.settings_image)
+    if a.check_registry:
+        registry_check(cfg, failures, notes)
     for note in notes:
         print(note)
     for failure in failures:

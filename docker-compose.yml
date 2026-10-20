@@ -70,7 +70,11 @@ services:
     # S3-compatible object store; the S3 adapter arrives in M1c.
     # Docker Hub no longer serves minio/minio; the official image is on
     # quay.io. Pinned so dev environments are reproducible.
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    # PR #66: this tag is no longer pullable from the registry; existing dev hosts
+    # run it from cache. A fresh dev host sets RAS_MINIO_IMAGE to the digest in
+    # deploy/compose.yaml; an existing dev volume needs the one-time ownership step
+    # of docs/m8a-pilot-entry-hardening.md first (that image runs as UID 65532).
+    image: ${RAS_MINIO_IMAGE:-quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z}
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}

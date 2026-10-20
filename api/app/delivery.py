@@ -1,9 +1,10 @@
 """Delivery of invitation/reset links.
 
 - ``SmtpDelivery`` (M8a): one plain-text email per link over SMTP with
-  mandatory, verified TLS (SMTPS or required STARTTLS). A server accepting a
-  message is not proof the recipient received it. Failures raise
-  ``DeliveryFailed`` carrying only a stable code; nothing is retried here.
+  mandatory, verified TLS (SMTPS or required STARTTLS), sent by a child
+  process under one hard deadline. A server accepting a message is not proof
+  the recipient received it. Failures raise ``DeliveryFailed`` carrying only
+  a stable code; nothing is retried here.
 - ``DisabledDelivery``: nothing can be sent. Creating an invitation is
   refused; a reset request still answers generically but sends nothing.
 - ``DevOutbox`` (RAS_ENVIRONMENT=development only): messages stay in API
@@ -18,12 +19,14 @@ do not send to servers, so it never reaches web/API access logs.
 
 from __future__ import annotations
 
+import base64
 import email.policy
 import itertools
+import json
+import os
 import re
-import smtplib
-import socket
-import ssl
+import subprocess
+import sys
 import threading
 import time
 from collections import deque
@@ -152,25 +155,22 @@ def compose_message(message: OutgoingMessage, cfg: SmtpSettings, *, now: datetim
 class SmtpDelivery:
     """SMTP over verified TLS; never plaintext, never unverified.
 
-    The caller holds no database session, row or journal lock while ``send``
-    runs (the invitation and reset writers release them first). The whole send
-    is bounded by ``total_timeout_seconds``: every socket wait gets at most the
-    time left."""
+    The whole send (DNS, connect, greeting, TLS, EHLO, AUTH, MAIL/RCPT/DATA,
+    every reply) runs in one child process (``app.smtp_transport``) that this
+    adapter owns. ``total_timeout_seconds`` is enforced here: at the deadline
+    the child is killed and reaped and the outcome is ``smtp_timeout``, even if
+    the server may already have accepted DATA (callers compensate, never
+    retry). A result that arrives after the deadline is never a success. The
+    job and password go to the child over its stdin only. The caller holds no
+    database session, row or journal lock while ``send`` runs.
+    """
 
     enabled = True
 
     def __init__(self, cfg: SmtpSettings) -> None:
         self._cfg = cfg
-
-    def _context(self) -> ssl.SSLContext:
-        try:
-            ctx = ssl.create_default_context(cafile=str(self._cfg.ca_file) if self._cfg.ca_file else None)
-        except (OSError, ssl.SSLError):
-            raise DeliveryFailed("smtp_ca_unavailable") from None
-        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-        ctx.check_hostname = True
-        ctx.verify_mode = ssl.CERT_REQUIRED
-        return ctx
+        # Observability for tests: the last child process (exit state only).
+        self.last_child: subprocess.Popen | None = None
 
     def _password(self) -> str:
         try:
@@ -188,80 +188,63 @@ class SmtpDelivery:
     def send(self, message: OutgoingMessage, *, now: datetime) -> None:
         cfg = self._cfg
         deadline = time.monotonic() + cfg.total_timeout_seconds
-
-        def remaining() -> float:
-            left = deadline - time.monotonic()
-            if left <= 0:
-                raise DeliveryFailed("smtp_timeout")
-            return left
-
         msg = compose_message(message, cfg, now=now)
-        context = self._context()
         password = self._password() if cfg.username else None
-        client: smtplib.SMTP | None = None
+        job = json.dumps({
+            "host": cfg.host, "port": cfg.port, "security": cfg.security, "helo_name": cfg.helo_name,
+            "ca_file": str(cfg.ca_file) if cfg.ca_file else None, "sender": cfg.sender,
+            "recipient": message.recipient, "username": cfg.username, "password": password,
+            "connect_timeout_seconds": cfg.connect_timeout_seconds,
+            "total_timeout_seconds": cfg.total_timeout_seconds,
+            "message": base64.b64encode(msg.as_bytes(policy=email.policy.SMTP)).decode("ascii"),
+        }).encode("utf-8")
         try:
-            connect = min(cfg.connect_timeout_seconds, remaining())
-            if cfg.security == "implicit_tls":
-                client = smtplib.SMTP_SSL(cfg.host, cfg.port, local_hostname=cfg.helo_name,
-                                          timeout=connect, context=context)
-            else:
-                client = smtplib.SMTP(cfg.host, cfg.port, local_hostname=cfg.helo_name, timeout=connect)
-
-            def step() -> None:
-                client.sock.settimeout(remaining())
-
-            step()
-            client.ehlo()
-            if cfg.security == "starttls":
-                if not client.has_extn("starttls"):
-                    raise DeliveryFailed("smtp_starttls_unavailable")
-                step()
-                code, _ = client.starttls(context=context)
-                if code != 220:
-                    raise DeliveryFailed("smtp_starttls_unavailable")
-                step()
-                client.ehlo()
-            if cfg.username:
-                step()
-                client.login(cfg.username, password)
-            step()
-            refused = client.send_message(msg, from_addr=cfg.sender, to_addrs=[message.recipient])
-            if refused:
-                raise DeliveryFailed("smtp_rejected")
-        except DeliveryFailed:
-            raise
-        except ssl.SSLCertVerificationError:
-            raise DeliveryFailed("smtp_tls_verify_failed") from None
-        except ssl.SSLError:
-            raise DeliveryFailed("smtp_tls_failed") from None
-        except (socket.timeout, TimeoutError):
-            raise DeliveryFailed("smtp_timeout") from None
-        except smtplib.SMTPAuthenticationError:
-            raise DeliveryFailed("smtp_auth_failed") from None
-        except (smtplib.SMTPRecipientsRefused, smtplib.SMTPSenderRefused, smtplib.SMTPDataError,
-                smtplib.SMTPNotSupportedError, smtplib.SMTPHeloError):
-            raise DeliveryFailed("smtp_rejected") from None
-        except (smtplib.SMTPServerDisconnected, smtplib.SMTPConnectError) as exc:
-            # smtplib turns a socket timeout while reading a reply into a disconnect.
-            timed_out = isinstance(exc.__context__, (socket.timeout, TimeoutError))
-            raise DeliveryFailed("smtp_timeout" if timed_out else "smtp_connection_failed") from None
-        except smtplib.SMTPException:  # before OSError: SMTPException derives from it
-            raise DeliveryFailed("smtp_failed") from None
+            child = subprocess.Popen([sys.executable, "-m", "app.smtp_transport"], stdin=subprocess.PIPE,
+                                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=_child_env())
         except OSError:
-            raise DeliveryFailed("smtp_connection_failed") from None
-        else:
-            # DATA was accepted; a failed QUIT does not undo that.
-            try:
-                client.sock.settimeout(max(0.1, min(1.0, deadline - time.monotonic())))
-                client.quit()
-            except Exception:  # noqa: BLE001
-                pass
-        finally:
-            if client is not None:
-                try:
-                    client.close()
-                except Exception:  # noqa: BLE001
-                    pass
+            raise DeliveryFailed("smtp_transport_unavailable") from None
+        self.last_child = child
+        try:
+            out, _ = child.communicate(job, timeout=max(0.0, deadline - time.monotonic()))
+        except subprocess.TimeoutExpired:
+            _reap(child)
+            raise DeliveryFailed("smtp_timeout") from None
+        except BaseException:
+            _reap(child)
+            raise
+        if time.monotonic() > deadline:
+            raise DeliveryFailed("smtp_timeout")  # late answers are never a success
+        try:
+            result = json.loads(out)["result"]
+        except (ValueError, KeyError, TypeError):
+            result = "smtp_failed"
+        if child.returncode != 0 or not isinstance(result, str):
+            result = "smtp_failed"
+        if result != "ok":
+            raise DeliveryFailed(result if _CODE.fullmatch(result) else "smtp_failed")
+
+
+_CODE = re.compile(r"smtp_[a-z_]{1,40}")
+_CHILD_ENV = ("PATH", "SYSTEMROOT", "PYTHONPATH", "SSL_CERT_FILE", "SSL_CERT_DIR", "TMPDIR", "TEMP", "TMP")
+
+
+def _child_env() -> dict[str, str]:
+    """Only what the interpreter and TLS need; no database or service secrets."""
+    env = {k: v for k, v in os.environ.items() if k in _CHILD_ENV}
+    env.update(PYTHONIOENCODING="utf-8", PYTHONDONTWRITEBYTECODE="1")
+    return env
+
+
+def _reap(child: subprocess.Popen) -> None:
+    """Kill and wait for exactly the child this adapter started."""
+    try:
+        child.kill()
+    except OSError:
+        pass
+    try:
+        child.communicate(timeout=5)
+    except (subprocess.TimeoutExpired, OSError, ValueError):
+        pass
 
 
 def build_link(base_url: str, path: str, token: str) -> str:

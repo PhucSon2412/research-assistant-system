@@ -397,6 +397,23 @@ def http_phase(root: Path, c: dict) -> int:
             break
         time.sleep(1)
     check("worker extracts the upload and stops before paid embedding (pricing false)", status == "awaiting_index", status)
+    # PR #66 P2-2: the storage container is the digest-pinned image and survives a restart with data.
+    pinned = re.search(r"\$\{RAS_MINIO_IMAGE:-([^}]+)\}", (REPO / "deploy/compose.yaml").read_text(encoding="utf-8")).group(1)
+    minio_id = compose("ps", "-q", "minio").stdout.strip()
+    running = run(["docker", "inspect", minio_id, "--format", "{{.Config.Image}}"]).stdout.strip()
+    check("storage runs the digest-pinned MinIO image", running == pinned, running)
+    first = a.request("GET", f"/api/files/{file_id}/original")
+    compose("restart", "minio")
+    deadline = time.monotonic() + 90
+    while time.monotonic() < deadline:
+        health = run(["docker", "inspect", minio_id, "--format", "{{.State.Health.Status}}"]).stdout.strip()
+        if health == "healthy":
+            break
+        time.sleep(2)
+    again = a.request("GET", f"/api/files/{file_id}/original")
+    check("after a MinIO restart the original reads back byte-for-byte",
+          first.status_code == again.status_code == 200 and first.content == again.content == data
+          and hashlib.sha256(again.content).hexdigest() == hashlib.sha256(data).hexdigest(), (first.status_code, again.status_code))
     rag = a.post("/rag/ask", {"scope": "all", "question": "What does the pilot measure?", "mode": "keyword"})
     check("RAG answers the unverified-pricing 503, not an answer",
           rag.status_code == 503 and rag.json()["error"] == "rag_generation_unavailable_unverified_pricing", rag.text[:200])
