@@ -70,7 +70,9 @@ x-provider-env: &provider-env
 
 services:
   edge:
-    image: ${RAS_EDGE_IMAGE:-caddy:2.10.2-alpine}
+    # M8c: every pulled image is pinned to the digest the release candidate was tested
+    # with (caddy:2.10.2-alpine); a moved tag would otherwise install untested bytes.
+    image: ${RAS_EDGE_IMAGE:-caddy@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d}
     environment:
       RAS_PUBLIC_HOST: ${RAS_PUBLIC_HOST:?set the public HTTPS host name}
       RAS_HSTS_MAX_AGE: ${RAS_HSTS_MAX_AGE:-86400}
@@ -120,7 +122,9 @@ services:
     restart: unless-stopped
 
   db:
-    image: pgvector/pgvector:pg16
+    # M8c: pgvector/pgvector:pg16 as tested (PostgreSQL 16.14); that tag has since moved to 16.15.
+    # Change only to another digest that passed the release regression.
+    image: pgvector/pgvector@sha256:a36250871de0833b8757561c72f2477ef1ddd1101afa4e617fb552e0de514c6b
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
@@ -137,7 +141,8 @@ services:
 
   redis:
     # Celery broker (db 0) and the shared auth rate limiter (db 1).
-    image: redis:7-alpine
+    # M8c: redis:7-alpine as tested (Redis 7.4.11), pinned like every pulled image.
+    image: redis@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
     command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$${REDIS_PASSWORD}\""]
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}

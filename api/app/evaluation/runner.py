@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 
 from app import config as app_config
 from app import db as app_db
+from app import rate_limit as app_rate_limit
 from app.authz import Principal
 from app.clock import utcnow
 from app.config import EmbeddingPolicy, GenerationPolicy, PasswordPolicy, RerankPolicy, Settings, get_settings
@@ -176,6 +177,9 @@ def environment(context: Path | None = None, keep: bool = False) -> Iterator[Env
            'RAS_STORAGE__SECRET_KEY':values['storage_secret_key'], 'RAS_STORAGE__BUCKET':name.replace('_','-'),
            'RAS_ENVIRONMENT':'development', 'RAS_HTTP__COOKIE_SECURE':'false',
            'RAS_HTTP__ALLOWED_ORIGINS':json.dumps([ORIGIN]), 'RAS_DELIVERY__MODE':'disabled',
+           # M8c: in-process API without Redis, like the dev compose. The M8a default (redis)
+           # made every evaluation login a 503 rate_limit_unavailable.
+           'RAS_RATE_LIMIT__MODE':'disabled',
            'RAS_EMBEDDING__API_KEY':'', 'RAS_EMBEDDING__PRICING_VERIFIED':'false',
            'RAS_RERANK__PRICING_VERIFIED':'false', 'RAS_GENERATION__PRICING_VERIFIED':'false'}
     saved = {key: os.environ.get(key) for key in (*env, 'RAS_DATABASE_URL')}
@@ -186,6 +190,7 @@ def environment(context: Path | None = None, keep: bool = False) -> Iterator[Env
         os.environ.pop('RAS_DATABASE_URL',None)
         os.environ.update(env)
         app_config.get_settings.cache_clear()
+        app_rate_limit.get_rate_limiter.cache_clear()
         app_db.get_engine.cache_clear()
         cfg = Config(str(API_DIR / 'alembic.ini'))
         cfg.set_main_option('script_location',str(API_DIR / 'migrations'))
@@ -220,6 +225,7 @@ def environment(context: Path | None = None, keep: bool = False) -> Iterator[Env
             if value is None: os.environ.pop(key,None)
             else: os.environ[key]=value
         app_config.get_settings.cache_clear()
+        app_rate_limit.get_rate_limiter.cache_clear()
         app_db.get_engine.cache_clear()
         if not keep:
             with admin.connect() as conn:

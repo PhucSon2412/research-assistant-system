@@ -121,6 +121,8 @@ tái hiện: MinIO không ready; sau bước này đọc lại object cũ và gh
 khi `minio` đã dừng. Dev `docker-compose.yml` vẫn mặc định tag cũ (chạy từ cache) để không đổi dữ liệu dev; host dev
 mới đặt `RAS_MINIO_IMAGE` = digest trên, volume dev cũ cần bước đổi chủ trước.
 
+**M8c:** edge/db/redis cũng pin digest đã kiểm (tag `pgvector/pgvector:pg16` đã dời sang 16.15), checker buộc mọi image được kéo pin digest; harness smoke cấp config/secret M8b tổng hợp — xem [M8c](m8c-release-candidate.md#2-lỗi-thật-đã-sửa).
+
 **Nâng cấp có dữ liệu:** theo [runbook C4](c4-integrated-runtime-cutover.md#runbook-cutover-có-dữ-liệu--chưa-chạy-trên-dev):
 dừng api/worker/beat/web/edge → `run --rm --no-deps recovery-init python -m app.cli.recovery hold` bằng image cũ
 → build image mới → `run --rm --no-deps migrate` → `run --rm --no-deps provision` →

@@ -287,6 +287,37 @@ def test_runner_renews_expired_idle_session_through_real_login(api):
     assert ADMIN_PASSWORD not in repr(identity)
 
 
+def test_cli_environment_logs_in_with_the_real_limiter_and_no_redis(real_rate_limiter, monkeypatch, tmp_path):
+    """M8c: ``python -m app.evaluation run`` drives the API in process without Redis. With
+    the M8a default limiter (redis) every seeded login was a 503 rate_limit_unavailable."""
+    import os
+    import secrets
+    import socket
+    from sqlalchemy.engine import make_url
+    from app.evaluation import runner
+    from app.identity.bootstrap import bootstrap_admin
+    admin = make_url(os.environ['RAS_TEST_DATABASE_ADMIN_URL'])
+    with socket.socket() as probe:  # a loopback port nothing listens on: Redis is absent
+        probe.bind(('127.0.0.1', 0))
+        closed = probe.getsockname()[1]
+    monkeypatch.setenv('RAS_REDIS_HOST', '127.0.0.1')
+    monkeypatch.setenv('RAS_REDIS_PORT', str(closed))
+    context = tmp_path / 'evaluation.json'
+    context.write_text(json.dumps({
+        'db_host': admin.host, 'db_port': admin.port, 'db_user': admin.username, 'db_password': admin.password,
+        'db_name': admin.database, 'storage_endpoint': f"http://127.0.0.1:{os.environ['MINIO_API_HOST_PORT']}",
+        'storage_access_key': os.environ['MINIO_ROOT_USER'], 'storage_secret_key': os.environ['MINIO_ROOT_PASSWORD'],
+        'journal_directory': str(tmp_path / 'journals')}), encoding='utf-8')
+    password = secrets.token_urlsafe(24)
+    before = os.environ.get('RAS_RATE_LIMIT__MODE')
+    with runner.environment(context) as env:
+        uid = bootstrap_admin(env.engine, email=runner.EMAILS['admin'], password=password,
+                              policy=env.settings.password, clock=env.clock).user_id
+        identity = runner._login(runner.EMAILS['admin'], password, 'admin', uid, 'admin')
+        assert identity.client.get('/auth/session').status_code == 200
+    assert os.environ.get('RAS_RATE_LIMIT__MODE') == before  # the process environment is restored
+
+
 def test_runner_refuses_missing_context_before_database_or_dotenv(monkeypatch):
     import psycopg  # preload driver metadata before the global filesystem tripwire
     from app.evaluation import runner
