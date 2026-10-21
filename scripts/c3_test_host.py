@@ -14,6 +14,8 @@ import subprocess
 import sys
 
 REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from m8a_test_host import deploy_image  # noqa: E402  (same pinned PostgreSQL/Redis digests as deploy)
 
 
 def run(argv, **kw):
@@ -50,7 +52,7 @@ def main():
         (root / 'empty.env').write_text('', encoding='utf-8')
         label = {'ras.task': c['project']}
         compose = {'services': {
-            'db': {'image': 'pgvector/pgvector:pg16', 'environment': {'POSTGRES_USER': 'task_admin',
+            'db': {'image': deploy_image('db'), 'environment': {'POSTGRES_USER': 'task_admin',
                 'POSTGRES_PASSWORD': c['password'], 'POSTGRES_DB': 'task_control'},
                 'ports': [f"127.0.0.1:{c['db_port']}:5432"], 'labels': label,
                 'healthcheck': {'test': ['CMD-SHELL', 'pg_isready -U task_admin -d task_control'], 'interval': '1s', 'retries': 60}},
@@ -58,7 +60,7 @@ def main():
                 'command': ['server', '/data'], 'environment': {'MINIO_ROOT_USER': 'task_minio', 'MINIO_ROOT_PASSWORD': c['minio']},
                 'ports': [f"127.0.0.1:{c['minio_port']}:9000"], 'labels': label,
                 'healthcheck': {'test': ['CMD', 'mc', 'ready', 'local'], 'interval': '1s', 'retries': 60}},
-            'redis': {'image': 'redis:7-alpine', 'command': ['sh', '-c', 'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"'],
+            'redis': {'image': deploy_image('redis'), 'command': ['sh', '-c', 'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"'],
                 'environment': {'REDIS_PASSWORD': c['redis'], 'REDISCLI_AUTH': c['redis']},
                 'ports': [f"127.0.0.1:{c['redis_port']}:6379"], 'labels': label,
                 'healthcheck': {'test': ['CMD', 'redis-cli', 'ping'], 'interval': '1s', 'retries': 60}}},

@@ -41,13 +41,22 @@ httpx.HTTPTransport.handle_request = guard(httpx.HTTPTransport.handle_request)
 """
 
 
-def deploy_minio_image() -> str:
-    """The digest-pinned MinIO image of deploy/compose.yaml (one source for tests and deploy)."""
+def deploy_image(service: str) -> str:
+    """The digest-pinned image of one deploy/compose.yaml service (one source for tests and deploy).
+
+    Reads the ``image:`` line of the service block, plain or as a ``${RAS_*_IMAGE:-<default>}``
+    default; anything not pinned by digest is refused rather than replaced by a tag."""
     text = (REPO / "deploy" / "compose.yaml").read_text(encoding="utf-8")
-    match = re.search(r"\$\{RAS_MINIO_IMAGE:-([^}]+@sha256:[0-9a-f]{64})\}", text)
+    block = re.search(rf"^  {re.escape(service)}:\n(.*?)(?=^  \S|^\S|\Z)", text, re.M | re.S)
+    match = block and re.search(r"^    image: (?:\$\{RAS_\w+_IMAGE:-)?([^\s}]+@sha256:[0-9a-f]{64})\}?\s*$",
+                                block.group(1), re.M)
     if not match:
-        raise SystemExit("deploy/compose.yaml does not pin the MinIO image by digest")
+        raise SystemExit(f"deploy/compose.yaml does not pin the {service} image by digest")
     return match.group(1)
+
+
+def deploy_minio_image() -> str:
+    return deploy_image("minio")
 
 
 def wait_http(url: str, seconds: float) -> bool:
@@ -97,12 +106,14 @@ def main() -> int:
             "pg_port": free_port(), "redis_port": free_port(), "minio_port": free_port()}
         label = {"ras.m8a.context": root.as_posix()}
         spec = {"name": c["project"], "services": {
-            "db": {"image": "pgvector/pgvector:pg16", "labels": label, "tmpfs": ["/var/lib/postgresql/data"],
+            # PostgreSQL/Redis/MinIO: the digests pinned in deploy/compose.yaml, so CI and the
+            # pilot deploy exercise the same bytes (M7c, P3 of the PR #68 review).
+            "db": {"image": deploy_image("db"), "labels": label, "tmpfs": ["/var/lib/postgresql/data"],
                    "environment": {"POSTGRES_USER": "m8a_admin", "POSTGRES_PASSWORD": c["pg"], "POSTGRES_DB": "m8a"},
                    "ports": [f"127.0.0.1:{c['pg_port']}:5432"],
                    "healthcheck": {"test": ["CMD-SHELL", "pg_isready -U m8a_admin -d m8a"], "interval": "2s",
                                    "retries": 30}},
-            "redis": {"image": "redis:7-alpine", "labels": label,
+            "redis": {"image": deploy_image("redis"), "labels": label,
                       "command": ["redis-server", "--save", "", "--appendonly", "no", "--requirepass", c["redis"]],
                       "ports": [f"127.0.0.1:{c['redis_port']}:6379"]},
             # Same digest-pinned image as the pilot deploy (PR #66); readiness is the

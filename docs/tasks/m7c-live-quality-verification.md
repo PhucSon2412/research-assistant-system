@@ -9,24 +9,26 @@ Bạn là coding agent tiếp theo. Triển khai **một PR hoàn chỉnh** khé
 
 ## 1. Base và ủy quyền mới của chủ dự án (2026-10-21)
 
-- PR #68 đã merge: đã fetch/xác minh `origin/main = 7009a8483e4f9891f11a966f114df136c90c4953` (parent `e0dcdb4` + head review `36444ae`), tree khớp `4fa14a7`. Source **0052**.
-- Fetch lại, tạo `feat/m7c-live-quality-verification` từ `origin/main`. Mang theo mọi docs orchestrator/reviewer modified/untracked (report review PR #68, task này, cập nhật trạng thái) vào PR; không reset/stash/discard.
-- **TẠM DỪNG (cập nhật 2026-10-21): chưa giao.** Chỉ bắt đầu khi chủ dự án báo đã có key **thuộc tài khoản OpenRouter do chính chủ dự án tạo và quản lý**. Key OpenRouter đang có trên máy không thuộc tài khoản của chủ dự án: **không đọc, không dùng** cho bất kỳ lượt live, test hay stack nào.
+- Base: lấy `origin/main` mới nhất. Nếu PR #69 (M9 demo LAN) đã merge thì base là merge đó; nếu chưa thì `7009a8483e4f9891f11a966f114df136c90c4953`. Source **0052**.
+- Fetch lại, tạo `feat/m7c-live-quality-verification`. Mang theo mọi docs orchestrator/reviewer modified/untracked vào PR; không reset/stash/discard.
+- **Bản demo `ras-pilot` đang chạy trên máy này** ([handoff M9](../m9-lan-demo-deployment.md)): không hạ, xóa hay restore nó ngoài mục 7.
 - **Ủy quyền của chủ dự án (2026-10-21):**
+  - dùng key OpenRouter của nhóm;
   - nhờ orchestrator duyệt policy và chọn paper;
-  - nhờ đánh giá thay phiếu người đọc.
+  - nhờ đánh giá thay phiếu người đọc;
+  - mục tiêu là bản demo cho CV.
 
-  Orchestrator chốt cách thực hiện ở mục 2–4. Đây là lựa chọn của orchestrator theo ủy quyền, ghi đúng nguồn trong decisions.
+  Orchestrator chốt cách thực hiện ở mục 2–7. Đây là lựa chọn của orchestrator theo ủy quyền, ghi đúng nguồn trong decisions.
 - **Key:**
-  - chỉ dùng key mới của chủ dự án, nhận qua file secret chủ dự án tự tạo ngoài repo (agent không đọc `.env`);
-  - truyền vào stack thử qua file secret 0600 trong context ngoài repo;
-  - không in key/header/cookie.
-  - Cài đặt logging/training của tài khoản do chủ dự án tự đặt trên tài khoản của mình.
+  - Key do nhóm của chủ dự án mua và chia sẻ cho thành viên. Chủ dự án được dùng nhưng không quản lý tài khoản, nên **không xác minh được** cài đặt logging/training của tài khoản.
+  - Lấy key **chỉ** từ file `%USERPROFILE%\ras-pilot\secrets\openrouter_api_key` do chủ dự án tự tạo. Không đọc `.env`.
+  - Truyền vào stack thử qua file secret 0600 trong context ngoài repo; không in key/header/cookie, không copy key vào repo, log hay artifact.
 - **Trần chi phí của task** (orchestrator đặt để chặn vòng lặp lỗi, không phải giới hạn của chủ dự án):
   - ≤ **$5,00** tổng (gồm judge) và ≤ **400** inference call; ledger fail-closed như M7a;
   - chạm 80 % thì dừng gọi mới và báo cáo.
   - Spending cap $50/ngày của key và budget ứng dụng $10/ngày giữ nguyên.
-- Vẫn không đụng dev `ras`/Dify, không gửi mail thật, không cutover, không đổi config pilot. `pricing_verified=true` chỉ bật trong stack thử cô lập của task này.
+- Vẫn không đụng dev `ras`/Dify, Tailscale/Radmin, không gửi mail thật ngoài alert của demo. Phần xác minh/đánh giá chạy trong stack thử cô lập; chỉ mục 7 được đổi bản demo.
+- Vì không xác minh được cài đặt tài khoản: chỉ gửi qua provider **paper giấy phép mở hoặc dữ liệu tổng hợp**. Bản demo phải nhắc người dùng thử **không upload tài liệu riêng/nhạy cảm** (thông báo upload hiện có + kịch bản demo).
 
 ## 2. Policy provider đã duyệt (orchestrator, theo ủy quyền)
 
@@ -82,7 +84,22 @@ Bạn là coding agent tiếp theo. Triển khai **một PR hoàn chỉnh** khé
 - `scripts/m8a_test_host.py` và `scripts/c3_test_host.py` dùng **cùng digest PostgreSQL/Redis** đã pin trong `deploy/compose.yaml` (đọc từ compose như cách đã làm cho MinIO), để CI và deploy kiểm cùng bytes.
 - Thêm `tests/test_evaluation.py` (và test mới của task) vào selection CI. Chặn mọi HTTP ngoài trong CI như cũ; test live chỉ chạy tay, không trong CI.
 
-## 7. Kiểm chứng và bàn giao
+## 7. Bật provider cho bản demo và chuẩn bị nội dung demo
+
+Chỉ làm sau khi mục 5 có kết luận theo route:
+
+- Với bản demo `ras-pilot`, đặt key vào env file ngoài repo của demo (`%USERPROFILE%\ras-pilot\pilot\pilot.env`, đọc từ file secret ở trên). Bật `pricing_verified=true` **chỉ** cho route đã đủ chứng cứ.
+  - Recreate api/worker theo runbook (cửa sổ bảo trì ngắn, readiness thật). Không đổi image rc2, không đổi `deploy/`.
+- Budget ứng dụng giữ **$10/ngày** và quota User như cấu hình, để demo không đốt quá.
+- Chuẩn bị thư mục paper demo ngoài repo: chính các PDF giấy phép mở đã kiểm ở mục 3, kèm file attribution.
+  - Upload vào demo là việc **chủ dự án tự làm qua UI**, vì mỗi upload cần người xác nhận thông báo xử lý. Agent không tạo tài khoản hay dùng mật khẩu của chủ dự án.
+  - Viết sẵn 5–8 câu hỏi demo ấn tượng: một paper, so sánh, câu không có đáp án.
+- Kiểm từ máy này qua HTTPS với CA demo:
+  - search keyword/hybrid ra hit có citation mở được;
+  - RAG trả lời có citation trên paper vừa index, bằng tài khoản thử do chủ dự án tạo; nếu chưa có tài khoản thì ghi not-run và hướng dẫn.
+- Cập nhật handoff M9 (mục "Chưa demo được") và kịch bản demo.
+
+## 8. Kiểm chứng và bàn giao
 
 - Pytest không gọi provider/arXiv thật. Live chỉ chạy qua script riêng có ledger; JUnit/artifact được quét không có key/token/toàn văn.
 - Countercheck nhắm:

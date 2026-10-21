@@ -8,6 +8,8 @@
     python scripts/m9_lan_demo.py schedule install|remove            # "RAS pilot backup" 03:00, "RAS pilot check" 15 min
     python scripts/m9_lan_demo.py firewall-commands                  # elevated add/remove commands (printed, not run)
     python scripts/m9_lan_demo.py uninstall --yes                    # tasks, projects/volumes (label-checked), tags
+    python scripts/m9_lan_demo.py provider --routes <r ...> [--apply] # M7c: key from secrets file, pricing per route
+    python scripts/m9_lan_demo.py provider --off [--apply]            # back to provider off
 
 Everything lives under ``--root`` (default ``%USERPROFILE%\\ras-pilot``), outside the repository. The
 deploy itself is the reviewed ``deploy/compose.yaml`` of the release commit, copied with ``git archive``
@@ -17,7 +19,9 @@ API origins with the port, the network to the same-machine MinIO) and never touc
 
 Secrets are generated once and never printed. The SMTP password is only mounted as a Compose secret;
 this script reads ``smtp_username`` (the Gmail address) to fill the env file and ops config, both
-outside the repo. Provider key stays empty and pricing false. The replica/backup destination is a
+outside the repo. Provider key stays empty and pricing false until ``provider`` (M7c) enables the routes
+with live evidence; the key is then read from the owner's ``secrets/openrouter_api_key`` into the
+owner-only env file, never printed. The replica/backup destination is a
 MinIO on the SAME machine (own project/volume): it is not an independent failure domain, which the
 owner accepted for this demo.
 """
@@ -346,9 +350,29 @@ def pilot_env(state: dict, kind: str, gmail: str) -> dict:
         "RAS_SMTP_SENDER": gmail, "RAS_SMTP_SENDER_NAME": "Research Assistant System (demo)",
         "RAS_SMTP_USERNAME": gmail, "RAS_SMTP_PASSWORD_FILE": "/run/secrets/smtp_password", "RAS_SMTP_CA_FILE": "",
         "RAS_SMTP_CONNECT_TIMEOUT_SECONDS": "10", "RAS_SMTP_TOTAL_TIMEOUT_SECONDS": "20",
-        # Provider off for M9: empty key, pricing false (search/RAG show "not available").
-        "OPENROUTER_API_KEY": "", "RAS_EMBEDDING__PRICING_VERIFIED": "false", "RAS_RERANK__PRICING_VERIFIED": "false",
-        "RAS_GENERATION__PRICING_VERIFIED": "false", "RAS_DISCOVERY__ENABLED": "false"}
+        **provider_values(state, kind), "RAS_DISCOVERY__ENABLED": "false"}
+
+
+PROVIDER_ROUTES = ("embedding", "rerank", "generation")
+KEY_FILE = "openrouter_api_key"
+
+
+def provider_values(state: dict, kind: str) -> dict:
+    """Provider off (M9 default) unless ``provider`` enabled routes (M7c); the drill always stays off.
+
+    The key comes only from the owner's ``secrets/openrouter_api_key`` and is written only into the
+    owner-only env file; it is never printed. A route's pricing gate opens only when it was enabled."""
+    routes = ((state.get("provider") or {}).get("routes") or []) if kind == "pilot" else []
+    key = ""
+    if routes:
+        try:
+            key = (Path(state["root"]) / "secrets" / KEY_FILE).read_text(encoding="utf-8").strip()
+        except OSError:
+            raise SystemExit("secrets/openrouter_api_key absent: the owner creates it; provider stays off") from None
+        if not key or any(c.isspace() for c in key):
+            raise SystemExit("secrets/openrouter_api_key malformed; provider stays off")
+    return {"OPENROUTER_API_KEY": key,
+            **{f"RAS_{route.upper()}__PRICING_VERIFIED": str(route in routes).lower() for route in PROVIDER_ROUTES}}
 
 
 def override_yaml(kind: str) -> str:
@@ -596,6 +620,40 @@ def rebind(args) -> int:
     return 0
 
 
+def provider(args) -> int:
+    """M7c: enable the provider for the routes with live evidence (or ``--off``); recreate api/worker/beat.
+
+    Rewrites only the provider lines of pilot.env (all other values regenerate from state as in
+    ``rebind``); image, deploy files and the drill env stay unchanged. Budget and quotas keep the
+    application defaults ($10/day app budget, per-user quotas)."""
+    root = Path(args.root).resolve()
+    state = load_state(root)
+    routes = [] if args.off else sorted(set(args.routes))
+    unknown = set(routes) - set(PROVIDER_ROUTES)
+    if unknown:
+        raise SystemExit(f"unknown route(s) {sorted(unknown)}")
+    state["provider"] = {"routes": routes, "changed_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")}
+    gmail = gmail_address(root / "secrets")
+    values = pilot_env(state, "pilot", gmail)  # validates the key file before anything is written
+    env_path = root / "pilot" / "pilot.env"
+    shutil.copyfile(env_path, env_path.with_name("pilot.env.before-provider"))
+    write(env_path, env_text(values))
+    save_state(root, state)
+    user = f"{os.environ['USERDOMAIN']}\\{os.environ['USERNAME']}"
+    for name in ("pilot.env", "pilot.env.before-provider"):  # the key file's neighbours: owner-only (0600)
+        run(["icacls", str(root / "pilot" / name), "/inheritance:r", "/grant:r", f"{user}:F"])
+    result = {"routes": routes, "key_present": bool(values["OPENROUTER_API_KEY"]),
+              "pricing": {r: values[f"RAS_{r.upper()}__PRICING_VERIFIED"] for r in PROVIDER_ROUTES}}
+    if args.apply:
+        up = run(compose_cmd(state, PROJECT) + ["up", "-d", "--wait", "--force-recreate", "api", "worker", "beat"],
+                 check=False)
+        result["recreate_exit"] = up.returncode
+        if up.returncode:
+            result["recreate_error"] = up.stderr[-400:]
+    print(json.dumps(result))
+    return 0 if result.get("recreate_exit", 0) == 0 else 1
+
+
 def schedule(args) -> int:
     root = Path(args.root).resolve()
     load_state(root)
@@ -681,10 +739,15 @@ def main() -> int:
     sub.add_parser("firewall-commands")
     s = sub.add_parser("uninstall")
     s.add_argument("--yes", action="store_true")
+    s = sub.add_parser("provider")
+    group = s.add_mutually_exclusive_group(required=True)
+    group.add_argument("--routes", nargs="+", choices=PROVIDER_ROUTES)
+    group.add_argument("--off", action="store_true")
+    s.add_argument("--apply", action="store_true", help="recreate api/worker/beat now (short maintenance window)")
     args = p.parse_args()
     return {"inventory": inventory, "prepare": prepare, "offsite-up": offsite_up, "verify": verify,
             "rebind": rebind, "schedule": schedule, "firewall-commands": firewall_commands,
-            "uninstall": uninstall}[args.cmd](args)
+            "uninstall": uninstall, "provider": provider}[args.cmd](args)
 
 
 if __name__ == "__main__":

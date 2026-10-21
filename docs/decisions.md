@@ -12,7 +12,10 @@
 
 **Orchestrator chọn:**
 
-- Không dùng key đó cho bất kỳ live/test/stack nào. M7c **tạm dừng** tới khi chủ dự án có key thuộc tài khoản của mình.
+- ~~Không dùng key đó; M7c tạm dừng.~~ **Đính chính cùng ngày:** chủ dự án cho biết key do **nhóm của chủ dự án mua và chia sẻ cho thành viên dùng**; chủ dự án được phép dùng nhưng không quản lý tài khoản. M7c mở lại với các điều kiện:
+  - key chỉ lấy từ file secret chủ dự án tự tạo, không đọc `.env`;
+  - trần task $5/400 call; budget demo $10/ngày;
+  - vì không xác minh được cài đặt logging của tài khoản, chỉ gửi paper giấy phép mở/dữ liệu tổng hợp, và nhắc người dùng demo không upload tài liệu riêng.
 - Giao trước [M9 — demo LAN trên máy này](tasks/m9-lan-demo-deployment.md):
   - rc2 không build lại;
   - edge chỉ bind IP Ethernet, cổng 8443, CA riêng cho demo;
@@ -31,6 +34,27 @@ Agent chọn trong phạm vi [task M9](tasks/m9-lan-demo-deployment.md); không 
 - **Bản sao phát hành** `git archive 7009a84` (`deploy/`, `scripts/ras_ops.py`) dưới `%USERPROFILE%as-pilotelease`, để lịch/compose không đổi theo nhánh đang checkout; tag alias `ras-pilot-*:rc2` trỏ đúng ID rc2.
 - **CA demo name-constrained** (`ras-demo.lan` + dải IP private), khóa chỉ quyền user; một MinIO cùng máy với hai bucket/bốn credential (replica không có quyền xóa, object lock 1 ngày).
 - **Task Scheduler** chạy `pythonw` + wrapper ẩn cửa sổ, phiên tương tác (Docker Desktop vốn chỉ chạy khi đăng nhập).
+
+## Triển khai M7c (2026-10-21)
+
+Agent chọn trong phạm vi [task M7c](tasks/m7c-live-quality-verification.md), theo lựa chọn orchestrator đã chốt; không phải
+chủ dự án chọn trực tiếp. Chi tiết và số đo ở [handoff M7c](m7c-live-quality-verification.md).
+
+- **License đúng version:** nhận một version arXiv chỉ khi trang abs của version đó **và** OAI-PMH `arXivRaw` cùng ghi
+  CC BY 4.0, CC BY-SA 4.0 hoặc CC0 1.0, và version đó là mới nhất. Lệch nguồn hoặc không rõ thì từ chối.
+- **Bộ paper:** 12 paper ngắn (≤ 8 trang) chủ đề RAG, 10 index được và 2 không index được (giữ để báo trạng thái thật).
+  Chọn paper ngắn vì mỗi chunk là một call embedding và trần là 400 call.
+- **Judge:** `anthropic/claude-sonnet-5.5` (khác họ với generation OpenAI), pin Amazon Bedrock (ZDR), không fallback, không
+  thu thập dữ liệu, `max_price` bằng giá niêm yết. Không gửi `temperature` vì endpoint không hỗ trợ (dùng mặc định model).
+  Rubric có version; answer dùng `/2` (chấm cả việc từ chối câu có đáp án).
+- **Key trong stack thử:** chỉ qua file secret mount read-only, nạp bởi observer test-only; không có trong Compose env.
+  Trên demo, key nằm trong `pilot.env` (ACL chỉ user) theo hợp đồng deploy M8a.
+- **`pricing_verified`:** đủ chứng cứ cho embedding document/query; rerank và generation đủ chứng cứ kèm điều kiện theo dõi
+  giá (rerank không có biên; cache-write nằm ngoài `max_price.prompt`). Mặc định trong source/`deploy/` giữ `false`; chỉ bản
+  demo bật cả ba route.
+- **Không sửa trong PR này, chờ quyết định:** nhãn M4c CMP-09/RCI-09 (judge `needs_change`; sửa sẽ đổi binding M7b),
+  `generation.max_output_tokens=512` (cắt câu so sánh dài), nhận diện paper khi so sánh dựa trên title (upload mặc định
+  dùng tên file).
 
 ## Gói D theo chỉ dẫn chủ dự án và giao M7c (2026-10-21)
 

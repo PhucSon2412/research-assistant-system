@@ -2,6 +2,8 @@
 
 **Model tiếp quản orchestrator:** bắt đầu từ [handover chung cho ChatGPT/Codex và Claude](orchestrator-handover.md), sau đó [AGENTS.md](../AGENTS.md), [CLAUDE.md](../CLAUDE.md) và kế hoạch MVP. Snapshot 2026-10-20 giữ trạng thái PR #66 cùng việc chưa commit; phải đối chiếu Git/PR khi tiếp quản, không giả PR đã merge hoặc các mốc pending cũ còn hiện hành.
 
+**M7c trên nhánh `feat/m7c-live-quality-verification`, 2026-10-21 (chờ review, chưa merge):** [handoff live + paper giấy phép mở + AI judge + `pricing_verified` theo route](m7c-live-quality-verification.md) · [inventory](m7c-test-inventory.json) · [report AI judge](../evaluation/ai-review/report.md) · [bộ paper](../evaluation/m7c-papers/README.md). Demo `ras-pilot` đã bật provider; AI judge không thay người đọc.
+
 **M9 trên nhánh `ops/m9-lan-demo-deployment`, 2026-10-21 (chờ review, chưa merge):** [handoff demo LAN — topology, hướng dẫn demo, gỡ sạch](m9-lan-demo-deployment.md) · [`scripts/m9_lan_demo.py`](../scripts/m9_lan_demo.py). rc2 chạy trên máy chủ dự án, chỉ LAN, lưu trữ cùng máy.
 
 **Sau merge PR #68 (`7009a84`, 2026-10-21):** rc2 là baseline. Tiếp [M9 — demo LAN trên máy chủ dự án](tasks/m9-lan-demo-deployment.md), mới giao; [M7c](tasks/m7c-live-quality-verification.md) tạm dừng tới khi có key OpenRouter của chính chủ dự án.

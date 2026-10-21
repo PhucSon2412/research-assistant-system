@@ -10,3 +10,8 @@ evaluation/rag/corpus/**/*.pdf binary
 # M7b review bundle is bound by SHA-256 to the exact bytes it was built from (the M7a corpus copy
 # keeps the CRLF bytes the live run uploaded): no line-ending conversion.
 evaluation/human-review/** -text
+
+# M7c: AI judge records bind to the SHA-256 of the run snapshot, paper manifest and questions;
+# synthetic notes are uploaded as LF. Keep the bytes identical on every checkout.
+evaluation/ai-review/** -text
+evaluation/m7c-papers/** -text

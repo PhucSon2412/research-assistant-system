@@ -31,13 +31,15 @@ jobs:
       - name: Install API with dev extras
         run: python -m pip install -e "./api[dev]"
       - name: Start isolated PostgreSQL/Redis/MinIO
-        # MinIO comes from the digest pinned in deploy/compose.yaml (pulled fresh on the runner).
+        # PostgreSQL/Redis/MinIO come from the digests pinned in deploy/compose.yaml (pulled fresh on the runner).
         run: python scripts/m8a_test_host.py --context "$RUNNER_TEMP/m8a-api" setup
       - name: Run API selection
         # Why each file: config and new M8a modules; session/CSRF/Origin/cookies;
         # invitation and reset runtime/journal/compensation (delivery boundary);
         # provenance/receipts and auth safety; migrations/ORM; C4 contract/health;
-        # M8b journal replica, encrypted backups/retention, alerts, host entrypoint, real MinIO.
+        # M8b journal replica, encrypted backups/retention, alerts, host entrypoint, real MinIO;
+        # M7c: the evaluation CLI/runner, the AI judge track and the live tooling (offline only:
+        # the outbound-HTTP guard stays; live runs are manual scripts with a ledger, never CI).
         # Deselected: one dump/restore round that needs the C3 host container fixture.
         run: >-
           python scripts/m8a_test_host.py --context "$RUNNER_TEMP/m8a-api" test
@@ -53,6 +55,7 @@ jobs:
           tests/test_c4_contract.py tests/test_health.py
           tests/test_m8b_replica.py tests/test_m8b_artifacts.py tests/test_m8b_alerts.py
           tests/test_m8b_ops_host.py tests/test_m8b_s3_minio.py
+          tests/test_evaluation.py tests/test_m7c_ai_review.py tests/test_m7c_tooling.py
           --deselect tests/test_pre_c4_initial_receipts.py::test_two_dump_restore_rounds_keep_valid_provenance_and_restrict_forgery
       - name: Scan JUnit for context secrets before upload
         # Runs even when tests failed, so clean failure evidence stays available.
