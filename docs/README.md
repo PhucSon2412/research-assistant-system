@@ -2,6 +2,12 @@
 
 **Model tiếp quản orchestrator:** bắt đầu từ [handover chung cho ChatGPT/Codex và Claude](orchestrator-handover.md), sau đó [AGENTS.md](../AGENTS.md), [CLAUDE.md](../CLAUDE.md) và kế hoạch MVP. Snapshot 2026-10-20 giữ trạng thái PR #66 cùng việc chưa commit; phải đối chiếu Git/PR khi tiếp quản, không giả PR đã merge hoặc các mốc pending cũ còn hiện hành.
 
+**M9 trên nhánh `ops/m9-lan-demo-deployment`, 2026-10-21 (chờ review, chưa merge):** [handoff demo LAN — topology, hướng dẫn demo, gỡ sạch](m9-lan-demo-deployment.md) · [`scripts/m9_lan_demo.py`](../scripts/m9_lan_demo.py). rc2 chạy trên máy chủ dự án, chỉ LAN, lưu trữ cùng máy.
+
+**Sau merge PR #68 (`7009a84`, 2026-10-21):** rc2 là baseline. Tiếp [M9 — demo LAN trên máy chủ dự án](tasks/m9-lan-demo-deployment.md), mới giao; [M7c](tasks/m7c-live-quality-verification.md) tạm dừng tới khi có key OpenRouter của chính chủ dự án.
+
+**Review PR #68 tại `36444ae`, 2026-10-21:** [không thấy điểm chặn merge mới trong scope M8c](reviews/pr68-m8c-release-candidate.md); bốn P3 không chặn. Chưa merge/cutover.
+
 **M8c trên nhánh `chore/m8c-release-candidate`, 2026-10-21 (chờ review, chưa merge):** [handoff bản ứng viên + điều kiện/runbook cutover](m8c-release-candidate.md) · [inventory](m8c-test-inventory.json) · [`scripts/m8c_inventory.py`](../scripts/m8c_inventory.py). Image rc2 đóng băng; full inventory 5.579/5.579 một lượt, năm drill C4, smoke M8a, diễn tập M8b, web, CLI evaluation; sửa pin digest hạ tầng và CLI evaluation. Chưa cutover.
 
 **Sau merge PR #67 (`e0dcdb4`, 2026-10-20):** M8b vào main, chưa cutover. Tiếp [M8c — hồi quy tổng bản ứng viên phát hành](tasks/m8c-release-candidate-regression.md), mới giao/chưa triển khai.

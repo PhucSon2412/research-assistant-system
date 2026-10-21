@@ -1,5 +1,55 @@
 # Nhật ký quyết định
 
+## Cập nhật cùng ngày: key, đường vào, lưu trữ, mục tiêu demo (2026-10-21)
+
+**Chủ dự án cho biết:**
+
+- key OpenRouter đang có trên máy **không thuộc tài khoản do chủ dự án quản lý**;
+- chỉ truy cập trong LAN, không đụng tailnet;
+- chấp nhận chỉ lưu journal replica/backup trên máy này;
+- dùng một Gmail mới cho SMTP;
+- mục tiêu là bản demo cho CV, không phục vụ lâu dài.
+
+**Orchestrator chọn:**
+
+- Không dùng key đó cho bất kỳ live/test/stack nào. M7c **tạm dừng** tới khi chủ dự án có key thuộc tài khoản của mình.
+- Giao trước [M9 — demo LAN trên máy này](tasks/m9-lan-demo-deployment.md):
+  - rc2 không build lại;
+  - edge chỉ bind IP Ethernet, cổng 8443, CA riêng cho demo;
+  - một firewall rule `LocalSubnet`;
+  - Task Scheduler thay systemd;
+  - đích replica/backup là MinIO riêng cùng máy, ghi rõ không độc lập miền sự cố;
+  - provider trống, `pricing_verified=false`.
+- Phần dưới đây ("Gói D theo chỉ dẫn…") vẫn áp dụng cho M7c khi được mở lại, trừ phần key.
+
+## Triển khai M9 (2026-10-21)
+
+Agent chọn trong phạm vi [task M9](tasks/m9-lan-demo-deployment.md); không phải chủ dự án chọn. Chi tiết ở [handoff M9](m9-lan-demo-deployment.md).
+
+- **Overlay ngoài repo thay vì sửa `deploy/`:** compose gốc map cứng container `:443` và origin không cổng; với 8443 trình duyệt bị từ chối CSRF. Overlay sinh bởi `scripts/m9_lan_demo.py` đặt site Caddy/origin/`PUBLIC_BASE_URL` có cổng và chỉ publish `IP_Ethernet:8443`. Không publish cổng redirect HTTP (Caddy sẽ redirect về 443).
+- **Chỉ hostname `ras-demo.lan`:** truy cập IP trần không có SNI và Caddyfile đã review không có `default_sni` (đã kiểm: handshake lỗi); không sửa Caddyfile cho demo. Điện thoại cần DNS nội bộ ở router.
+- **Bản sao phát hành** `git archive 7009a84` (`deploy/`, `scripts/ras_ops.py`) dưới `%USERPROFILE%as-pilotelease`, để lịch/compose không đổi theo nhánh đang checkout; tag alias `ras-pilot-*:rc2` trỏ đúng ID rc2.
+- **CA demo name-constrained** (`ras-demo.lan` + dải IP private), khóa chỉ quyền user; một MinIO cùng máy với hai bucket/bốn credential (replica không có quyền xóa, object lock 1 ngày).
+- **Task Scheduler** chạy `pythonw` + wrapper ẩn cửa sổ, phiên tương tác (Docker Desktop vốn chỉ chạy khi đăng nhập).
+
+## Gói D theo chỉ dẫn chủ dự án và giao M7c (2026-10-21)
+
+Fetch xác minh `origin/main = 7009a8483e4f9891f11a966f114df136c90c4953` (merge PR #68), tree khớp `36444ae`. Source **0052**.
+
+**Chủ dự án trực tiếp nói trong hội thoại:**
+
+- được dùng API key OpenRouter cho live mà không đặt hạn mức;
+- nhờ orchestrator duyệt policy và paper;
+- nhờ orchestrator điền đánh giá thay phiếu người đọc;
+- muốn host nhóm thử trên chính máy này, không thuê ngoài.
+
+**Orchestrator chọn theo ủy quyền đó** (cho [M7c](tasks/m7c-live-quality-verification.md)):
+
+- Đánh giá do **AI judge** (model khác họ với generation), là track riêng có nhãn `ai_judge`. Không điền phiếu/record người đọc M7b, vì như vậy là ghi giả kết quả của người. Checklist chất lượng ghi "đạt bằng AI judge", phản hồi người dùng nhóm thử là kênh người thật.
+- Policy provider: giữ ba model đã chọn, route pin ZDR/no fallback/`data_collection=deny`/`max_price` như M7a; cài đặt logging của tài khoản do chủ dự án tự xác nhận.
+- Paper: 10–15 paper arXiv chỉ license CC BY 4.0/CC BY-SA 4.0/CC0 theo đúng version; không commit PDF/toàn văn.
+- Trần task $5/400 call để chặn vòng lặp lỗi; spending cap $50/ngày của key và budget ứng dụng $10/ngày giữ nguyên. `pricing_verified` chỉ bật trong stack thử; bật cho pilot quyết định ở cutover theo kết luận từng route.
+
 ## Triển khai M8c (2026-10-21)
 
 Agent thực hiện trong phạm vi [task M8c](tasks/m8c-release-candidate-regression.md); không phải chủ dự án chọn. Chi tiết ở [handoff M8c](m8c-release-candidate.md).
