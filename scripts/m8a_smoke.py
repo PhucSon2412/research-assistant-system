@@ -98,7 +98,8 @@ def setup(root: Path) -> int:
     else:
         raise SystemExit("no free private /24 for the backend network")
     web_ip = str(subnet.network_address + 10)
-    for d in ("pki", "tls.d", "trust", "secrets", "journal", "capture", "evidence"):
+    for d in ("pki", "tls.d", "trust", "secrets", "journal", "capture", "evidence", "ops-config", "ops-state", "staging",
+              "maintenance"):
         (root / d).mkdir()
     ca = make_ca(root / "pki", "ca", "RAS M8a smoke test root")
     site = make_leaf(root / "pki", ca, "site", [HOST])
@@ -110,12 +111,30 @@ def setup(root: Path) -> int:
     shutil.copyfile(ca.cert, root / "trust" / "ca.crt")
     secret = {"edge_token": secrets.token_urlsafe(32), "rate_limit_key": secrets.token_hex(32),
               "smtp_password": secrets.token_urlsafe(24)}
+    # M8c: the deploy compose now carries the M8b services. The smoke supplies synthetic M8b
+    # credentials/config so the same compose renders; the journal replicator points at a target
+    # that does not exist on the internal egress network (a failed destination only grows the
+    # lag, per M8b). Replica/backup/alerts themselves are exercised by scripts/m8b_drill.py.
+    for name in ("journal_replica", "backup_target"):
+        for suffix in ("credentials", "read_credentials"):
+            secret[f"{name}_{suffix}"] = json.dumps({"access_key_id": f"m8a-{name}-{suffix}",
+                                                     "secret_access_key": secrets.token_hex(20)})
     for name, value in secret.items():
         (root / "secrets" / name).write_text(value + "\n", encoding="utf-8")
+    import pyrage
+    (root / "ops-config" / "age-recipients.txt").write_text(
+        str(pyrage.x25519.Identity.generate().to_public()) + "\n", encoding="ascii")
+    ops = json.loads((REPO / "deploy" / "ops.example.json").read_text(encoding="utf-8"))
+    ops["journal_replica"]["endpoint_url"] = "http://offsite-journal.invalid:9000"
+    ops["backup_target"]["endpoint_url"] = "http://offsite-backup.invalid:9000"
+    (root / "ops-config" / "ops.json").write_text(json.dumps(ops, indent=1), encoding="utf-8")
     pw = {k: secrets.token_hex(24) for k in ("pg", "runtime", "recovery", "redis", "minio")}
     ports = {"http": free_port(), "https": free_port()}
     env = {
         "RAS_DEPLOY_PROJECT": project, "RAS_API_IMAGE": f"{project}-api:local", "RAS_WEB_IMAGE": f"{project}-web:local",
+        "RAS_OPS_IMAGE": f"{project}-ops:local", "RAS_OPS_CONFIG_DIR": (root / "ops-config").as_posix(),
+        "RAS_OPS_STATE_DIR": (root / "ops-state").as_posix(), "RAS_OPS_STAGING_DIR": (root / "staging").as_posix(),
+        "RAS_MAINTENANCE_DIR": (root / "maintenance").as_posix(),
         "RAS_PUBLIC_HOST": HOST, "RAS_EDGE_BIND": "127.0.0.1", "RAS_EDGE_HTTP_PORT": str(ports["http"]),
         "RAS_EDGE_HTTPS_PORT": str(ports["https"]), "RAS_HSTS_MAX_AGE": "300",
         "RAS_CADDY_TLS_DIR": (root / "tls.d").as_posix(), "RAS_BACKEND_SUBNET": str(subnet),
@@ -143,7 +162,7 @@ def setup(root: Path) -> int:
         "networks": {"egress": {"internal": True}},
         "services": {
             **{name: {"labels": label} for name in ("db", "redis", "minio", "migrate", "provision", "recovery-init",
-                                                   "worker", "beat", "web")},
+                                                   "worker", "beat", "web", "journal-replicator")},
             "edge": {"labels": label, "networks": {"public": {"aliases": [HOST]}, "edge": {}}},
             "api": {"labels": label, "environment": limits},
             "smtp": {"image": "python:3.12-alpine", "labels": label,
@@ -625,7 +644,7 @@ def cleanup(root: Path, c: dict) -> int:
         if not users <= set(ids):
             raise SystemExit("volume has a foreign consumer; refusing cleanup")
     code = subprocess.call(compose_cmd(root, c, "down", "-v", "--remove-orphans"), cwd=REPO, env=clean_env())
-    for tag in (f"{c['project']}-api:local", f"{c['project']}-web:local"):
+    for tag in (f"{c['project']}-api:local", f"{c['project']}-web:local", f"{c['project']}-ops:local"):
         subprocess.call(["docker", "image", "rm", tag], env=clean_env())
     return code
 

@@ -2,6 +2,8 @@
 
 **Snapshot: 2026-10-20, Asia/Saigon.** Dành cho model tiếp quản, dù chạy trong ChatGPT/Codex hay Claude. Tài liệu không giả định tên model, plugin, bộ nhớ hoặc tool namespace của phiên cũ. Trạng thái dưới đây đã được kiểm lúc bàn giao; khi làm tiếp phải đối chiếu Git/PR mới nhất. Chỉ dẫn mới của chủ dự án có ưu tiên hơn snapshot này.
 
+**Cập nhật sau merge PR #67 (2026-10-20):** `origin/main = e0dcdb472506a49691edffdbee6e4071a3f17d5f` (M8b, tree khớp `68351dc`, CI pass). Đã giao [M8c — hồi quy tổng bản ứng viên](tasks/m8c-release-candidate-regression.md), mới giao. Việc kế tiếp của orchestrator: review PR M8c; khi chủ dự án cấp hạ tầng/người vận hành thì viết task cutover thật.
+
 **Cập nhật sau merge PR #66 (2026-10-20):** `origin/main = 0de10f4c7d119bd0190a673a52cc99b0e98ca99f`, parent `3b59a1d` + `5ca3e4c`, tree khớp; CI run `39379651177` trên head pass ba job. Đã giao [M8b](tasks/m8b-pilot-operations.md), mới giao/chưa triển khai. Bảng mục 3 và các bước “ngay khi tiếp quản” bên dưới là snapshot trước merge; việc kế tiếp của orchestrator là review PR M8b khi agent báo cáo.
 
 ## 1. Vai trò và cách cộng tác

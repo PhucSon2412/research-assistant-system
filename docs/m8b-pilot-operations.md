@@ -312,4 +312,4 @@ và `C:\Users\ADMIN\AppData\Local\Temp\ras-m8b-fix67\` (diễn tập, test, coun
 6. **Domain** + DNS cho `RAS_PUBLIC_HOST` (ACME) hoặc certificate.
 7. **Giờ cửa sổ bảo trì** hằng ngày (đo được ở diễn tập: xem số đo) và lịch diễn tập tháng.
 8. **Probe/dead-man ngoài host** (dịch vụ ngoài kiểm HTTPS và nhận heartbeat), vì host chết không tự alert được.
-9. Mirror image (API/web/ops, MinIO digest, Caddy, PostgreSQL, Redis) vào registry người vận hành kiểm soát (như M8a).
+9. Mirror image (API/web/ops, MinIO digest, Caddy, PostgreSQL, Redis) vào registry người vận hành kiểm soát (như M8a). Từ M8c cả bốn image hạ tầng pin digest trong `deploy/compose.yaml` và bản ứng viên là digest rc2: xem [M8c](m8c-release-candidate.md#1-bản-ứng-viên).

@@ -1,5 +1,19 @@
 # Nhật ký quyết định
 
+## Triển khai M8c (2026-10-21)
+
+Agent thực hiện trong phạm vi [task M8c](tasks/m8c-release-candidate-regression.md); không phải chủ dự án chọn. Chi tiết ở [handoff M8c](m8c-release-candidate.md).
+
+- **Pin digest mọi image hạ tầng của deploy** (Caddy, PostgreSQL/pgvector, Redis, cùng MinIO đã pin ở PR #66) theo đúng digest đã qua hồi quy, vì tag `pgvector/pgvector:pg16` đã dời sang PostgreSQL 16.15 chưa kiểm. Checker deploy buộc mọi service được kéo pin digest. Nâng PostgreSQL/Redis/Caddy là quyết định riêng: pin digest mới rồi chạy lại hồi quy. Dev compose giữ nguyên.
+- **Bản ứng viên là digest image (rc2), không phải source build lại**: dependency Python dùng khoảng phiên bản và base theo tag. Cutover nạp đúng digest đã nghiệm thu.
+- **CLI evaluation tắt auth rate limiter trong môi trường in-process của nó** (development, delivery disabled, như dev compose); không đổi limiter/route/Settings production.
+
+## Giao M8c sau merge PR #67 (2026-10-20)
+
+Fetch xác minh `origin/main = e0dcdb472506a49691edffdbee6e4071a3f17d5f`, parent `0de10f4` + head review `68351dc`, tree khớp; CI `39431941809` pass. Source **0052**.
+
+Theo ủy quyền hoàn thành MVP, **orchestrator chọn** chạy [M8c](tasks/m8c-release-candidate-regression.md) trước cutover: một bản ứng viên đóng băng, chạy lại full inventory API + năm restore drill + smoke M8a + diễn tập M8b + web + CLI evaluation trên cùng digest, thay vì cộng chứng cứ từ các source khác nhau. Không thêm tính năng; P3 của PR #67 (nạp replica tại chỗ, upload multipart) để sau nhóm thử trừ khi hồi quy lộ lỗi liên quan. Cutover thật và D vẫn chờ thông tin/ủy quyền của chủ dự án.
+
 ## Quyết định triển khai M8b (2026-10-20)
 
 Agent chọn trong phạm vi các lựa chọn orchestrator đã chốt cho [M8b](tasks/m8b-pilot-operations.md); không phải chủ dự án chọn nhà cung cấp/host/người trực. Chi tiết, runbook và kết quả ở [handoff M8b](m8b-pilot-operations.md).

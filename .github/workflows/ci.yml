@@ -117,4 +117,4 @@ jobs:
           docker run --rm --network none -e RAS_PUBLIC_HOST=ras.example.org -e RAS_HSTS_MAX_AGE=86400 \
             -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" -v "$PWD/deploy/caddy/tls.d:/etc/caddy/tls.d:ro" \
             -v "$RUNNER_TEMP/edge/edge_token:/run/secrets/edge_token:ro" -v "$RUNNER_TEMP/edge:/etc/caddy/maintenance:ro" \
-            caddy:2.10.2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+            caddy@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile

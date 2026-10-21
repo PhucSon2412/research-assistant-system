@@ -2,6 +2,12 @@
 
 **Model tiếp quản orchestrator:** bắt đầu từ [handover chung cho ChatGPT/Codex và Claude](orchestrator-handover.md), sau đó [AGENTS.md](../AGENTS.md), [CLAUDE.md](../CLAUDE.md) và kế hoạch MVP. Snapshot 2026-10-20 giữ trạng thái PR #66 cùng việc chưa commit; phải đối chiếu Git/PR khi tiếp quản, không giả PR đã merge hoặc các mốc pending cũ còn hiện hành.
 
+**M8c trên nhánh `chore/m8c-release-candidate`, 2026-10-21 (chờ review, chưa merge):** [handoff bản ứng viên + điều kiện/runbook cutover](m8c-release-candidate.md) · [inventory](m8c-test-inventory.json) · [`scripts/m8c_inventory.py`](../scripts/m8c_inventory.py). Image rc2 đóng băng; full inventory 5.579/5.579 một lượt, năm drill C4, smoke M8a, diễn tập M8b, web, CLI evaluation; sửa pin digest hạ tầng và CLI evaluation. Chưa cutover.
+
+**Sau merge PR #67 (`e0dcdb4`, 2026-10-20):** M8b vào main, chưa cutover. Tiếp [M8c — hồi quy tổng bản ứng viên phát hành](tasks/m8c-release-candidate-regression.md), mới giao/chưa triển khai.
+
+**Review lại PR #67 tại `68351dc`, 2026-10-20:** [hai P2 đã sửa, không thấy điểm chặn merge mới trong scope M8b](reviews/pr67-m8b-pilot-operations.md#review-lại-tại-68351dc--hai-p2-đã-sửa). Chưa merge; chờ CI API trên head; chưa cutover.
+
 **Sửa review PR #67, 2026-10-20 (chờ review lại):** [mục sửa trong handoff M8b](m8b-pilot-operations.md#sửa-review-pr-67) · [inventory](m8b-test-inventory.json). Drill chỉ dọn đồ của chính nó; alert gửi/dedupe theo từng người nhận; chưa merge.
 
 **Review PR #67 tại `41d07d4`, 2026-10-20:** [hai P2 — drill xóa journal không do nó tạo, alert dừng ở người nhận lỗi đầu](reviews/pr67-m8b-pilot-operations.md); [prompt sửa cùng PR](tasks/fix-pr67-drill-teardown-alert-recipients.md). Chưa merge/cutover.

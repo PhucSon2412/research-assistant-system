@@ -219,8 +219,13 @@ def check(cfg: dict, env: dict, failures: list[str], notes: list[str], settings_
     need({s["source"] for s in services["web"].get("secrets", [])} == {"edge_token"}, "web secret")
     need(services["web"]["environment"].get("WEB_EDGE_TOKEN_FILE") == "/run/secrets/edge_token", "web token file")
     # PR #66: storage image pinned by digest; its healthcheck was verified in that image.
+    # M8c: the same for every image the deployment pulls (edge, db, redis, minio), so a
+    # moved registry tag cannot install bytes the release regression never ran.
+    for name, svc in sorted(services.items()):
+        if svc.get("pull_policy") != "never":
+            need(re.fullmatch(r"[^\s@]+@sha256:[0-9a-f]{64}", svc["image"]) is not None,
+                 f"{name} image must be pinned by digest")
     minio = services["minio"]
-    need(re.fullmatch(r"[^\s@]+@sha256:[0-9a-f]{64}", minio["image"]) is not None, "minio image must be pinned by digest")
     need(minio.get("healthcheck", {}).get("test") == ["CMD", "mc", "ready", "local"], "minio readiness healthcheck")
     need(services["recovery-init"]["depends_on"].get("minio", {}).get("condition") == "service_healthy"
          and services["api"]["depends_on"].get("minio", {}).get("condition") == "service_healthy",

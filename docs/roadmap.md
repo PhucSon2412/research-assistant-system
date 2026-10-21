@@ -1,5 +1,7 @@
 # Roadmap đề xuất
 
+**Sau merge PR #67, 2026-10-20:** M8b đã merge `e0dcdb4`, chưa cutover. Giao [M8c](tasks/m8c-release-candidate-regression.md) (hồi quy tổng bản ứng viên trên một bộ image), mới giao; tiếp theo là cutover thật khi có hạ tầng/operator, song song D (phiếu human, live mới, policy/paper thật).
+
 **Sau merge PR #66, 2026-10-20:** M8a đã merge `0de10f4`, chưa cutover. Giao [M8b](tasks/m8b-pilot-operations.md) (journal replica ngoài máy, backup lịch/mã hóa/retention, alert, diễn tập restore), mới giao; sau đó cutover thật khi có hạ tầng/operator. D vẫn chờ phiếu human và điều kiện live riêng.
 
 **M8a trên nhánh review, 2026-10-19:** phần đầu E đã triển khai và kiểm cô lập ([handoff](m8a-pilot-entry-hardening.md)); chưa merge/cutover. Tiếp M8b (journal độc lập, backup/retention/alert, nghiệm thu vận hành) sau review; D vẫn chờ phiếu human.

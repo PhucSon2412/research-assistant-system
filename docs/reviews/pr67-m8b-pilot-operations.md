@@ -1,5 +1,44 @@
 # Review PR #67 — M8b vận hành nhóm thử
 
+## Review lại tại `68351dc` — hai P2 đã sửa
+
+**Kết luận (2026-10-20): hai P2 đã sửa, không thấy điểm chặn merge mới trong scope M8b đã kiểm.** PR vẫn OPEN, chưa merge; source **0052**, chưa cutover. Mục "Kết luận tại `41d07d4`" bên dưới là lịch sử trước khi sửa.
+
+**Bản sửa:**
+
+- **P2-1 (drill):** `drill_preflight` chạy **trước** lock và mọi side effect, chỉ đọc. Nó từ chối khi:
+  - đã có journal hoặc file torn;
+  - cờ bảo trì đang bật;
+  - staging không rỗng;
+  - `--record-state-dir` trùng thư mục của chính drill;
+  - project có container/volume.
+
+  Từ chối thì không teardown. Teardown chỉ gỡ cờ `restore` do lượt này đặt.
+- **P2-2 (alert):** gửi tới từng người nhận; dedupe/nhắc lại/`RESOLVED` theo hash từng người nhận; người lỗi giữ state cũ để thử lại; có lỗi thì exit 5.
+
+**Kiểm chứng của reviewer** (Python Conda `ras`, basetemp ngoài repo; không Docker/MinIO/SMTP thật):
+
+- Hai repro ban đầu: trên `41d07d4` fail, nay **pass**. Ca mô tả P3 vẫn pass.
+- Test M8b `replica/artifacts/alerts/ops_host`: **79/79 pass** (67 cũ + 12 regression mới).
+- 4 ca độc lập thêm, **4/4 pass**:
+  - B lỗi, A không bị gửi lặp, B được thử lại tới khi nhận;
+  - thư mục journal dùng chung chỉ có file torn → từ chối, file giữ nguyên, không `down`;
+  - staging dùng chung không rỗng → từ chối, không teardown;
+  - cờ bảo trì do bên khác đặt trong lúc drill → được giữ.
+- Inventory: 51/51 hash file thay đổi khớp `68351dc`. Source trước/sau review lại trùng.
+- CI:
+  - run `39422883314` trên `41d07d4`: **success** cả ba job;
+  - run `39431941809` trên `68351dc`: web và deploy contract **success**, job API **đang chạy** lúc ghi. Chưa suy ra xanh; nên chờ job này trước khi merge.
+
+**Giới hạn còn lại (P3, không chặn):**
+
+- Thư mục bảo trì dùng chung với bản thật mà lúc preflight chưa có cờ thì drill vẫn chạy. Edge thật trả 503 trong thời gian drill (khoảng 1 phút), rồi teardown gỡ cờ.
+- Chưa có công cụ nạp chuỗi replica làm journal local tại chỗ. Runbook đã ghi đánh đổi "restore từ backup làm mất thay đổi DB sau backup".
+- Upload một PUT ≤ 5 GB, đã ghi giới hạn.
+- Failure SMTP lịch sử giữ chưa rõ nguyên nhân.
+
+**Reviewer không chạy lại:** drill/disaster/Chrome trên Docker, selection, countercheck 16. Kết quả 117/117, 16/16 và 42/42 là của agent.
+
 **Kết luận tại `41d07d4` (2026-10-20): có hai P2 cần sửa cùng PR trước merge.** Phần lõi (đường ghi journal không đổi, replica chỉ-thêm có kiểm chain/fork, chọn chuỗi khi restore, mã hóa `age` trước khi rời host, retention giữ bản tốt, cửa sổ bảo trì luôn mở lại writer, không đọc `.env`) đúng hướng task và đã được kiểm tốt trên môi trường cô lập. Hai lỗi nằm ở công cụ vận hành: lượt diễn tập xóa journal không do nó tạo, và một người nhận alert lỗi làm im lặng các người nhận khác. [Prompt sửa hẹp](../tasks/fix-pr67-drill-teardown-alert-recipients.md).
 
 PR OPEN, chưa merge; source **0052**, không migration. Chưa cutover; đích S3/SMTP/host thật chưa có.
