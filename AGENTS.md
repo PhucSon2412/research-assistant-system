@@ -12,6 +12,18 @@
 
 ## Trạng thái triển khai và lịch sử
 
+**M10 — frontend cho demo CV (2026-10-22, chờ review, chưa merge):** nhánh `feat/m10-frontend-ui`, base `0dd5a9c`,
+source **0052**. Chỉ trình bày `web/app`: token/CSS Module, shell responsive, auth, library/upload, search/RAG/panel
+nguồn và Admin. `web/lib`, route/proxy/API/deploy/dependency giữ nguyên. Web 79/79 + typecheck/build; HTTPS 68 HTTP/
+16 Chrome; 54 ảnh 1440/390 + 18 kiểm riêng tới 360 px, provider giả. Demo chỉ recreate web `ras-pilot-web:ui1`
+(`36ed5b03…`), API rc2 (`c0936a81…`) và mọi service khác giữ nguyên; readiness/HTTPS 200. Lệnh `web-image` lưu state
+cho `rebind`/`provider`, rollback về `ras-pilot-web:rc2`. [Handoff](docs/m10-frontend-ui.md) ·
+[inventory](docs/m10-test-inventory.json) · [10 ảnh tổng hợp](docs/screenshots/README.md). Không merge, không live mới.
+
+**Sau merge PR #70 (2026-10-22):** `origin/main = 0dd5a9c07ac0561c55b97da52555b2777d291817`. Demo `ras-pilot` chạy search/RAG có citation trên 12 paper giấy phép mở do chủ dự án upload. Giao [M10 — làm mới giao diện web](docs/tasks/m10-frontend-ui-redesign.md) cho frontend agent (Codex), **mới giao**: chỉ trình bày, không đổi API/proxy/quyền, không tài nguyên mạng ngoài, smoke HTTPS cô lập phải pass, web image mới cho demo, API rc2 giữ nguyên. Skill Codex `ras-frontend` (ngoài repo, `~/.codex/skills`) tóm tắt cùng ràng buộc.
+
+**Review lại PR #70 tại `e73ec96` (2026-10-22): P2 pypdf đã sửa, không thấy điểm chặn merge mới.** [Report](docs/reviews/pr70-m7c-live-quality-verification.md#review-lại-tại-e73ec96-code-sửa-be44a03--p2-đã-sửa): CI `39724086744`/`39730087653` success; constraints `api/constraints-rc2.txt` (pypdf 6.21.1) cho CI và Conda; dataset chỉ đổi 15 dòng phiên bản parser; reviewer chạy validate 80/16/15 OK, 2 test từng fail pass, `human-validate` sạch (0 phiếu thật). Demo output 1024, provider ba route. Ledger live đã tới 80 %; hai nhãn M4c "cần sửa" là dao động judge. Giữ docs reviewer chưa commit cho PR kế tiếp.
+
 **Sửa review PR #70 (2026-10-22, chờ review lại, chưa merge):** dependency một nguồn `api/constraints-rc2.txt` (pip freeze rc2, pypdf 6.21.1) cho CI và Conda `ras` (đã cài lại, 58/59 pin khớp, `uvloop` không có trên Windows). Nhãn M4c chỉ đổi chuỗi parser (text/segment 3 PDF trùng 6.19/6.21; 15 dòng `parser`); gold M7c không đổi; bundle M7b dựng lại, `human-validate` sạch, 0 verdict thật. AI judge chấm lại phần stale (88 record nhãn + 6 M7a) trong trần: ledger dừng đúng 320/400 call, $2,512 cam kết; nhãn mới 71/73 adequate, đồng thuận với lượt cũ 78/80. Demo: output generation 1024 + trần request $0,06 qua env/overlay ngoài repo (`m9_lan_demo.py provider --max-output-tokens`), image rc2/`deploy/` không đổi. Cài Python từ nay: `pip install -c api/constraints-rc2.txt -e ./api[dev]`. [Handoff](docs/m7c-live-quality-verification.md#sửa-review-pr-70-2026-10-22).
 
 **Review PR #70 (M7c) tại `1d740e2` (2026-10-22): có P2 chặn merge.** CI GitHub `39605520554` job API fail 2/1.283 (`test_evaluation.py`): image rc2/CI dùng **pypdf 6.21.1**, Conda `ras` và nhãn evaluation dùng **6.19.0** (`pyproject` chỉ ghi khoảng). [Report](docs/reviews/pr70-m7c-live-quality-verification.md) · [prompt sửa](docs/tasks/fix-pr70-parser-dependency-drift.md): constraints theo `pip freeze` rc2 cho CI và Conda; xác lập lại span/binding trên 6.21.1; dựng lại bundle M7b; chạy lại phần AI judge bị stale trong trần còn lại; demo nâng output lên 1024. Không lộ key (6 chuỗi `sk-or-…` là giá trị test giả). Demo khỏe, provider bật ba route. Giữ docs reviewer chưa commit cho cùng PR sửa.

@@ -5,6 +5,9 @@ import { useState, type FormEvent } from "react";
 import { api, describeError } from "../../lib/api";
 import { ErrorText } from "../components/session";
 
+
+import { AuthFrame } from "../components/ui";
+
 export default function ForgotPasswordPage() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +25,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main style={{ maxWidth: 420 }}>
+    <AuthFrame>
       <h1>Quên mật khẩu</h1>
       {sent ? (
         // Same message whether or not the account exists.
@@ -31,11 +34,11 @@ export default function ForgotPasswordPage() {
           lại mật khẩu dùng một lần và có thời hạn.
         </p>
       ) : (
-        <form onSubmit={submit} style={{ display: "grid", gap: "0.75rem" }}>
+        <form onSubmit={submit} className="form-stack">
           <label>
             Email
             <br />
-            <input name="email" type="email" required style={{ width: "100%" }} />
+            <input name="email" type="email" required className="full-width" />
           </label>
           <button type="submit">Gửi liên kết</button>
         </form>
@@ -44,6 +47,6 @@ export default function ForgotPasswordPage() {
       <p>
         <Link href="/login">Quay lại đăng nhập</Link>
       </p>
-    </main>
+    </AuthFrame>
   );
 }

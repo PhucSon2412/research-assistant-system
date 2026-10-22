@@ -63,11 +63,12 @@ export function Upload({ onComplete }: { onComplete: () => void }) {
   }
 
   return (
-    <section aria-label="Tải paper riêng" style={{ border: "1px solid #ccc", padding: "1rem", margin: "1rem 0" }}>
+    <section aria-label="Tải paper riêng" className="upload-card">
+      <span className="upload-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V3m-5 5 5-5 5 5M4 16v5h16v-5" /></svg></span>
       <h2>Tải paper vào kho riêng</h2>
       <p>{notice?.text ?? "Đang tải thông báo xử lý ngoài…"}</p>
       <form onSubmit={submit}>
-        <p><input type="file" accept=".pdf,.md,.markdown" disabled={busy} onChange={(e) => {
+        <p><label htmlFor="upload-file">Chọn tài liệu · PDF hoặc Markdown</label><input id="upload-file" type="file" accept=".pdf,.md,.markdown" disabled={busy} onChange={(e) => {
           setFile(e.target.files?.[0] ?? null);
           setConfirmed(false);
         }} /></p>
@@ -78,7 +79,7 @@ export function Upload({ onComplete }: { onComplete: () => void }) {
         </button></p>
       </form>
       {error && <p role="alert">{error}</p>}
-      {result && <p>Đã nhận file. <a href={`/items/${result}`}>Xem item</a>.</p>}
+      {result && <p role="status">Đã nhận file. <a href={`/items/${result}`}>Xem item</a>.</p>}
     </section>
   );
 }

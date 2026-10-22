@@ -83,7 +83,7 @@ export function ReviewRequests({ itemId, files, versions }: { itemId: string; fi
       </p>
       <ErrorText message={error} />
       {done && <p role="status">{done}</p>}
-      {requests && requests.length > 0 && <ul>{requests.map((r) => <li key={r.id} style={{ marginBottom: "0.6rem" }}>
+      {requests && requests.length > 0 && <ul>{requests.map((r) => <li key={r.id} className="spaced">
         <strong>{STATUS_TEXT[r.status]}</strong> · gửi {fmt(r.submitted_at)}
         {r.closed_at && ` · đóng ${fmt(r.closed_at)}`}
         {closeReasonText(r.close_reason_code, r.status) && ` · ${closeReasonText(r.close_reason_code, r.status)}`}
@@ -94,31 +94,31 @@ export function ReviewRequests({ itemId, files, versions }: { itemId: string; fi
         {r.status === "open" && <> <button type="button" onClick={() => withdraw(r.id)}>Rút yêu cầu</button></>}
       </li>)}</ul>}
       {files.length === 0 ? <p>Item chưa có file gốc để gửi duyệt.</p> : (
-        <form onSubmit={submit} style={{ display: "grid", gap: "0.5rem", maxWidth: "40rem" }}>
+        <form onSubmit={submit} className="form-panel">
           <label>Version/file gửi duyệt
-            <br /><select value={fileId} onChange={(e) => setFileId(e.target.value)} required style={{ width: "100%" }}>
+            <br /><select value={fileId} onChange={(e) => setFileId(e.target.value)} required className="full-width">
               <option value="">— Chọn đúng version/file —</option>
               {files.map((f) => <option key={f.id} value={f.id}>{fileChoiceLabel(f, versions)}</option>)}
             </select>
           </label>
           <label>Nguồn của file (bạn lấy file từ đâu)
             <br /><textarea value={source} onChange={(e) => setSource(e.target.value)} required maxLength={2000}
-              rows={2} style={{ width: "100%" }} />
+              rows={2} className="full-width" />
           </label>
           <label>URL nguồn (không bắt buộc)
             <br /><input type="url" value={sourceUrl} onChange={(e) => setSourceUrl(e.target.value)} maxLength={2048}
-              style={{ width: "100%" }} />
+              className="full-width" />
           </label>
           <label>Quyền phân phối bạn biết (giấy phép, sự cho phép…)
             <br /><textarea value={rights} onChange={(e) => setRights(e.target.value)} required maxLength={2000}
-              rows={2} style={{ width: "100%" }} />
+              rows={2} className="full-width" />
           </label>
           <label>URL giấy phép/bằng chứng (không bắt buộc)
             <br /><input type="url" value={licenseUrl} onChange={(e) => setLicenseUrl(e.target.value)} maxLength={2048}
-              style={{ width: "100%" }} />
+              className="full-width" />
           </label>
           <small>Thông tin trên là lời khai của bạn; Admin sẽ tự kiểm tra, việc bạn upload file không chứng minh quyền phân phối.</small>
-          {notice && <p style={{ background: "#f4f4f4", padding: "0.5rem" }}>{notice.text}</p>}
+          {notice && <p className="notice">{notice.text}</p>}
           <label>
             <input type="checkbox" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} />
             {" "}Tôi hiểu rằng gửi yêu cầu sẽ cấp cho Admin quyền xem tạm đúng version/file đã chọn để duyệt.

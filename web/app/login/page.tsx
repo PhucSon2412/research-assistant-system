@@ -6,6 +6,9 @@ import { useState, type FormEvent } from "react";
 import { api, describeError } from "../../lib/api";
 import { ErrorText } from "../components/session";
 
+
+import { AuthFrame } from "../components/ui";
+
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -27,18 +30,18 @@ export default function LoginPage() {
   }
 
   return (
-    <main style={{ maxWidth: 420 }}>
+    <AuthFrame>
       <h1>Đăng nhập</h1>
-      <form onSubmit={submit} style={{ display: "grid", gap: "0.75rem" }}>
+      <form onSubmit={submit} className="form-stack">
         <label>
           Email
           <br />
-          <input name="email" type="email" autoComplete="username" required style={{ width: "100%" }} />
+          <input name="email" type="email" autoComplete="username" required className="full-width" />
         </label>
         <label>
           Mật khẩu
           <br />
-          <input name="password" type="password" autoComplete="current-password" required style={{ width: "100%" }} />
+          <input name="password" type="password" autoComplete="current-password" required className="full-width" />
         </label>
         <button type="submit" disabled={busy}>
           Đăng nhập
@@ -48,7 +51,7 @@ export default function LoginPage() {
       <p>
         <Link href="/forgot-password">Quên mật khẩu?</Link>
       </p>
-      <p style={{ color: "#555" }}>Tài khoản chỉ được tạo qua lời mời của Admin.</p>
-    </main>
+      <p className="text-muted">Tài khoản chỉ được tạo qua lời mời của Admin.</p>
+    </AuthFrame>
   );
 }

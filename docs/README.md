@@ -1,5 +1,9 @@
 # Tài liệu dự án
 
+**M10 — frontend cho demo CV (2026-10-22):** [handoff UI, kiểm chứng và rollback web image](m10-frontend-ui.md) ·
+[ảnh tổng hợp dùng cho CV](screenshots/README.md) · [task](tasks/m10-frontend-ui-redesign.md).
+Base PR #70 đã merge `0dd5a9c`, source **0052**; phần lịch sử dưới đây giữ theo từng lượt.
+
 **Model tiếp quản orchestrator:** bắt đầu từ [handover chung cho ChatGPT/Codex và Claude](orchestrator-handover.md), sau đó [AGENTS.md](../AGENTS.md), [CLAUDE.md](../CLAUDE.md) và kế hoạch MVP. Snapshot 2026-10-20 giữ trạng thái PR #66 cùng việc chưa commit; phải đối chiếu Git/PR khi tiếp quản, không giả PR đã merge hoặc các mốc pending cũ còn hiện hành.
 
 **M7c trên nhánh `feat/m7c-live-quality-verification`, 2026-10-21 (chờ review, chưa merge):** [handoff live + paper giấy phép mở + AI judge + `pricing_verified` theo route](m7c-live-quality-verification.md) · [inventory](m7c-test-inventory.json) · [report AI judge](../evaluation/ai-review/report.md) · [bộ paper](../evaluation/m7c-papers/README.md). Demo `ras-pilot` đã bật provider; AI judge không thay người đọc.

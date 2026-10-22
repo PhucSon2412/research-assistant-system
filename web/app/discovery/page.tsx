@@ -6,6 +6,8 @@ import { api, describeError } from "../../lib/api";
 import { RELATION_NOTE } from "../../lib/citations";
 import { ErrorText, Shell, useSession } from "../components/session";
 
+import { PageHeading, EmptyState, Badge } from "../components/ui";
+
 type Paper = {
   id: string; arxiv_id: string; title: string; authors: string | null;
   original_url: string; topics: string[]; latest_version: string | null;
@@ -15,6 +17,7 @@ type Paper = {
 type Page = { items: Paper[]; total: number; limit: number; offset: number };
 type Source = { topic: string; last_success_at: string | null; state: string; last_error: string | null };
 type Citing = { items: { id: string; title: string | null; linked_references: number }[]; total: number };
+
 
 const LIMIT = 20;
 export default function DiscoveryPage() {
@@ -49,16 +52,17 @@ export default function DiscoveryPage() {
     }
   }, [user]);
   return <Shell user={user}>
-    <h1>Khám phá arXiv</h1>
+    <PageHeading eyebrow="Khám phá nghiên cứu" title="Khám phá arXiv" />
     <p>Chỉ có metadata và link tới trang gốc. Các paper này không có toàn văn trong hệ thống và không được dùng làm bằng chứng RAG.</p>
     <p>{RELATION_NOTE} Nút “Paper của tôi trích dẫn bài này” chỉ tìm trong paper riêng của bạn.</p>
     <label>Chủ đề{" "}<select value={topic} onChange={(event) => { setTopic(event.target.value); setOffset(0); }}>
       {["", ...topics].map((value) => <option key={value} value={value}>{value || "Tất cả"}</option>)}
     </select></label>
     <ErrorText message={error} />
+    {page && page.items.length === 0 && <EmptyState title="Chưa có paper trong phạm vi này" />}
     {page && <><p>{page.total} paper</p><ul>
-      {page.items.map((paper) => <li key={paper.id} style={{ marginBottom: "1.2rem" }}>
-        <strong>{paper.title}</strong> <span>Chỉ có metadata</span><br />
+      {page.items.map((paper) => <li key={paper.id} className="spaced">
+        <strong>{paper.title}</strong> <Badge>Chỉ có metadata</Badge><br />
         {paper.authors && <span>{paper.authors}<br /></span>}
         <span>Chủ đề: {paper.topics.join(", ") || "—"} · arXiv: {paper.arxiv_id}{paper.latest_version ?? ""}</span><br />
         <span>Công bố: {paper.source_published_at ? new Date(paper.source_published_at).toLocaleDateString("vi-VN") : "không rõ"} · Cập nhật nguồn: {paper.source_updated_at ? new Date(paper.source_updated_at).toLocaleDateString("vi-VN") : "không rõ"} · Mới phát hiện: {new Date(paper.first_discovered_at).toLocaleDateString("vi-VN")}</span><br />

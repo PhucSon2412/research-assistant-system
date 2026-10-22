@@ -1,5 +1,23 @@
 # Review PR #70 — M7c live, paper thật, AI judge
 
+## Review lại tại `e73ec96` (code sửa `be44a03`) — P2 đã sửa
+
+**Kết luận (2026-10-22): không thấy điểm chặn merge mới.**
+
+- **CI:** run `39724086744` (`be44a03`) và `39730087653` (`e73ec96`) **success** cả ba job.
+- **Dependency:** CI cài bằng `pip install -c api/constraints-rc2.txt` (`pypdf==6.21.1`). Conda `ras` hiện là 6.21.1.
+- **Dataset:** `evaluation/rag/questions.json` chỉ đổi đúng 15 dòng phiên bản parser `6.19.0 → 6.21.1`, 0 dòng nội dung nhãn đổi.
+- **Reviewer chạy:**
+  - `python -m app.evaluation validate`: 80 câu/16 holdout/15 paper OK;
+  - hai test từng fail trên CI: 2/2 pass;
+  - `human-validate` cả hai phiếu: exit 0, 80 + 4 dòng pending, 0 dòng đã duyệt (M7b vẫn 0 phiếu thật).
+- **Demo `ras-pilot`:** healthy; `RAS_GENERATION__MAX_OUTPUT_TOKENS=1024`; provider ba route bật; edge trên IP LAN hiện tại.
+- **Ghi nhận:**
+  - Ledger live dừng ở mốc 80 % (320/400); chấm thêm cần trần mới.
+  - Danh sách hai nhãn M4c bị AI judge đánh "cần sửa" đổi giữa hai lượt (CMP-09/RCI-09 → PP-05/RCI-09). Coi là dao động của judge, giữ nguyên nhãn.
+
+Phần dưới là review lần đầu tại `1d740e2`, giữ làm lịch sử.
+
 **Kết luận tại `1d740e2` (2026-10-22): có một P2 chặn merge.**
 
 - CI GitHub run `39605520554`: job API **fail**, 2 failed / 1.281 passed. Job deploy contract và web pass.

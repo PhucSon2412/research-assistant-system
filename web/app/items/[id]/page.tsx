@@ -11,6 +11,7 @@ import { NO_DOWNLOADABLE_FILE, commonItemNote, contentLabel, originalDownloadHre
 import { sourceKindLabel } from "../../../lib/search";
 import { ReviewRequests } from "../../components/review-request";
 import { ErrorText, Shell, useSession } from "../../components/session";
+import { Badge, Icon } from "../../components/ui";
 import type { Item } from "../../page";
 import { DeletePrivate } from "../../components/private-delete";
 import { deletionStatus, type DeletionReceipt } from "../../../lib/private-delete";
@@ -41,6 +42,8 @@ type RagAnswer = { status: "answered" | "insufficient_evidence"; coverage: strin
 type Collection = { id: string; name: string };
 
 const stateText: Record<string, string> = {
+  ready: "Đã lập chỉ mục",
+  needs_review: "Cần kiểm tra nội dung trích xuất",
   received: "Đã nhận file, chờ xử lý",
   validating: "Đang kiểm tra file",
   stored: "Đã xác minh file gốc",
@@ -151,34 +154,79 @@ export default function ItemPage() {
 
   return (
     <Shell user={user}>
+      <div className="item-layout">
       <p>
         <Link href="/">← Thư viện</Link>
       </p>
       <ErrorText message={error} />
+      {!item && <h1>Chi tiết paper</h1>}
       {deletion && <p role="status">{deletionStatus(deletion)}</p>}
-      {ownPrivate && !deletion && <DeletePrivate itemId={id} onDeleted={(receipt) => {
-        setDeletion(receipt); setItem(null); setRag(null); setReferences(null); setError(null);
-      }} />}
       {item && (
         <>
+          <p className="text-small">TÀI LIỆU / CHI TIẾT PAPER</p>
           <h1>{item.title ?? "(chưa có tiêu đề)"}</h1>
           <p>
-            Kho: {item.visibility === "common" ? "chung" : "riêng của bạn"} · Nội dung: {contentLabel(item)}
+            Kho: {item.visibility === "common" ? "chung" : "riêng của bạn"} · Nội dung: <Badge tone={item.fulltext_search_available ? "success" : "neutral"}>{contentLabel(item)}</Badge>
           </p>
           {item.visibility === "common" && (
-            <p style={{ background: "#f3f3f3", padding: "0.5rem" }}>
+            <p className="notice">
               {commonItemNote(item.files, item.content_status, item.fulltext_search_available, item.rag_available)}</p>
           )}
           {item.fulltext_search_available && (
             <p><Link href={`/search?item_id=${encodeURIComponent(item.id)}`}>Tìm trong paper này</Link></p>
           )}
           {item.can_edit && (
-            <form onSubmit={save} style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-              <input name="title" defaultValue={item.title ?? ""} maxLength={1000} style={{ flex: 1, minWidth: 200 }} />
+            <form onSubmit={save} className="form-row">
+              <label className="sr-only" htmlFor="item-title">Tiêu đề paper</label><input id="item-title" name="title" defaultValue={item.title ?? ""} maxLength={1000} className="full-width" />
               <button type="submit">Lưu tiêu đề</button>
               {saved && <span>Đã lưu.</span>}
             </form>
           )}
+          {/* The API's RAG gate for this item; the server still checks rights (and pricing) on every request. */}
+          {item.rag_available && <section className="rag-panel">
+            <h2><Icon name="quote" />Hỏi đáp có dẫn nguồn</h2>
+            <p>{RAG_NOTICE}</p>
+            <form onSubmit={ask} className="rag-form" aria-busy={asking}>
+              <label>Phạm vi <select value={ragScope} onChange={(e) => { setRagScope(e.target.value); setRag(null); }}>
+                <option value="item">Paper này</option>
+                <option value="all">{RAG_ALL_SCOPE_OPTION}</option>
+                {collections.map((collection) => <option key={collection.id} value={collection.id}>
+                  Collection: {collection.name}</option>)}
+              </select></label>{" "}
+              <label htmlFor="rag-question">Câu hỏi</label>{" "}
+              <input id="rag-question" value={question} onChange={(e) => setQuestion(e.target.value)}
+                required maxLength={1024} className="full-width" />{" "}
+              <select aria-label="Cách tìm bằng chứng" value={mode}
+                onChange={(e) => setMode(e.target.value as "keyword" | "hybrid")}>
+                <option value="keyword">Từ khóa</option><option value="hybrid">Kết hợp</option>
+              </select>{" "}
+              <button type="submit" disabled={asking}>{asking ? "Đang hỏi…" : "Hỏi"}</button>
+            </form>
+            <ErrorText message={ragError} />
+            {rag && <div className="rag-answer" aria-live="polite">
+              <p>Phạm vi đã hỏi: {ragScopeText(rag.scope.kind, rag.scope.kind === "collection"
+                ? collections.find((c) => c.id === rag.scope.collection_id)?.name ?? rag.scope.collection_id : undefined)}.</p>
+              <p>Trạng thái: {rag.status === "answered" ? "Có câu trả lời" : "Chưa đủ bằng chứng"}.
+                {rag.coverage === "partial" && " File chỉ được trích xuất một phần."}</p>
+              {ragReasonText(rag.reason) && <p>{ragReasonText(rag.reason)}</p>}
+              {ragWithheldText(rag.evidence_withheld) && <p><small>{ragWithheldText(rag.evidence_withheld)}</small></p>}
+              <div className="answer-grid"><div className="answer-copy">
+                {rag.claims.map((claim, index) => <p key={index}>{claim.text}{" "}
+                  {claim.citations.map((citation, citationIndex) => <span key={citation.chunk_id}><a href={`#citation-${index}-${citationIndex}`} aria-label={`Bằng chứng ${index + 1}.${citationIndex + 1}`}>[{index + 1}.{citationIndex + 1}]</a>{" "}</span>)}
+                </p>)}
+              </div>{rag.claims.some((claim) => claim.citations.length > 0) && <section className="citation-panel" aria-label="Nguồn trích dẫn"><h3>Nguồn & vị trí bằng chứng</h3><ol>
+                {rag.claims.flatMap((claim, index) => claim.citations.map((citation, citationIndex) => {
+                  const originalHref = sourceOriginalHref(citation.original_url, citation.locator_kind, citation.start_page);
+                  return <li key={`${index}-${citation.chunk_id}`} id={`citation-${index}-${citationIndex}`}>
+                    <Link href={citation.url}>[{index + 1}.{citationIndex + 1}] {citation.title || citation.item_id} · {citation.locator_kind === "pdf" ? `trang ${citation.start_page}` : `dòng ${citation.start_line}`}</Link>
+                    <q>{citation.quote}</q>
+                    <small>{sourceKindLabel(citation.visibility)} · Version {citation.version_id} · File {citation.source_file_id}
+                      {originalHref && <> · <a href={originalHref}>file gốc</a></>}</small>
+                  </li>;
+                }))}
+              </ol></section>}</div>
+            </div>}
+          </section>}
           <h2>Phiên bản</h2>
           <ul>
             {item.versions.map((v) => (
@@ -199,7 +247,7 @@ export default function ItemPage() {
             {j.warnings.length > 0 && ` · cảnh báo: ${j.warnings.map((w) => issueText[w] ?? w).join(", ")}`}
             {j.state === "duplicate" && j.warnings.includes("duplicate_in_private_library") && (() => {
               const notice = duplicateNotice(j.existing_copy);
-              return <p role="note" style={{ background: "#fff7e0", padding: "0.5rem" }}>{notice.text}
+              return <p role="note" className="notice">{notice.text}
                 {notice.href && <>{" "}<Link href={notice.href}>{notice.label}</Link></>}</p>;
             })()}
           </li>)}</ul>
@@ -224,8 +272,8 @@ export default function ItemPage() {
             {references && references.length === 0 && <p>Chưa có tài liệu tham khảo được trích xuất.</p>}
             {references && references.length > 0 && <ol>{references.map((ref) => {
               const link = ref.citation_link;
-              return <li key={ref.id} style={{ marginBottom: "0.8rem" }}>
-                <span style={{ whiteSpace: "pre-wrap" }}>{ref.raw_citation.trim()}</span><br />
+              return <li key={ref.id} className="spaced">
+                <span className="pre-wrap">{ref.raw_citation.trim()}</span><br />
                 <small>{referenceLocator(ref)} · Version {ref.version_id} · File {ref.source_file_id}</small><br />
                 <small>{citationStatusText(link.status)}
                   {link.arxiv_id && ` · arXiv ${link.arxiv_id}`}
@@ -240,50 +288,13 @@ export default function ItemPage() {
               </li>;
             })}</ol>}
           </section>}
-          {/* The API's RAG gate for this item; the server still checks rights (and pricing) on every request. */}
-          {item.rag_available && <section>
-            <h2>Hỏi đáp có dẫn nguồn</h2>
-            <p>{RAG_NOTICE}</p>
-            <form onSubmit={ask}>
-              <label>Phạm vi <select value={ragScope} onChange={(e) => { setRagScope(e.target.value); setRag(null); }}>
-                <option value="item">Paper này</option>
-                <option value="all">{RAG_ALL_SCOPE_OPTION}</option>
-                {collections.map((collection) => <option key={collection.id} value={collection.id}>
-                  Collection: {collection.name}</option>)}
-              </select></label>{" "}
-              <label htmlFor="rag-question">Câu hỏi</label>{" "}
-              <input id="rag-question" value={question} onChange={(e) => setQuestion(e.target.value)}
-                required maxLength={1024} style={{ width: "min(100%, 36rem)" }} />{" "}
-              <select aria-label="Cách tìm bằng chứng" value={mode}
-                onChange={(e) => setMode(e.target.value as "keyword" | "hybrid")}>
-                <option value="keyword">Từ khóa</option><option value="hybrid">Kết hợp</option>
-              </select>{" "}
-              <button type="submit" disabled={asking}>{asking ? "Đang hỏi…" : "Hỏi"}</button>
-            </form>
-            <ErrorText message={ragError} />
-            {rag && <div aria-live="polite">
-              <p>Phạm vi đã hỏi: {ragScopeText(rag.scope.kind, rag.scope.kind === "collection"
-                ? collections.find((c) => c.id === rag.scope.collection_id)?.name ?? rag.scope.collection_id : undefined)}.</p>
-              <p>Trạng thái: {rag.status === "answered" ? "Có câu trả lời" : "Chưa đủ bằng chứng"}.
-                {rag.coverage === "partial" && " File chỉ được trích xuất một phần."}</p>
-              {ragReasonText(rag.reason) && <p>{ragReasonText(rag.reason)}</p>}
-              {ragWithheldText(rag.evidence_withheld) && <p><small>{ragWithheldText(rag.evidence_withheld)}</small></p>}
-              {rag.claims.map((claim, index) => <p key={index}>
-                {claim.text}{" "}
-                {claim.citations.map((citation) => {
-                  const originalHref = sourceOriginalHref(citation.original_url, citation.locator_kind, citation.start_page);
-                  return <span key={citation.chunk_id}>
-                    <Link href={citation.url}>[{citation.title || citation.item_id} · {citation.locator_kind === "pdf" ? `trang ${citation.start_page}` : `dòng ${citation.start_line}`}]</Link>{" "}
-                    <q>{citation.quote}</q>{" "}
-                    <small>{sourceKindLabel(citation.visibility)} · Version {citation.version_id} · File {citation.source_file_id}
-                      {originalHref && <> · <a href={originalHref}>file gốc</a></>}</small>{" "}
-                  </span>;
-                })}
-              </p>)}
-            </div>}
-          </section>}
+
         </>
       )}
+      {ownPrivate && !deletion && <DeletePrivate itemId={id} onDeleted={(receipt) => {
+        setDeletion(receipt); setItem(null); setRag(null); setReferences(null); setError(null);
+      }} />}
+    </div>
     </Shell>
   );
 }

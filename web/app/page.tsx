@@ -9,6 +9,7 @@ import { api, describeError } from "../lib/api";
 import { contentLabel } from "../lib/files";
 import { ErrorText, Shell, useSession } from "./components/session";
 import { Upload } from "./components/upload";
+import { Badge, EmptyState, Loading, PageHeading } from "./components/ui";
 
 export type Item = {
   id: string;
@@ -49,8 +50,7 @@ export default function LibraryPage() {
   return (
     <Shell user={user}>
       <p><Link href="/search">Tìm kiếm toàn văn (paper riêng và bản chung được phép)</Link> · <Link href="/collections">Collection của tôi</Link></p>
-      <h1>Thư viện</h1>
-      <p style={{ color: "#555" }}>Kho chung và kho riêng của bạn.</p>
+      <PageHeading eyebrow="Tài liệu & tri thức" title="Thư viện">Kho chung và kho riêng của bạn. Một nơi để lưu trữ, tìm kiếm và kết nối bằng chứng.</PageHeading>
       {user?.role === "user" && <Upload onComplete={() => { setOffset(0); setRefresh((n) => n + 1); }} />}
       <label>
         Phạm vi{" "}
@@ -67,12 +67,15 @@ export default function LibraryPage() {
         </select>
       </label>
       <ErrorText message={error} />
+      {!page && !error && <Loading />}
       {page && (
         <>
-          <p>Tổng: {page.total}</p>
-          <table style={{ borderCollapse: "collapse", width: "100%" }}>
+          <p className="text-small">Tổng: {page.total} tài liệu</p>
+          {page.total === 0 && <EmptyState title="Thư viện chưa có tài liệu">Tải paper vào kho riêng để bắt đầu nghiên cứu.</EmptyState>}
+          <div className="table-wrap">
+          <table className="data-table">
             <thead>
-              <tr style={{ textAlign: "left" }}>
+              <tr>
                 <th>Tiêu đề</th>
                 <th>Kho</th>
                 <th>Trạng thái nội dung</th>
@@ -80,17 +83,18 @@ export default function LibraryPage() {
             </thead>
             <tbody>
               {page.items.map((item) => (
-                <tr key={item.id} style={{ borderTop: "1px solid #ddd" }}>
+                <tr key={item.id} className="record-row">
                   <td>
                     <Link href={`/items/${item.id}`}>{item.title ?? "(chưa có tiêu đề)"}</Link>
                   </td>
-                  <td>{item.visibility === "common" ? "Chung" : "Riêng"}</td>
-                  <td>{contentLabel(item)}</td>
+                  <td><Badge>{item.visibility === "common" ? "Chung" : "Riêng"}</Badge></td>
+                  <td><Badge tone={item.fulltext_search_available ? "success" : "neutral"}>{contentLabel(item)}</Badge></td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p style={{ display: "flex", gap: "0.5rem" }}>
+          </div>
+          <p className="actions">
             <button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}>
               Trước
             </button>

@@ -17,7 +17,7 @@ import {
 import { ErrorText, Shell, useSession } from "../../../components/session";
 
 const fmt = (iso: string) => new Date(iso).toLocaleString("vi-VN");
-const wide = { width: "100%" };
+
 
 function ApproveSection({ request, onDone }: { request: AdminReviewRequest; onDone: () => void }) {
   const checksum = request.file?.checksum_sha256 ?? "";
@@ -46,9 +46,9 @@ function ApproveSection({ request, onDone }: { request: AdminReviewRequest; onDo
   }
 
   return (
-    <form onSubmit={submit} style={{ display: "grid", gap: "0.5rem", maxWidth: "40rem" }}>
+    <form onSubmit={submit} className="form-panel">
       <h2>Phê duyệt và ghi nhận quyền</h2>
-      <p style={{ background: "#fff6e0", padding: "0.5rem" }}>
+      <p className="notice">
         Chỉ điền điều <strong>bạn đã tự kiểm</strong> cho đúng file có SHA-256 bên dưới. Lời khai của User, việc
         User upload, hay việc paper đọc miễn phí trên arXiv/Hugging Face <strong>không</strong> tự cấp quyền phân
         phối. Phê duyệt tạo một <strong>bản chung riêng đang chờ công bố</strong>: User khác chưa thấy bản này, chưa
@@ -58,23 +58,23 @@ function ApproveSection({ request, onDone }: { request: AdminReviewRequest; onDo
       <ErrorText message={error} />
       <label>Tiêu đề bản chung
         <br /><input value={form.title} onChange={(e) => set("title", e.target.value)} required maxLength={1000}
-          style={wide} />
+          className="full-width" />
       </label>
       <label>Nguồn file đã kiểm (nơi có đúng bản này)
         <br /><textarea value={form.source} onChange={(e) => set("source", e.target.value)} required maxLength={2000}
-          rows={2} style={wide} />
+          rows={2} className="full-width" />
       </label>
       <label>URL nguồn file đã kiểm (không bắt buộc)
         <br /><input type="url" value={form.sourceUrl} onChange={(e) => set("sourceUrl", e.target.value)}
-          maxLength={2048} style={wide} />
+          maxLength={2048} className="full-width" />
       </label>
       <label>URL giấy phép đã kiểm
         <br /><input type="url" value={form.licenseUrl} onChange={(e) => set("licenseUrl", e.target.value)}
-          maxLength={2048} style={wide} />
+          maxLength={2048} className="full-width" />
       </label>
       <label>Bằng chứng khác đã kiểm (thư cho phép, điều khoản…)
         <br /><textarea value={form.evidence} onChange={(e) => set("evidence", e.target.value)} maxLength={2000}
-          rows={2} style={wide} />
+          rows={2} className="full-width" />
       </label>
       <small>Cần ít nhất URL giấy phép hoặc ghi chú bằng chứng.</small>
       <label>Ngày kiểm
@@ -91,7 +91,7 @@ function ApproveSection({ request, onDone }: { request: AdminReviewRequest; onDo
           (embedding, rerank, RAG)</label><br />
         <label>Điều kiện kèm theo (không bắt buộc)
           <br /><input value={form.conditions} onChange={(e) => set("conditions", e.target.value)} maxLength={1000}
-            style={wide} />
+            className="full-width" />
         </label>
         <br /><small>{CONDITIONS_BLOCK_NOTE}</small>
       </fieldset>
@@ -175,16 +175,16 @@ export default function ReviewDetailPage() {
           <h2>Thông tin User khai báo</h2>
           <p><em>{request.declaration.note}</em></p>
           <dl>
-            <dt>Nguồn</dt><dd style={{ whiteSpace: "pre-wrap" }}>{request.declaration.source}</dd>
+            <dt>Nguồn</dt><dd className="pre-wrap">{request.declaration.source}</dd>
             {request.declaration.source_url && <><dt>URL nguồn</dt><dd>{request.declaration.source_url}</dd></>}
-            <dt>Quyền phân phối</dt><dd style={{ whiteSpace: "pre-wrap" }}>{request.declaration.rights}</dd>
+            <dt>Quyền phân phối</dt><dd className="pre-wrap">{request.declaration.rights}</dd>
             {request.declaration.license_url && <><dt>URL giấy phép/bằng chứng</dt>
               <dd>{request.declaration.license_url}</dd></>}
           </dl>
           {request.status === "open" && <ApproveSection key={request.id} request={request} onDone={load} />}
         </>}
         {request.status === "open" && <form onSubmit={reject}
-          style={{ display: "grid", gap: "0.5rem", maxWidth: "32rem" }}>
+          className="form-panel">
           <h2>Từ chối</h2>
           <label>Lý do
             <br /><select value={reason} onChange={(e) => setReason(e.target.value)} required>
@@ -194,7 +194,7 @@ export default function ReviewDetailPage() {
           </label>
           <label>Ghi chú ngắn cho User (không bắt buộc, không ghi vào audit)
             <br /><input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500}
-              style={{ width: "100%" }} />
+              className="full-width" />
           </label>
           <button type="submit" disabled={busy || !reason}>{busy ? "Đang gửi…" : "Từ chối yêu cầu"}</button>
           <small>Từ chối kết thúc ngay quyền xem tạm của Admin với mọi lần mở mới.</small>
