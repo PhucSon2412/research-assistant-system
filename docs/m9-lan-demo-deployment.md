@@ -9,6 +9,11 @@ trong cửa sổ backup, drill restore, hai scheduled task. **Phần chủ dự 
 tạo rule firewall (cần Administrator), bootstrap Admin (nhập mật khẩu), nghiệm thu từ một thiết bị LAN khác, xác nhận mail
 đã vào hộp thư, cất private key `age` ra khỏi máy. Xem [mục 4](#4-việc-của-chủ-dự-án-và-nghiệm-thu).
 
+**Cập nhật M7c (2026-10-21, nhánh `feat/m7c-live-quality-verification`):** đã bật provider cho ba route bằng lệnh mới
+`m9_lan_demo.py provider` (image rc2 và `deploy/` không đổi). Thư mục paper demo giấy phép mở và kịch bản search/RAG ở
+[mục 3](#3-giới-hạn-và-rủi-ro-đã-biết) và [kịch bản demo](#kịch-bản-demo-510-phút). Sau một lần mất điện máy, demo tự chạy
+lại: gate open, journal = DB, replica `ok`.
+
 Đây là **bản demo LAN**, lưu trữ cùng máy theo quyết định chủ dự án; không phải cutover nhóm thử theo
 [điều kiện M8c](m8c-release-candidate.md#8-điều-kiện-cutover).
 
@@ -24,7 +29,7 @@ tạo rule firewall (cần Administrator), bootstrap Admin (nhập mật khẩu)
 | Hạ tầng | Caddy/PostgreSQL 16.14/Redis/MinIO theo digest pin trong `deploy/compose.yaml` (đều đã có trong cache máy) |
 | Mạng nội bộ | backend `ras-pilot` `172.30.64.0/24`, drill `172.30.48.0/24`; `ras-pilot-offsite_offsite` internal, chỉ replicator/`ops`/`ops-check` nối vào |
 | SMTP | `smtp.gmail.com:465` `implicit_tls`, CA hệ thống của image; tài khoản/sender/người nhận alert = địa chỉ trong `secrets\smtp_username`; mật khẩu chỉ là Compose secret `smtp_password` |
-| Provider | Key trống, `pricing_verified=false` cả ba route, discovery tắt |
+| Provider | **Từ M7c (2026-10-21):** key nhóm (từ `secrets\openrouter_api_key`) trong `pilot.env` (ACL chỉ user), `pricing_verified=true` cho embedding/rerank/generation sau khi có chứng cứ live ([handoff M7c](m7c-live-quality-verification.md)); routing ZDR pin như M7a; budget app $10/ngày, quota User mặc định; output generation 1024 token, trần request $0,06 (từ 2026-10-22, chỉ demo); discovery tắt. Trước đó: key trống, pricing false |
 | Lịch | Task Scheduler: `RAS pilot backup` 03:00 hằng ngày, `RAS pilot check` mỗi 15 phút; chạy `pythonw.exe` của Conda `ras` → `bin\run_ops_task.py` → `release\scripts\ras_ops.py`; log `logs\ops-<ngày>.log` (giữ 30 ngày) |
 
 **Overlay, không sửa deploy đã review.** `scripts/m9_lan_demo.py prepare` sinh `pilot\override.yaml` ngoài repo:
@@ -88,9 +93,20 @@ Số đo trên là máy này, dữ liệu gần rỗng, đích cùng máy; **kh�
 - **Durability:** journal ghi qua bind mount của Docker Desktop (Windows → VM); không tuyên bố an toàn mất điện.
 - `scripts/m9_lan_demo.py uninstall` **chưa chạy** (sẽ phá bản demo đang dùng); đã có lệnh thủ công tương đương ở mục 8.
 
-**Chưa demo được khi chưa có provider** (cần key OpenRouter thuộc tài khoản chủ dự án, làm ở
-[M7c](tasks/m7c-live-quality-verification.md)): index full-text (upload dừng trước bước index, lý do
-`embedding_key_missing`), search keyword/hybrid trên toàn văn, hỏi đáp RAG có citation. UI hiện thông báo chưa khả dụng.
+**Provider đã bật (M7c, 2026-10-21; giới hạn output cập nhật 2026-10-22).** `python scripts/m9_lan_demo.py provider --routes
+embedding rerank generation --max-output-tokens 1024 --apply` (tắt: `provider --off --apply`). Lúc bật demo không có item nào; ngày
+22/10 demo đã có 12 paper do chủ dự án upload (10 `indexed`, 1 `needs_review`, 1 lỗi parser, đúng như stack thử). Agent đã kiểm readiness, cấu hình, egress OpenRouter và bind
+mạng. **Chưa kiểm** search/RAG qua UI trên demo: việc này cần chủ dự án upload paper và có tài khoản thử. Giới hạn:
+
+- **Chỉ upload paper giấy phép mở hoặc tài liệu tự viết.** Text sẽ đi qua OpenRouter, mà key thuộc tài khoản nhóm và chưa
+  xác minh được cài đặt logging. Thông báo upload trong image rc2 chỉ nói dữ liệu đi qua OpenRouter, không cảnh báo tài
+  liệu nhạy cảm, nên người trình bày phải nói rõ điều này.
+- Khoảng 40 % paper arXiv hai cột được parser xếp `needs_review` và không index (không OCR); demo nên dùng bộ đã kiểm.
+- **Câu so sánh cần title thật và chế độ hybrid**: sau upload, sửa tiêu đề ở trang item (tên file `arxiv-…` không khớp tên
+  paper trong câu hỏi), và hỏi so sánh ở chế độ **hybrid**. Keyword mode thường không gom đủ hai paper (M7c, keyword: 1/6).
+  Hybrid cho câu so sánh chưa được đo trong M7c (hết trần), nên hỏi thử trước và chỉ trình diễn câu đã chạy được.
+- **Output generation của demo là 1024 token** (`max_request_usd` 0,06): trước đây 512 token cắt câu so sánh dài (lỗi
+  503). Mỗi câu thường tốn $0,005–0,02; quota User $1/ngày, ngân sách ứng dụng $10/ngày.
 
 ## 4. Việc của chủ dự án và nghiệm thu
 
@@ -119,7 +135,7 @@ $A  = @('--env-file',"$R\pilot\pilot.env",'--project','ras-pilot','--compose-fil
 | Reset mật khẩu | "Quên mật khẩu" với tài khoản demo; link qua Gmail |
 | Upload có xác nhận, thư viện, collection, tải original | Tài khoản demo upload một PDF có text; xác nhận thông báo xử lý; thêm vào collection; tải original |
 | Review → approve → publish → revoke | Demo gửi yêu cầu review; Admin mở file review, approve, publish (bản chung hiện cho tài khoản khác), revoke (bị chặn với request mới) |
-| Search/RAG chưa có provider | Mở trang tìm kiếm/hỏi đáp: thông báo chưa khả dụng |
+| Search/RAG có citation (M7c) | Tài khoản demo upload 3–4 PDF trong `%USERPROFILE%\ras-pilot\demo-papers\` (đọc `ATTRIBUTION.md`), chờ `indexed`, sửa tiêu đề; tìm hybrid và hỏi các câu ở kịch bản dưới; bấm citation mở đúng trang |
 | Edge 503 khi backup | `Start-ScheduledTask -TaskName 'RAS pilot backup'` rồi tải lại trang trong ~20 s: trang "Bảo trì" |
 
 ## 5. Cài CA và hosts trên thiết bị demo
@@ -140,17 +156,34 @@ File CA: `%USERPROFILE%\ras-pilot\public\ras-demo-ca.crt` (chỉ certificate, kh
 
 ### Kịch bản demo 5–10 phút
 
-Chuẩn bị trước: Admin và tài khoản demo đã tạo; một PDF có text; một item đã upload sẵn.
+Chuẩn bị trước (khoảng 15 phút, trước buổi demo):
 
-1. (1 phút) Kiến trúc: HTTPS trong LAN, phiên `__Host-`, quyền lọc trong SQL, journal thu hồi, backup mã hóa.
-2. (2 phút) Tài khoản demo: upload có hộp xác nhận xử lý → trạng thái xử lý (dừng trước index, nói rõ do chưa bật
-   provider) → thư viện, collection, tải original.
-3. (2 phút) Gửi review → Admin xem đúng file được yêu cầu → approve → publish → đăng nhập tài khoản khác thấy bản chung →
+- Admin và tài khoản demo đã tạo.
+- Tài khoản demo upload các PDF P10 (SCAR), P06 (SciRet), P07 (RAGdb), P09 (title-chain) và P01 (Experience-RAG) từ
+  `%USERPROFILE%\ras-pilot\demo-papers\`. Chờ trạng thái `indexed` (khoảng 5 phút/paper), rồi sửa tiêu đề từng item
+  thành tiêu đề paper.
+- Upload thêm P11 để minh họa trạng thái "cần review" (không index, không OCR).
+- Hỏi thử trước từng câu bên dưới; câu nào không ra kết quả thì bỏ khỏi buổi demo.
+
+1. (1 phút) Kiến trúc: HTTPS trong LAN, phiên `__Host-`, quyền lọc trong SQL, journal thu hồi, backup mã hóa; provider qua
+   OpenRouter chỉ endpoint ZDR, ngân sách $10/ngày. **Nói rõ: chỉ dùng paper giấy phép mở, không upload tài liệu riêng.**
+2. (2 phút) Upload một paper có hộp xác nhận xử lý → trạng thái `indexed`; P11 dừng ở "cần review" (parser không chắc ranh
+   giới body, không đoán) → thư viện, collection, tải original.
+3. (3 phút) Tìm kiếm và hỏi đáp có citation (các câu đã trả lời đúng trong M7c):
+   - tìm hybrid: `reranking for scientific retrieval` → hit có trang, mở citation;
+   - trên item SCAR: *What recall does SCAR achieve on boundary-fragmented queries, and with how many chunks?*;
+   - trên item SciRet: *What effect did the MS MARCO-trained cross-encoder reranker have in SciRet?*;
+   - trên item RAGdb: *How much does RAGdb reduce disk footprint compared with Docker-based RAG stacks?*;
+   - toàn thư viện: *Do all retrieval benchmarks report perfect recall?* (trả lời "không", trích SCAR và Experience-RAG);
+   - toàn thư viện, so sánh, **chế độ hybrid**: *Compare how SCAR and the title-chain chunking paper address evidence split
+     across chunk boundaries.* (cần đã sửa tiêu đề);
+   - không có đáp án, trên item RAGdb: *What monthly subscription price does RAGdb charge?* → hệ thống báo thiếu bằng chứng;
+   - bấm một citation → mở đúng paper/trang, quote nằm trong đoạn.
+4. (2 phút) Gửi review → Admin xem đúng file được yêu cầu → approve → publish → đăng nhập tài khoản khác thấy bản chung →
    revoke → request mới bị chặn.
-4. (1 phút) Mời người dùng: mail thật tới Gmail, accept; reset mật khẩu.
-5. (1–2 phút) Vận hành: `& $py "$R\release\scripts\ras_ops.py" status @A`; chạy task backup → trang bảo trì 503 → tự mở
+5. (1 phút) Mời người dùng: mail thật tới Gmail, accept; reset mật khẩu.
+6. (1–2 phút) Vận hành: `& $py "$R\release\scripts\ras_ops.py" status @A`; chạy task backup → trang bảo trì 503 → tự mở
    lại; mail alert.
-6. (1 phút) Phần chưa bật: search/RAG có citation cần provider (M7c).
 
 ## 6. Bật/tắt, sau khởi động lại, khi IP đổi
 

@@ -1,0 +1,729 @@
+{
+ "task": "M7c — live verification, open-licence papers, AI judge, pricing_verified per route",
+ "branch": "feat/m7c-live-quality-verification",
+ "base": "b5d8117ff6278f79ab4c4ae7169826fb8bfdf16f",
+ "base_check": "merge PR #69, parents 7009a84 + 209d92b, tree 319670d equals the reviewed head",
+ "migration_head": "0052",
+ "images": {
+  "test_stack_project": "rasc45baae9c6",
+  "api": "sha256:88c1e2ab57cf9f07ef922d87af6f99cf24cc3f616cf2352127b3a216c41ebd70",
+  "web": "sha256:ff17bfe37b2d8f284063e4a4352c360a0974ffc210638c7cabaf0b4406482e22",
+  "pypdf": "6.21.1 (same as rc2; parse output byte-identical to rc2 for the 12 papers)",
+  "changed_after_build_in_api": [
+   "app/evaluation/ai_review.py",
+   "tests/test_m7c_ai_review.py",
+   "tests/test_m7c_tooling.py"
+  ],
+  "demo": "ras-pilot-api:rc2 sha256:c0936a81... unchanged"
+ },
+ "corpus": {
+  "candidates": 47,
+  "licence_accepted": 30,
+  "licence_refused_arxiv_default": 17,
+  "production_parse_of_accepted": {
+   "awaiting_index": 17,
+   "needs_review": 11,
+   "parser_error": 2
+  },
+  "chosen": 12,
+  "indexed_in_test_stack": 10,
+  "not_indexed": {
+   "P11": "needs_review/pdf_body_uncertain",
+   "P12": "terminal_failed/pdf_text_invalid"
+  },
+  "synthetic_notes": 2,
+  "questions": 36,
+  "holdout": 7,
+  "gold_spans": 34
+ },
+ "ledger": {
+  "ceiling": "$5.00 / 400 calls, stop at 80% ($4.00 / 320)",
+  "requests": 307,
+  "committed_usd": "1.98738776",
+  "billed_usd": "0.97738776",
+  "held_at_ceiling_usd": "1.01",
+  "held_detail": "6 judge calls HTTP 404 (temperature + require_parameters, no generation id) $0.96; 1 generation timeout drill $0.05",
+  "by_family": {
+   "embedding_document": {
+    "calls": 188,
+    "billed": "0.00078616"
+   },
+   "embedding_query": {
+    "calls": 26,
+    "billed": "0.000009"
+   },
+   "rerank": {
+    "calls": 26,
+    "billed": "0.0205312"
+   },
+   "generation": {
+    "calls": 29,
+    "billed": "0.1874354",
+    "revoked_unused_permits": 33
+   },
+   "judge": {
+    "calls": 38,
+    "billed": "0.768626"
+   }
+  },
+  "reconcile": "300/300 /generation ids found, total_cost == usage.cost for all 300"
+ },
+ "settlement": {
+  "embed_document": {
+   "calls": 188,
+   "paired": 188,
+   "covered": 188,
+   "charge_usd": 0.00078616,
+   "app_cost_usd": 0.0039308,
+   "generation_found": 188,
+   "generation_equal": 188
+  },
+  "embed_query": {
+   "calls": 26,
+   "paired": 26,
+   "covered": 26,
+   "charge_usd": 9e-06,
+   "app_cost_usd": 4.5e-05,
+   "generation_found": 26,
+   "generation_equal": 26
+  },
+  "generation": {
+   "calls": 28,
+   "paired": 28,
+   "covered": 28,
+   "charge_usd": 0.1874354,
+   "app_cost_usd": 0.2750725,
+   "generation_found": 28,
+   "generation_equal": 28
+  },
+  "rerank": {
+   "calls": 26,
+   "paired": 26,
+   "covered": 26,
+   "charge_usd": 0.0205312,
+   "app_cost_usd": 0.0205312,
+   "generation_found": 26,
+   "generation_equal": 26
+  }
+ },
+ "cache": {
+  "write_calls": 21,
+  "read": "SP-15 repeat: cached_tokens 3872, prompt cost 0.0007804 vs 0.009686 on write"
+ },
+ "budget_drills": {
+  "user_cap": {
+   "http": 429,
+   "error": "rag_user_budget_exhausted",
+   "provider_calls": 0
+  },
+  "generation_bucket": {
+   "http": 429,
+   "error": "rag_generation_budget_exhausted",
+   "status": null,
+   "provider_calls": 0
+  },
+  "concurrency": {
+   "b": {
+    "http": 429,
+    "error": "rag_generation_concurrency_limit",
+    "status": null,
+    "provider_calls": 0
+   },
+   "a": {
+    "http": 200,
+    "error": null,
+    "status": "answered",
+    "provider_calls": 0
+   },
+   "provider_calls": 1
+  },
+  "uncertain": {
+   "http": 503,
+   "error": "rag_provider_outcome_uncertain",
+   "provider_responses": 0
+  },
+  "usage_rows": "see evidence"
+ },
+ "retrieval": {
+  "keyword": {
+   "k": 5,
+   "questions": 26,
+   "span_recall_at_k": {
+    "numerator": 23,
+    "denominator": 34,
+    "value": 0.6765
+   },
+   "question_all_spans_at_k": {
+    "numerator": 19,
+    "denominator": 26,
+    "value": 0.7308
+   },
+   "per_question": {
+    "SP-01": [
+     true
+    ],
+    "SP-02": [
+     true
+    ],
+    "SP-03": [
+     true
+    ],
+    "SP-04": [
+     true
+    ],
+    "SP-05": [
+     true
+    ],
+    "SP-06": [
+     true
+    ],
+    "SP-07": [
+     true
+    ],
+    "SP-08": [
+     true
+    ],
+    "SP-09": [
+     true
+    ],
+    "SP-10": [
+     true
+    ],
+    "SP-11": [
+     false
+    ],
+    "SP-12": [
+     true
+    ],
+    "SP-13": [
+     true
+    ],
+    "SP-14": [
+     true
+    ],
+    "SP-15": [
+     true
+    ],
+    "SP-16": [
+     true
+    ],
+    "CMP-01": [
+     false,
+     false
+    ],
+    "CMP-02": [
+     true,
+     true
+    ],
+    "CMP-03": [
+     false,
+     false
+    ],
+    "CMP-04": [
+     false,
+     false
+    ],
+    "CMP-05": [
+     false,
+     false
+    ],
+    "CMP-06": [
+     false,
+     true
+    ],
+    "PP-01": [
+     true
+    ],
+    "PP-02": [
+     true,
+     true
+    ],
+    "INJ-01": [
+     false
+    ],
+    "INJ-03": [
+     true,
+     true
+    ]
+   }
+  },
+  "hybrid_rerank": {
+   "k": 5,
+   "questions": 26,
+   "span_recall_at_k": {
+    "numerator": 31,
+    "denominator": 34,
+    "value": 0.9118
+   },
+   "question_all_spans_at_k": {
+    "numerator": 23,
+    "denominator": 26,
+    "value": 0.8846
+   },
+   "per_question": {
+    "SP-01": [
+     true
+    ],
+    "SP-02": [
+     true
+    ],
+    "SP-03": [
+     true
+    ],
+    "SP-04": [
+     true
+    ],
+    "SP-05": [
+     true
+    ],
+    "SP-06": [
+     true
+    ],
+    "SP-07": [
+     true
+    ],
+    "SP-08": [
+     true
+    ],
+    "SP-09": [
+     true
+    ],
+    "SP-10": [
+     true
+    ],
+    "SP-11": [
+     true
+    ],
+    "SP-12": [
+     true
+    ],
+    "SP-13": [
+     true
+    ],
+    "SP-14": [
+     true
+    ],
+    "SP-15": [
+     true
+    ],
+    "SP-16": [
+     true
+    ],
+    "CMP-01": [
+     true,
+     true
+    ],
+    "CMP-02": [
+     true,
+     true
+    ],
+    "CMP-03": [
+     true,
+     false
+    ],
+    "CMP-04": [
+     true,
+     true
+    ],
+    "CMP-05": [
+     true,
+     false
+    ],
+    "CMP-06": [
+     false,
+     true
+    ],
+    "PP-01": [
+     true
+    ],
+    "PP-02": [
+     true,
+     true
+    ],
+    "INJ-01": [
+     true
+    ],
+    "INJ-03": [
+     true,
+     true
+    ]
+   }
+  }
+ },
+ "machine": {
+  "responses": 36,
+  "status_matches_expected": {
+   "numerator": 27,
+   "denominator": 36,
+   "value": 0.75
+  },
+  "status_by_group": {
+   "comparison": {
+    "numerator": 1,
+    "denominator": 6,
+    "value": 0.1667
+   },
+   "injection": {
+    "numerator": 2,
+    "denominator": 4,
+    "value": 0.5
+   },
+   "no_answer": {
+    "numerator": 6,
+    "denominator": 6,
+    "value": 1.0
+   },
+   "partial": {
+    "numerator": 4,
+    "denominator": 4,
+    "value": 1.0
+   },
+   "single_paper": {
+    "numerator": 14,
+    "denominator": 16,
+    "value": 0.875
+   }
+  },
+  "answered_when_expected": {
+   "numerator": 18,
+   "denominator": 26,
+   "value": 0.6923
+  },
+  "quote_verbatim_in_chunk": {
+   "numerator": 25,
+   "denominator": 25,
+   "value": 1.0
+  },
+  "quote_in_parser_page": {
+   "numerator": 24,
+   "denominator": 24,
+   "value": 1.0
+  },
+  "citation_in_scope": {
+   "numerator": 25,
+   "denominator": 25,
+   "value": 1.0
+  },
+  "gold_span_cited": {
+   "numerator": 16,
+   "denominator": 34,
+   "value": 0.4706
+  },
+  "injection_marker_leaked": {
+   "numerator": 0,
+   "denominator": 4,
+   "value": 0.0
+  },
+  "foreign_marker_leaked": {
+   "numerator": 0,
+   "denominator": 36,
+   "value": 0.0
+  },
+  "comparison_cites_two_papers": {
+   "numerator": 1,
+   "denominator": 1,
+   "value": 1.0
+  }
+ },
+ "ai_judge": {
+  "model": "anthropic/claude-sonnet-5.5",
+  "provider": "amazon-bedrock (ZDR)",
+  "rubric": {
+   "answers": "m7c-judge-rubric/2-answers",
+   "labels": "m7c-judge-rubric/1"
+  },
+  "m4c_labels": {
+   "judged": 80,
+   "verdicts": {
+    "adequate": 71,
+    "comment_only": 7,
+    "needs_change": 2
+   },
+   "adequate": {
+    "denominator": 73,
+    "numerator": 71,
+    "value": 0.9726
+   },
+   "stability": {
+    "denominator": 8,
+    "numerator": 8,
+    "pairs": 8,
+    "value": 1.0
+   }
+  },
+  "m7a_answers": {
+   "abstention_appropriate": {
+    "denominator": 1,
+    "numerator": 1,
+    "value": 1.0
+   },
+   "citation_correct": {
+    "denominator": 3,
+    "numerator": 3,
+    "value": 1.0
+   },
+   "claim_partial": {
+    "denominator": 2,
+    "numerator": 0,
+    "value": 0.0
+   },
+   "claim_supported": {
+    "denominator": 2,
+    "numerator": 2,
+    "value": 1.0
+   },
+   "claims": 2,
+   "declined_answerable": {
+    "denominator": 0,
+    "numerator": 0,
+    "value": null
+   },
+   "injection_followed": {
+    "denominator": 0,
+    "numerator": 0,
+    "value": null
+   },
+   "out_of_scope": {
+    "denominator": 3,
+    "numerator": 0,
+    "value": 0.0
+   },
+   "responses": 3
+  },
+  "m7c_answers": {
+   "abstention_appropriate": {
+    "denominator": 10,
+    "numerator": 9,
+    "value": 0.9
+   },
+   "citation_correct": {
+    "denominator": 27,
+    "numerator": 27,
+    "value": 1.0
+   },
+   "claim_partial": {
+    "denominator": 23,
+    "numerator": 2,
+    "value": 0.087
+   },
+   "claim_supported": {
+    "denominator": 23,
+    "numerator": 21,
+    "value": 0.913
+   },
+   "claims": 23,
+   "declined_answerable": {
+    "denominator": 7,
+    "numerator": 7,
+    "value": 1.0
+   },
+   "injection_followed": {
+    "denominator": 4,
+    "numerator": 0,
+    "value": 0.0
+   },
+   "out_of_scope": {
+    "denominator": 36,
+    "numerator": 0,
+    "value": 0.0
+   },
+   "responses": 36
+  },
+  "m7c_stability": {
+   "denominator": 8,
+   "numerator": 8,
+   "pairs": 8,
+   "value": 1.0
+  },
+  "m7b_human_records": {
+   "answer_records": 0,
+   "label_records": 0,
+   "note": "M7b chỉ đếm phiếu do người điền; track AI không ghi vào đó"
+  }
+ },
+ "pricing_verified_conclusion": {
+  "embedding_document": "sufficient",
+  "embedding_query": "sufficient",
+  "rerank": "sufficient with condition: settlement equals charge, no margin; max_price bounds price",
+  "generation": "sufficient with condition: cache-write price outside max_price.prompt",
+  "source_and_deploy_defaults": "unchanged (false)",
+  "demo_ras_pilot": "enabled for all three routes"
+ },
+ "tests": {
+  "m7c_offline": {
+   "files": [
+    "api/tests/test_m7c_tooling.py",
+    "api/tests/test_m7c_ai_review.py"
+   ],
+   "collected": 55,
+   "passed": 55
+  },
+  "counterchecks": {
+   "script": "scripts/m7c_counterchecks.py",
+   "holds": 15,
+   "total": 15,
+   "clean_exit": 0,
+   "source_unchanged": true,
+   "mutations": [
+    "ai_output_into_human_tree",
+    "ai_record_with_human_fields",
+    "judge_counted_unbound",
+    "judge_record_without_binding",
+    "m7c_binding_ignores_corpus",
+    "accept_arxiv_default_licence",
+    "accept_any_version",
+    "accept_licence_disagreement",
+    "no_80_percent_stop",
+    "judge_content_on_invalid_cost",
+    "judge_unpinned_provider",
+    "key_from_environment",
+    "settlement_below_charge_accepted",
+    "generation_settles_at_prompt_price",
+    "drill_gets_provider_key"
+   ],
+   "first_attempt": "crashed before results (Windows codepage decoding of pytest output); output dir deleted and rerun"
+  },
+  "ci_selection_local": {
+   "runner": "scripts/m8a_test_host.py (PostgreSQL/Redis/MinIO pinned digests from deploy/compose.yaml)",
+   "args": "tests/test_config.py tests/test_m8a_smtp_delivery.py tests/test_m8a_rate_limit.py tests/test_m8a_smtp_deadline.py tests/test_m8a_ci_guard.py tests/test_m8a_auth_delivery.py tests/test_csrf_and_cookies.py tests/test_c2a_origin.py tests/test_auth_sessions.py tests/test_c2a_login_sessions.py tests/test_auth_secrets.py tests/test_invitations.py tests/test_invitation_journal.py tests/test_c2c2_invitations.py tests/test_password_reset.py tests/test_c2b_reset_status.py tests/test_reset_token_journal.py tests/test_session_revocation_journal.py tests/test_pre_c4_initial_receipts.py tests/test_auth_safety_foundation.py tests/test_c2c1_bootstrap.py tests/test_migrations.py tests/test_c4_contract.py tests/test_health.py tests/test_m8b_replica.py tests/test_m8b_artifacts.py tests/test_m8b_alerts.py tests/test_m8b_ops_host.py tests/test_m8b_s3_minio.py tests/test_evaluation.py tests/test_m7c_ai_review.py tests/test_m7c_tooling.py --deselect tests/test_pre_c4_initial_receipts.py::test_two_dump_restore_rounds_keep_valid_provenance_and_restrict_forgery",
+   "result": "1 failed, 1282 passed, 1 deselected (exit 1) in 1:11:26",
+   "failed": "tests/test_m8a_smtp_delivery.py::test_verified_tls_delivers_one_message_with_fragment_link[starttls] — smtp_timeout of the child transport under load",
+   "reruns_of_that_file": [
+    "25 passed",
+    "25 passed",
+    "25 passed"
+   ],
+   "smtp_files_changed_in_pr": false,
+   "earlier_attempt": "first local run interrupted by a power loss at ~61%; its tmpfs stack was cleaned by context label and rebuilt",
+   "source_during_run": "unchanged except two README files added under evaluation/"
+  },
+  "github_ci": "not run yet (runs on the PR)"
+ },
+ "development_failures_kept": [
+  "C4 default flow first run failed at check 5: harness order (fake-off not configured; key empty -> embedding_key_missing)",
+  "Recall@5 first computed 0/34: PDF offsets live in locator_detail; hits enriched by opening 130 chunks through the API (no provider call)",
+  "RAG first pass: 10 all-scope questions 422 (missing scope=all), rejected by validation before any call; 16 permits revoked",
+  "Comparison first pass with filename titles 0/6; after owner title edit (PATCH) 1/6 answered",
+  "Budget drills: generation bucket and concurrency first run never reached admission (B question without evidence); rerun with B's own note",
+  "Judge: 6 calls 404 (temperature unsupported + require_parameters) counted at ceiling; script now stops at the first non-completed outcome",
+  "Judge: one 16-question label batch truncated at 4000 tokens ($0.07); rerun as batches of 8",
+  "Judge answers rubric /1 parser too strict on 5/9 batches; all answers re-judged under rubric /2 (10 calls), /1 records moved to evidence; last batch recorded from the saved raw reply"
+ ],
+ "docker": {
+  "before": [
+   "containers: 37",
+   "volumes: 194",
+   "networks: 14",
+   "images: 146"
+  ],
+  "after": [
+   "containers: 37",
+   "volumes: 194",
+   "networks: 14",
+   "images: 148"
+  ],
+  "changes": "ras-pilot api/worker/beat recreated (provider enabled); images rasc45baae9c6-api/web kept; task containers/volumes/networks removed by project label"
+ },
+ "secret_scan": "real key loaded in memory and searched in 4744 files of evidence/state/repo (no .env read): 0 matches; context key copy deleted",
+ "evidence": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-m7c-20261021",
+ "fix_pr70": {
+  "review": "docs/reviews/pr70-m7c-live-quality-verification.md (P2 pypdf drift, CI run 39605520554 API 2 failed)",
+  "constraints": {
+   "file": "api/constraints-rc2.txt",
+   "source": "docker run --rm --network none --entrypoint pip rasm8c-api:rc2 freeze (image sha256:c0936a8189df...)",
+   "pins": 59,
+   "excluded": [
+    "ras-api (the project)"
+   ],
+   "dev_only_kept_as_ranges": [
+    "pytest",
+    "reportlab",
+    "cryptography",
+    "pyrage"
+   ],
+   "conda_ras": "pip install -c api/constraints-rc2.txt -e ./api[dev]: 25 packages changed; 58/59 pins match (uvloop not installed on Windows by marker)",
+   "ci": "API job installs with the same -c"
+  },
+  "m4c_labels": {
+   "pdf_papers_compared": 3,
+   "pages_and_segments_identical_6_19_vs_6_21": true,
+   "class": "a (version string only)",
+   "annotate_diff": "15 'parser' lines 6.19.0 -> 6.21.1, no quote/offset change",
+   "validate": "15 errors -> OK"
+  },
+  "m7c_papers": "host parse on 6.21.1 identical to image parse for 11/11 papers (P12 parser error in both); gold unchanged",
+  "m7b_bundle": "human-prepare rebuilt (15 label pages + index + manifest: parser string); --check up to date; human-validate labels/answers clean (0 reviewed); report awaiting_human_review; 0 real verdicts",
+  "ai_judge_rejudge": {
+   "stale_before": {
+    "m4c_label_records": 88,
+    "m7a_records": 6,
+    "m7c_records": 0
+   },
+   "calls": 13,
+   "billed_usd": "0.524444",
+   "ledger_after": {
+    "requests": 320,
+    "committed_usd": "2.51183176",
+    "stop_at": "320 (80%) reached"
+   },
+   "reconcile": "313/313 /generation ids found",
+   "labels_new": {
+    "adequate": 71,
+    "comment_only": 7,
+    "needs_change": [
+     "PP-05",
+     "RCI-09"
+    ]
+   },
+   "agreement_old_vs_new_80_labels": "78/80 (differ: CMP-09 needs_change->adequate, PP-05 adequate->needs_change)",
+   "stability_sample": {
+    "labels": "8/8",
+    "m7a": "3/3"
+   }
+  },
+  "live_m7c_run_parser": "test image rasc45baae9c6-api had pypdf 6.21.1 (checked at build); live results remain valid",
+  "demo": {
+   "command": "python scripts/m9_lan_demo.py provider --routes embedding rerank generation --max-output-tokens 1024 --apply",
+   "env": {
+    "RAS_GENERATION__MAX_OUTPUT_TOKENS": "1024",
+    "RAS_GENERATION__MAX_REQUEST_USD": "0.06"
+   },
+   "why_request_ceiling": "16000 x $2.5/M + 1024 x $10/M = $0.05024 > 0.05 would refuse every RAG (rag_generation_ceiling_unverified)",
+   "overlay": "outside repo; api environment gets both variables with code defaults (512/0.05) when unset",
+   "checks": "image rc2 sha256:c0936a81 unchanged; readyz 200; recovery gate open journal 12 = db 12; replica ok; verify ok on the current LAN IP; settings: pricing true x3, max_output 1024, max_request_usd 0.06, routing azure",
+   "demo_content_at_change": "12 owner uploads: 10 indexed, 1 needs_review, 1 terminal_failed; no running job",
+   "window_s": 16
+  },
+  "tests": {
+   "focused_first": "166 passed, 1 failed (new test compared Decimal('0.05024000') as a string; test fixed)",
+   "focused_final": {
+    "files": [
+     "tests/test_evaluation.py",
+     "tests/test_m7c_tooling.py",
+     "tests/test_m7c_ai_review.py",
+     "tests/test_human_review.py",
+     "tests/test_pdf_ingest.py",
+     "tests/test_markdown_ingest.py",
+     "tests/test_ingest_worker.py"
+    ],
+    "runner": "scripts/m8a_test_host.py on the pinned Conda env",
+    "result": "167 passed, 0 failed (exit 0)"
+   },
+   "counterchecks": "15/15 holds, clean exit 0, source unchanged",
+   "github_ci": {
+    "run_id": 39724086744,
+    "head_sha": "be44a034defdbcfbf230b2b275564cccfadee85d",
+    "conclusion": "success",
+    "jobs": {
+     "API selection": "success, 1284 passed, 1 deselected, 1:01:23",
+     "Web tests, typecheck, build": "success",
+     "Pilot deploy config contract": "success"
+    },
+    "previous_run_on_1d740e2": {
+     "run_id": 39605520554,
+     "api": "failure, 2 failed (test_evaluation.py pypdf drift)"
+    }
+   }
+  }
+ }
+}

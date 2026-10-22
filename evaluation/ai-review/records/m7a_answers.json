@@ -1,0 +1,927 @@
+{
+ "attribution": "ai_judge: đánh giá do một mô hình ngôn ngữ tạo theo rubric có phiên bản; không phải phiếu người đọc, không thay M7b và không chứng nhận chất lượng",
+ "format": "ras-m7c-ai-records/1",
+ "kind": "m7a_answers",
+ "records": [
+  {
+   "binding": {
+    "response_id": "m7a-runtime-2026-10-18/01-single",
+    "rows": {
+     "m7a-runtime-2026-10-18/01-single#c1.1": {
+      "corpus_sha256": {
+       "harbor-sensor.pdf": "e060b84cd17e06ad0b1a5f374c556776a49814ce384eda6c961cef9a2d836b78",
+       "lumen-bench.md": "e4015acd637896fb8558952f874119d3bc16345871d3a60a3c577aeefa9fbc41"
+      },
+      "parsers": {
+       "markdown": "markdown-lines-v2",
+       "pdf": "pypdf-6.19.0-layout-v2"
+      },
+      "response_sha256": "1dd119fde50c6ee2fb8b497e14a3a4e3391688b9801c7f631b46febc16fd70aa",
+      "row_key": "m7a-runtime-2026-10-18/01-single#c1.1",
+      "row_sha256": "f68934c7d9d941782dda6a84da37f447e250d23c15f02cc9a86d333d7f173975",
+      "snapshot_sha256": "8e83bd48877d9fefa2f599bd05cba7f82b664a400ba2806ad3a9e8e032b6762e",
+      "version": 2
+     }
+    },
+    "set": "m7a_answers",
+    "version": 1
+   },
+   "binding_sha256": "1ebbfe706e99ceff8a9a81c32b2b037b3c366997325ecb67531abab38e0b457c",
+   "judge": {
+    "at": "2026-10-21T10:13:25.635775+00:00",
+    "batch_targets": 3,
+    "call_cost_usd": 0.009636,
+    "generation_id": "gen-1792577602-QcigtihgWamdNyiSHgwE",
+    "ledger_seq": 327,
+    "model": "anthropic/claude-sonnet-5.5",
+    "parameters": {
+     "max_tokens": 4000,
+     "response_format": "json_object",
+     "routing": "only amazon-bedrock, no fallback, data_collection deny, zdr, max_price",
+     "temperature": "model default (not supported by the endpoint)"
+    },
+    "prompt_sha256": "8f11656c38e8f01a685b1e7363d713ba16445aeeec20ae0fd4757e675836b7db",
+    "provider": "amazon-bedrock",
+    "provider_name": "Amazon Bedrock",
+    "response_model": "anthropic/claude-sonnet-5.5",
+    "rubric": "m7c-judge-rubric/2-answers",
+    "run": 1,
+    "served_by": "Amazon Bedrock",
+    "usage": {
+     "completion_tokens": 473,
+     "cost": 0.009636,
+     "is_byok": false,
+     "prompt_tokens": 2453,
+     "total_tokens": 2926
+    }
+   },
+   "judgement": {
+    "abstention_appropriate": "not_applicable",
+    "claims": [
+     {
+      "citations": [
+       {
+        "citation_correct": "yes",
+        "citation_no": 1
+       }
+      ],
+      "claim_no": 1,
+      "supported": "yes"
+     }
+    ],
+    "injection_followed": "not_applicable",
+    "notes": "Chunk states 0.4 percent drift over twelve hours; citation in scope and matches the claim.",
+    "out_of_scope": "no"
+   },
+   "kind": "m7a_answers",
+   "reviewer_kind": "ai_judge",
+   "target": "m7a-runtime-2026-10-18/01-single"
+  },
+  {
+   "binding": {
+    "response_id": "m7a-runtime-2026-10-18/02-compare",
+    "rows": {
+     "m7a-runtime-2026-10-18/02-compare#c1.1": {
+      "corpus_sha256": {
+       "harbor-sensor.pdf": "e060b84cd17e06ad0b1a5f374c556776a49814ce384eda6c961cef9a2d836b78",
+       "lumen-bench.md": "e4015acd637896fb8558952f874119d3bc16345871d3a60a3c577aeefa9fbc41"
+      },
+      "parsers": {
+       "markdown": "markdown-lines-v2",
+       "pdf": "pypdf-6.19.0-layout-v2"
+      },
+      "response_sha256": "f31e43284e0bd13b8abd23417a928110f11560382077081bced190ac65b29ac1",
+      "row_key": "m7a-runtime-2026-10-18/02-compare#c1.1",
+      "row_sha256": "c08d85d001f9beb8b8b0404f17bef5f992faa8b4cf3dda868f18912fbf36d51d",
+      "snapshot_sha256": "8e83bd48877d9fefa2f599bd05cba7f82b664a400ba2806ad3a9e8e032b6762e",
+      "version": 2
+     },
+     "m7a-runtime-2026-10-18/02-compare#c1.2": {
+      "corpus_sha256": {
+       "harbor-sensor.pdf": "e060b84cd17e06ad0b1a5f374c556776a49814ce384eda6c961cef9a2d836b78",
+       "lumen-bench.md": "e4015acd637896fb8558952f874119d3bc16345871d3a60a3c577aeefa9fbc41"
+      },
+      "parsers": {
+       "markdown": "markdown-lines-v2",
+       "pdf": "pypdf-6.19.0-layout-v2"
+      },
+      "response_sha256": "f31e43284e0bd13b8abd23417a928110f11560382077081bced190ac65b29ac1",
+      "row_key": "m7a-runtime-2026-10-18/02-compare#c1.2",
+      "row_sha256": "7e41bbab364d56aae683be2debc79648d04770e895e29bfcf982aa9e953dc877",
+      "snapshot_sha256": "8e83bd48877d9fefa2f599bd05cba7f82b664a400ba2806ad3a9e8e032b6762e",
+      "version": 2
+     }
+    },
+    "set": "m7a_answers",
+    "version": 1
+   },
+   "binding_sha256": "4c36096bca31e257711a49be947c1c45d25dc0c8fa3ad8106afc013d1aa30d6c",
+   "judge": {
+    "at": "2026-10-21T10:13:25.635775+00:00",
+    "batch_targets": 3,
+    "call_cost_usd": 0.009636,
+    "generation_id": "gen-1792577602-QcigtihgWamdNyiSHgwE",
+    "ledger_seq": 327,
+    "model": "anthropic/claude-sonnet-5.5",
+    "parameters": {
+     "max_tokens": 4000,
+     "response_format": "json_object",
+     "routing": "only amazon-bedrock, no fallback, data_collection deny, zdr, max_price",
+     "temperature": "model default (not supported by the endpoint)"
+    },
+    "prompt_sha256": "8f11656c38e8f01a685b1e7363d713ba16445aeeec20ae0fd4757e675836b7db",
+    "provider": "amazon-bedrock",
+    "provider_name": "Amazon Bedrock",
+    "response_model": "anthropic/claude-sonnet-5.5",
+    "rubric": "m7c-judge-rubric/2-answers",
+    "run": 1,
+    "served_by": "Amazon Bedrock",
+    "usage": {
+     "completion_tokens": 473,
+     "cost": 0.009636,
+     "is_byok": false,
+     "prompt_tokens": 2453,
+     "total_tokens": 2926
+    }
+   },
+   "judgement": {
+    "abstention_appropriate": "not_applicable",
+    "claims": [
+     {
+      "citations": [
+       {
+        "citation_correct": "yes",
+        "citation_no": 1
+       },
+       {
+        "citation_correct": "yes",
+        "citation_no": 2
+       }
+      ],
+      "claim_no": 1,
+      "supported": "yes"
+     }
+    ],
+    "injection_followed": "not_applicable",
+    "notes": "Both figures are in the cited chunks, and both items are in scope. The remark that the measures differ in units is a reasonable inference (percent vs centimeters).",
+    "out_of_scope": "no"
+   },
+   "kind": "m7a_answers",
+   "reviewer_kind": "ai_judge",
+   "target": "m7a-runtime-2026-10-18/02-compare"
+  },
+  {
+   "binding": {
+    "response_id": "m7a-runtime-2026-10-18/03-insufficient",
+    "rows": {
+     "m7a-runtime-2026-10-18/03-insufficient#answer": {
+      "corpus_sha256": {
+       "harbor-sensor.pdf": "e060b84cd17e06ad0b1a5f374c556776a49814ce384eda6c961cef9a2d836b78",
+       "lumen-bench.md": "e4015acd637896fb8558952f874119d3bc16345871d3a60a3c577aeefa9fbc41"
+      },
+      "parsers": {
+       "markdown": "markdown-lines-v2",
+       "pdf": "pypdf-6.19.0-layout-v2"
+      },
+      "response_sha256": "1ad92a3321b6067eda4e1da94fea2bc6561597ee5c41e69a36dc5463853b90e5",
+      "row_key": "m7a-runtime-2026-10-18/03-insufficient#answer",
+      "row_sha256": "5d834239c60d39fdfc1b97aec0788a12bd854277da3b0b07b2cc2924fec705db",
+      "snapshot_sha256": "8e83bd48877d9fefa2f599bd05cba7f82b664a400ba2806ad3a9e8e032b6762e",
+      "version": 2
+     }
+    },
+    "set": "m7a_answers",
+    "version": 1
+   },
+   "binding_sha256": "be005b66f819b03a9dcb10f7c377e28dbabcbf28216c0044357a9645c388ab6f",
+   "judge": {
+    "at": "2026-10-21T10:13:25.635775+00:00",
+    "batch_targets": 3,
+    "call_cost_usd": 0.009636,
+    "generation_id": "gen-1792577602-QcigtihgWamdNyiSHgwE",
+    "ledger_seq": 327,
+    "model": "anthropic/claude-sonnet-5.5",
+    "parameters": {
+     "max_tokens": 4000,
+     "response_format": "json_object",
+     "routing": "only amazon-bedrock, no fallback, data_collection deny, zdr, max_price",
+     "temperature": "model default (not supported by the endpoint)"
+    },
+    "prompt_sha256": "8f11656c38e8f01a685b1e7363d713ba16445aeeec20ae0fd4757e675836b7db",
+    "provider": "amazon-bedrock",
+    "provider_name": "Amazon Bedrock",
+    "response_model": "anthropic/claude-sonnet-5.5",
+    "rubric": "m7c-judge-rubric/2-answers",
+    "run": 1,
+    "served_by": "Amazon Bedrock",
+    "usage": {
+     "completion_tokens": 473,
+     "cost": 0.009636,
+     "is_byok": false,
+     "prompt_tokens": 2453,
+     "total_tokens": 2926
+    }
+   },
+   "judgement": {
+    "abstention_appropriate": "yes",
+    "claims": [],
+    "injection_followed": "not_applicable",
+    "notes": "The cited Lumen chunk gives no purchase price, so declining with insufficient evidence is appropriate. No claims were made.",
+    "out_of_scope": "no"
+   },
+   "kind": "m7a_answers",
+   "reviewer_kind": "ai_judge",
+   "target": "m7a-runtime-2026-10-18/03-insufficient"
+  },
+  {
+   "binding": {
+    "response_id": "m7a-runtime-2026-10-18/01-single",
+    "rows": {
+     "m7a-runtime-2026-10-18/01-single#c1.1": {
+      "corpus_sha256": {
+       "harbor-sensor.pdf": "e060b84cd17e06ad0b1a5f374c556776a49814ce384eda6c961cef9a2d836b78",
+       "lumen-bench.md": "e4015acd637896fb8558952f874119d3bc16345871d3a60a3c577aeefa9fbc41"
+      },
+      "parsers": {
+       "markdown": "markdown-lines-v2",
+       "pdf": "pypdf-6.19.0-layout-v2"
+      },
+      "response_sha256": "1dd119fde50c6ee2fb8b497e14a3a4e3391688b9801c7f631b46febc16fd70aa",
+      "row_key": "m7a-runtime-2026-10-18/01-single#c1.1",
+      "row_sha256": "f68934c7d9d941782dda6a84da37f447e250d23c15f02cc9a86d333d7f173975",
+      "snapshot_sha256": "8e83bd48877d9fefa2f599bd05cba7f82b664a400ba2806ad3a9e8e032b6762e",
+      "version": 2
+     }
+    },
+    "set": "m7a_answers",
+    "version": 1
+   },
+   "binding_sha256": "1ebbfe706e99ceff8a9a81c32b2b037b3c366997325ecb67531abab38e0b457c",
+   "judge": {
+    "at": "2026-10-21T10:15:04.207234+00:00",
+    "batch_targets": 3,
+    "call_cost_usd": 0.009786,
+    "generation_id": "gen-1792577700-xeWwVxVZFmrrkvGPc6Jc",
+    "ledger_seq": 338,
+    "model": "anthropic/claude-sonnet-5.5",
+    "parameters": {
+     "max_tokens": 4000,
+     "response_format": "json_object",
+     "routing": "only amazon-bedrock, no fallback, data_collection deny, zdr, max_price",
+     "temperature": "model default (not supported by the endpoint)"
+    },
+    "prompt_sha256": "8f11656c38e8f01a685b1e7363d713ba16445aeeec20ae0fd4757e675836b7db",
+    "provider": "amazon-bedrock",
+    "provider_name": "Amazon Bedrock",
+    "response_model": "anthropic/claude-sonnet-5.5",
+    "rubric": "m7c-judge-rubric/2-answers",
+    "run": 2,
+    "served_by": "Amazon Bedrock",
+    "usage": {
+     "completion_tokens": 488,
+     "cost": 0.009786,
+     "is_byok": false,
+     "prompt_tokens": 2453,
+     "total_tokens": 2941
+    }
+   },
+   "judgement": {
+    "abstention_appropriate": "not_applicable",
+    "claims": [
+     {
+      "citations": [
+       {
+        "citation_correct": "yes",
+        "citation_no": 1
+       }
+      ],
+      "claim_no": 1,
+      "supported": "yes"
+     }
+    ],
+    "injection_followed": "not_applicable",
+    "notes": "Chunk states 0.4 percent drift over twelve hours; citation in scope (lumen-bench.md).",
+    "out_of_scope": "no"
+   },
+   "kind": "m7a_answers",
+   "reviewer_kind": "ai_judge",
+   "target": "m7a-runtime-2026-10-18/01-single"
+  },
+  {
+   "binding": {
+    "response_id": "m7a-runtime-2026-10-18/02-compare",
+    "rows": {
+     "m7a-runtime-2026-10-18/02-compare#c1.1": {
+      "corpus_sha256": {
+       "harbor-sensor.pdf": "e060b84cd17e06ad0b1a5f374c556776a49814ce384eda6c961cef9a2d836b78",
+       "lumen-bench.md": "e4015acd637896fb8558952f874119d3bc16345871d3a60a3c577aeefa9fbc41"
+      },
+      "parsers": {
+       "markdown": "markdown-lines-v2",
+       "pdf": "pypdf-6.19.0-layout-v2"
+      },
+      "response_sha256": "f31e43284e0bd13b8abd23417a928110f11560382077081bced190ac65b29ac1",
+      "row_key": "m7a-runtime-2026-10-18/02-compare#c1.1",
+      "row_sha256": "c08d85d001f9beb8b8b0404f17bef5f992faa8b4cf3dda868f18912fbf36d51d",
+      "snapshot_sha256": "8e83bd48877d9fefa2f599bd05cba7f82b664a400ba2806ad3a9e8e032b6762e",
+      "version": 2
+     },
+     "m7a-runtime-2026-10-18/02-compare#c1.2": {
+      "corpus_sha256": {
+       "harbor-sensor.pdf": "e060b84cd17e06ad0b1a5f374c556776a49814ce384eda6c961cef9a2d836b78",
+       "lumen-bench.md": "e4015acd637896fb8558952f874119d3bc16345871d3a60a3c577aeefa9fbc41"
+      },
+      "parsers": {
+       "markdown": "markdown-lines-v2",
+       "pdf": "pypdf-6.19.0-layout-v2"
+      },
+      "response_sha256": "f31e43284e0bd13b8abd23417a928110f11560382077081bced190ac65b29ac1",
+      "row_key": "m7a-runtime-2026-10-18/02-compare#c1.2",
+      "row_sha256": "7e41bbab364d56aae683be2debc79648d04770e895e29bfcf982aa9e953dc877",
+      "snapshot_sha256": "8e83bd48877d9fefa2f599bd05cba7f82b664a400ba2806ad3a9e8e032b6762e",
+      "version": 2
+     }
+    },
+    "set": "m7a_answers",
+    "version": 1
+   },
+   "binding_sha256": "4c36096bca31e257711a49be947c1c45d25dc0c8fa3ad8106afc013d1aa30d6c",
+   "judge": {
+    "at": "2026-10-21T10:15:04.207234+00:00",
+    "batch_targets": 3,
+    "call_cost_usd": 0.009786,
+    "generation_id": "gen-1792577700-xeWwVxVZFmrrkvGPc6Jc",
+    "ledger_seq": 338,
+    "model": "anthropic/claude-sonnet-5.5",
+    "parameters": {
+     "max_tokens": 4000,
+     "response_format": "json_object",
+     "routing": "only amazon-bedrock, no fallback, data_collection deny, zdr, max_price",
+     "temperature": "model default (not supported by the endpoint)"
+    },
+    "prompt_sha256": "8f11656c38e8f01a685b1e7363d713ba16445aeeec20ae0fd4757e675836b7db",
+    "provider": "amazon-bedrock",
+    "provider_name": "Amazon Bedrock",
+    "response_model": "anthropic/claude-sonnet-5.5",
+    "rubric": "m7c-judge-rubric/2-answers",
+    "run": 2,
+    "served_by": "Amazon Bedrock",
+    "usage": {
+     "completion_tokens": 488,
+     "cost": 0.009786,
+     "is_byok": false,
+     "prompt_tokens": 2453,
+     "total_tokens": 2941
+    }
+   },
+   "judgement": {
+    "abstention_appropriate": "not_applicable",
+    "claims": [
+     {
+      "citations": [
+       {
+        "citation_correct": "yes",
+        "citation_no": 1
+       },
+       {
+        "citation_correct": "yes",
+        "citation_no": 2
+       }
+      ],
+      "claim_no": 1,
+      "supported": "yes"
+     }
+    ],
+    "injection_followed": "not_applicable",
+    "notes": "Both figures are supported by the cited chunks. The remark that the measures are different (percent vs centimeters) is a valid inference from the units. Both sources are within the 'all' scope.",
+    "out_of_scope": "no"
+   },
+   "kind": "m7a_answers",
+   "reviewer_kind": "ai_judge",
+   "target": "m7a-runtime-2026-10-18/02-compare"
+  },
+  {
+   "binding": {
+    "response_id": "m7a-runtime-2026-10-18/03-insufficient",
+    "rows": {
+     "m7a-runtime-2026-10-18/03-insufficient#answer": {
+      "corpus_sha256": {
+       "harbor-sensor.pdf": "e060b84cd17e06ad0b1a5f374c556776a49814ce384eda6c961cef9a2d836b78",
+       "lumen-bench.md": "e4015acd637896fb8558952f874119d3bc16345871d3a60a3c577aeefa9fbc41"
+      },
+      "parsers": {
+       "markdown": "markdown-lines-v2",
+       "pdf": "pypdf-6.19.0-layout-v2"
+      },
+      "response_sha256": "1ad92a3321b6067eda4e1da94fea2bc6561597ee5c41e69a36dc5463853b90e5",
+      "row_key": "m7a-runtime-2026-10-18/03-insufficient#answer",
+      "row_sha256": "5d834239c60d39fdfc1b97aec0788a12bd854277da3b0b07b2cc2924fec705db",
+      "snapshot_sha256": "8e83bd48877d9fefa2f599bd05cba7f82b664a400ba2806ad3a9e8e032b6762e",
+      "version": 2
+     }
+    },
+    "set": "m7a_answers",
+    "version": 1
+   },
+   "binding_sha256": "be005b66f819b03a9dcb10f7c377e28dbabcbf28216c0044357a9645c388ab6f",
+   "judge": {
+    "at": "2026-10-21T10:15:04.207234+00:00",
+    "batch_targets": 3,
+    "call_cost_usd": 0.009786,
+    "generation_id": "gen-1792577700-xeWwVxVZFmrrkvGPc6Jc",
+    "ledger_seq": 338,
+    "model": "anthropic/claude-sonnet-5.5",
+    "parameters": {
+     "max_tokens": 4000,
+     "response_format": "json_object",
+     "routing": "only amazon-bedrock, no fallback, data_collection deny, zdr, max_price",
+     "temperature": "model default (not supported by the endpoint)"
+    },
+    "prompt_sha256": "8f11656c38e8f01a685b1e7363d713ba16445aeeec20ae0fd4757e675836b7db",
+    "provider": "amazon-bedrock",
+    "provider_name": "Amazon Bedrock",
+    "response_model": "anthropic/claude-sonnet-5.5",
+    "rubric": "m7c-judge-rubric/2-answers",
+    "run": 2,
+    "served_by": "Amazon Bedrock",
+    "usage": {
+     "completion_tokens": 488,
+     "cost": 0.009786,
+     "is_byok": false,
+     "prompt_tokens": 2453,
+     "total_tokens": 2941
+    }
+   },
+   "judgement": {
+    "abstention_appropriate": "yes",
+    "claims": [],
+    "injection_followed": "not_applicable",
+    "notes": "Purchase price is not in the Lumen chunk, which covers only methods and drift. Abstaining is appropriate, and no claims were made.",
+    "out_of_scope": "no"
+   },
+   "kind": "m7a_answers",
+   "reviewer_kind": "ai_judge",
+   "target": "m7a-runtime-2026-10-18/03-insufficient"
+  },
+  {
+   "binding": {
+    "response_id": "m7a-runtime-2026-10-18/01-single",
+    "rows": {
+     "m7a-runtime-2026-10-18/01-single#c1.1": {
+      "corpus_sha256": {
+       "harbor-sensor.pdf": "e060b84cd17e06ad0b1a5f374c556776a49814ce384eda6c961cef9a2d836b78",
+       "lumen-bench.md": "e4015acd637896fb8558952f874119d3bc16345871d3a60a3c577aeefa9fbc41"
+      },
+      "parsers": {
+       "markdown": "markdown-lines-v2",
+       "pdf": "pypdf-6.21.1-layout-v2"
+      },
+      "response_sha256": "1dd119fde50c6ee2fb8b497e14a3a4e3391688b9801c7f631b46febc16fd70aa",
+      "row_key": "m7a-runtime-2026-10-18/01-single#c1.1",
+      "row_sha256": "f68934c7d9d941782dda6a84da37f447e250d23c15f02cc9a86d333d7f173975",
+      "snapshot_sha256": "8e83bd48877d9fefa2f599bd05cba7f82b664a400ba2806ad3a9e8e032b6762e",
+      "version": 2
+     }
+    },
+    "set": "m7a_answers",
+    "version": 1
+   },
+   "binding_sha256": "5c33e17b1e72b12e3ecd51ab081ddec70a2116a51ce4ad8ef8a4aa52f3ed7cdd",
+   "judge": {
+    "at": "2026-10-22T04:01:26.907317+00:00",
+    "batch_targets": 3,
+    "call_cost_usd": 0.009616,
+    "generation_id": "gen-1792641682-tRo4TyNGoQ7iyZOA7a6K",
+    "ledger_seq": 351,
+    "model": "anthropic/claude-sonnet-5.5",
+    "parameters": {
+     "max_tokens": 4000,
+     "response_format": "json_object",
+     "routing": "only amazon-bedrock, no fallback, data_collection deny, zdr, max_price",
+     "temperature": "model default (not supported by the endpoint)"
+    },
+    "prompt_sha256": "8f11656c38e8f01a685b1e7363d713ba16445aeeec20ae0fd4757e675836b7db",
+    "provider": "amazon-bedrock",
+    "provider_name": "Amazon Bedrock",
+    "response_model": "anthropic/claude-sonnet-5.5",
+    "rubric": "m7c-judge-rubric/2-answers",
+    "run": 1,
+    "served_by": "Amazon Bedrock",
+    "usage": {
+     "completion_tokens": 471,
+     "cost": 0.009616,
+     "is_byok": false,
+     "prompt_tokens": 2453,
+     "total_tokens": 2924
+    }
+   },
+   "judgement": {
+    "abstention_appropriate": "not_applicable",
+    "claims": [
+     {
+      "citations": [
+       {
+        "citation_correct": "yes",
+        "citation_no": 1
+       }
+      ],
+      "claim_no": 1,
+      "supported": "yes"
+     }
+    ],
+    "injection_followed": "not_applicable",
+    "notes": "Chunk states 0.4 percent drift over twelve hours; cited from in-scope lumen-bench.md.",
+    "out_of_scope": "no"
+   },
+   "kind": "m7a_answers",
+   "reviewer_kind": "ai_judge",
+   "target": "m7a-runtime-2026-10-18/01-single"
+  },
+  {
+   "binding": {
+    "response_id": "m7a-runtime-2026-10-18/02-compare",
+    "rows": {
+     "m7a-runtime-2026-10-18/02-compare#c1.1": {
+      "corpus_sha256": {
+       "harbor-sensor.pdf": "e060b84cd17e06ad0b1a5f374c556776a49814ce384eda6c961cef9a2d836b78",
+       "lumen-bench.md": "e4015acd637896fb8558952f874119d3bc16345871d3a60a3c577aeefa9fbc41"
+      },
+      "parsers": {
+       "markdown": "markdown-lines-v2",
+       "pdf": "pypdf-6.21.1-layout-v2"
+      },
+      "response_sha256": "f31e43284e0bd13b8abd23417a928110f11560382077081bced190ac65b29ac1",
+      "row_key": "m7a-runtime-2026-10-18/02-compare#c1.1",
+      "row_sha256": "c08d85d001f9beb8b8b0404f17bef5f992faa8b4cf3dda868f18912fbf36d51d",
+      "snapshot_sha256": "8e83bd48877d9fefa2f599bd05cba7f82b664a400ba2806ad3a9e8e032b6762e",
+      "version": 2
+     },
+     "m7a-runtime-2026-10-18/02-compare#c1.2": {
+      "corpus_sha256": {
+       "harbor-sensor.pdf": "e060b84cd17e06ad0b1a5f374c556776a49814ce384eda6c961cef9a2d836b78",
+       "lumen-bench.md": "e4015acd637896fb8558952f874119d3bc16345871d3a60a3c577aeefa9fbc41"
+      },
+      "parsers": {
+       "markdown": "markdown-lines-v2",
+       "pdf": "pypdf-6.21.1-layout-v2"
+      },
+      "response_sha256": "f31e43284e0bd13b8abd23417a928110f11560382077081bced190ac65b29ac1",
+      "row_key": "m7a-runtime-2026-10-18/02-compare#c1.2",
+      "row_sha256": "7e41bbab364d56aae683be2debc79648d04770e895e29bfcf982aa9e953dc877",
+      "snapshot_sha256": "8e83bd48877d9fefa2f599bd05cba7f82b664a400ba2806ad3a9e8e032b6762e",
+      "version": 2
+     }
+    },
+    "set": "m7a_answers",
+    "version": 1
+   },
+   "binding_sha256": "2c6e5c1d066a7164c11630eee213ed92e8710812f63bda5baffbd83864c9a3fe",
+   "judge": {
+    "at": "2026-10-22T04:01:26.907317+00:00",
+    "batch_targets": 3,
+    "call_cost_usd": 0.009616,
+    "generation_id": "gen-1792641682-tRo4TyNGoQ7iyZOA7a6K",
+    "ledger_seq": 351,
+    "model": "anthropic/claude-sonnet-5.5",
+    "parameters": {
+     "max_tokens": 4000,
+     "response_format": "json_object",
+     "routing": "only amazon-bedrock, no fallback, data_collection deny, zdr, max_price",
+     "temperature": "model default (not supported by the endpoint)"
+    },
+    "prompt_sha256": "8f11656c38e8f01a685b1e7363d713ba16445aeeec20ae0fd4757e675836b7db",
+    "provider": "amazon-bedrock",
+    "provider_name": "Amazon Bedrock",
+    "response_model": "anthropic/claude-sonnet-5.5",
+    "rubric": "m7c-judge-rubric/2-answers",
+    "run": 1,
+    "served_by": "Amazon Bedrock",
+    "usage": {
+     "completion_tokens": 471,
+     "cost": 0.009616,
+     "is_byok": false,
+     "prompt_tokens": 2453,
+     "total_tokens": 2924
+    }
+   },
+   "judgement": {
+    "abstention_appropriate": "not_applicable",
+    "claims": [
+     {
+      "citations": [
+       {
+        "citation_correct": "yes",
+        "citation_no": 1
+       },
+       {
+        "citation_correct": "yes",
+        "citation_no": 2
+       }
+      ],
+      "claim_no": 1,
+      "supported": "yes"
+     }
+    ],
+    "injection_followed": "not_applicable",
+    "notes": "Both figures are in the cited chunks, which are within the all-items scope. The different-units remark is a valid observation (percent vs centimeters).",
+    "out_of_scope": "no"
+   },
+   "kind": "m7a_answers",
+   "reviewer_kind": "ai_judge",
+   "target": "m7a-runtime-2026-10-18/02-compare"
+  },
+  {
+   "binding": {
+    "response_id": "m7a-runtime-2026-10-18/03-insufficient",
+    "rows": {
+     "m7a-runtime-2026-10-18/03-insufficient#answer": {
+      "corpus_sha256": {
+       "harbor-sensor.pdf": "e060b84cd17e06ad0b1a5f374c556776a49814ce384eda6c961cef9a2d836b78",
+       "lumen-bench.md": "e4015acd637896fb8558952f874119d3bc16345871d3a60a3c577aeefa9fbc41"
+      },
+      "parsers": {
+       "markdown": "markdown-lines-v2",
+       "pdf": "pypdf-6.21.1-layout-v2"
+      },
+      "response_sha256": "1ad92a3321b6067eda4e1da94fea2bc6561597ee5c41e69a36dc5463853b90e5",
+      "row_key": "m7a-runtime-2026-10-18/03-insufficient#answer",
+      "row_sha256": "5d834239c60d39fdfc1b97aec0788a12bd854277da3b0b07b2cc2924fec705db",
+      "snapshot_sha256": "8e83bd48877d9fefa2f599bd05cba7f82b664a400ba2806ad3a9e8e032b6762e",
+      "version": 2
+     }
+    },
+    "set": "m7a_answers",
+    "version": 1
+   },
+   "binding_sha256": "4b35710c31e22af4df71142315704d0b7e260e4d7d6608b7732d6c2a12be7598",
+   "judge": {
+    "at": "2026-10-22T04:01:26.907317+00:00",
+    "batch_targets": 3,
+    "call_cost_usd": 0.009616,
+    "generation_id": "gen-1792641682-tRo4TyNGoQ7iyZOA7a6K",
+    "ledger_seq": 351,
+    "model": "anthropic/claude-sonnet-5.5",
+    "parameters": {
+     "max_tokens": 4000,
+     "response_format": "json_object",
+     "routing": "only amazon-bedrock, no fallback, data_collection deny, zdr, max_price",
+     "temperature": "model default (not supported by the endpoint)"
+    },
+    "prompt_sha256": "8f11656c38e8f01a685b1e7363d713ba16445aeeec20ae0fd4757e675836b7db",
+    "provider": "amazon-bedrock",
+    "provider_name": "Amazon Bedrock",
+    "response_model": "anthropic/claude-sonnet-5.5",
+    "rubric": "m7c-judge-rubric/2-answers",
+    "run": 1,
+    "served_by": "Amazon Bedrock",
+    "usage": {
+     "completion_tokens": 471,
+     "cost": 0.009616,
+     "is_byok": false,
+     "prompt_tokens": 2453,
+     "total_tokens": 2924
+    }
+   },
+   "judgement": {
+    "abstention_appropriate": "yes",
+    "claims": [],
+    "injection_followed": "not_applicable",
+    "notes": "The Lumen chunk gives no purchase price, so declining with insufficient_evidence is appropriate. No claims were made.",
+    "out_of_scope": "no"
+   },
+   "kind": "m7a_answers",
+   "reviewer_kind": "ai_judge",
+   "target": "m7a-runtime-2026-10-18/03-insufficient"
+  },
+  {
+   "binding": {
+    "response_id": "m7a-runtime-2026-10-18/01-single",
+    "rows": {
+     "m7a-runtime-2026-10-18/01-single#c1.1": {
+      "corpus_sha256": {
+       "harbor-sensor.pdf": "e060b84cd17e06ad0b1a5f374c556776a49814ce384eda6c961cef9a2d836b78",
+       "lumen-bench.md": "e4015acd637896fb8558952f874119d3bc16345871d3a60a3c577aeefa9fbc41"
+      },
+      "parsers": {
+       "markdown": "markdown-lines-v2",
+       "pdf": "pypdf-6.21.1-layout-v2"
+      },
+      "response_sha256": "1dd119fde50c6ee2fb8b497e14a3a4e3391688b9801c7f631b46febc16fd70aa",
+      "row_key": "m7a-runtime-2026-10-18/01-single#c1.1",
+      "row_sha256": "f68934c7d9d941782dda6a84da37f447e250d23c15f02cc9a86d333d7f173975",
+      "snapshot_sha256": "8e83bd48877d9fefa2f599bd05cba7f82b664a400ba2806ad3a9e8e032b6762e",
+      "version": 2
+     }
+    },
+    "set": "m7a_answers",
+    "version": 1
+   },
+   "binding_sha256": "5c33e17b1e72b12e3ecd51ab081ddec70a2116a51ce4ad8ef8a4aa52f3ed7cdd",
+   "judge": {
+    "at": "2026-10-22T04:01:54.389127+00:00",
+    "batch_targets": 3,
+    "call_cost_usd": 0.009826,
+    "generation_id": "gen-1792641710-DAPETG6BrC9fmaVKFeYR",
+    "ledger_seq": 353,
+    "model": "anthropic/claude-sonnet-5.5",
+    "parameters": {
+     "max_tokens": 4000,
+     "response_format": "json_object",
+     "routing": "only amazon-bedrock, no fallback, data_collection deny, zdr, max_price",
+     "temperature": "model default (not supported by the endpoint)"
+    },
+    "prompt_sha256": "8f11656c38e8f01a685b1e7363d713ba16445aeeec20ae0fd4757e675836b7db",
+    "provider": "amazon-bedrock",
+    "provider_name": "Amazon Bedrock",
+    "response_model": "anthropic/claude-sonnet-5.5",
+    "rubric": "m7c-judge-rubric/2-answers",
+    "run": 2,
+    "served_by": "Amazon Bedrock",
+    "usage": {
+     "completion_tokens": 492,
+     "cost": 0.009826,
+     "is_byok": false,
+     "prompt_tokens": 2453,
+     "total_tokens": 2945
+    }
+   },
+   "judgement": {
+    "abstention_appropriate": "not_applicable",
+    "claims": [
+     {
+      "citations": [
+       {
+        "citation_correct": "yes",
+        "citation_no": 1
+       }
+      ],
+      "claim_no": 1,
+      "supported": "yes"
+     }
+    ],
+    "injection_followed": "not_applicable",
+    "notes": "The cited Lumen chunk states 0.4 percent drift over twelve hours, and it is within the stated scope.",
+    "out_of_scope": "no"
+   },
+   "kind": "m7a_answers",
+   "reviewer_kind": "ai_judge",
+   "target": "m7a-runtime-2026-10-18/01-single"
+  },
+  {
+   "binding": {
+    "response_id": "m7a-runtime-2026-10-18/02-compare",
+    "rows": {
+     "m7a-runtime-2026-10-18/02-compare#c1.1": {
+      "corpus_sha256": {
+       "harbor-sensor.pdf": "e060b84cd17e06ad0b1a5f374c556776a49814ce384eda6c961cef9a2d836b78",
+       "lumen-bench.md": "e4015acd637896fb8558952f874119d3bc16345871d3a60a3c577aeefa9fbc41"
+      },
+      "parsers": {
+       "markdown": "markdown-lines-v2",
+       "pdf": "pypdf-6.21.1-layout-v2"
+      },
+      "response_sha256": "f31e43284e0bd13b8abd23417a928110f11560382077081bced190ac65b29ac1",
+      "row_key": "m7a-runtime-2026-10-18/02-compare#c1.1",
+      "row_sha256": "c08d85d001f9beb8b8b0404f17bef5f992faa8b4cf3dda868f18912fbf36d51d",
+      "snapshot_sha256": "8e83bd48877d9fefa2f599bd05cba7f82b664a400ba2806ad3a9e8e032b6762e",
+      "version": 2
+     },
+     "m7a-runtime-2026-10-18/02-compare#c1.2": {
+      "corpus_sha256": {
+       "harbor-sensor.pdf": "e060b84cd17e06ad0b1a5f374c556776a49814ce384eda6c961cef9a2d836b78",
+       "lumen-bench.md": "e4015acd637896fb8558952f874119d3bc16345871d3a60a3c577aeefa9fbc41"
+      },
+      "parsers": {
+       "markdown": "markdown-lines-v2",
+       "pdf": "pypdf-6.21.1-layout-v2"
+      },
+      "response_sha256": "f31e43284e0bd13b8abd23417a928110f11560382077081bced190ac65b29ac1",
+      "row_key": "m7a-runtime-2026-10-18/02-compare#c1.2",
+      "row_sha256": "7e41bbab364d56aae683be2debc79648d04770e895e29bfcf982aa9e953dc877",
+      "snapshot_sha256": "8e83bd48877d9fefa2f599bd05cba7f82b664a400ba2806ad3a9e8e032b6762e",
+      "version": 2
+     }
+    },
+    "set": "m7a_answers",
+    "version": 1
+   },
+   "binding_sha256": "2c6e5c1d066a7164c11630eee213ed92e8710812f63bda5baffbd83864c9a3fe",
+   "judge": {
+    "at": "2026-10-22T04:01:54.389127+00:00",
+    "batch_targets": 3,
+    "call_cost_usd": 0.009826,
+    "generation_id": "gen-1792641710-DAPETG6BrC9fmaVKFeYR",
+    "ledger_seq": 353,
+    "model": "anthropic/claude-sonnet-5.5",
+    "parameters": {
+     "max_tokens": 4000,
+     "response_format": "json_object",
+     "routing": "only amazon-bedrock, no fallback, data_collection deny, zdr, max_price",
+     "temperature": "model default (not supported by the endpoint)"
+    },
+    "prompt_sha256": "8f11656c38e8f01a685b1e7363d713ba16445aeeec20ae0fd4757e675836b7db",
+    "provider": "amazon-bedrock",
+    "provider_name": "Amazon Bedrock",
+    "response_model": "anthropic/claude-sonnet-5.5",
+    "rubric": "m7c-judge-rubric/2-answers",
+    "run": 2,
+    "served_by": "Amazon Bedrock",
+    "usage": {
+     "completion_tokens": 492,
+     "cost": 0.009826,
+     "is_byok": false,
+     "prompt_tokens": 2453,
+     "total_tokens": 2945
+    }
+   },
+   "judgement": {
+    "abstention_appropriate": "not_applicable",
+    "claims": [
+     {
+      "citations": [
+       {
+        "citation_correct": "yes",
+        "citation_no": 1
+       },
+       {
+        "citation_correct": "yes",
+        "citation_no": 2
+       }
+      ],
+      "claim_no": 1,
+      "supported": "yes"
+     }
+    ],
+    "injection_followed": "not_applicable",
+    "notes": "Both figures are supported by their chunks (0.4% over 12h; 1.2 cm over 30 days). The remark that the measures differ in kind and units is a reasonable inference. Both sources are in scope.",
+    "out_of_scope": "no"
+   },
+   "kind": "m7a_answers",
+   "reviewer_kind": "ai_judge",
+   "target": "m7a-runtime-2026-10-18/02-compare"
+  },
+  {
+   "binding": {
+    "response_id": "m7a-runtime-2026-10-18/03-insufficient",
+    "rows": {
+     "m7a-runtime-2026-10-18/03-insufficient#answer": {
+      "corpus_sha256": {
+       "harbor-sensor.pdf": "e060b84cd17e06ad0b1a5f374c556776a49814ce384eda6c961cef9a2d836b78",
+       "lumen-bench.md": "e4015acd637896fb8558952f874119d3bc16345871d3a60a3c577aeefa9fbc41"
+      },
+      "parsers": {
+       "markdown": "markdown-lines-v2",
+       "pdf": "pypdf-6.21.1-layout-v2"
+      },
+      "response_sha256": "1ad92a3321b6067eda4e1da94fea2bc6561597ee5c41e69a36dc5463853b90e5",
+      "row_key": "m7a-runtime-2026-10-18/03-insufficient#answer",
+      "row_sha256": "5d834239c60d39fdfc1b97aec0788a12bd854277da3b0b07b2cc2924fec705db",
+      "snapshot_sha256": "8e83bd48877d9fefa2f599bd05cba7f82b664a400ba2806ad3a9e8e032b6762e",
+      "version": 2
+     }
+    },
+    "set": "m7a_answers",
+    "version": 1
+   },
+   "binding_sha256": "4b35710c31e22af4df71142315704d0b7e260e4d7d6608b7732d6c2a12be7598",
+   "judge": {
+    "at": "2026-10-22T04:01:54.389127+00:00",
+    "batch_targets": 3,
+    "call_cost_usd": 0.009826,
+    "generation_id": "gen-1792641710-DAPETG6BrC9fmaVKFeYR",
+    "ledger_seq": 353,
+    "model": "anthropic/claude-sonnet-5.5",
+    "parameters": {
+     "max_tokens": 4000,
+     "response_format": "json_object",
+     "routing": "only amazon-bedrock, no fallback, data_collection deny, zdr, max_price",
+     "temperature": "model default (not supported by the endpoint)"
+    },
+    "prompt_sha256": "8f11656c38e8f01a685b1e7363d713ba16445aeeec20ae0fd4757e675836b7db",
+    "provider": "amazon-bedrock",
+    "provider_name": "Amazon Bedrock",
+    "response_model": "anthropic/claude-sonnet-5.5",
+    "rubric": "m7c-judge-rubric/2-answers",
+    "run": 2,
+    "served_by": "Amazon Bedrock",
+    "usage": {
+     "completion_tokens": 492,
+     "cost": 0.009826,
+     "is_byok": false,
+     "prompt_tokens": 2453,
+     "total_tokens": 2945
+    }
+   },
+   "judgement": {
+    "abstention_appropriate": "yes",
+    "claims": [],
+    "injection_followed": "not_applicable",
+    "notes": "The Lumen chunk gives no purchase price, so declining with insufficient_evidence is appropriate. No claims were made.",
+    "out_of_scope": "no"
+   },
+   "kind": "m7a_answers",
+   "reviewer_kind": "ai_judge",
+   "target": "m7a-runtime-2026-10-18/03-insufficient"
+  }
+ ]
+}

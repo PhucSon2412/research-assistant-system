@@ -1,0 +1,352 @@
+{
+ "format": "ras-m7c-papers/1",
+ "corpus_id": "m7c-open-licence-rag-2026-10-21",
+ "topic": "retrieval-augmented generation: retrieval, reranking, chunking, evaluation, hallucination",
+ "selection": "Orchestrator-delegated choice by the coding agent (M7c task): arXiv versions whose abs page AND OAI-PMH arXivRaw record both name CC BY 4.0, CC BY-SA 4.0 or CC0 1.0 and that are the latest version; short papers (<= 8 pages by the author comment) so the 400-call ceiling fits; 10 that the production parser indexes and 2 it does not, kept to report the real product state.",
+ "redistribution": "PDFs and full text are NOT in the repository. scripts/m7c_papers.py fetch re-downloads exactly these versions from arXiv and checks SHA-256 and size.",
+ "papers": [
+  {
+   "id": "P01",
+   "arxiv_id": "2605.03989",
+   "version": 2,
+   "title": "An Agent-Oriented Pluggable Experience-RAG Skill for Experience-Driven Retrieval Strategy Orchestration",
+   "authors": "Dutao Zhang and Tian Liao",
+   "licence": "CC BY 4.0",
+   "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+   "abs_url": "https://arxiv.org/abs/2605.03989v2",
+   "pdf_url": "https://arxiv.org/pdf/2605.03989v2",
+   "filename": "arxiv-2605.03989v2.pdf",
+   "sha256": "d355cc8035aba729ae63c8a6a3e3f1117303ae844da957105e070fc9b798ba5f",
+   "bytes": 261357,
+   "retrieved_on": "2026-10-21",
+   "licence_checked_at": "2026-10-21T08:59:19+00:00",
+   "attribution": "Dutao Zhang and Tian Liao. \"An Agent-Oriented Pluggable Experience-RAG Skill for Experience-Driven Retrieval Strategy Orchestration\". arXiv:2605.03989v2. Licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Unmodified PDF; the repository keeps no copy.",
+   "production_parse": {
+    "parser": "pypdf-6.21.1-layout-v2",
+    "pages": 6,
+    "disposition": "awaiting_index",
+    "coverage": "complete",
+    "error": null,
+    "warnings": [
+     "two_column_order_heuristic",
+     "margin_lines_excluded"
+    ]
+   },
+   "embedded_chunks": 11
+  },
+  {
+   "id": "P02",
+   "arxiv_id": "2308.00479",
+   "version": 1,
+   "title": "Retrieval Augmented Generation and Representative Vector Summarization for large unstructured textual data in Medical Education",
+   "authors": "S. S. Manathunga and Y. A. Illangasekara",
+   "licence": "CC BY 4.0",
+   "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+   "abs_url": "https://arxiv.org/abs/2308.00479v1",
+   "pdf_url": "https://arxiv.org/pdf/2308.00479v1",
+   "filename": "arxiv-2308.00479v1.pdf",
+   "sha256": "3dc83c1bbf8685a5109abb32d7974baa96b23b3f06d14f73fcdeb37621b28c3d",
+   "bytes": 2017723,
+   "retrieved_on": "2026-10-21",
+   "licence_checked_at": "2026-10-21T08:58:48+00:00",
+   "attribution": "S. S. Manathunga and Y. A. Illangasekara. \"Retrieval Augmented Generation and Representative Vector Summarization for large unstructured textual data in Medical Education\". arXiv:2308.00479v1. Licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Unmodified PDF; the repository keeps no copy.",
+   "production_parse": {
+    "parser": "pypdf-6.21.1-layout-v2",
+    "pages": 6,
+    "disposition": "awaiting_index",
+    "coverage": "partial",
+    "error": null,
+    "warnings": [
+     "margin_lines_excluded",
+     "body_pages_below_min_chars"
+    ]
+   },
+   "embedded_chunks": 14
+  },
+  {
+   "id": "P03",
+   "arxiv_id": "2606.11199",
+   "version": 1,
+   "title": "NightFeats @ MMU-RAGent NeurIPS 2025: A Context-Optimized Multi-Agent RAG System for the Text-to-Text Track",
+   "authors": "Quentin Fever and Naziha Aslam",
+   "licence": "CC BY 4.0",
+   "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+   "abs_url": "https://arxiv.org/abs/2606.11199v1",
+   "pdf_url": "https://arxiv.org/pdf/2606.11199v1",
+   "filename": "arxiv-2606.11199v1.pdf",
+   "sha256": "2a9ad0e0b4198113ac68e046e1070f5fd101f3ca625677827a5cc81fd8e90b0e",
+   "bytes": 660424,
+   "retrieved_on": "2026-10-21",
+   "licence_checked_at": "2026-10-21T08:58:20+00:00",
+   "attribution": "Quentin Fever and Naziha Aslam. \"NightFeats @ MMU-RAGent NeurIPS 2025: A Context-Optimized Multi-Agent RAG System for the Text-to-Text Track\". arXiv:2606.11199v1. Licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Unmodified PDF; the repository keeps no copy.",
+   "production_parse": {
+    "parser": "pypdf-6.21.1-layout-v2",
+    "pages": 6,
+    "disposition": "awaiting_index",
+    "coverage": "complete",
+    "error": null,
+    "warnings": [
+     "layout_order_uncertain"
+    ]
+   },
+   "embedded_chunks": 15
+  },
+  {
+   "id": "P04",
+   "arxiv_id": "2602.23184",
+   "version": 1,
+   "title": "MTRAG-UN: A Benchmark for Open Challenges in Multi-Turn RAG Conversations",
+   "authors": "Sara Rosenthal, Yannis Katsis, Vraj Shah, Lihong He, Lucian Popa, Marina Danilevsky",
+   "licence": "CC BY-SA 4.0",
+   "licence_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "abs_url": "https://arxiv.org/abs/2602.23184v1",
+   "pdf_url": "https://arxiv.org/pdf/2602.23184v1",
+   "filename": "arxiv-2602.23184v1.pdf",
+   "sha256": "687b2fc0e9a958e1e3c0f3cdc2771e86e4389cb2ddf9fe3318377f742e476b9a",
+   "bytes": 1208421,
+   "retrieved_on": "2026-10-21",
+   "licence_checked_at": "2026-10-21T08:59:41+00:00",
+   "attribution": "Sara Rosenthal, Yannis Katsis, Vraj Shah, Lihong He, Lucian Popa, Marina Danilevsky. \"MTRAG-UN: A Benchmark for Open Challenges in Multi-Turn RAG Conversations\". arXiv:2602.23184v1. Licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/). Unmodified PDF; the repository keeps no copy.",
+   "production_parse": {
+    "parser": "pypdf-6.21.1-layout-v2",
+    "pages": 7,
+    "disposition": "awaiting_index",
+    "coverage": "complete",
+    "error": null,
+    "warnings": [
+     "two_column_order_heuristic",
+     "layout_order_uncertain"
+    ]
+   },
+   "embedded_chunks": 17
+  },
+  {
+   "id": "P05",
+   "arxiv_id": "2610.22615",
+   "version": 1,
+   "title": "When Does Uncertainty Measure RAG Hallucination Risk?",
+   "authors": "Rajeel Ahmad Ansari, Tautik Agrahari",
+   "licence": "CC BY 4.0",
+   "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+   "abs_url": "https://arxiv.org/abs/2610.22615v1",
+   "pdf_url": "https://arxiv.org/pdf/2610.22615v1",
+   "filename": "arxiv-2610.22615v1.pdf",
+   "sha256": "5fe58888d0fa7eff14d80722b8fb39764f1f6e57762f2b64d0f5f146e23384ee",
+   "bytes": 211559,
+   "retrieved_on": "2026-10-21",
+   "licence_checked_at": "2026-10-21T08:58:55+00:00",
+   "attribution": "Rajeel Ahmad Ansari, Tautik Agrahari. \"When Does Uncertainty Measure RAG Hallucination Risk?\". arXiv:2610.22615v1. Licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Unmodified PDF; the repository keeps no copy.",
+   "production_parse": {
+    "parser": "pypdf-6.21.1-layout-v2",
+    "pages": 6,
+    "disposition": "awaiting_index",
+    "coverage": "complete",
+    "error": null,
+    "warnings": [
+     "two_column_order_heuristic"
+    ]
+   },
+   "embedded_chunks": 17
+  },
+  {
+   "id": "P06",
+   "arxiv_id": "2608.03860",
+   "version": 1,
+   "title": "SciRet: A Compute-Aware Empirical Study of Retrieval and Reranking for Scientific RAG",
+   "authors": "Kaysarul Anas Apurba, Md. Hasibul Hasan, Rofiqul Alam Shehab, Asab Azad",
+   "licence": "CC BY 4.0",
+   "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+   "abs_url": "https://arxiv.org/abs/2608.03860v1",
+   "pdf_url": "https://arxiv.org/pdf/2608.03860v1",
+   "filename": "arxiv-2608.03860v1.pdf",
+   "sha256": "6a9d0dd365c5db9b22d56c2735f6859011ca3000576c0e63b6b7b0b8fab764bf",
+   "bytes": 300326,
+   "retrieved_on": "2026-10-21",
+   "licence_checked_at": "2026-10-21T08:59:26+00:00",
+   "attribution": "Kaysarul Anas Apurba, Md. Hasibul Hasan, Rofiqul Alam Shehab, Asab Azad. \"SciRet: A Compute-Aware Empirical Study of Retrieval and Reranking for Scientific RAG\". arXiv:2608.03860v1. Licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Unmodified PDF; the repository keeps no copy.",
+   "production_parse": {
+    "parser": "pypdf-6.21.1-layout-v2",
+    "pages": 6,
+    "disposition": "awaiting_index",
+    "coverage": "complete",
+    "error": null,
+    "warnings": [
+     "two_column_order_heuristic",
+     "layout_order_uncertain",
+     "margin_lines_excluded"
+    ]
+   },
+   "embedded_chunks": 19
+  },
+  {
+   "id": "P07",
+   "arxiv_id": "2602.22217",
+   "version": 1,
+   "title": "RAGdb: A Zero-Dependency, Embeddable Architecture for Multimodal Retrieval-Augmented Generation on the Edge",
+   "authors": "Ahmed Bin Khalid",
+   "licence": "CC BY 4.0",
+   "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+   "abs_url": "https://arxiv.org/abs/2602.22217v1",
+   "pdf_url": "https://arxiv.org/pdf/2602.22217v1",
+   "filename": "arxiv-2602.22217v1.pdf",
+   "sha256": "52f5bdd177c79b517be9c4fcfb4eb1f53f21bc84fa8559db5463c1fbf986cb96",
+   "bytes": 263015,
+   "retrieved_on": "2026-10-21",
+   "licence_checked_at": "2026-10-21T08:57:51+00:00",
+   "attribution": "Ahmed Bin Khalid. \"RAGdb: A Zero-Dependency, Embeddable Architecture for Multimodal Retrieval-Augmented Generation on the Edge\". arXiv:2602.22217v1. Licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Unmodified PDF; the repository keeps no copy.",
+   "production_parse": {
+    "parser": "pypdf-6.21.1-layout-v2",
+    "pages": 6,
+    "disposition": "awaiting_index",
+    "coverage": "complete",
+    "error": null,
+    "warnings": [
+     "layout_order_uncertain",
+     "margin_lines_excluded"
+    ]
+   },
+   "embedded_chunks": 20
+  },
+  {
+   "id": "P08",
+   "arxiv_id": "2407.12101",
+   "version": 2,
+   "title": "Better RAG using Relevant Information Gain",
+   "authors": "Marc Pickett, Jeremy Hartman, Ayan Kumar Bhowmick, Raquib-ul Alam, Aditya Vempaty",
+   "licence": "CC BY 4.0",
+   "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+   "abs_url": "https://arxiv.org/abs/2407.12101v2",
+   "pdf_url": "https://arxiv.org/pdf/2407.12101v2",
+   "filename": "arxiv-2407.12101v2.pdf",
+   "sha256": "6d178cb689a8223040d96852535e29a92a37f976f2b33826306b7a740475059e",
+   "bytes": 572541,
+   "retrieved_on": "2026-10-21",
+   "licence_checked_at": "2026-10-21T09:00:11+00:00",
+   "attribution": "Marc Pickett, Jeremy Hartman, Ayan Kumar Bhowmick, Raquib-ul Alam, Aditya Vempaty. \"Better RAG using Relevant Information Gain\". arXiv:2407.12101v2. Licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Unmodified PDF; the repository keeps no copy.",
+   "production_parse": {
+    "parser": "pypdf-6.21.1-layout-v2",
+    "pages": 8,
+    "disposition": "awaiting_index",
+    "coverage": "complete",
+    "error": null,
+    "warnings": [
+     "two_column_order_heuristic"
+    ]
+   },
+   "embedded_chunks": 21
+  },
+  {
+   "id": "P09",
+   "arxiv_id": "2608.00824",
+   "version": 1,
+   "title": "Structure-Aware Semantic Chunking with Title-Chain Prefixes: A 1600-Query Evaluation and the Measurement Trap in Text-Transform Ablations",
+   "authors": "Yang Yang",
+   "licence": "CC BY 4.0",
+   "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+   "abs_url": "https://arxiv.org/abs/2608.00824v1",
+   "pdf_url": "https://arxiv.org/pdf/2608.00824v1",
+   "filename": "arxiv-2608.00824v1.pdf",
+   "sha256": "25ad7caf1b936f8dbcdb97f58f72560854b50bd690ec908dc0e9e53c27b96b06",
+   "bytes": 309965,
+   "retrieved_on": "2026-10-21",
+   "licence_checked_at": "2026-10-21T09:02:17+00:00",
+   "attribution": "Yang Yang. \"Structure-Aware Semantic Chunking with Title-Chain Prefixes: A 1600-Query Evaluation and the Measurement Trap in Text-Transform Ablations\". arXiv:2608.00824v1. Licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Unmodified PDF; the repository keeps no copy.",
+   "production_parse": {
+    "parser": "pypdf-6.21.1-layout-v2",
+    "pages": 8,
+    "disposition": "awaiting_index",
+    "coverage": "complete",
+    "error": null,
+    "warnings": [
+     "margin_lines_excluded"
+    ]
+   },
+   "embedded_chunks": 23
+  },
+  {
+   "id": "P10",
+   "arxiv_id": "2606.16661",
+   "version": 2,
+   "title": "SCAR: Semantic Continuity-Aware Retrieval for Efficient Context Expansion in RAG",
+   "authors": "Nathana\\\"el Langlois",
+   "licence": "CC BY 4.0",
+   "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+   "abs_url": "https://arxiv.org/abs/2606.16661v2",
+   "pdf_url": "https://arxiv.org/pdf/2606.16661v2",
+   "filename": "arxiv-2606.16661v2.pdf",
+   "sha256": "4ec5dfa2d6ad6ab1030c217bf58b1936a44c42498203d23a7c13ee5822a33bec",
+   "bytes": 878455,
+   "retrieved_on": "2026-10-21",
+   "licence_checked_at": "2026-10-21T09:01:40+00:00",
+   "attribution": "Nathana\\\"el Langlois. \"SCAR: Semantic Continuity-Aware Retrieval for Efficient Context Expansion in RAG\". arXiv:2606.16661v2. Licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Unmodified PDF; the repository keeps no copy.",
+   "production_parse": {
+    "parser": "pypdf-6.21.1-layout-v2",
+    "pages": 5,
+    "disposition": "awaiting_index",
+    "coverage": "complete",
+    "error": null,
+    "warnings": [
+     "two_column_order_heuristic",
+     "layout_order_uncertain"
+    ]
+   },
+   "embedded_chunks": 26
+  },
+  {
+   "id": "P11",
+   "arxiv_id": "2607.11933",
+   "version": 1,
+   "title": "Transforming LLMs into Efficient Cross-Encoders via Knowledge Distillation for RAG Reranking",
+   "authors": "Shreeya Dasa Lakshminath, Shubhan S",
+   "licence": "CC BY 4.0",
+   "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+   "abs_url": "https://arxiv.org/abs/2607.11933v1",
+   "pdf_url": "https://arxiv.org/pdf/2607.11933v1",
+   "filename": "arxiv-2607.11933v1.pdf",
+   "sha256": "aa33f8060929b97168e4bcd5e69368f15027c80fe9b12c946cb246dee18a9323",
+   "bytes": 825587,
+   "retrieved_on": "2026-10-21",
+   "licence_checked_at": "2026-10-21T09:00:40+00:00",
+   "attribution": "Shreeya Dasa Lakshminath, Shubhan S. \"Transforming LLMs into Efficient Cross-Encoders via Knowledge Distillation for RAG Reranking\". arXiv:2607.11933v1. Licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Unmodified PDF; the repository keeps no copy.",
+   "production_parse": {
+    "parser": "pypdf-6.21.1-layout-v2",
+    "pages": 4,
+    "disposition": "needs_review",
+    "coverage": "none",
+    "error": null,
+    "warnings": [
+     "two_column_order_heuristic",
+     "layout_order_uncertain",
+     "body_boundary_uncertain"
+    ]
+   },
+   "embedded_chunks": 0
+  },
+  {
+   "id": "P12",
+   "arxiv_id": "2410.02914",
+   "version": 1,
+   "title": "Streamlining Conformal Information Retrieval via Score Refinement",
+   "authors": "Yotam Intrator, Ori Kelner, Regev Cohen, Roman Goldenberg, Ehud Rivlin, Daniel Freedman",
+   "licence": "CC BY 4.0",
+   "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+   "abs_url": "https://arxiv.org/abs/2410.02914v1",
+   "pdf_url": "https://arxiv.org/pdf/2410.02914v1",
+   "filename": "arxiv-2410.02914v1.pdf",
+   "sha256": "a1f4ddcea967be2234883b3d962f6b73372643f87b89b879e14c44008976d489",
+   "bytes": 336110,
+   "retrieved_on": "2026-10-21",
+   "licence_checked_at": "2026-10-21T08:59:48+00:00",
+   "attribution": "Yotam Intrator, Ori Kelner, Regev Cohen, Roman Goldenberg, Ehud Rivlin, Daniel Freedman. \"Streamlining Conformal Information Retrieval via Score Refinement\". arXiv:2410.02914v1. Licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Unmodified PDF; the repository keeps no copy.",
+   "production_parse": {
+    "parser": "pypdf-6.21.1-layout-v2",
+    "pages": null,
+    "disposition": "parser_error",
+    "coverage": null,
+    "error": "pdf_text_invalid",
+    "warnings": []
+   },
+   "embedded_chunks": 0
+  }
+ ]
+}

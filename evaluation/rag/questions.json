@@ -438,7 +438,7 @@
               "page": 3,
               "start_offset": 97,
               "end_offset": 188,
-              "parser": "pypdf-6.19.0-layout-v2"
+              "parser": "pypdf-6.21.1-layout-v2"
             }
           ]
         }
@@ -474,7 +474,7 @@
               "page": 4,
               "start_offset": 95,
               "end_offset": 153,
-              "parser": "pypdf-6.19.0-layout-v2"
+              "parser": "pypdf-6.21.1-layout-v2"
             },
             {
               "item": "A/P07",
@@ -483,7 +483,7 @@
               "page": 1,
               "start_offset": 337,
               "end_offset": 384,
-              "parser": "pypdf-6.19.0-layout-v2"
+              "parser": "pypdf-6.21.1-layout-v2"
             }
           ]
         }
@@ -521,7 +521,7 @@
               "page": 4,
               "start_offset": 180,
               "end_offset": 267,
-              "parser": "pypdf-6.19.0-layout-v2"
+              "parser": "pypdf-6.21.1-layout-v2"
             }
           ]
         }
@@ -1130,7 +1130,7 @@
               "page": 4,
               "start_offset": 180,
               "end_offset": 267,
-              "parser": "pypdf-6.19.0-layout-v2"
+              "parser": "pypdf-6.21.1-layout-v2"
             }
           ]
         }
@@ -1169,7 +1169,7 @@
               "page": 3,
               "start_offset": 364,
               "end_offset": 457,
-              "parser": "pypdf-6.19.0-layout-v2"
+              "parser": "pypdf-6.21.1-layout-v2"
             }
           ]
         },
@@ -1249,7 +1249,7 @@
               "page": 1,
               "start_offset": 216,
               "end_offset": 292,
-              "parser": "pypdf-6.19.0-layout-v2"
+              "parser": "pypdf-6.21.1-layout-v2"
             },
             {
               "item": "A/P09",
@@ -1258,7 +1258,7 @@
               "page": 3,
               "start_offset": 88,
               "end_offset": 158,
-              "parser": "pypdf-6.19.0-layout-v2"
+              "parser": "pypdf-6.21.1-layout-v2"
             }
           ]
         }
@@ -1917,7 +1917,7 @@
               "page": 3,
               "start_offset": 8,
               "end_offset": 76,
-              "parser": "pypdf-6.19.0-layout-v2"
+              "parser": "pypdf-6.21.1-layout-v2"
             }
           ]
         }
@@ -1985,7 +1985,7 @@
               "page": 5,
               "start_offset": 79,
               "end_offset": 158,
-              "parser": "pypdf-6.19.0-layout-v2"
+              "parser": "pypdf-6.21.1-layout-v2"
             }
           ]
         }
@@ -2051,7 +2051,7 @@
               "page": 6,
               "start_offset": 11,
               "end_offset": 97,
-              "parser": "pypdf-6.19.0-layout-v2"
+              "parser": "pypdf-6.21.1-layout-v2"
             }
           ]
         }
@@ -2089,7 +2089,7 @@
               "page": 3,
               "start_offset": 8,
               "end_offset": 87,
-              "parser": "pypdf-6.19.0-layout-v2"
+              "parser": "pypdf-6.21.1-layout-v2"
             }
           ]
         }
@@ -2157,7 +2157,7 @@
               "page": 5,
               "start_offset": 174,
               "end_offset": 246,
-              "parser": "pypdf-6.19.0-layout-v2"
+              "parser": "pypdf-6.21.1-layout-v2"
             }
           ]
         }
@@ -2195,7 +2195,7 @@
               "page": 3,
               "start_offset": 88,
               "end_offset": 158,
-              "parser": "pypdf-6.19.0-layout-v2"
+              "parser": "pypdf-6.21.1-layout-v2"
             }
           ]
         }
@@ -2232,7 +2232,7 @@
               "page": 5,
               "start_offset": 95,
               "end_offset": 173,
-              "parser": "pypdf-6.19.0-layout-v2"
+              "parser": "pypdf-6.21.1-layout-v2"
             }
           ]
         }
