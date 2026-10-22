@@ -29,7 +29,7 @@ lại: gate open, journal = DB, replica `ok`.
 | Hạ tầng | Caddy/PostgreSQL 16.14/Redis/MinIO theo digest pin trong `deploy/compose.yaml` (đều đã có trong cache máy) |
 | Mạng nội bộ | backend `ras-pilot` `172.30.64.0/24`, drill `172.30.48.0/24`; `ras-pilot-offsite_offsite` internal, chỉ replicator/`ops`/`ops-check` nối vào |
 | SMTP | `smtp.gmail.com:465` `implicit_tls`, CA hệ thống của image; tài khoản/sender/người nhận alert = địa chỉ trong `secrets\smtp_username`; mật khẩu chỉ là Compose secret `smtp_password` |
-| Provider | **Từ M7c (2026-10-21):** key nhóm (từ `secrets\openrouter_api_key`) trong `pilot.env` (ACL chỉ user), `pricing_verified=true` cho embedding/rerank/generation sau khi có chứng cứ live ([handoff M7c](m7c-live-quality-verification.md)); routing ZDR pin như M7a; budget app $10/ngày, quota User mặc định; discovery tắt. Trước đó: key trống, pricing false |
+| Provider | **Từ M7c (2026-10-21):** key nhóm (từ `secrets\openrouter_api_key`) trong `pilot.env` (ACL chỉ user), `pricing_verified=true` cho embedding/rerank/generation sau khi có chứng cứ live ([handoff M7c](m7c-live-quality-verification.md)); routing ZDR pin như M7a; budget app $10/ngày, quota User mặc định; output generation 1024 token, trần request $0,06 (từ 2026-10-22, chỉ demo); discovery tắt. Trước đó: key trống, pricing false |
 | Lịch | Task Scheduler: `RAS pilot backup` 03:00 hằng ngày, `RAS pilot check` mỗi 15 phút; chạy `pythonw.exe` của Conda `ras` → `bin\run_ops_task.py` → `release\scripts\ras_ops.py`; log `logs\ops-<ngày>.log` (giữ 30 ngày) |
 
 **Overlay, không sửa deploy đã review.** `scripts/m9_lan_demo.py prepare` sinh `pilot\override.yaml` ngoài repo:
@@ -93,18 +93,20 @@ Số đo trên là máy này, dữ liệu gần rỗng, đích cùng máy; **kh�
 - **Durability:** journal ghi qua bind mount của Docker Desktop (Windows → VM); không tuyên bố an toàn mất điện.
 - `scripts/m9_lan_demo.py uninstall` **chưa chạy** (sẽ phá bản demo đang dùng); đã có lệnh thủ công tương đương ở mục 8.
 
-**Provider đã bật (M7c, 2026-10-21).** `python scripts/m9_lan_demo.py provider --routes embedding rerank generation --apply`
-(tắt: `provider --off --apply`). Lúc bật demo không có item nào. Agent đã kiểm readiness, cấu hình, egress OpenRouter và bind
+**Provider đã bật (M7c, 2026-10-21; giới hạn output cập nhật 2026-10-22).** `python scripts/m9_lan_demo.py provider --routes
+embedding rerank generation --max-output-tokens 1024 --apply` (tắt: `provider --off --apply`). Lúc bật demo không có item nào; ngày
+22/10 demo đã có 12 paper do chủ dự án upload (10 `indexed`, 1 `needs_review`, 1 lỗi parser, đúng như stack thử). Agent đã kiểm readiness, cấu hình, egress OpenRouter và bind
 mạng. **Chưa kiểm** search/RAG qua UI trên demo: việc này cần chủ dự án upload paper và có tài khoản thử. Giới hạn:
 
 - **Chỉ upload paper giấy phép mở hoặc tài liệu tự viết.** Text sẽ đi qua OpenRouter, mà key thuộc tài khoản nhóm và chưa
   xác minh được cài đặt logging. Thông báo upload trong image rc2 chỉ nói dữ liệu đi qua OpenRouter, không cảnh báo tài
   liệu nhạy cảm, nên người trình bày phải nói rõ điều này.
 - Khoảng 40 % paper arXiv hai cột được parser xếp `needs_review` và không index (không OCR); demo nên dùng bộ đã kiểm.
-- **Câu so sánh cần title thật**: sau upload, sửa tiêu đề ở trang item (tên file `arxiv-…` không khớp tên paper trong câu
-  hỏi). Kể cả vậy, keyword mode thường không gom đủ hai paper (M7c: 1/6 so sánh trả lời được). Chỉ trình diễn câu so sánh
-  đã chạy được.
-- Output 512 token có thể cắt câu trả lời dài (lỗi 503); hỏi câu ngắn, cụ thể.
+- **Câu so sánh cần title thật và chế độ hybrid**: sau upload, sửa tiêu đề ở trang item (tên file `arxiv-…` không khớp tên
+  paper trong câu hỏi), và hỏi so sánh ở chế độ **hybrid**. Keyword mode thường không gom đủ hai paper (M7c, keyword: 1/6).
+  Hybrid cho câu so sánh chưa được đo trong M7c (hết trần), nên hỏi thử trước và chỉ trình diễn câu đã chạy được.
+- **Output generation của demo là 1024 token** (`max_request_usd` 0,06): trước đây 512 token cắt câu so sánh dài (lỗi
+  503). Mỗi câu thường tốn $0,005–0,02; quota User $1/ngày, ngân sách ứng dụng $10/ngày.
 
 ## 4. Việc của chủ dự án và nghiệm thu
 
@@ -173,8 +175,8 @@ Chuẩn bị trước (khoảng 15 phút, trước buổi demo):
    - trên item SciRet: *What effect did the MS MARCO-trained cross-encoder reranker have in SciRet?*;
    - trên item RAGdb: *How much does RAGdb reduce disk footprint compared with Docker-based RAG stacks?*;
    - toàn thư viện: *Do all retrieval benchmarks report perfect recall?* (trả lời "không", trích SCAR và Experience-RAG);
-   - toàn thư viện, so sánh: *Compare how SCAR and the title-chain chunking paper address evidence split across chunk
-     boundaries.* (cần đã sửa tiêu đề);
+   - toàn thư viện, so sánh, **chế độ hybrid**: *Compare how SCAR and the title-chain chunking paper address evidence split
+     across chunk boundaries.* (cần đã sửa tiêu đề);
    - không có đáp án, trên item RAGdb: *What monthly subscription price does RAGdb charge?* → hệ thống báo thiếu bằng chứng;
    - bấm một citation → mở đúng paper/trang, quote nằm trong đoạn.
 4. (2 phút) Gửi review → Admin xem đúng file được yêu cầu → approve → publish → đăng nhập tài khoản khác thấy bản chung →

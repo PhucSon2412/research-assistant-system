@@ -31,9 +31,22 @@ Agent chọn trong phạm vi [task M9](tasks/m9-lan-demo-deployment.md); không 
 
 - **Overlay ngoài repo thay vì sửa `deploy/`:** compose gốc map cứng container `:443` và origin không cổng; với 8443 trình duyệt bị từ chối CSRF. Overlay sinh bởi `scripts/m9_lan_demo.py` đặt site Caddy/origin/`PUBLIC_BASE_URL` có cổng và chỉ publish `IP_Ethernet:8443`. Không publish cổng redirect HTTP (Caddy sẽ redirect về 443).
 - **Chỉ hostname `ras-demo.lan`:** truy cập IP trần không có SNI và Caddyfile đã review không có `default_sni` (đã kiểm: handshake lỗi); không sửa Caddyfile cho demo. Điện thoại cần DNS nội bộ ở router.
-- **Bản sao phát hành** `git archive 7009a84` (`deploy/`, `scripts/ras_ops.py`) dưới `%USERPROFILE%as-pilotelease`, để lịch/compose không đổi theo nhánh đang checkout; tag alias `ras-pilot-*:rc2` trỏ đúng ID rc2.
+- **Bản sao phát hành** `git archive 7009a84` (`deploy/`, `scripts/ras_ops.py`) dưới `%USERPROFILE%
+as-pilot
+elease`, để lịch/compose không đổi theo nhánh đang checkout; tag alias `ras-pilot-*:rc2` trỏ đúng ID rc2.
 - **CA demo name-constrained** (`ras-demo.lan` + dải IP private), khóa chỉ quyền user; một MinIO cùng máy với hai bucket/bốn credential (replica không có quyền xóa, object lock 1 ngày).
 - **Task Scheduler** chạy `pythonw` + wrapper ẩn cửa sổ, phiên tương tác (Docker Desktop vốn chỉ chạy khi đăng nhập).
+
+## Sửa review PR #70: một nguồn dependency (2026-10-22)
+
+Orchestrator chọn ([prompt sửa](tasks/fix-pr70-parser-dependency-drift.md)); agent triển khai.
+
+- **Chuẩn dependency là image rc2 đang chạy:** `api/constraints-rc2.txt` từ `pip freeze` của `rasm8c-api:rc2`. CI và Conda
+  `ras` cài với `-c` file này; `pyproject.toml` giữ khoảng (không nới, không siết). Image build sau này phải dùng constraints
+  này hoặc digest đã nghiệm thu. Gói chỉ có ở `[dev]` giữ khoảng.
+- **Nhãn evaluation** cập nhật phiên bản parser bằng `annotate` khi text không đổi; text đổi thì phải sửa span có bằng chứng.
+- **Demo:** output generation 1024 và trần request $0,06 chỉ trong env/overlay demo; mặc định code/`deploy/` giữ 512/$0,05.
+- Hai nhãn M4c AI judge đánh "cần sửa" giữ nguyên; tập này đổi giữa hai lượt judge (78/80 đồng thuận), không tự sửa dữ liệu.
 
 ## Triển khai M7c (2026-10-21)
 
@@ -52,7 +65,7 @@ chủ dự án chọn trực tiếp. Chi tiết và số đo ở [handoff M7c](m
 - **`pricing_verified`:** đủ chứng cứ cho embedding document/query; rerank và generation đủ chứng cứ kèm điều kiện theo dõi
   giá (rerank không có biên; cache-write nằm ngoài `max_price.prompt`). Mặc định trong source/`deploy/` giữ `false`; chỉ bản
   demo bật cả ba route.
-- **Không sửa trong PR này, chờ quyết định:** nhãn M4c CMP-09/RCI-09 (judge `needs_change`; sửa sẽ đổi binding M7b),
+- **Không sửa trong PR này, chờ quyết định:** nhãn M4c judge `needs_change` (CMP-09/RCI-09 lượt đầu, PP-05/RCI-09 lượt chấm lại; sửa sẽ đổi binding M7b),
   `generation.max_output_tokens=512` (cắt câu so sánh dài), nhận diện paper khi so sánh dựa trên title (upload mặc định
   dùng tên file).
 

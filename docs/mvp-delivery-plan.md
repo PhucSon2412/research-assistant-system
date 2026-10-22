@@ -1,5 +1,7 @@
 # Kế hoạch hoàn thành MVP
 
+**Sửa review PR #70 (2026-10-22, chờ review lại):** pypdf trôi giữa image (6.21.1) và Conda/nhãn (6.19.0) đã thống nhất bằng `api/constraints-rc2.txt`; nhãn/bundle/AI judge xác lập lại trên 6.21.1; trần live M7c đã dùng hết tới mốc 80 %; demo output 1024. Xem [handoff](m7c-live-quality-verification.md#sửa-review-pr-70-2026-10-22).
+
 **M7c trên nhánh `feat/m7c-live-quality-verification` (2026-10-21, chờ review, chưa merge):** base `b5d8117`, source **0052**. Live trong stack cô lập trên paper arXiv giấy phép mở, AI judge track riêng, demo `ras-pilot` đã bật provider. Xem [handoff](m7c-live-quality-verification.md); điểm yếu so sánh nhiều paper và output 512 token chờ quyết định.
 
 **Review M9 PR #69 tại `209d92b`, 2026-10-21:** không thấy điểm chặn merge. Reviewer kiểm trực tiếp demo đang chạy: TLS/CA, Origin/CSRF, path nội bộ, bind chỉ Ethernet, scheduled task, name constraints CA. Key OpenRouter được chủ dự án đính chính là key nhóm chia sẻ, được phép dùng. [M7c](tasks/m7c-live-quality-verification.md) mở lại, thêm bước bật provider cho demo theo route đã kiểm. Ước lượng **2–3 ngày**, xong là demo có search/RAG có citation trên paper thật giấy phép mở.

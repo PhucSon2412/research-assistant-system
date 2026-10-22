@@ -558,15 +558,18 @@ def build_report(*, records: Path = DEFAULT_RECORDS, root: Path = DEFAULT_ROOT, 
     loaded = {kind: load_records(records, kind) for kind in KINDS}
     human_labels = human.load_records(human.DEFAULT_RECORDS, "labels")
     human_answers = human.load_records(human.DEFAULT_RECORDS, "answers")
+    m7c = m7c_current(run=m7c_run)
     return {"format": FORMAT + "#report", "generated_on": (today or date.today()).isoformat(),
             "reviewer_kind": REVIEWER_KIND, "attribution": ATTRIBUTION,
             "rubric": {"labels": RUBRIC_VERSION, "answers": ANSWER_RUBRIC_VERSION},
+            # Parser the live bindings use: this process for M4c/M7a, the run snapshot for M7c.
+            "parsers": {"m4c_m7a": human.parsers(), "m7c_run": m7c["parser"] if m7c else None},
             "judges": _judges([r for rows in loaded.values() for r in rows]),
             "m7b_human": {"label_records": len(human_labels), "answer_records": len(human_answers),
                           "note": "M7b chỉ đếm phiếu do người điền; track AI không ghi vào đó"},
             "m4c_labels": _label_section(loaded["m4c_labels"], root),
             "m7a_answers": _m7a_section(loaded["m7a_answers"], bundle, corpus),
-            "m7c_answers": _m7c_section(loaded["m7c_answers"], m7c_current(run=m7c_run)),
+            "m7c_answers": _m7c_section(loaded["m7c_answers"], m7c),
             "limits": ["AI judge không thay người đọc: một mô hình chấm theo rubric, có thể sai và có thiên lệch.",
                        "Nhãn M4c và câu hỏi M7c do agent soạn; judge chấm nhãn chứ không xác nhận như chuyên gia.",
                        "Kiểm máy (quote nguyên văn, locator, scope) đứng riêng; judge không ghi đè.",
@@ -584,7 +587,10 @@ def render_report(data: dict) -> str:
     lines = [f"# Đánh giá bằng AI judge (M7c) — {data['generated_on']}", "",
              f"**reviewer_kind: `{data['reviewer_kind']}`** — {data['attribution']}.", "",
              f"Rubric nhãn `{data['rubric']['labels']}`, answer `{data['rubric']['answers']}`. M7b (người thật): {data['m7b_human']['label_records']} record nhãn, "
-             f"{data['m7b_human']['answer_records']} record answer — không thay đổi bởi track này.", "", "## Judge", ""]
+             f"{data['m7b_human']['answer_records']} record answer — không thay đổi bởi track này.", "",
+             f"Parser của binding hiện hành: nhãn M4c/answer M7a `{data['parsers']['m4c_m7a']['pdf']}` "
+             f"(Markdown `{data['parsers']['m4c_m7a']['markdown']}`); run M7c `{data['parsers']['m7c_run']}`. "
+             "Record bind parser khác là stale và không được tính.", "", "## Judge", ""]
     for judge in data["judges"]:
         lines.append(f"- `{judge['model']}` qua `{judge['provider']}`, rubric `{judge['rubric']}`: {judge['calls']} call, "
                      f"${judge['cost_usd']:.6f} billed" + (f", {judge['cost_unknown_calls']} call chưa rõ chi phí"

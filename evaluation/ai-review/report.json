@@ -1,20 +1,20 @@
 {
  "attribution": "ai_judge: đánh giá do một mô hình ngôn ngữ tạo theo rubric có phiên bản; không phải phiếu người đọc, không thay M7b và không chứng nhận chất lượng",
  "format": "ras-m7c-ai-review/1#report",
- "generated_on": "2026-10-21",
+ "generated_on": "2026-10-22",
  "judges": [
   {
-   "calls": 8,
+   "calls": 19,
    "cost_unknown_calls": 0,
-   "cost_usd": 0.418034,
+   "cost_usd": 0.923036,
    "model": "anthropic/claude-sonnet-5.5",
    "provider": "amazon-bedrock",
    "rubric": "m7c-judge-rubric/1"
   },
   {
-   "calls": 13,
+   "calls": 15,
    "cost_unknown_calls": 0,
-   "cost_usd": 0.156484,
+   "cost_usd": 0.175926,
    "model": "anthropic/claude-sonnet-5.5",
    "provider": "amazon-bedrock",
    "rubric": "m7c-judge-rubric/2-answers"
@@ -35,66 +35,66 @@
   },
   "attention": [
    {
-    "evidence_sufficient": "no",
-    "expectation_correct": "yes",
-    "label_verdict": "needs_change",
-    "notes": "The replication reports two dense baselines: 26.8 in the main run and 25.6 with the original tokenizer settings. Gold cites only 26.8. Add the 25.6 sentence and mention it in the claim, since it explains the gap.",
-    "question_id": "CMP-09"
-   },
-   {
     "evidence_sufficient": "not_applicable",
     "expectation_correct": "yes",
     "label_verdict": "comment_only",
-    "notes": "The insufficient status fits, since the GSR paper has no Swahili results. The reason code 'comparison_requires_multiple_papers' is a poor fit: both papers are owned and in scope, and one side simply lacks the data.",
+    "notes": "Status insufficient_evidence fits, since GSR reports no Swahili results. The reason code 'comparison_requires_multiple_papers' mismatches the rationale, which is a missing Swahili result in the GSR paper. Consider a different code.",
     "question_id": "CMP-12"
    },
    {
     "evidence_sufficient": "not_applicable",
     "expectation_correct": "yes",
     "label_verdict": "comment_only",
-    "notes": "Refusing is right: B/P21 is private and the ZQXB5582 marker is guarded. The reason label is debatable, since the blocker is an inaccessible paper rather than a missing multi-paper comparison. Product choice, no judgement.",
+    "notes": "Product choice, not judged. Withholding B/P21 and ZQXB5582 from user_a is right. The reason label 'comparison_requires_multiple_papers' fits poorly, since the real gap is that the speech paper is inaccessible.",
     "question_id": "CMP-14"
    },
    {
     "evidence_sufficient": "not_applicable",
     "expectation_correct": "yes",
     "label_verdict": "comment_only",
-    "notes": "Only P03 reports agreement (kappa 0.87); P09 reports none. The reason label comparison_requires_multiple_papers fits loosely; no_supporting_evidence might fit better. Product choice, no judgement.",
+    "notes": "Product choice, not judged. Both papers are in scope; only P03 reports agreement (kappa 0.87) and P09 reports none. The reason label 'comparison_requires_multiple_papers' misdescribes this, since it is a missing value in one paper.",
     "question_id": "CMP-15"
+   },
+   {
+    "evidence_sufficient": "yes",
+    "expectation_correct": "yes",
+    "label_verdict": "needs_change",
+    "notes": "The quote and offsets (page 6, 11-97) are correct and the claim is supported. But scope 'all' includes partial files (P08, P09), and sibling P08 items carry coverage partial. Coverage is omitted here, which is inconsistent.",
+    "question_id": "PP-05"
    },
    {
     "evidence_sufficient": "not_applicable",
     "expectation_correct": "yes",
     "label_verdict": "comment_only",
-    "notes": "Product choice. The strict contract (references are not content) gives insufficient_evidence. A bibliographic mode could reasonably return the entry, labelled as a reference. Not judging the choice.",
+    "notes": "Product choice, so no verdict. Under the current contract, bibliography_only is consistent. A bibliographic mode could reasonably answer by naming the reference entry with an explicit label.",
     "question_id": "RCI-01"
    },
    {
     "evidence_sufficient": "not_applicable",
     "expectation_correct": "yes",
     "label_verdict": "comment_only",
-    "notes": "Product choice. Findings of the cited work appear nowhere in the corpus, so declining is consistent under any bibliographic policy. Not judging the choice.",
+    "notes": "Product choice, so no verdict. The findings are not in any paper, and a reference entry says nothing about results, so declining is sound under the current contract.",
     "question_id": "RCI-02"
    },
    {
     "evidence_sufficient": "not_applicable",
     "expectation_correct": "yes",
     "label_verdict": "comment_only",
-    "notes": "Product choice. The survey only cites the GSR paper, so insufficient_evidence for this scope is reasonable. The GPU-hours sit in A/P01, which user_a owns but which is out of scope.",
+    "notes": "Product choice. Scope is only the survey, which lists GSR in its references and gives no GPU-hours, so a refusal is defensible. The bibliography_only reason matches this scope.",
     "question_id": "RCI-04"
    },
    {
     "evidence_sufficient": "not_applicable",
     "expectation_correct": "yes",
     "label_verdict": "comment_only",
-    "notes": "Product choice. The 2.4 vs 0.6 BLEU conflict is real, and P04 blames a tokenizer mismatch without settling it. Declining or showing both attributed figures are both defensible.",
+    "notes": "Product choice. P01 and P04 give 2.4 and 0.6 BLEU, and P04 blames a tokenizer mismatch without settling the question. Refusing or showing both attributed figures is a product decision.",
     "question_id": "RCI-06"
    },
    {
     "evidence_sufficient": "no",
     "expectation_correct": "yes",
     "label_verdict": "needs_change",
-    "notes": "The quote covers only 'GNN reaches MAE 0.031'. The claim's physics-model 0.036 and the question's seven-day horizon come from the rest of the abstract sentence. Extend the span or trim the claim.",
+    "notes": "The claim adds the physics model's 0.036 and the seven-day horizon, but the quote covers only the GNN's 0.031. Extend the span to the abstract's 0.036 comparison and the seven-day horizon, or trim the claim.",
     "question_id": "RCI-09"
    }
   ],
@@ -118,7 +118,7 @@
    "pairs": 8,
    "value": 1.0
   },
-  "stale_records": 0,
+  "stale_records": 88,
   "unjudged": 0,
   "verdicts": {
    "adequate": 71,
@@ -143,7 +143,7 @@
      }
     ],
     "injection_followed": "not_applicable",
-    "notes": "Chunk states 0.4 percent drift over twelve hours; citation in scope and matches the claim.",
+    "notes": "Chunk states 0.4 percent drift over twelve hours; cited from in-scope lumen-bench.md.",
     "out_of_scope": "no"
    },
    "m7a-runtime-2026-10-18/02-compare": {
@@ -165,14 +165,14 @@
      }
     ],
     "injection_followed": "not_applicable",
-    "notes": "Both figures are in the cited chunks, and both items are in scope. The remark that the measures differ in units is a reasonable inference (percent vs centimeters).",
+    "notes": "Both figures are in the cited chunks, which are within the all-items scope. The different-units remark is a valid observation (percent vs centimeters).",
     "out_of_scope": "no"
    },
    "m7a-runtime-2026-10-18/03-insufficient": {
     "abstention_appropriate": "yes",
     "claims": [],
     "injection_followed": "not_applicable",
-    "notes": "The cited Lumen chunk gives no purchase price, so declining with insufficient evidence is appropriate. No claims were made.",
+    "notes": "The Lumen chunk gives no purchase price, so declining with insufficient_evidence is appropriate. No claims were made.",
     "out_of_scope": "no"
    }
   },
@@ -228,7 +228,7 @@
    "pairs": 3,
    "value": 1.0
   },
-  "stale_records": 0
+  "stale_records": 6
  },
  "m7b_human": {
   "answer_records": 0,
@@ -1284,6 +1284,13 @@
   },
   "stale_records": 0,
   "status": "measured"
+ },
+ "parsers": {
+  "m4c_m7a": {
+   "markdown": "markdown-lines-v2",
+   "pdf": "pypdf-6.21.1-layout-v2"
+  },
+  "m7c_run": "pypdf-6.21.1-layout-v2"
  },
  "reviewer_kind": "ai_judge",
  "rubric": {

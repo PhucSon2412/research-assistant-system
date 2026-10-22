@@ -8,7 +8,7 @@
     python scripts/m9_lan_demo.py schedule install|remove            # "RAS pilot backup" 03:00, "RAS pilot check" 15 min
     python scripts/m9_lan_demo.py firewall-commands                  # elevated add/remove commands (printed, not run)
     python scripts/m9_lan_demo.py uninstall --yes                    # tasks, projects/volumes (label-checked), tags
-    python scripts/m9_lan_demo.py provider --routes <r ...> [--apply] # M7c: key from secrets file, pricing per route
+    python scripts/m9_lan_demo.py provider --routes <r ...> [--max-output-tokens N] [--apply]  # M7c: key, pricing
     python scripts/m9_lan_demo.py provider --off [--apply]            # back to provider off
 
 Everything lives under ``--root`` (default ``%USERPROFILE%\\ras-pilot``), outside the repository. The
@@ -371,8 +371,28 @@ def provider_values(state: dict, kind: str) -> dict:
             raise SystemExit("secrets/openrouter_api_key absent: the owner creates it; provider stays off") from None
         if not key or any(c.isspace() for c in key):
             raise SystemExit("secrets/openrouter_api_key malformed; provider stays off")
-    return {"OPENROUTER_API_KEY": key,
-            **{f"RAS_{route.upper()}__PRICING_VERIFIED": str(route in routes).lower() for route in PROVIDER_ROUTES}}
+    values = {"OPENROUTER_API_KEY": key,
+              **{f"RAS_{route.upper()}__PRICING_VERIFIED": str(route in routes).lower() for route in PROVIDER_ROUTES}}
+    generation = (state.get("provider") or {}).get("generation") if kind == "pilot" else None
+    if generation:  # M7c review: output limit of the demo only; the overlay passes these two to the API
+        values["RAS_GENERATION__MAX_OUTPUT_TOKENS"] = str(generation["max_output_tokens"])
+        values["RAS_GENERATION__MAX_REQUEST_USD"] = generation["max_request_usd"]
+    return values
+
+
+# GenerationPolicy defaults the admission ceiling is computed from (api/app/config.py): input token
+# estimate and the input/output price ceilings per million tokens.
+GENERATION_INPUT_TOKENS, GENERATION_INPUT_USD_PER_M, GENERATION_OUTPUT_USD_PER_M = 16_000, 2.5, 10.0
+
+
+def generation_limits(max_output_tokens: int) -> dict:
+    """Output limit and a request ceiling that still admits it (rounded up to the cent)."""
+    if not 64 <= max_output_tokens <= 4096:
+        raise SystemExit("max output tokens must be between 64 and 4096")
+    ceiling = (GENERATION_INPUT_TOKENS * GENERATION_INPUT_USD_PER_M + max_output_tokens * GENERATION_OUTPUT_USD_PER_M) / 1e6
+    cents = int(round(ceiling * 100, 9) // 1) + (round(ceiling * 100, 9) % 1 > 0)
+    return {"max_output_tokens": max_output_tokens, "max_request_usd": f"{cents / 100:.2f}",
+            "admission_ceiling_usd": round(ceiling, 6)}
 
 
 def override_yaml(kind: str) -> str:
@@ -388,7 +408,10 @@ def override_yaml(kind: str) -> str:
                 "    ports: !override",
                 '      - "${RAS_EDGE_BIND:?set the Ethernet address}:${RAS_EDGE_HTTPS_PORT:?}:${RAS_EDGE_HTTPS_PORT:?}"',
                 "  api:", f"    labels: {label}", "    environment:",
-                "      RAS_HTTP__ALLOWED_ORIGINS: ${RAS_LAN_ALLOWED_ORIGINS:?set the LAN origins}"]
+                "      RAS_HTTP__ALLOWED_ORIGINS: ${RAS_LAN_ALLOWED_ORIGINS:?set the LAN origins}",
+                "      # M7c review: demo-only generation output limit (defaults = code defaults when unset).",
+                "      RAS_GENERATION__MAX_OUTPUT_TOKENS: ${RAS_GENERATION__MAX_OUTPUT_TOKENS:-512}",
+                "      RAS_GENERATION__MAX_REQUEST_USD: ${RAS_GENERATION__MAX_REQUEST_USD:-0.05}"]
     else:
         out += ["  edge:", f"    labels: {label}", "  api:", f"    labels: {label}"]
     out += ["  journal-replicator:", f"    labels: {label}", "    networks: {egress: {}, offsite: {}}",
@@ -632,18 +655,24 @@ def provider(args) -> int:
     unknown = set(routes) - set(PROVIDER_ROUTES)
     if unknown:
         raise SystemExit(f"unknown route(s) {sorted(unknown)}")
+    previous = state.get("provider") or {}
     state["provider"] = {"routes": routes, "changed_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")}
+    if "generation" in routes and (args.max_output_tokens or previous.get("generation")):
+        state["provider"]["generation"] = (generation_limits(args.max_output_tokens) if args.max_output_tokens
+                                           else previous["generation"])
     gmail = gmail_address(root / "secrets")
     values = pilot_env(state, "pilot", gmail)  # validates the key file before anything is written
     env_path = root / "pilot" / "pilot.env"
     shutil.copyfile(env_path, env_path.with_name("pilot.env.before-provider"))
     write(env_path, env_text(values))
+    write(root / "pilot" / "override.yaml", override_yaml("pilot"))  # passes the generation limits to the API
     save_state(root, state)
     user = f"{os.environ['USERDOMAIN']}\\{os.environ['USERNAME']}"
     for name in ("pilot.env", "pilot.env.before-provider"):  # the key file's neighbours: owner-only (0600)
         run(["icacls", str(root / "pilot" / name), "/inheritance:r", "/grant:r", f"{user}:F"])
     result = {"routes": routes, "key_present": bool(values["OPENROUTER_API_KEY"]),
-              "pricing": {r: values[f"RAS_{r.upper()}__PRICING_VERIFIED"] for r in PROVIDER_ROUTES}}
+              "pricing": {r: values[f"RAS_{r.upper()}__PRICING_VERIFIED"] for r in PROVIDER_ROUTES},
+              "generation": state["provider"].get("generation")}
     if args.apply:
         up = run(compose_cmd(state, PROJECT) + ["up", "-d", "--wait", "--force-recreate", "api", "worker", "beat"],
                  check=False)
@@ -744,6 +773,7 @@ def main() -> int:
     group.add_argument("--routes", nargs="+", choices=PROVIDER_ROUTES)
     group.add_argument("--off", action="store_true")
     s.add_argument("--apply", action="store_true", help="recreate api/worker/beat now (short maintenance window)")
+    s.add_argument("--max-output-tokens", type=int, help="demo-only generation output limit (request ceiling follows)")
     args = p.parse_args()
     return {"inventory": inventory, "prepare": prepare, "offsite-up": offsite_up, "verify": verify,
             "rebind": rebind, "schedule": schedule, "firewall-commands": firewall_commands,

@@ -28,8 +28,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install API with dev extras
-        run: python -m pip install -e "./api[dev]"
+      - name: Install API with dev extras, pinned to the accepted image rc2
+        # Same parser/library versions as the running image (pypdf 6.21.1); dev-only extras keep their ranges.
+        run: python -m pip install -c api/constraints-rc2.txt -e "./api[dev]"
       - name: Start isolated PostgreSQL/Redis/MinIO
         # PostgreSQL/Redis/MinIO come from the digests pinned in deploy/compose.yaml (pulled fresh on the runner).
         run: python scripts/m8a_test_host.py --context "$RUNNER_TEMP/m8a-api" setup

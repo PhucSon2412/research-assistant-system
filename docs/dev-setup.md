@@ -655,11 +655,18 @@ docker compose down -v   # dừng và XÓA volume db/redis/minio (mất Admin đ
 
 ## Chạy test và build
 
+**Dependency (sửa review PR #70, 2026-10-22):** Conda `ras`, CI và image cùng dùng pin của image rc2 trong
+[`api/constraints-rc2.txt`](../api/constraints-rc2.txt) (sinh từ `pip freeze` của `rasm8c-api:rc2`, không mạng). Trước đó
+Conda chạy pypdf 6.19.0 còn image/CI 6.21.1, nên nhãn evaluation và test host kiểm parser khác bản đang chạy. Cài/cập
+nhật Conda bằng `& $py -m pip install -c ".\api\constraints-rc2.txt" -e ".\api[dev]"`. Gói chỉ có ở `[dev]` (pytest,
+reportlab, cryptography, pyrage) giữ khoảng của `pyproject.toml`. Image build sau này phải dùng constraints này hoặc
+digest đã nghiệm thu; các lệnh `pip install -e` không `-c` ở các mục lịch sử bên dưới không còn là cách cài hiện hành.
+
 Test API cần PostgreSQL của Compose (`docker compose up -d --wait db` là đủ). Mỗi test tạo database trống riêng `ras_test_*` (và role tạm cho test mật khẩu đặc biệt), rồi xóa sau khi chạy. Kết nối admin lấy từ `RAS_TEST_DATABASE_ADMIN_URL` (URL đã percent-encode); nếu không có thì đọc từng thành phần trong `.env` (`127.0.0.1:${POSTGRES_HOST_PORT:-5432}`, chấp nhận giá trị bọc nháy).
 
 ```powershell
 # PowerShell
-& $py -m pip install -e ".\api[dev]"     # một lần
+& $py -m pip install -c ".\api\constraints-rc2.txt" -e ".\api[dev]"     # một lần; cùng pin với image rc2
 & $py -m pytest api -q
 npm ci --prefix web
 npm run typecheck --prefix web
@@ -668,7 +675,7 @@ npm run build --prefix web
 
 ```bash
 # Git Bash
-"$PY" -m pip install -e "./api[dev]"     # một lần
+"$PY" -m pip install -c "./api/constraints-rc2.txt" -e "./api[dev]"     # một lần; cùng pin với image rc2
 "$PY" -m pytest api -q
 npm ci --prefix web
 npm run typecheck --prefix web

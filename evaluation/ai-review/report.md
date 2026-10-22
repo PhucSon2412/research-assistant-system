@@ -1,31 +1,33 @@
-# Đánh giá bằng AI judge (M7c) — 2026-10-21
+# Đánh giá bằng AI judge (M7c) — 2026-10-22
 
 **reviewer_kind: `ai_judge`** — ai_judge: đánh giá do một mô hình ngôn ngữ tạo theo rubric có phiên bản; không phải phiếu người đọc, không thay M7b và không chứng nhận chất lượng.
 
 Rubric nhãn `m7c-judge-rubric/1`, answer `m7c-judge-rubric/2-answers`. M7b (người thật): 0 record nhãn, 0 record answer — không thay đổi bởi track này.
 
+Parser của binding hiện hành: nhãn M4c/answer M7a `pypdf-6.21.1-layout-v2` (Markdown `markdown-lines-v2`); run M7c `pypdf-6.21.1-layout-v2`. Record bind parser khác là stale và không được tính.
+
 ## Judge
 
-- `anthropic/claude-sonnet-5.5` qua `amazon-bedrock`, rubric `m7c-judge-rubric/1`: 8 call, $0.418034 billed
-- `anthropic/claude-sonnet-5.5` qua `amazon-bedrock`, rubric `m7c-judge-rubric/2-answers`: 13 call, $0.156484 billed
+- `anthropic/claude-sonnet-5.5` qua `amazon-bedrock`, rubric `m7c-judge-rubric/1`: 19 call, $0.923036 billed
+- `anthropic/claude-sonnet-5.5` qua `amazon-bedrock`, rubric `m7c-judge-rubric/2-answers`: 15 call, $0.175926 billed
 
 ## Nhãn M4c (80 câu, agent soạn)
 
-Đã chấm 80/80, record stale 0. Phân bố: {'adequate': 71, 'needs_change': 2, 'comment_only': 7}. Adequate trên nhãn không phải lựa chọn sản phẩm: 71/73 = 0.9726. Ổn định hai lượt: 8/8 = 1.0000 (8 cặp).
+Đã chấm 80/80, record stale 88. Phân bố: {'adequate': 71, 'comment_only': 7, 'needs_change': 2}. Adequate trên nhãn không phải lựa chọn sản phẩm: 71/73 = 0.9726. Ổn định hai lượt: 8/8 = 1.0000 (8 cặp).
 
-- `CMP-09` needs_change (expectation yes, evidence no): The replication reports two dense baselines: 26.8 in the main run and 25.6 with the original tokenizer settings. Gold cites only 26.8. Add the 25.6 sentence and mention it in the claim, since it explains the gap.
-- `CMP-12` comment_only (expectation yes, evidence not_applicable): The insufficient status fits, since the GSR paper has no Swahili results. The reason code 'comparison_requires_multiple_papers' is a poor fit: both papers are owned and in scope, and one side simply lacks the data.
-- `CMP-14` comment_only (expectation yes, evidence not_applicable): Refusing is right: B/P21 is private and the ZQXB5582 marker is guarded. The reason label is debatable, since the blocker is an inaccessible paper rather than a missing multi-paper comparison. Product choice, no judgement.
-- `CMP-15` comment_only (expectation yes, evidence not_applicable): Only P03 reports agreement (kappa 0.87); P09 reports none. The reason label comparison_requires_multiple_papers fits loosely; no_supporting_evidence might fit better. Product choice, no judgement.
-- `RCI-01` comment_only (expectation yes, evidence not_applicable): Product choice. The strict contract (references are not content) gives insufficient_evidence. A bibliographic mode could reasonably return the entry, labelled as a reference. Not judging the choice.
-- `RCI-02` comment_only (expectation yes, evidence not_applicable): Product choice. Findings of the cited work appear nowhere in the corpus, so declining is consistent under any bibliographic policy. Not judging the choice.
-- `RCI-04` comment_only (expectation yes, evidence not_applicable): Product choice. The survey only cites the GSR paper, so insufficient_evidence for this scope is reasonable. The GPU-hours sit in A/P01, which user_a owns but which is out of scope.
-- `RCI-06` comment_only (expectation yes, evidence not_applicable): Product choice. The 2.4 vs 0.6 BLEU conflict is real, and P04 blames a tokenizer mismatch without settling it. Declining or showing both attributed figures are both defensible.
-- `RCI-09` needs_change (expectation yes, evidence no): The quote covers only 'GNN reaches MAE 0.031'. The claim's physics-model 0.036 and the question's seven-day horizon come from the rest of the abstract sentence. Extend the span or trim the claim.
+- `CMP-12` comment_only (expectation yes, evidence not_applicable): Status insufficient_evidence fits, since GSR reports no Swahili results. The reason code 'comparison_requires_multiple_papers' mismatches the rationale, which is a missing Swahili result in the GSR paper. Consider a different code.
+- `CMP-14` comment_only (expectation yes, evidence not_applicable): Product choice, not judged. Withholding B/P21 and ZQXB5582 from user_a is right. The reason label 'comparison_requires_multiple_papers' fits poorly, since the real gap is that the speech paper is inaccessible.
+- `CMP-15` comment_only (expectation yes, evidence not_applicable): Product choice, not judged. Both papers are in scope; only P03 reports agreement (kappa 0.87) and P09 reports none. The reason label 'comparison_requires_multiple_papers' misdescribes this, since it is a missing value in one paper.
+- `PP-05` needs_change (expectation yes, evidence yes): The quote and offsets (page 6, 11-97) are correct and the claim is supported. But scope 'all' includes partial files (P08, P09), and sibling P08 items carry coverage partial. Coverage is omitted here, which is inconsistent.
+- `RCI-01` comment_only (expectation yes, evidence not_applicable): Product choice, so no verdict. Under the current contract, bibliography_only is consistent. A bibliographic mode could reasonably answer by naming the reference entry with an explicit label.
+- `RCI-02` comment_only (expectation yes, evidence not_applicable): Product choice, so no verdict. The findings are not in any paper, and a reference entry says nothing about results, so declining is sound under the current contract.
+- `RCI-04` comment_only (expectation yes, evidence not_applicable): Product choice. Scope is only the survey, which lists GSR in its references and gives no GPU-hours, so a refusal is defensible. The bibliography_only reason matches this scope.
+- `RCI-06` comment_only (expectation yes, evidence not_applicable): Product choice. P01 and P04 give 2.4 and 0.6 BLEU, and P04 blames a tokenizer mismatch without settling the question. Refusing or showing both attributed figures is a product decision.
+- `RCI-09` needs_change (expectation yes, evidence no): The claim adds the physics model's 0.036 and the seven-day horizon, but the quote covers only the GNN's 0.031. Extend the span to the abstract's 0.036 comparison and the seven-day horizon, or trim the claim.
 
 ## Answer M7a (tổng hợp, 3 response có cấu trúc)
 
-- Response đã chấm: 3; claim 2; record stale 0.
+- Response đã chấm: 3; claim 2; record stale 6.
 - Claim được hỗ trợ đầy đủ: 2/2 = 1.0000; một phần: 0/2 = 0.0000.
 - Citation đúng: 3/3 = 1.0000.
 - Abstention đúng ở câu kỳ vọng không trả lời: 1/1 = 1.0000; câu có đáp án mà hệ thống từ chối, judge đánh là từ chối sai: not measured (0 mẫu).

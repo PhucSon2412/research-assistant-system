@@ -4,6 +4,63 @@ Nhánh `feat/m7c-live-quality-verification`, base `origin/main = b5d8117` (merge
 Source migration giữ **0052**, không migration/grant, không đổi code runtime của API/web. [Task](tasks/m7c-live-quality-verification.md) ·
 [inventory](m7c-test-inventory.json) · [report AI judge](../evaluation/ai-review/report.md). Chưa merge.
 
+## Sửa review PR #70 (2026-10-22)
+
+[Review](reviews/pr70-m7c-live-quality-verification.md) · [prompt sửa](tasks/fix-pr70-parser-dependency-drift.md).
+
+P2: CI GitHub đỏ ở `test_evaluation.py` vì pypdf trôi. Image rc2/demo/CI chạy **6.21.1**, còn Conda `ras` và nhãn evaluation
+chạy 6.19.0. Cách sửa:
+
+1. **Một nguồn dependency.** [`api/constraints-rc2.txt`](../api/constraints-rc2.txt) sinh từ `pip freeze` của
+   `rasm8c-api:rc2` (không mạng): 59 pin, bỏ chính `ras-api`. CI cài `pip install -c api/constraints-rc2.txt -e "./api[dev]"`.
+   Conda `ras` được cài lại theo cùng lệnh: 25 gói đổi về đúng bản rc2; sau đó 58/59 pin khớp, `uvloop` không cài trên
+   Windows do marker. Gói chỉ có ở `[dev]` (pytest, reportlab, cryptography, pyrage) giữ khoảng của `pyproject.toml`.
+   `pyproject` không nới. **Image build sau này phải dùng constraints này hoặc digest đã nghiệm thu.**
+   Lệnh ghi ở [dev-setup](dev-setup.md#chạy-test-và-build).
+2. **Dữ liệu đánh giá trên 6.21.1.**
+   - **Nhãn M4c — loại (a), chỉ khác chuỗi phiên bản.** Text trang và segment của 3 PDF M4c trùng hoàn toàn giữa 6.19.0
+     (Conda cũ) và 6.21.1 (image). `python -m app.evaluation annotate` chỉ đổi 15 dòng `parser` của 15 span PDF;
+     quote/offset/kỳ vọng giữ nguyên. `validate` đi từ 15 lỗi về OK. Không có trường hợp (b).
+   - **Bộ paper M7c:** gold đã định vị trên parser 6.21.1 trong image từ đầu. Parse lại trên host (giờ 6.21.1) trùng
+     byte với parse trong image ở 11/11 paper (P12 lỗi parser ở cả hai), nên không đổi gold.
+   - **Bundle M7b** dựng lại bằng `human-prepare`: 15 trang nhãn + `index.html` + manifest chỉ đổi chuỗi parser.
+     `human-prepare --check` báo up to date; `human-validate` cả hai phiếu sạch (0 dòng đã duyệt); report
+     `awaiting_human_review`. Vẫn 0 verdict thật.
+   - **AI judge:** 88 record nhãn M4c và 6 record M7a bị stale vì binding gồm phiên bản parser. Đã chấm lại đúng phần đó
+     (13 call, $0,524444 billed): 80 nhãn theo batch 8 (10 call), M7a (1 call), lượt ổn định 8 nhãn + M7a (2 call). 36 record M7c
+     vẫn live vì bind parser của run (6.21.1). Report ghi parser của binding hiện hành.
+   - **Kết quả nhãn mới:** 71/73 adequate như trước, nhưng tập `needs_change` đổi từ CMP-09 + RCI-09 thành **PP-05 +
+     RCI-09**. Hai lượt đầy đủ trên cùng nội dung nhãn đồng thuận **78/80** (khác ở CMP-09, PP-05); mẫu ổn định 8/8 và
+     M7a 3/3. Biến động của judge vì vậy rộng hơn mẫu nhỏ cho thấy. Nhãn M4c **không** sửa.
+   - **Ledger dừng đúng mốc 80 %:** 320/400 call, $2,51183176 cam kết; 313/313 ID `/generation` đối soát được.
+     Không còn call live nào trong trần task.
+   - **Lượt live M7c (stack C4):** image build từ source nhánh có pypdf **6.21.1** (đã kiểm khi build), cùng bản với rc2.
+     Gold M7c, retrieval, answer và settlement **vẫn còn hiệu lực**; chỉ binding phía host (M4c/M7a) phải xác lập lại.
+3. **Demo (quyết định orchestrator).** `python scripts/m9_lan_demo.py provider --routes embedding rerank generation
+   --max-output-tokens 1024 --apply`:
+   - `pilot.env` có `RAS_GENERATION__MAX_OUTPUT_TOKENS=1024` và `RAS_GENERATION__MAX_REQUEST_USD=0.06`; overlay ngoài repo
+     truyền hai biến vào API, mặc định bằng giá trị trong code nếu không đặt.
+   - Nâng trần request là bắt buộc: với 1024 token, trần admission là 16.000 × $2,5/M + 1.024 × $10/M = $0,05024 > $0,05,
+     nên chỉ nâng output thì mọi câu RAG bị `rag_generation_ceiling_unverified`.
+   - Ước tính mỗi câu: phổ biến $0,005–0,02 (M7c với 512 token trung bình $0,0067). Reservation khi đang chạy $0,05024;
+     quota User $1/ngày nên tối thiểu khoảng 50 câu/ngày/người.
+   - Recreate api/worker/beat khoảng 16 s. Image rc2 giữ ID; `/readyz` 200; gate open (journal 12 = DB 12); replica `ok`;
+     verify mạng ok trên IP hiện tại.
+   - Demo lúc đó đã có 12 paper do chủ dự án upload: 10 `indexed`, 1 `needs_review`, 1 `terminal_failed`, khớp stack thử.
+     Không có job đang chạy khi recreate.
+   - Kịch bản demo ([handoff M9](m9-lan-demo-deployment.md)): câu so sánh dùng **hybrid**, sửa tiêu đề sau upload, chỉ tài
+     liệu giấy phép mở/tự viết.
+
+**Kiểm chứng lượt sửa** (Conda đã pin, hạ tầng thử `m8a_test_host.py`; chi tiết ở [inventory](m7c-test-inventory.json) mục `fix_pr70`):
+
+| Kiểm | Kết quả |
+| --- | --- |
+| `test_evaluation`, `test_m7c_tooling`, `test_m7c_ai_review`, `test_human_review`, `test_pdf_ingest`, `test_markdown_ingest`, `test_ingest_worker` | **167/167 pass** (lượt đầu 166 pass/1 fail do chính test mới so `Decimal` dạng chuỗi; đã sửa test) |
+| Countercheck M7c | 15/15 đột biến bị bắt, source trước/sau trùng |
+| `python -m app.evaluation validate` | OK (trước: 15 lỗi phiên bản parser) |
+| `human-prepare --check` / `human-validate` | up to date / sạch, 0 phiếu thật |
+| CI GitHub trên commit sửa | ghi ở mục dưới sau khi run xong |
+
 **Tóm tắt.** Live trong stack C4 cô lập, image build từ source của nhánh: 10 paper arXiv CC BY/CC BY-SA index được,
 retrieval hybrid+rerank Recall@5 = 31/34 span gold, cache-write và cache-read đã quan sát live và settlement ứng dụng
 ≥ charge thật ở mọi call có kết quả, bốn giới hạn budget/quota chạy đúng trên đường live. AI judge (Claude Sonnet 5.5,
@@ -138,7 +195,7 @@ bằng cách mở từng chunk qua API (130 chunk, không gọi provider). Hit g
 **AI judge** (`anthropic/claude-sonnet-5.5`, khác họ với generation OpenAI, Amazon Bedrock ZDR, rubric có version):
 
 - **Nhãn M4c:** chấm 80/80. 71/73 `adequate` (không tính 7 câu lựa chọn sản phẩm, chỉ ghi nhận xét). 2 `needs_change`:
-  CMP-09 và RCI-09, quote gold chưa phủ hết claim. Nhãn M4c **không** sửa trong PR này vì sửa sẽ đổi binding mà M7b đang
+  CMP-09 và RCI-09, quote gold chưa phủ hết claim (lượt binding parser 6.19.0; lượt chấm lại trên 6.21.1 là PP-05 và RCI-09, xem mục sửa review). Nhãn M4c **không** sửa trong PR này vì sửa sẽ đổi binding mà M7b đang
   chờ người đọc.
 - **Answer M7a:** claim được hỗ trợ 2/2, citation đúng 3/3, abstention đúng 1/1.
 - **Answer M7c:** claim được hỗ trợ đầy đủ 21/23 (2 partial: CMP-02 suy diễn cách diễn đạt, SP-13 tự tính chênh lệch).

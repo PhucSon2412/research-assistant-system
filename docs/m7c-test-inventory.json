@@ -625,5 +625,92 @@
   "changes": "ras-pilot api/worker/beat recreated (provider enabled); images rasc45baae9c6-api/web kept; task containers/volumes/networks removed by project label"
  },
  "secret_scan": "real key loaded in memory and searched in 4744 files of evidence/state/repo (no .env read): 0 matches; context key copy deleted",
- "evidence": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-m7c-20261021"
+ "evidence": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\ras-m7c-20261021",
+ "fix_pr70": {
+  "review": "docs/reviews/pr70-m7c-live-quality-verification.md (P2 pypdf drift, CI run 39605520554 API 2 failed)",
+  "constraints": {
+   "file": "api/constraints-rc2.txt",
+   "source": "docker run --rm --network none --entrypoint pip rasm8c-api:rc2 freeze (image sha256:c0936a8189df...)",
+   "pins": 59,
+   "excluded": [
+    "ras-api (the project)"
+   ],
+   "dev_only_kept_as_ranges": [
+    "pytest",
+    "reportlab",
+    "cryptography",
+    "pyrage"
+   ],
+   "conda_ras": "pip install -c api/constraints-rc2.txt -e ./api[dev]: 25 packages changed; 58/59 pins match (uvloop not installed on Windows by marker)",
+   "ci": "API job installs with the same -c"
+  },
+  "m4c_labels": {
+   "pdf_papers_compared": 3,
+   "pages_and_segments_identical_6_19_vs_6_21": true,
+   "class": "a (version string only)",
+   "annotate_diff": "15 'parser' lines 6.19.0 -> 6.21.1, no quote/offset change",
+   "validate": "15 errors -> OK"
+  },
+  "m7c_papers": "host parse on 6.21.1 identical to image parse for 11/11 papers (P12 parser error in both); gold unchanged",
+  "m7b_bundle": "human-prepare rebuilt (15 label pages + index + manifest: parser string); --check up to date; human-validate labels/answers clean (0 reviewed); report awaiting_human_review; 0 real verdicts",
+  "ai_judge_rejudge": {
+   "stale_before": {
+    "m4c_label_records": 88,
+    "m7a_records": 6,
+    "m7c_records": 0
+   },
+   "calls": 13,
+   "billed_usd": "0.524444",
+   "ledger_after": {
+    "requests": 320,
+    "committed_usd": "2.51183176",
+    "stop_at": "320 (80%) reached"
+   },
+   "reconcile": "313/313 /generation ids found",
+   "labels_new": {
+    "adequate": 71,
+    "comment_only": 7,
+    "needs_change": [
+     "PP-05",
+     "RCI-09"
+    ]
+   },
+   "agreement_old_vs_new_80_labels": "78/80 (differ: CMP-09 needs_change->adequate, PP-05 adequate->needs_change)",
+   "stability_sample": {
+    "labels": "8/8",
+    "m7a": "3/3"
+   }
+  },
+  "live_m7c_run_parser": "test image rasc45baae9c6-api had pypdf 6.21.1 (checked at build); live results remain valid",
+  "demo": {
+   "command": "python scripts/m9_lan_demo.py provider --routes embedding rerank generation --max-output-tokens 1024 --apply",
+   "env": {
+    "RAS_GENERATION__MAX_OUTPUT_TOKENS": "1024",
+    "RAS_GENERATION__MAX_REQUEST_USD": "0.06"
+   },
+   "why_request_ceiling": "16000 x $2.5/M + 1024 x $10/M = $0.05024 > 0.05 would refuse every RAG (rag_generation_ceiling_unverified)",
+   "overlay": "outside repo; api environment gets both variables with code defaults (512/0.05) when unset",
+   "checks": "image rc2 sha256:c0936a81 unchanged; readyz 200; recovery gate open journal 12 = db 12; replica ok; verify ok on the current LAN IP; settings: pricing true x3, max_output 1024, max_request_usd 0.06, routing azure",
+   "demo_content_at_change": "12 owner uploads: 10 indexed, 1 needs_review, 1 terminal_failed; no running job",
+   "window_s": 16
+  },
+  "tests": {
+   "focused_first": "166 passed, 1 failed (new test compared Decimal('0.05024000') as a string; test fixed)",
+   "focused_final": {
+    "files": [
+     "tests/test_evaluation.py",
+     "tests/test_m7c_tooling.py",
+     "tests/test_m7c_ai_review.py",
+     "tests/test_human_review.py",
+     "tests/test_pdf_ingest.py",
+     "tests/test_markdown_ingest.py",
+     "tests/test_ingest_worker.py"
+    ],
+    "runner": "scripts/m8a_test_host.py on the pinned Conda env",
+    "result": "167 passed, 0 failed (exit 0)"
+   },
+   "counterchecks": "15/15 holds, clean exit 0, source unchanged",
+   "github_ci": "see PR / handoff (run on the fix commit)"
+  }
+ }
 }

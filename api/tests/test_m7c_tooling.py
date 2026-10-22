@@ -366,3 +366,27 @@ def test_generation_settlement_covers_every_m7c_live_charge():
         split = (Decimal(i - write - read) * 2 + Decimal(write) * Decimal('2.5') + Decimal(read) * Decimal('0.2')
                  + Decimal(o) * 10) / 1_000_000
         assert abs(split - Decimal(b)) <= Decimal('0.0000005')
+
+
+def test_demo_generation_limit_keeps_the_admission_ceiling_admissible(tmp_path):
+    from scripts import m9_lan_demo
+    from app.config import Settings
+    from app.rag import money
+    limits = m9_lan_demo.generation_limits(1024)
+    assert limits == {'max_output_tokens': 1024, 'max_request_usd': '0.06', 'admission_ceiling_usd': 0.05024}
+    assert m9_lan_demo.generation_limits(512)['max_request_usd'] == '0.05'  # the code default stays admissible
+    p = Settings(db=None, database_url='postgresql+psycopg://test@localhost/test',
+                 generation={'max_output_tokens': 1024, 'max_request_usd': 0.06}).generation
+    ceiling = money(p.max_input_tokens_estimate, p.input_usd_per_million_ceiling) + money(
+        p.max_output_tokens, p.max_output_usd_per_million_tokens)
+    assert ceiling == Decimal('0.05024') and ceiling <= Decimal(limits['max_request_usd'])
+    with pytest.raises(SystemExit):
+        m9_lan_demo.generation_limits(8192)
+    (tmp_path / 'secrets').mkdir()
+    (tmp_path / 'secrets' / 'openrouter_api_key').write_text(SECRET, encoding='utf-8')
+    state = {'root': str(tmp_path), 'provider': {'routes': ['generation'], 'generation': limits}}
+    values = m9_lan_demo.provider_values(state, 'pilot')
+    assert values['RAS_GENERATION__MAX_OUTPUT_TOKENS'] == '1024' and values['RAS_GENERATION__MAX_REQUEST_USD'] == '0.06'
+    assert 'RAS_GENERATION__MAX_OUTPUT_TOKENS' not in m9_lan_demo.provider_values(state, 'drill')
+    overlay = m9_lan_demo.override_yaml('pilot')
+    assert '${RAS_GENERATION__MAX_OUTPUT_TOKENS:-512}' in overlay and '${RAS_GENERATION__MAX_REQUEST_USD:-0.05}' in overlay

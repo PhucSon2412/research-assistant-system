@@ -1,7 +1,7 @@
 {
  "attribution": "self_reported: reviewer và review_date do người điền phiếu tự ghi; không phải danh tính hay chữ ký đã được xác thực độc lập",
  "format": "ras-m7b-human-review/1#report",
- "generated_on": "2026-10-19",
+ "generated_on": "2026-10-22",
  "limits": [
   "M4c: 15 paper tổng hợp, 87 chunk, nhãn do agent soạn; không đại diện paper thật.",
   "M7a: corpus tổng hợp riêng 2 tài liệu, vài answer live của một run (keyword, user A); không có gold label và không lưu evidence pack.",
