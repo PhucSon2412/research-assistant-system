@@ -710,7 +710,20 @@
     "result": "167 passed, 0 failed (exit 0)"
    },
    "counterchecks": "15/15 holds, clean exit 0, source unchanged",
-   "github_ci": "see PR / handoff (run on the fix commit)"
+   "github_ci": {
+    "run_id": 39724086744,
+    "head_sha": "be44a034defdbcfbf230b2b275564cccfadee85d",
+    "conclusion": "success",
+    "jobs": {
+     "API selection": "success, 1284 passed, 1 deselected, 1:01:23",
+     "Web tests, typecheck, build": "success",
+     "Pilot deploy config contract": "success"
+    },
+    "previous_run_on_1d740e2": {
+     "run_id": 39605520554,
+     "api": "failure, 2 failed (test_evaluation.py pypdf drift)"
+    }
+   }
   }
  }
 }

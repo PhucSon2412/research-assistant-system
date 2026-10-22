@@ -59,7 +59,7 @@ chạy 6.19.0. Cách sửa:
 | Countercheck M7c | 15/15 đột biến bị bắt, source trước/sau trùng |
 | `python -m app.evaluation validate` | OK (trước: 15 lỗi phiên bản parser) |
 | `human-prepare --check` / `human-validate` | up to date / sạch, 0 phiếu thật |
-| CI GitHub trên commit sửa | ghi ở mục dưới sau khi run xong |
+| CI GitHub run `39724086744` trên `be44a03` | **success**: API selection 1.284 pass, 1 deselect (1 giờ 01 phút); Web tests/typecheck/build success; Pilot deploy config contract success |
 
 **Tóm tắt.** Live trong stack C4 cô lập, image build từ source của nhánh: 10 paper arXiv CC BY/CC BY-SA index được,
 retrieval hybrid+rerank Recall@5 = 31/34 span gold, cache-write và cache-read đã quan sát live và settlement ứng dụng
