@@ -1,5 +1,7 @@
 # M10 — giao diện web cho demo CV
 
+**Cập nhật sửa review PR #71:** xem [mục sửa font/wrapping/CI](#sửa-review-pr-71--font-tiếng-việt-wrapping-và-ci). Các số liệu ui1 bên dưới giữ theo lượt M10 đầu.
+
 Task: [M10](tasks/m10-frontend-ui-redesign.md). Base đã fetch/xác minh:
 `0dd5a9c07ac0561c55b97da52555b2777d291817` (merge PR #70), nhánh `feat/m10-frontend-ui`.
 Source migration **0052**. Không migration, không sửa `api/`, `deploy/`, `web/lib/`, route/proxy hay dependency npm.
@@ -125,3 +127,47 @@ destination xác nhận tập không đổi. Không gọi search/RAG/provider th
 đó bị từ chối quyền, không phải yêu cầu xóa. Không merge PR. Raw evidence giữ ngoài Git; các stack thử được dọn riêng.
 Cleanup cả ba project thử đã kiểm nhãn/consumer volume, exit 0, không còn container/volume/network của chúng;
 browser CLI session `m10` đã đóng. Image web `ui1` và build cache được giữ; không dùng prune toàn máy.
+
+## Sửa review PR #71 — font tiếng Việt, wrapping và CI
+
+Theo [report tại f81abd8](reviews/pr71-m10-frontend-ui.md) và [task sửa](tasks/fix-pr71-vietnamese-font-wrap-ci.md).
+Sửa trên cùng nhánh/PR; giữ nguyên docs reviewer. Không sửa API/proxy/quyền, dependency npm hay workflow CI.
+
+1. `web/types/css-modules.d.ts` khai báo `*.module.css` trong Git; `tsconfig` include tường minh `types/**/*.d.ts`.
+   Không phụ thuộc `next-env.d.ts`. Clone sạch ngoài repo tại `%TEMP%\ras-pr71-fix-20261022\clean`, không có
+   `next-env.d.ts`/`.next/` trước và trong typecheck/test. Chạy `npm ci --no-audit --no-fund`, preflight typecheck,
+   rồi đúng chuỗi CI **test → typecheck → build**: tất cả exit 0, **79/79** test, không sửa expectation.
+2. Bỏ toàn bộ Georgia và letter-spacing âm. `--font-reading` dùng `"Times New Roman", Cambria, "Noto Serif",
+   "DejaVu Serif", serif`; auth heading/quote và RAG `q` dùng token đó. Kiểm trên **Windows host `win32`, Chrome
+   155.0.8059.85**, cả browser headed qua Playwright CLI và Playwright Python dùng Chrome cài trên Windows.
+   CDP `CSS.getPlatformFontsForNode` xác nhận ui1 trộn Georgia/Times New Roman trong câu đăng nhập, mẫu thường/nghiêng
+   `ồ ắ ầ ẫ ữ ỵ ẽ ở ợ Ý Ặ Ổ` và RAG. Ui2 dùng **chỉ Times New Roman**, không custom/web font, cho cả năm trường hợp.
+   Ảnh trước/sau và metadata font giữ ở `<context>/{before,after}/`; ảnh CLI riêng ở root context.
+3. Wrapping chung đổi sang `break-word`; chỉ `.opaque-value` (hash đã biết) giữ `anywhere`. Badge và nút dùng
+   `nowrap`; bảng thư viện có min-width và cột Kho/trạng thái có min-width. Màn hẹp cuộn **trong** `.table-wrap`;
+   Admin tiếp tục thành card ở mobile. Hai bảng kiểm với user thật của stack tổng hợp, ba paper riêng tiêu đề dài
+   và một bản chung được approve/publish qua API, ở **1440/1024/768/390/360 px**. Sau sửa: không tràn ngang trang,
+   badge không cao hơn một dòng, nút giữ nowrap. Có ảnh thư viện cuộn sang cột Kho/trạng thái trên màn hẹp.
+
+Evidence riêng: `%TEMP%\ras-pr71-fix-20261022\`; không trộn kết quả với lượt ui1. Provider chỉ là fake trong C4;
+smoke HTTPS dùng CA/SMTP thử, provider tắt. Source/API thử vẫn là rc2 + bản sao app/migrations hiện tại, dependency rc2.
+Lượt setup smoke đầu bị trùng subnet Docker mới cấp cho C4; chỉ đổi subnet context thử sang dải RFC1918 đã kiểm trống.
+Không đổi mạng dev/demo/VPN. Không đổi selector/assertion smoke. Kết quả smoke/deploy và inventory chốt bên dưới.
+
+Chrome smoke lần đầu chưa phát POST/API request: helper bấm form SSR trước khi các chunk Next.js hydrate.
+`scripts/m8a_browser.py` thêm **chỉ** `page.wait_for_load_state("networkidle")` sau goto login; giữ nguyên toàn bộ
+selector, assertion và số POST yêu cầu. Lượt thất bại giữ riêng, không tính là pass. Không sửa runtime auth.
+
+**Lượt chốt ui2:** clean clone 79/79 + typecheck/build; HTTPS **68/68 HTTP + 16/16 Chrome** trên **cùng image ui2**
+`sha256:aeb3cc71a7bd254475b3f8cb25261a63fa70da96d786cdc43175793c3a07519b`.
+Windows: 10 tổ hợp bảng/viewport, 70 badge và 30 nút kiểm nowrap, 0 tràn ngang toàn trang, 0 outbound;
+font glyph 5 trường hợp như trên, 10 ảnh chọn lọc đã thay bằng ảnh ui2 trên Windows.
+[Inventory sửa PR71](m10-pr71-fix-inventory.json) tách khỏi inventory ui1 lịch sử.
+
+Demo đã chạy `web-image --image ras-pilot-web:ui2 --apply`, exit 0; HTTPS và API readiness 200. Đối chiếu snapshot
+theo ID/image/start/tập mount: chỉ web đổi, API vẫn `c0936a81…`; không query/sửa paper, tài khoản hoặc gọi provider thật.
+Rollback gần nhất: `python scripts/m9_lan_demo.py web-image --image ras-pilot-web:ui1 --apply`; rc2 vẫn được giữ.
+`m10-test-inventory.json` là snapshot hash ở `f81abd8`; hash source/ảnh ui2 nằm ở inventory sửa, không ghi đè lịch sử.
+
+CI GitHub phải chạy xong trên commit sửa; run ID và kết quả từng job được ghi vào mô tả PR #71 và bàn giao cuối,
+không kết luận từ CI local hoặc từ run `39755540725` bị lỗi ở head cũ.

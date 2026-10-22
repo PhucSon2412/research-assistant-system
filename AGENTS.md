@@ -12,6 +12,21 @@
 
 ## Trạng thái triển khai và lịch sử
 
+**Sửa review PR #71 (2026-10-22, chờ review lại):** CSS Modules có khai báo kiểu trong Git; clone sạch không có
+`next-env.d.ts`/`.next` pass 79 test, typecheck, build theo thứ tự CI. Bỏ Georgia và letter-spacing âm; Chrome
+Windows 155.0.8059.85 xác nhận Times New Roman cho đủ mẫu dấu/câu login/RAG. Bảng user/Admin kiểm ở
+1440/1024/768/390/360: badge/nút nowrap, cột ngắn min-width, chỉ bảng cuộn ngang. HTTPS cùng web ui2: 68 HTTP/
+16 Chrome pass; helper smoke chờ networkidle trước form SSR, không đổi assertion. Demo chỉ recreate web ui2
+(`aeb3cc71…`); API rc2 và service khác giữ nguyên. [Mục sửa](docs/m10-frontend-ui.md#sửa-review-pr-71--font-tiếng-việt-wrapping-và-ci) ·
+[inventory sửa](docs/m10-pr71-fix-inventory.json). CI trên commit sửa phải chờ kết thúc và báo từng job; không merge.
+
+**Review PR #71 (M10) tại `f81abd8` (2026-10-22): ba lỗi sửa cùng PR.** [Report](docs/reviews/pr71-m10-frontend-ui.md) · [prompt sửa](docs/tasks/fix-pr71-vietnamese-font-wrap-ci.md):
+- CI typecheck fail TS2307 `*.module.css` (kiểu chỉ có trong `next-env.d.ts` bị ignore);
+- Georgia trên Windows thiếu glyph tiếng Việt U+1Exx nên chữ bị tách ở trang đăng nhập;
+- `overflow-wrap: anywhere` diện rộng làm badge "Riêng" vỡ từng ký tự trong bảng thư viện.
+
+Kiểm font phải chạy trên Windows thật, không chỉ container Linux. Giữ docs reviewer chưa commit cho cùng PR.
+
 **M10 — frontend cho demo CV (2026-10-22, chờ review, chưa merge):** nhánh `feat/m10-frontend-ui`, base `0dd5a9c`,
 source **0052**. Chỉ trình bày `web/app`: token/CSS Module, shell responsive, auth, library/upload, search/RAG/panel
 nguồn và Admin. `web/lib`, route/proxy/API/deploy/dependency giữ nguyên. Web 79/79 + typecheck/build; HTTPS 68 HTTP/

@@ -73,7 +73,7 @@ export default function LibraryPage() {
           <p className="text-small">Tổng: {page.total} tài liệu</p>
           {page.total === 0 && <EmptyState title="Thư viện chưa có tài liệu">Tải paper vào kho riêng để bắt đầu nghiên cứu.</EmptyState>}
           <div className="table-wrap">
-          <table className="data-table">
+          <table className="data-table library-table">
             <thead>
               <tr>
                 <th>Tiêu đề</th>

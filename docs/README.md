@@ -3,6 +3,8 @@
 **M10 — frontend cho demo CV (2026-10-22):** [handoff UI, kiểm chứng và rollback web image](m10-frontend-ui.md) ·
 [ảnh tổng hợp dùng cho CV](screenshots/README.md) · [task](tasks/m10-frontend-ui-redesign.md).
 Base PR #70 đã merge `0dd5a9c`, source **0052**; phần lịch sử dưới đây giữ theo từng lượt.
+Sửa review PR #71: [font Windows/wrapping/typecheck sạch](m10-frontend-ui.md#sửa-review-pr-71--font-tiếng-việt-wrapping-và-ci),
+[inventory ui2](m10-pr71-fix-inventory.json); demo chỉ thay web ui2, API rc2 giữ nguyên.
 
 **Model tiếp quản orchestrator:** bắt đầu từ [handover chung cho ChatGPT/Codex và Claude](orchestrator-handover.md), sau đó [AGENTS.md](../AGENTS.md), [CLAUDE.md](../CLAUDE.md) và kế hoạch MVP. Snapshot 2026-10-20 giữ trạng thái PR #66 cùng việc chưa commit; phải đối chiếu Git/PR khi tiếp quản, không giả PR đã merge hoặc các mốc pending cũ còn hiện hành.
 

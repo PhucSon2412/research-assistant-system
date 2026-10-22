@@ -97,7 +97,7 @@ function ApproveSection({ request, onDone }: { request: AdminReviewRequest; onDo
       </fieldset>
       <label>
         <input type="checkbox" checked={form.confirmed} onChange={(e) => set("confirmed", e.target.checked)} />
-        {" "}Tôi đã tự kiểm quyền cho đúng file có SHA-256 <code>{checksum}</code>; thông tin trên là kết quả kiểm của
+        {" "}Tôi đã tự kiểm quyền cho đúng file có SHA-256 <code className="opaque-value">{checksum}</code>; thông tin trên là kết quả kiểm của
         tôi, không chép từ lời khai của User.
       </label>
       <button type="submit" disabled={busy || !body}>{busy ? "Đang ghi…" : "Phê duyệt (chờ công bố)"}</button>
@@ -169,7 +169,7 @@ export default function ReviewDetailPage() {
               {" · nhận "}{fmt(request.version.received_at)}</li>
             <li>File: {request.file.filename ?? "(không tên)"} · {request.file.verified_mime} · {request.file.byte_size} byte
               {request.file.page_count ? ` · ${request.file.page_count} trang` : ""}</li>
-            <li>SHA-256 lúc gửi: <code>{request.file.checksum_sha256}</code></li>
+            <li>SHA-256 lúc gửi: <code className="opaque-value">{request.file.checksum_sha256}</code></li>
           </ul>
           {href && <p><a href={href}>Tải file gốc để duyệt</a> (mỗi lần tải được ghi audit; API kiểm lại checksum trước khi gửi)</p>}
           <h2>Thông tin User khai báo</h2>
