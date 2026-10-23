@@ -287,9 +287,54 @@ def run(root, manifest, watch, target):
             api.close()
 
 
+def quarantine_topics(root):
+    """Move already accepted topic exclusions to an eighth review collection.
+
+    Keeps every item/original/job/cost. Only collection memberships change.
+    A durable sending marker blocks an automatic replay after an unknown result.
+    """
+    evidence = root / 'evidence/m11'
+    path = evidence / 'topic-reclassification.json'
+    progress = json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
+    if any(r.get('status') != 'complete' for r in progress.values()):
+        raise RuntimeError('uncertain prior topic reclassification; inspect memberships, no automatic replay')
+    checkpoint = evidence / 'uploads.json'
+    uploads = json.loads(checkpoint.read_text(encoding='utf-8'))
+    exclusions = json.loads(m11_papers.MANIFEST.with_name('topic-exclusions.json').read_text(encoding='utf-8'))
+    name = 'Cần xem lại — ngoài phạm vi M11'
+    with Ledger(evidence / 'cost').exclusive():
+        api = Api(root)
+        try:
+            collections = {c['name']: c['id'] for c in api.request('GET', '/collections')['collections']}
+            if name not in collections:
+                progress['_collection'] = {'status': 'sending'}
+                m11_papers.save(path, progress)
+                collections[name] = api.request('POST', '/collections', json={'name': name})['collection']['id']
+                progress['_collection'] = {'status': 'complete', 'id': collections[name]}
+                m11_papers.save(path, progress)
+            for paper in exclusions:
+                tagged, iid = paper['tagged'], paper.get('uploaded_item_id')
+                if not iid or tagged in progress:
+                    continue
+                row = uploads[tagged]
+                progress[tagged] = {'status': 'sending', 'item_id': iid, 'old_topic': row['topic']}
+                m11_papers.save(path, progress)
+                # Membership removal does not remove the item, original or derived content.
+                api.request('DELETE', '/collections/' + collections[row['topic']] + '/items/' + iid)
+                api.request('POST', '/collections/' + collections[name] + '/items', json={'item_id': iid})
+                row.update({'excluded_from_target': paper['reason'], 'topic': name})
+                m11_papers.save(checkpoint, uploads)
+                progress[tagged]['status'] = 'complete'
+                m11_papers.save(path, progress)
+                print(json.dumps({'retained_item': iid, 'excluded_from_target': tagged}, ensure_ascii=False), flush=True)
+            m11_papers.save(evidence / 'collections.json', collections)
+        finally:
+            api.close()
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('action', choices=['run', 'inspect'])
+    p.add_argument('action', choices=['run', 'inspect', 'quarantine-topics'])
     p.add_argument('--root', type=Path, default=Path(os.environ['USERPROFILE']) / 'ras-pilot')
     p.add_argument('--manifest', type=Path, default=m11_papers.MANIFEST)
     p.add_argument('--watch', action='store_true')
@@ -297,6 +342,8 @@ def main():
     args = p.parse_args()
     if args.action == 'run':
         run(args.root, args.manifest, args.watch, args.target)
+    elif args.action == 'quarantine-topics':
+        quarantine_topics(args.root)
     else:
         api = Api(args.root)
         try:

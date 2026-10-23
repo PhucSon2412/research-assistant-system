@@ -191,36 +191,6 @@
       }
     },
     {
-      "tagged": "2502.00857v2",
-      "topic": "RAG evaluation & benchmarks",
-      "title": "HintEval: An Open-Source Python Toolkit for Hint Generation and Hint Evaluation",
-      "authors": [
-        "Jamshid Mozafari, Bhawna Piryani, Abdelrahman Abdallah, Adam Jatowt"
-      ],
-      "oai": {
-        "licence": "http://creativecommons.org/licenses/by/4.0/",
-        "versions": [
-          1,
-          2
-        ],
-        "batch": "oai-batch-000.xml",
-        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
-      },
-      "arxiv_id": "2502.00857",
-      "version": 2,
-      "filename": "arxiv-2502.00857v2.pdf",
-      "licence": "CC BY 4.0",
-      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
-      "sha256": "e50212a32e349f5528780dbb39d023acc9daecdd281f88db79abc1d2517d33b5",
-      "bytes": 627982,
-      "licence_checked_at": "2026-10-23T13:12:26+00:00",
-      "licence_evidence": {
-        "abs": "http://creativecommons.org/licenses/by/4.0/",
-        "oai": "http://creativecommons.org/licenses/by/4.0/",
-        "latest_version_required": true
-      }
-    },
-    {
       "tagged": "2410.19245v3",
       "topic": "Grounding & hallucination",
       "title": "MaCTG: Multi-Agent Collaborative Thought Graph for Automatic Programming",
@@ -395,38 +365,6 @@
       "sha256": "b66d73aa6b35f59d1acefe1f6fc25ce33e8e31db22d8dfa36bea9cb78cdeb4bc",
       "bytes": 3056172,
       "licence_checked_at": "2026-10-23T13:13:17+00:00",
-      "licence_evidence": {
-        "abs": "http://creativecommons.org/licenses/by/4.0/",
-        "oai": "http://creativecommons.org/licenses/by/4.0/",
-        "latest_version_required": true
-      }
-    },
-    {
-      "tagged": "2505.01811v4",
-      "topic": "RAG evaluation & benchmarks",
-      "title": "BadPatches: Routing-Aware Backdoor Attacks on Vision Mixture-of-Experts",
-      "authors": [
-        "Jona te Lintelo, Cedric Chan, Stjepan Picek"
-      ],
-      "oai": {
-        "licence": "http://creativecommons.org/licenses/by/4.0/",
-        "versions": [
-          1,
-          2,
-          3,
-          4
-        ],
-        "batch": "oai-batch-000.xml",
-        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
-      },
-      "arxiv_id": "2505.01811",
-      "version": 4,
-      "filename": "arxiv-2505.01811v4.pdf",
-      "licence": "CC BY 4.0",
-      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
-      "sha256": "dcf88a24a6665ad3d9198569fd6c13c8d529efd0bd1006f66d3fa6ee78753330",
-      "bytes": 7592659,
-      "licence_checked_at": "2026-10-23T13:13:26+00:00",
       "licence_evidence": {
         "abs": "http://creativecommons.org/licenses/by/4.0/",
         "oai": "http://creativecommons.org/licenses/by/4.0/",
@@ -614,37 +552,6 @@
       }
     },
     {
-      "tagged": "2506.08311v3",
-      "topic": "RAG evaluation & benchmarks",
-      "title": "Understanding Automated Program Repair Agents Through the Lens of Traceability: An Empirical Study",
-      "authors": [
-        "Ira Ceka, Hailie Mitchell, Saurabh Pujar, Luca Buratti, Shyam Ramji, Junfeng Yang, Gail Kaiser, and Baishakhi Ray"
-      ],
-      "oai": {
-        "licence": "http://creativecommons.org/licenses/by/4.0/",
-        "versions": [
-          1,
-          2,
-          3
-        ],
-        "batch": "oai-batch-000.xml",
-        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
-      },
-      "arxiv_id": "2506.08311",
-      "version": 3,
-      "filename": "arxiv-2506.08311v3.pdf",
-      "licence": "CC BY 4.0",
-      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
-      "sha256": "c1bafcfe04d22fd4cedf31140414d076f8308d3bd97deeed67be103a51a59b6e",
-      "bytes": 1127033,
-      "licence_checked_at": "2026-10-23T13:14:19+00:00",
-      "licence_evidence": {
-        "abs": "http://creativecommons.org/licenses/by/4.0/",
-        "oai": "http://creativecommons.org/licenses/by/4.0/",
-        "latest_version_required": true
-      }
-    },
-    {
       "tagged": "2606.11052v2",
       "topic": "Long context & chunking",
       "title": "Attention Amnesia in Hybrid LLMs: When CoT Fine-Tuning Breaks Long-Range Recall, and How to Fix It",
@@ -787,68 +694,6 @@
       "sha256": "06c7f66c3c9f4fe7503fe010ed6acf9b6361bec391e20b99f0234fb8fa5acc76",
       "bytes": 9218562,
       "licence_checked_at": "2026-10-23T13:15:22+00:00",
-      "licence_evidence": {
-        "abs": "http://creativecommons.org/licenses/by/4.0/",
-        "oai": "http://creativecommons.org/licenses/by/4.0/",
-        "latest_version_required": true
-      }
-    },
-    {
-      "tagged": "2509.04183v3",
-      "topic": "RAG evaluation & benchmarks",
-      "title": "MAGneT: Coordinated Multi-Agent Generation of Synthetic Multi-Turn Mental Health Counseling Sessions",
-      "authors": [
-        "Aishik Mandal, Tanmoy Chakraborty, Iryna Gurevych"
-      ],
-      "oai": {
-        "licence": "http://creativecommons.org/licenses/by/4.0/",
-        "versions": [
-          1,
-          2,
-          3
-        ],
-        "batch": "oai-batch-000.xml",
-        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
-      },
-      "arxiv_id": "2509.04183",
-      "version": 3,
-      "filename": "arxiv-2509.04183v3.pdf",
-      "licence": "CC BY 4.0",
-      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
-      "sha256": "e292ef6977535326a16df9590ee737fbf666aead0e6be1a9467b961270a6062b",
-      "bytes": 1795985,
-      "licence_checked_at": "2026-10-23T13:15:31+00:00",
-      "licence_evidence": {
-        "abs": "http://creativecommons.org/licenses/by/4.0/",
-        "oai": "http://creativecommons.org/licenses/by/4.0/",
-        "latest_version_required": true
-      }
-    },
-    {
-      "tagged": "2602.19736v3",
-      "topic": "Grounding & hallucination",
-      "title": "InfScene-SR: Seamless Super-Resolution of Arbitrarily Large Remote-Sensing Scenes via Variance-Preserving Joint Denoising",
-      "authors": [
-        "Shoukun Sun, Zhe Wang, Xiang Que, Jiyin Zhang, Xiaogang Ma"
-      ],
-      "oai": {
-        "licence": "http://creativecommons.org/licenses/by/4.0/",
-        "versions": [
-          1,
-          2,
-          3
-        ],
-        "batch": "oai-batch-000.xml",
-        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
-      },
-      "arxiv_id": "2602.19736",
-      "version": 3,
-      "filename": "arxiv-2602.19736v3.pdf",
-      "licence": "CC BY 4.0",
-      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
-      "sha256": "1cfcde668c9029a84c4ea083f44efc1a3d68f7c3e45d84f13964a13bdf46c146",
-      "bytes": 11892835,
-      "licence_checked_at": "2026-10-23T13:15:37+00:00",
       "licence_evidence": {
         "abs": "http://creativecommons.org/licenses/by/4.0/",
         "oai": "http://creativecommons.org/licenses/by/4.0/",
@@ -1186,39 +1031,6 @@
       }
     },
     {
-      "tagged": "2511.15503v5",
-      "topic": "RAG evaluation & benchmarks",
-      "title": "DCC: Data-Centric Compilation of Machine Learning Kernels for Processing-In-Memory Architectures",
-      "authors": [
-        "Peiming Yang, Sankeerth Durvasula, Ivan Fernandez, Mohammad Sadrosadati, Onur Mutlu, Gennady Pekhimenko, Christina Giannoula"
-      ],
-      "oai": {
-        "licence": "http://creativecommons.org/licenses/by/4.0/",
-        "versions": [
-          1,
-          2,
-          3,
-          4,
-          5
-        ],
-        "batch": "oai-batch-000.xml",
-        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
-      },
-      "arxiv_id": "2511.15503",
-      "version": 5,
-      "filename": "arxiv-2511.15503v5.pdf",
-      "licence": "CC BY 4.0",
-      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
-      "sha256": "5682c7c0c805b3145b15eb5b55a1db81d491211b7fc0155cc919462c657ad349",
-      "bytes": 2158248,
-      "licence_checked_at": "2026-10-23T13:17:17+00:00",
-      "licence_evidence": {
-        "abs": "http://creativecommons.org/licenses/by/4.0/",
-        "oai": "http://creativecommons.org/licenses/by/4.0/",
-        "latest_version_required": true
-      }
-    },
-    {
       "tagged": "2605.06582v4",
       "topic": "Grounding & hallucination",
       "title": "PairAlign: A Framework for Autoregressive Tokenization via Self-Alignment with Applications to Audio Tokenization",
@@ -1542,38 +1354,6 @@
       "sha256": "4ab18511f41df719140e403cd78a7409e63198e4b476975ea528ebda70cd5b54",
       "bytes": 1252444,
       "licence_checked_at": "2026-10-23T13:18:37+00:00",
-      "licence_evidence": {
-        "abs": "http://creativecommons.org/licenses/by/4.0/",
-        "oai": "http://creativecommons.org/licenses/by/4.0/",
-        "latest_version_required": true
-      }
-    },
-    {
-      "tagged": "2512.23805v4",
-      "topic": "RAG evaluation & benchmarks",
-      "title": "Fitted Q-Evaluation without Bellman Completeness via Occupancy Weighting",
-      "authors": [
-        "Lars van der Laan and Nathan Kallus"
-      ],
-      "oai": {
-        "licence": "http://creativecommons.org/licenses/by/4.0/",
-        "versions": [
-          1,
-          2,
-          3,
-          4
-        ],
-        "batch": "oai-batch-000.xml",
-        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
-      },
-      "arxiv_id": "2512.23805",
-      "version": 4,
-      "filename": "arxiv-2512.23805v4.pdf",
-      "licence": "CC BY 4.0",
-      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
-      "sha256": "ac8b54850ccced6efef4175318a120f4ab8f72c3d88a3389a5cdbbf36325a173",
-      "bytes": 951646,
-      "licence_checked_at": "2026-10-23T13:18:44+00:00",
       "licence_evidence": {
         "abs": "http://creativecommons.org/licenses/by/4.0/",
         "oai": "http://creativecommons.org/licenses/by/4.0/",
@@ -2067,37 +1847,6 @@
       }
     },
     {
-      "tagged": "2602.01390v3",
-      "topic": "RAG evaluation & benchmarks",
-      "title": "Toward Scalable Audio Description Quality Control: A Workflow for Evaluating Human and VLM Raters",
-      "authors": [
-        "Lana Do, Gio Jung, Juvenal Francisco Barajas, Andrew Taylor Scott, Shasta Ihorn, Alexander Mario Blum, Vassilis Athitsos, Ilmi Yoon"
-      ],
-      "oai": {
-        "licence": "http://creativecommons.org/licenses/by/4.0/",
-        "versions": [
-          1,
-          2,
-          3
-        ],
-        "batch": "oai-batch-000.xml",
-        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
-      },
-      "arxiv_id": "2602.01390",
-      "version": 3,
-      "filename": "arxiv-2602.01390v3.pdf",
-      "licence": "CC BY 4.0",
-      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
-      "sha256": "16476f2256bb2cea12a8f9ea29c4a338ed88a6b63ac2209b11470593cf247647",
-      "bytes": 4258339,
-      "licence_checked_at": "2026-10-23T13:21:04+00:00",
-      "licence_evidence": {
-        "abs": "http://creativecommons.org/licenses/by/4.0/",
-        "oai": "http://creativecommons.org/licenses/by/4.0/",
-        "latest_version_required": true
-      }
-    },
-    {
       "tagged": "2608.13426v2",
       "topic": "Long context & chunking",
       "title": "Reduced Matrix Multiplication: Input-Adaptive Matrix-Product Reduction for LLM Inference",
@@ -2336,37 +2085,6 @@
       }
     },
     {
-      "tagged": "2603.04445v3",
-      "topic": "RAG evaluation & benchmarks",
-      "title": "Dynamic Model Routing and Cascading for Efficient LLM Inference: A Survey",
-      "authors": [
-        "Yasmin Moslem, John D. Kelleher"
-      ],
-      "oai": {
-        "licence": "http://creativecommons.org/licenses/by/4.0/",
-        "versions": [
-          1,
-          2,
-          3
-        ],
-        "batch": "oai-batch-000.xml",
-        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
-      },
-      "arxiv_id": "2603.04445",
-      "version": 3,
-      "filename": "arxiv-2603.04445v3.pdf",
-      "licence": "CC BY 4.0",
-      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
-      "sha256": "034b24ebf60d6dfe41a9e8f277fa129f45eaeff63e7acb38306d8d94d7c84831",
-      "bytes": 4259746,
-      "licence_checked_at": "2026-10-23T13:23:15+00:00",
-      "licence_evidence": {
-        "abs": "http://creativecommons.org/licenses/by/4.0/",
-        "oai": "http://creativecommons.org/licenses/by/4.0/",
-        "latest_version_required": true
-      }
-    },
-    {
       "tagged": "2607.26178v2",
       "topic": "Grounding & hallucination",
       "title": "DuplexGen: Adaptive Synthesis of Human-AI Turn-Taking Dialogues",
@@ -2478,36 +2196,6 @@
       "sha256": "d6a04ec16a6397eb8208b3c455a0a7e47af9de66517ddf721592e87953e97cde",
       "bytes": 1053786,
       "licence_checked_at": "2026-10-23T13:23:43+00:00",
-      "licence_evidence": {
-        "abs": "http://creativecommons.org/licenses/by/4.0/",
-        "oai": "http://creativecommons.org/licenses/by/4.0/",
-        "latest_version_required": true
-      }
-    },
-    {
-      "tagged": "2603.05575v2",
-      "topic": "RAG evaluation & benchmarks",
-      "title": "Prediction-Powered Conditional Inference",
-      "authors": [
-        "Yang Sui, Jin Zhou, Hua Zhou, and Xiaowu Dai"
-      ],
-      "oai": {
-        "licence": "http://creativecommons.org/licenses/by/4.0/",
-        "versions": [
-          1,
-          2
-        ],
-        "batch": "oai-batch-000.xml",
-        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
-      },
-      "arxiv_id": "2603.05575",
-      "version": 2,
-      "filename": "arxiv-2603.05575v2.pdf",
-      "licence": "CC BY 4.0",
-      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
-      "sha256": "31b7f00ed2c8fb5962dfc99ef8937d6e5e248d19b80717b437da52f7874e62f5",
-      "bytes": 1334851,
-      "licence_checked_at": "2026-10-23T13:23:50+00:00",
       "licence_evidence": {
         "abs": "http://creativecommons.org/licenses/by/4.0/",
         "oai": "http://creativecommons.org/licenses/by/4.0/",
@@ -2629,36 +2317,6 @@
       "licence_evidence": {
         "abs": "http://creativecommons.org/licenses/by/4.0/",
         "oai": "http://creativecommons.org/licenses/by/4.0/",
-        "latest_version_required": true
-      }
-    },
-    {
-      "tagged": "2603.09703v2",
-      "topic": "RAG evaluation & benchmarks",
-      "title": "ProGS: Towards Progressive Coding for 3D Gaussian Splatting",
-      "authors": [
-        "Zhiye Tang, Lingzhuo Liu, Shengjie Jiao, Qiudan Zhang, Junhui Hou, You Yang, Xu Wang"
-      ],
-      "oai": {
-        "licence": "http://creativecommons.org/licenses/by-sa/4.0/",
-        "versions": [
-          1,
-          2
-        ],
-        "batch": "oai-batch-000.xml",
-        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
-      },
-      "arxiv_id": "2603.09703",
-      "version": 2,
-      "filename": "arxiv-2603.09703v2.pdf",
-      "licence": "CC BY-SA 4.0",
-      "licence_url": "https://creativecommons.org/licenses/by-sa/4.0/",
-      "sha256": "6d204daf64174f7dae576c36b64c0b48074aa20e35ce05f23f174112ed6e44bd",
-      "bytes": 17206137,
-      "licence_checked_at": "2026-10-23T13:24:28+00:00",
-      "licence_evidence": {
-        "abs": "http://creativecommons.org/licenses/by-sa/4.0/",
-        "oai": "http://creativecommons.org/licenses/by-sa/4.0/",
         "latest_version_required": true
       }
     },
@@ -2812,36 +2470,6 @@
       }
     },
     {
-      "tagged": "2608.26495v2",
-      "topic": "Grounding & hallucination",
-      "title": "Video-FLAIR: Not Whether to Reason, But How",
-      "authors": [
-        "Yogesh Kulkarni, Pooyan Fazli"
-      ],
-      "oai": {
-        "licence": "http://creativecommons.org/licenses/by/4.0/",
-        "versions": [
-          1,
-          2
-        ],
-        "batch": "oai-batch-000.xml",
-        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
-      },
-      "arxiv_id": "2608.26495",
-      "version": 2,
-      "filename": "arxiv-2608.26495v2.pdf",
-      "licence": "CC BY 4.0",
-      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
-      "sha256": "0a42196b722820495b0461f227841ad8e20bba701c82a4df4cc625cbba169a75",
-      "bytes": 9613596,
-      "licence_checked_at": "2026-10-23T13:25:26+00:00",
-      "licence_evidence": {
-        "abs": "http://creativecommons.org/licenses/by/4.0/",
-        "oai": "http://creativecommons.org/licenses/by/4.0/",
-        "latest_version_required": true
-      }
-    },
-    {
       "tagged": "2609.00092v1",
       "topic": "Long context & chunking",
       "title": "Safin-1: Safety from Within through Memory-Native State Evolution",
@@ -2922,6 +2550,3462 @@
       "sha256": "4db188c3f9c5f99b7b2884cf6afafb52b4e418a9e5005cd1d23d11cc44fd6334",
       "bytes": 1116149,
       "licence_checked_at": "2026-10-23T13:25:50+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.28596v1",
+      "topic": "Grounding & hallucination",
+      "title": "Paper Pilot: A Human-in-the-Loop Expert System for Evidence-Traceable Scientific Manuscript Generation in Applied Sciences",
+      "authors": [
+        "Nidhi Jha, Siddharth Chaudhary, Ajinkya Kulkarni"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by-sa/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.28596",
+      "version": 1,
+      "filename": "arxiv-2608.28596v1.pdf",
+      "licence": "CC BY-SA 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "sha256": "36eb23154900e386955131411bcc287f1e153d683745d4701265518f57250f43",
+      "bytes": 1727127,
+      "licence_checked_at": "2026-10-23T13:26:05+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by-sa/4.0/",
+        "oai": "http://creativecommons.org/licenses/by-sa/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.00097v1",
+      "topic": "Long context & chunking",
+      "title": "Faster Than Flash: Exploiting Attention Sparsity for Efficient Long-Context Decoding",
+      "authors": [
+        "Zhigeng Liu, Zhiyuan Ning, Ruixiao Li, Xiaoran Liu, Yuerong Song, Min Zhang, Ziwei He, Xipeng Qiu"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2609.00097",
+      "version": 1,
+      "filename": "arxiv-2609.00097v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "f1420a8e6b2b43873f1f8be7e6d05e0e60dc32566b9cf41432f6593260db5061",
+      "bytes": 992356,
+      "licence_checked_at": "2026-10-23T13:26:12+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.28609v1",
+      "topic": "Search agents & tools",
+      "title": "Parametric Multimodal User Memory: Storing What Captions Cannot Carry",
+      "authors": [
+        "Bojie Li, Noah Shi"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.28609",
+      "version": 1,
+      "filename": "arxiv-2608.28609v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "34acc232361f2785080bc5f24cd06d11ae84459d0b685b4e01cc6326c55bcf5f",
+      "bytes": 863694,
+      "licence_checked_at": "2026-10-23T13:26:19+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.00367v1",
+      "topic": "Long context & chunking",
+      "title": "Neurosymbolics for Data Engineering: Achieving Long Context Token Reduction Without Finetuning",
+      "authors": [
+        "Vishvesh Bhat"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2609.00367",
+      "version": 1,
+      "filename": "arxiv-2609.00367v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "3667806a3fad1fdfa681c0d5bca664c0d8c5da94181de380b9b444815c18221f",
+      "bytes": 533430,
+      "licence_checked_at": "2026-10-23T13:27:07+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.28612v1",
+      "topic": "Search agents & tools",
+      "title": "InternReviewer & InternAdvocate: Objective Reward and Evaluation for Agentic Reinforcement Learning in Peer Review and Rebuttal",
+      "authors": [
+        "Xuerui Su, Liya Guo, Qizhi Pei, Qipeng Guo, Zhongbo Tian, Lijun Wu, Kai Chen and Zun Wang"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.28612",
+      "version": 1,
+      "filename": "arxiv-2608.28612v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "1424de777107dea99699c2cbadd143ae4eb6f85371c9c5281e53cb04aa5f90a2",
+      "bytes": 5624573,
+      "licence_checked_at": "2026-10-23T13:27:14+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.03901v1",
+      "topic": "Reranking & search",
+      "title": "Comparing Retrieval Methods for Academic Advisor Discovery: A Six-Method Study of 768 CS Faculty Profiles Across 9 US Universities",
+      "authors": [
+        "Biraj Subedi"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-003.xml",
+        "batch_sha256": "7ead442cf521da3290ca4cd5fb11cf8073ecd31e2888432be0913aa08ec107d5"
+      },
+      "arxiv_id": "2609.03901",
+      "version": 1,
+      "filename": "arxiv-2609.03901v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "a69c8ca0d127798127658191100fd31637b271d366982a94ba2af8072e246602",
+      "bytes": 524670,
+      "licence_checked_at": "2026-10-23T13:27:24+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.28701v1",
+      "topic": "Grounding & hallucination",
+      "title": "TopoAgent: A Structure-Aware Perception-to-Reasoning Framework for Diagram-to-Graph Topology Extraction with Large Vision-Language Models",
+      "authors": [
+        "Bangwei Guo, Xujiang Zhao, Yanchi Liu, Wei Cheng, Shengyu Chen, Dongyue Li, Masaharu Morimoto, Takayuki Kuroda, Dimitris Metaxas, Haifeng Chen"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.28701",
+      "version": 1,
+      "filename": "arxiv-2608.28701v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "d5f66800419b3c65080e1847a6771db8d846cc50f3fbcab4f0adee0665022942",
+      "bytes": 2165964,
+      "licence_checked_at": "2026-10-23T13:27:39+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2604.08426v5",
+      "topic": "Long context & chunking",
+      "title": "KV Cache Offloading for Context-Intensive Tasks",
+      "authors": [
+        "Andrey Bocharnikov, Ivan Ermakov, Denis Kuznedelev, Vyacheslav Zhdanovskiy, Yegor Yershov"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "batch": "oai-batch-002.xml",
+        "batch_sha256": "c8bf1968bd63b542ed61abc7b2388e1799d5f22710f009835c77a831b494224d"
+      },
+      "arxiv_id": "2604.08426",
+      "version": 5,
+      "filename": "arxiv-2604.08426v5.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "8f2e154916a9edab54ed620127807958d92c8578dc92cc9ea15e41f901273293",
+      "bytes": 1108244,
+      "licence_checked_at": "2026-10-23T13:27:46+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.28695v1",
+      "topic": "Search agents & tools",
+      "title": "Weaving Visual Narratives: Agentic Image Bundle Composition Beyond Atomic Visual Matching",
+      "authors": [
+        "Rong Shan, Tianyi Xu, Congmin Zheng, Wenteng Chen, Jiachen Zhu, Junjie Wu, Teng Wang, Weiwen Liu, Changwang Zhang, Weinan Zhang, Jun Wang, Jianghao Lin"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.28695",
+      "version": 1,
+      "filename": "arxiv-2608.28695v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "5eb354e1ce86d3bdf4018f14823d0d49ffd5d3f8e7900cca3d03c9cdc7658e95",
+      "bytes": 14916758,
+      "licence_checked_at": "2026-10-23T13:27:53+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.04083v1",
+      "topic": "Reranking & search",
+      "title": "CORE: Improving Compositional Reasoning in MLLM Embedding via Reranker Distillation",
+      "authors": [
+        "Tingyu Song, Mingxin Li, Yanzhao Zhang, Dingkun Long, Chu Liu, Pengjun Xie, Yilun Zhao, Shu Wu"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-003.xml",
+        "batch_sha256": "7ead442cf521da3290ca4cd5fb11cf8073ecd31e2888432be0913aa08ec107d5"
+      },
+      "arxiv_id": "2609.04083",
+      "version": 1,
+      "filename": "arxiv-2609.04083v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "b473ca8329163ec39fc077ed50149f13df6cc799fd1f7cfc2c63358ad0878311",
+      "bytes": 1512094,
+      "licence_checked_at": "2026-10-23T13:28:04+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.01379v1",
+      "topic": "Long context & chunking",
+      "title": "Polish ModernBERT: The Long and Short of Polish Language Understanding",
+      "authors": [
+        "Micha{\\l} Pere{\\l}kiewicz, S{\\l}awomir Dadas, Rafa{\\l} Po\\'swiata, Ma{\\l}gorzata Gr\\k{e}bowiec"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-002.xml",
+        "batch_sha256": "c8bf1968bd63b542ed61abc7b2388e1799d5f22710f009835c77a831b494224d"
+      },
+      "arxiv_id": "2609.01379",
+      "version": 1,
+      "filename": "arxiv-2609.01379v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "2cb44a91d717bd21bd0773b1d29c6013f7594653213a2acebc6d59dfd6240d04",
+      "bytes": 1699190,
+      "licence_checked_at": "2026-10-23T13:28:28+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.28790v1",
+      "topic": "Search agents & tools",
+      "title": "ASTRA - Agentic System for Ticket Resolution and Analysis",
+      "authors": [
+        "Shashidhar Reddy Javaji, Mohamed Trabelsi, Jin Cao, Huseyin Uzunalioglu"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.28790",
+      "version": 1,
+      "filename": "arxiv-2608.28790v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "b485408a76318ae259786c408c61c8e59a3dac3beb47d073425fcbbe82394b6e",
+      "bytes": 1876175,
+      "licence_checked_at": "2026-10-23T13:28:37+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29120v1",
+      "topic": "Grounding & hallucination",
+      "title": "HEAR Who Said What: Unlocking Speaker-Attributed Reasoning via Counterfactual Voice Grounding",
+      "authors": [
+        "Dongwook Lee, Sangkwon Park, Eunwoo Song, Che Hyun Lee, Youngho Cho, Junho Kim, June Young Yi, Heeseung Kim, Sungroh Yoon"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29120",
+      "version": 1,
+      "filename": "arxiv-2608.29120v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "ba98d412c64bac28c8cae83809bdcac7bd7a568da11a55f1d6ec9b629c56cfe6",
+      "bytes": 24725157,
+      "licence_checked_at": "2026-10-23T13:28:51+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2605.30022v2",
+      "topic": "Long context & chunking",
+      "title": "Give it Space! Explicit Disentangling of Positional and Semantic Representations in Encoders",
+      "authors": [
+        "Pierre-Antoine Lequeu, Camille Barboule, Benjamin Piwowarski"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-002.xml",
+        "batch_sha256": "c8bf1968bd63b542ed61abc7b2388e1799d5f22710f009835c77a831b494224d"
+      },
+      "arxiv_id": "2605.30022",
+      "version": 2,
+      "filename": "arxiv-2605.30022v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "d60c4405543e4509f2d70b398ba818ccec7ec10be029f9d2b18b52e24ad24009",
+      "bytes": 990467,
+      "licence_checked_at": "2026-10-23T13:29:10+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.28978v1",
+      "topic": "Search agents & tools",
+      "title": "Selective Forgetting: A Graph-Based Memory Framework for Long-Term LLM Agents",
+      "authors": [
+        "Theo Rusu, Sourena Khanzadeh, Manar Alalfi"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.28978",
+      "version": 1,
+      "filename": "arxiv-2608.28978v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "7ce140e47c1364c6564bff4abd0de98f1775d216d80d2ba7dc7439e59ee1c434",
+      "bytes": 296340,
+      "licence_checked_at": "2026-10-23T13:29:17+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2605.29742v2",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "Citation-Closure Retrieval and Per-Rule Attribution for Real-World Regulatory Compliance Question Answering",
+      "authors": [
+        "Yeong-Joon Ju, Seong-Whan Lee"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2605.29742",
+      "version": 2,
+      "filename": "arxiv-2605.29742v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "f72410205d48d0c3871b7d9a68c6023c0d4edc863f8c9ebafa644c51dfa80f12",
+      "bytes": 2105087,
+      "licence_checked_at": "2026-10-23T13:29:25+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29016v1",
+      "topic": "Search agents & tools",
+      "title": "Towards Fully Automated Medical Imaging Code Generation via Validation-based Context Engineering",
+      "authors": [
+        "Zixiao Zhao, Jing Sun, Zhe Hou, Cheng-Hao Cai, Qian Liu, Mengze Li, Zijian Zhang, Jin Song Dong"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29016",
+      "version": 1,
+      "filename": "arxiv-2608.29016v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "f58dba5fbaef949b5ee18ed78727a6269ae1f7c95a8a6fc0c17dcc287debe2f8",
+      "bytes": 1472271,
+      "licence_checked_at": "2026-10-23T13:29:47+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29193v1",
+      "topic": "Grounding & hallucination",
+      "title": "HalluPrism: When Multimodal Uncertainty Should Diagnose, Not Decide",
+      "authors": [
+        "Aman Prakash, Sourish Dasgupta, Tanmoy Chakraborty"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29193",
+      "version": 1,
+      "filename": "arxiv-2608.29193v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "d4b9ac0f531d8dfbbed2a0823aaed7f94d6d1fc09d5683ce530e0a703f91b83f",
+      "bytes": 2325267,
+      "licence_checked_at": "2026-10-23T13:30:02+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.01925v1",
+      "topic": "Long context & chunking",
+      "title": "CRISP: Cliff-awaRe Input-adaptive Sparse Prefilling with Structural-Mass-Motivated Routing",
+      "authors": [
+        "Huu Huy Nguyen, Chien Van Nguyen, Franck Dernoncourt, Ryan A. Rossi, Linh Ngo Van, Jieyang Chen, Thien Huu Nguyen"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-002.xml",
+        "batch_sha256": "c8bf1968bd63b542ed61abc7b2388e1799d5f22710f009835c77a831b494224d"
+      },
+      "arxiv_id": "2609.01925",
+      "version": 1,
+      "filename": "arxiv-2609.01925v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "bc81c7adc6eb9209507e39daff6b12f936e6fd31f676fcd9cd08e312b48faa70",
+      "bytes": 575305,
+      "licence_checked_at": "2026-10-23T13:30:09+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29096v1",
+      "topic": "Search agents & tools",
+      "title": "Development of an Autonomous AI Coding Agent using Monte Carlo Tree Search (MCTS) and Gemini LLM Frameworks",
+      "authors": [
+        "Pravin Game, Vipin Ramakrishnan, Prathamesh Wagh"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29096",
+      "version": 1,
+      "filename": "arxiv-2608.29096v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "ee9be1fd30a2fe4df45239ecbadc11267d34d33b0cd39261357d2661dc103b80",
+      "bytes": 392744,
+      "licence_checked_at": "2026-10-23T13:30:16+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29251v1",
+      "topic": "Grounding & hallucination",
+      "title": "GuardianAgent: Policy-Conditioned Risk-Adaptive Anonymization with Verified Adversarial Escalation",
+      "authors": [
+        "Ruiyi Yang, Gayathri Lihinikaduarachchi, Rahat Masood, Flora D. Salim, Salil S. Kanhere"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29251",
+      "version": 1,
+      "filename": "arxiv-2608.29251v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "4e3082f792481067eb1bbfde431f7e114c4370ba5500d10e5deb2d36351b1692",
+      "bytes": 1498944,
+      "licence_checked_at": "2026-10-23T13:30:30+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2607.17117v2",
+      "topic": "Long context & chunking",
+      "title": "Persistent Sparse Autoencoders: Learning Feature-Specific Timescales in Language Model Representations",
+      "authors": [
+        "Haoyan Luo, Mateo Espinosa Zarlenga, Mateja Jamnik"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-003.xml",
+        "batch_sha256": "7ead442cf521da3290ca4cd5fb11cf8073ecd31e2888432be0913aa08ec107d5"
+      },
+      "arxiv_id": "2607.17117",
+      "version": 2,
+      "filename": "arxiv-2607.17117v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "9a1beaf0810c64b59f1d8a1329a87aed4553e019b84363d358dc90104ed6f1c2",
+      "bytes": 1416838,
+      "licence_checked_at": "2026-10-23T13:30:37+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29357v1",
+      "topic": "Search agents & tools",
+      "title": "LiteSearch-VL: Small Multimodal Search Agents via Trajectory Distillation and Synthetic Step-DPO",
+      "authors": [
+        "Saeed Khaki, Nima Safaei, Kamal Ginotra"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29357",
+      "version": 1,
+      "filename": "arxiv-2608.29357v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "8beb2ac5206f8d4d7bf2645c3050a0a8de0a11ca65a10aa15671544c80814b99",
+      "bytes": 3023910,
+      "licence_checked_at": "2026-10-23T13:30:45+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29307v1",
+      "topic": "Grounding & hallucination",
+      "title": "Detecting and Repairing Hallucinations in Retrieval-Augmented Generation",
+      "authors": [
+        "Sai Krishna Reddy Mulakkayala, Niki van Stein, Aske Plaat"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29307",
+      "version": 1,
+      "filename": "arxiv-2608.29307v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "dda791dbf7fb8dc5e451f0f525886b5b7c2c420e607f300e44f66da0175d6501",
+      "bytes": 332954,
+      "licence_checked_at": "2026-10-23T13:31:00+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.02496v1",
+      "topic": "Long context & chunking",
+      "title": "Debias-SparseGPT: Bias-Aware Pruning for Large Language Models",
+      "authors": [
+        "Irina Proskurina, Guillaume Metzler, Antoine Gourru, Julien Velcin"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-003.xml",
+        "batch_sha256": "7ead442cf521da3290ca4cd5fb11cf8073ecd31e2888432be0913aa08ec107d5"
+      },
+      "arxiv_id": "2609.02496",
+      "version": 1,
+      "filename": "arxiv-2609.02496v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "bded75679a7264a6bc9e7b2da2cdae1167339addc65314934fefb21ca3bfba12",
+      "bytes": 1224558,
+      "licence_checked_at": "2026-10-23T13:31:07+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29483v1",
+      "topic": "Search agents & tools",
+      "title": "GeoAgent: Evaluating VLM Geolocalization Through Embodied Navigation",
+      "authors": [
+        "Arka Mukherjee, Soham Roy, Kartikeya Trivedi, Shreya Ghosh"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29483",
+      "version": 1,
+      "filename": "arxiv-2608.29483v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "fa0e9e3fc2d250d096d7d3fee7831352484770324f68c024c86900aaa76aaddb",
+      "bytes": 7845384,
+      "licence_checked_at": "2026-10-23T13:31:14+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29374v1",
+      "topic": "Grounding & hallucination",
+      "title": "Think, Look, and Revise: Inconsistency-Aware Visual Self-Correction in MLLMs",
+      "authors": [
+        "Yu Cheng, Arushi Goel, Hakan Bilen"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29374",
+      "version": 1,
+      "filename": "arxiv-2608.29374v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "8513cdc5746e094354be137b0793d81557ad3565da42baa13b4ca4337377e34d",
+      "bytes": 1378648,
+      "licence_checked_at": "2026-10-23T13:31:33+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29528v1",
+      "topic": "Search agents & tools",
+      "title": "MedCache: Efficient and Temporally Valid Memory for Longitudinal Clinical Agents",
+      "authors": [
+        "Hei Ting (Una) Chan, Chenwei Wu, Xueshen Liu, Boyuan Zheng, Liyue Shen, Jiasi Chen, Z. Morley Mao"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29528",
+      "version": 1,
+      "filename": "arxiv-2608.29528v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "c9061b4f8a91d2ffa5c843f39b87697b6e54a67ca9faae98cb4de4da868a39cf",
+      "bytes": 879566,
+      "licence_checked_at": "2026-10-23T13:31:43+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29644v1",
+      "topic": "Search agents & tools",
+      "title": "Conducting Stylistic Analysis of Paintings through an Art-History Agent",
+      "authors": [
+        "Marc S. Walton and Astrid Harth"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29644",
+      "version": 1,
+      "filename": "arxiv-2608.29644v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "14d654e5eae11b8a8c7dc360c72f6aa8d4646bbc1ee919bb1f0818f5d80f3e7f",
+      "bytes": 6191598,
+      "licence_checked_at": "2026-10-23T13:32:14+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29803v1",
+      "topic": "Grounding & hallucination",
+      "title": "Do LLMs Change Their Minds Like Humans? Diagnosing Human--LLM Divergence in Single-Turn Persuasion Judgments",
+      "authors": [
+        "Lin Chen, Yitong Chen, Yong Li"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29803",
+      "version": 1,
+      "filename": "arxiv-2608.29803v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "2aa14e8c5fd72c80663d2f1615842a8b27c208e4aeb11ac8e79d9c525984a453",
+      "bytes": 4072734,
+      "licence_checked_at": "2026-10-23T13:32:34+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.04010v1",
+      "topic": "Long context & chunking",
+      "title": "Unlocking Lossless Speedups in LLMs via Discrete Diffusion",
+      "authors": [
+        "Subham Sekhar Sahoo, Lingjie Chen, Khiem Pham, Jonathan Geuter, Chaitanya Dwivedi, Varad Pimpalkhute, Yash Akhauri, Alexander Moreno, Mikhail Yurochkin, Zhenting Wang, Mostafa Elhoushi, Nolan Dey, Shane Bergsma, Joel Hestness, John Thickstun, Eric Xing, Zhengzhong Liu"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-003.xml",
+        "batch_sha256": "7ead442cf521da3290ca4cd5fb11cf8073ecd31e2888432be0913aa08ec107d5"
+      },
+      "arxiv_id": "2609.04010",
+      "version": 1,
+      "filename": "arxiv-2609.04010v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "849e47f21dffe66265e5416a50bb70fb49c3340feec970d389130c98a6c5ce67",
+      "bytes": 1348425,
+      "licence_checked_at": "2026-10-23T13:32:42+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29696v1",
+      "topic": "Search agents & tools",
+      "title": "Ideation Arena: Evaluating LLM Generated Research Ideas with Battle-style Human Expert Assessment",
+      "authors": [
+        "Zhiyu Chen, Keyu Zhao, Jigao Fu, Dong Liang, Yanbiao Wu, Jiaoyang Li, Haidong Xue, Xinhua Zeng, Yuanyi Zhen, Fengli Xu, Yong Li"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29696",
+      "version": 1,
+      "filename": "arxiv-2608.29696v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "58ab13faaa164871007ce2acabde8c480bd7bd8e8c8d6192efdfa832ff41381b",
+      "bytes": 737847,
+      "licence_checked_at": "2026-10-23T13:32:49+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29738v1",
+      "topic": "Search agents & tools",
+      "title": "Evaluating the Capabilities of LLMs for Persuasive Dialogue",
+      "authors": [
+        "Jordan Robinson and Angus R. Williams and Katie Atkinson and Anthony G. Cohn"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29738",
+      "version": 1,
+      "filename": "arxiv-2608.29738v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "39f0c97d41246c7dca2a4964b8d1395e76b39b1f9a594dbb1bdf83be6506631c",
+      "bytes": 2224738,
+      "licence_checked_at": "2026-10-23T13:33:11+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29880v1",
+      "topic": "Grounding & hallucination",
+      "title": "Perceive to Hypothesize, Verify to Ground: An Agentic Reasoning Framework for Open-World Geo-Localization",
+      "authors": [
+        "Yutian Jiang, Ruijie Li, Sisuo Lyu, Xixuan Hao, Qingxiang Liu, Yongzi Yu, Yuxuan Liang"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29880",
+      "version": 1,
+      "filename": "arxiv-2608.29880v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "b544ce39c84ed53438e1de97175740da856cc673e63ce3735d68f672e1a3460f",
+      "bytes": 6253481,
+      "licence_checked_at": "2026-10-23T13:33:26+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29834v1",
+      "topic": "Search agents & tools",
+      "title": "You Know What I Mean: A Benchmark for Agentic Conversational Reference Grounding",
+      "authors": [
+        "Karen Fuchs, Uri Katz, Yoav Goldberg"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by-sa/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29834",
+      "version": 1,
+      "filename": "arxiv-2608.29834v1.pdf",
+      "licence": "CC BY-SA 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "sha256": "9987b2f56cf4c77f0a5879a4ee742121d35b8ccc5a0116a2da480c8ed350492e",
+      "bytes": 969544,
+      "licence_checked_at": "2026-10-23T13:33:34+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by-sa/4.0/",
+        "oai": "http://creativecommons.org/licenses/by-sa/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29924v1",
+      "topic": "Grounding & hallucination",
+      "title": "Hallucination Mitigation for Large Vision-Language Models via Implicit Feature Stabilization",
+      "authors": [
+        "Aditi Sarker, Rafi Ibn Sultan, Hui Zhu, Dongxiao Zhu, Prashant Khanduri"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29924",
+      "version": 1,
+      "filename": "arxiv-2608.29924v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "e812918fbcebf87473f2e424b89df8f9dfdfe09f14325f58018ae8a7a79b8608",
+      "bytes": 3050569,
+      "licence_checked_at": "2026-10-23T13:34:04+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29953v1",
+      "topic": "Search agents & tools",
+      "title": "SearchWiki: Learning to Build and Navigate Knowledge Wikis for Active Information Seeking",
+      "authors": [
+        "Guransh Singh, Vishwajeet Kumar, Arkadeep Acharya, Adnan Qidwai, Jaydeep Sen, Sachindra Joshi"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29953",
+      "version": 1,
+      "filename": "arxiv-2608.29953v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "914270cade14ea0b19befe3227f3281ca16b94012d896eb978c2103197ff11af",
+      "bytes": 1042228,
+      "licence_checked_at": "2026-10-23T13:34:11+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29934v1",
+      "topic": "Grounding & hallucination",
+      "title": "Compression-Aware Abstention: Teaching LLMs to Refuse When KV-Compression Masks Remove Answer Evidence",
+      "authors": [
+        "Mohammadali Khodabandehlou, Bhaskar Krishnamachari"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29934",
+      "version": 1,
+      "filename": "arxiv-2608.29934v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "43f6f6b06a584642f47b20a25871e913e1a5795296276fcbd2cd018473122e30",
+      "bytes": 410570,
+      "licence_checked_at": "2026-10-23T13:34:26+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.30047v1",
+      "topic": "Search agents & tools",
+      "title": "Can LLM Agents Discover? Evaluating Creativity on ML Engineering Tasks",
+      "authors": [
+        "Shitanshu Bhushan, Yunxiang Zhang, Lu Wang"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.30047",
+      "version": 1,
+      "filename": "arxiv-2608.30047v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "a620a53cb2674f863383a41e23143250f7b28bed79612ce52227f44579af54f4",
+      "bytes": 613530,
+      "licence_checked_at": "2026-10-23T13:34:33+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29990v1",
+      "topic": "Grounding & hallucination",
+      "title": "Beyond Fluency: A Rubric-Based Benchmark for Evaluating Saudi Dialect and Cultural Competence in Large Language Models",
+      "authors": [
+        "Ghassan Al-Sumaidaee, Sajjad Abdoli, Ahmed Rashad, Maxim Legg"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29990",
+      "version": 1,
+      "filename": "arxiv-2608.29990v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "69a72250e752973ee254687f0afd2f4ddab77e964cb5f2029f1bf054820be24f",
+      "bytes": 1337651,
+      "licence_checked_at": "2026-10-23T13:34:46+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.30110v1",
+      "topic": "Search agents & tools",
+      "title": "Can LLMs Take the Pulse of the Economy? A Real-Time Evaluation of LLM Nowcasts on Macroeconomic Indicators",
+      "authors": [
+        "Xinyue Zhao, Ruiyi Zhang, Liqin Ye, Rui Cao, Pengtao Xie, Sudheer Chava"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.30110",
+      "version": 1,
+      "filename": "arxiv-2608.30110v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "e8a4b32ddf1ccc8bb014349122a90b5c4c8cdd0bdb7d717b92a4b1449308bed0",
+      "bytes": 7648750,
+      "licence_checked_at": "2026-10-23T13:34:53+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2512.16956v3",
+      "topic": "Search agents & tools",
+      "title": "SpIDER: Spatially Informed Dense Embedding Retrieval for Software Issue Localization",
+      "authors": [
+        "Shravan Chaudhari, Rahul Thomas Jacob, Jiajun Cao, Shihab Rashid, Mononito Goswami, Christian Bock"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2,
+          3
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2512.16956",
+      "version": 3,
+      "filename": "arxiv-2512.16956v3.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "36c65f35c5e22431797918f9254f925c92402bea994d3bf792af7913a69343c8",
+      "bytes": 1307632,
+      "licence_checked_at": "2026-10-23T13:35:38+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.30022v1",
+      "topic": "Grounding & hallucination",
+      "title": "Automatic Conversion of NICE Guidelines to an Executable Computational Model Using Large Language Models",
+      "authors": [
+        "Ashvin Gupta, Denys Prociuk, Alessandra Russo, Brendan C. Delaney"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.30022",
+      "version": 1,
+      "filename": "arxiv-2608.30022v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "09a30d0eb12d43aedb56d67bac1e71f7d6a2e82fed8da16bd9c4b41faa6e84ee",
+      "bytes": 2035705,
+      "licence_checked_at": "2026-10-23T13:35:51+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2603.03677v2",
+      "topic": "Search agents & tools",
+      "title": "MIND: Unified Inquiry and Diagnosis RL with Criteria Grounded Clinical Supports for Psychiatric Consultation",
+      "authors": [
+        "Guoyi Li, Shihao Xu, Jiatong Ma, Zhongjiang Yao, Yunyun Han, Jianhua Chen, Yafeng Deng"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2603.03677",
+      "version": 2,
+      "filename": "arxiv-2603.03677v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "da20e8ff81a5c51d68aad509e0862123d38bdc73d84ff48c5d0dd12a648bcc65",
+      "bytes": 1253942,
+      "licence_checked_at": "2026-10-23T13:35:59+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2505.17537v2",
+      "topic": "Grounding & hallucination",
+      "title": "Popular but Wrong: Understanding and Mitigating LLM Overconfidence through Knowledge Popularity",
+      "authors": [
+        "Shiyu Ni, Keping Bi, Jiafeng Guo, Xueqi Cheng"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2505.17537",
+      "version": 2,
+      "filename": "arxiv-2505.17537v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "5586e8e4807af9cbcf3c5e9efb14376f6cd7efe182e202a64f4dd535db2df877",
+      "bytes": 1282507,
+      "licence_checked_at": "2026-10-23T13:36:13+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2605.26081v2",
+      "topic": "Search agents & tools",
+      "title": "VeriTrace: Evolving Mental Models for Deep Research Agents",
+      "authors": [
+        "Haolang Zhao and Yunbo Long and Lukas Beckenbauer and Alexandra Brintrup"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2605.26081",
+      "version": 2,
+      "filename": "arxiv-2605.26081v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "f1399a647ea3be9d1678fbaaf3348f607157b4bd0dee6f9b4ceec35b4647f20b",
+      "bytes": 2728496,
+      "licence_checked_at": "2026-10-23T13:36:21+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2508.14273v3",
+      "topic": "Grounding & hallucination",
+      "title": "Towards AI-Assisted Research Writing: Benchmarking LLMs for AI/ML Introduction Generation",
+      "authors": [
+        "Krishna Garg, Firoz Shaik, Sambaran Bandyopadhyay, Cornelia Caragea"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2,
+          3
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2508.14273",
+      "version": 3,
+      "filename": "arxiv-2508.14273v3.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "675d97267fef0196f4ef1126b90fb4fcc5370b775a73260ef5a89bcd29ed69d8",
+      "bytes": 1889646,
+      "licence_checked_at": "2026-10-23T13:36:56+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2605.27955v2",
+      "topic": "Search agents & tools",
+      "title": "Skill-as-Pseudocode: Refactoring Skill Libraries to Pseudocode for LLM Agents",
+      "authors": [
+        "Xinze Li, Yuhang Zang, Yixin Cao, Aixin Sun"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2605.27955",
+      "version": 2,
+      "filename": "arxiv-2605.27955v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "5afa3c7e60924adae6aac23d59ddefdad1750b8f286dc88936356e5f107d021b",
+      "bytes": 490034,
+      "licence_checked_at": "2026-10-23T13:37:04+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2510.13387v3",
+      "topic": "Grounding & hallucination",
+      "title": "Make an Offer They Can't Refuse: Grounding Bayesian Persuasion in Real-World Dialogues without Pre-Commitment",
+      "authors": [
+        "Buwei He, Yang Liu, Zhaowei Zhang, Zixia Jia, Yang Yu, Huijia Wu, Zhaofeng He, Zilong Zheng, Yipeng Kang"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2,
+          3
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2510.13387",
+      "version": 3,
+      "filename": "arxiv-2510.13387v3.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "8bc33a2bc16fe6ec8acc663227ad7e9d65f27a90037e9640c1e4992f520b3858",
+      "bytes": 2224659,
+      "licence_checked_at": "2026-10-23T13:37:18+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2606.24820v2",
+      "topic": "Search agents & tools",
+      "title": "SHERLOC: Structured Diagnostic Localization for Code Repair Agents",
+      "authors": [
+        "Hovhannes Tamoyan, Sean Narenthiran, Erik Arakelyan, Mira Mezini, Boris Ginsburg"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2606.24820",
+      "version": 2,
+      "filename": "arxiv-2606.24820v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "862b3137f0881245eeeee7ae83f887649b95b467bef193fe9f08e3cf1c2aa3fd",
+      "bytes": 1642045,
+      "licence_checked_at": "2026-10-23T13:37:26+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.28607v1",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "RegDivergence-101: An LLM Benchmark for Cross-Jurisdiction Regulatory Contradiction Detection in Life Sciences",
+      "authors": [
+        "Chuchu Wu, Zhiyin Zhou, Jingzhuo Hu, Liang You"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.28607",
+      "version": 1,
+      "filename": "arxiv-2608.28607v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "c8f2d70d6ee69b76bf29f2c08c29c623fadb08501ddd8ec4cd4f78f1bf9658d9",
+      "bytes": 477879,
+      "licence_checked_at": "2026-10-23T13:37:33+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2601.03471v4",
+      "topic": "Grounding & hallucination",
+      "title": "EpiQAL: Benchmarking Large Language Models in Epidemiological Question Answering and Reasoning",
+      "authors": [
+        "Mingyang Wei, Dehai Min, Zewen Liu, Yuzhang Xie, Guanchen Wu, Ziyang Zhang, Carl Yang, Max S. Y. Lau, Qi He, Lu Cheng, Wei Jin"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2601.03471",
+      "version": 4,
+      "filename": "arxiv-2601.03471v4.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "3b26fabcbb2e07ca95aa610896fa131ba00ed49f52a14b6e5e00845472080ba9",
+      "bytes": 740751,
+      "licence_checked_at": "2026-10-23T13:37:40+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2607.18084v2",
+      "topic": "Search agents & tools",
+      "title": "WorldCupArena: Fine-Grained Evaluation of Language Models and Deep-Research Agents on Football Forecasting",
+      "authors": [
+        "Zhaokai Wang, Tianlin Gui, Jiayuan Rao, Shangzhe Di, Yihong Tang, Dingli Liang"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2607.18084",
+      "version": 2,
+      "filename": "arxiv-2607.18084v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "49b250254fb65c2fd22e6e2537e4c671a0d15eb0857b1bd87047712b1d69062e",
+      "bytes": 756155,
+      "licence_checked_at": "2026-10-23T13:37:47+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2601.06644v2",
+      "topic": "Grounding & hallucination",
+      "title": "Do Language Models Reason Across Languages?",
+      "authors": [
+        "Yan Meng, Wafaa Mohammed, Christof Monz"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2601.06644",
+      "version": 2,
+      "filename": "arxiv-2601.06644v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "299f9919eab0d7d7ca6001c34bdce5923dd73747f2a7def145fffe54cb1b3385",
+      "bytes": 6562332,
+      "licence_checked_at": "2026-10-23T13:38:01+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.18682v3",
+      "topic": "Search agents & tools",
+      "title": "RTPO: Reverse-Turn Policy Optimization for Stabilizing Agentic RL Training",
+      "authors": [
+        "Yugu Li, Zehong Cao, Jianglin Qiao, Siyi Hu"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2,
+          3
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2608.18682",
+      "version": 3,
+      "filename": "arxiv-2608.18682v3.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "be332224709d5b2545d049c719c49831794f5f08974f52af3cef10e239add36a",
+      "bytes": 2729493,
+      "licence_checked_at": "2026-10-23T13:38:09+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2603.12165v3",
+      "topic": "Grounding & hallucination",
+      "title": "QAQ: Bidirectional Semantic Coherence for Selecting High-Quality Synthetic Code Instructions",
+      "authors": [
+        "Jiayin Lei, Ming Ma, Yunxi Duan, Chenxi Li, Tianming Yang"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2,
+          3
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2603.12165",
+      "version": 3,
+      "filename": "arxiv-2603.12165v3.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "2eee952383c620d13aca4ea2eb555e49ad9f19289e05412c0b04955f7f273ea4",
+      "bytes": 1105985,
+      "licence_checked_at": "2026-10-23T13:38:24+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.27505v2",
+      "topic": "Search agents & tools",
+      "title": "A Survey on Rubric-Guided Reinforcement Learning for Language Models",
+      "authors": [
+        "Zifei Shan, Fangning Shao"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2608.27505",
+      "version": 2,
+      "filename": "arxiv-2608.27505v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "080d1d18f1c522f12cff298b2b878df1ca93bc7000a3564c24ec5123f97b1b56",
+      "bytes": 217601,
+      "licence_checked_at": "2026-10-23T13:38:31+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2603.21607v3",
+      "topic": "Grounding & hallucination",
+      "title": "INTRYGUE: Induction-Aware Entropy Gating for Reliable RAG Uncertainty Estimation",
+      "authors": [
+        "Alexandra Kuleshova, Andrei Volodichev, Daria Kotova, Alexey Zaytsev"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2,
+          3
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2603.21607",
+      "version": 3,
+      "filename": "arxiv-2603.21607v3.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "ea6fcc709ca6325bbeee16996dbe9b891be2481a159b3144805cc53957d2a9ff",
+      "bytes": 4428538,
+      "licence_checked_at": "2026-10-23T13:38:45+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.30177v1",
+      "topic": "Search agents & tools",
+      "title": "Understanding Stage-Wise Utility-Risk Trade-offs in LLM Agent Memory",
+      "authors": [
+        "Chuanchao Zang, Zijian Cao, Xiangtao Meng, Jianing Wang, Wenyu Chen, Xinyu Gao, Li Wang, Zheng Li, Shanqing Guo"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2608.30177",
+      "version": 1,
+      "filename": "arxiv-2608.30177v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "534d19430d42adaeb129ccf81a44a565d58b9bf14a242ac0c690fc95700330fa",
+      "bytes": 2902129,
+      "licence_checked_at": "2026-10-23T13:38:54+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.28669v1",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "MIRAGE-CAD: Construction-Mediated Multimodal Generation of Executable CAD Programs",
+      "authors": [
+        "Jizong Zhan"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.28669",
+      "version": 1,
+      "filename": "arxiv-2608.28669v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "fd5f6ff4c3ba60dffa546c0195fdadaa6b48b94c1f0c0761204f4716d4272e25",
+      "bytes": 1635202,
+      "licence_checked_at": "2026-10-23T13:39:02+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2604.01452v2",
+      "topic": "Grounding & hallucination",
+      "title": "A Multi-Agent Human-LLM Collaborative Framework for Closed-Loop Scientific Literature Summarization",
+      "authors": [
+        "Maxwell J. Jacobson, Daniel Xie, Jackson Shen, Adil Wazeer, Guang Lin, Xiao-Ying Yu, Haiyan Wang, Xinghang Zhang, Yexiang Xue"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2604.01452",
+      "version": 2,
+      "filename": "arxiv-2604.01452v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "5c3bd6eb486030a93d34caaecfe95b14106f3e471a26cfec9caf201fbaa5d2d4",
+      "bytes": 1479328,
+      "licence_checked_at": "2026-10-23T13:39:09+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.30288v1",
+      "topic": "Search agents & tools",
+      "title": "Extracting Knowledge from Tools in LLM Agents",
+      "authors": [
+        "Chuanchao Zang, Jianing Wang, Wenyu Chen, Xiangtao Meng, Li Wang, Xinyu Gao, Yingkai Dong, Zheng Li, Shanqing Guo"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2608.30288",
+      "version": 1,
+      "filename": "arxiv-2608.30288v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "0df0abee7855b9d871d465e44e69626f3b5615708afa51a4fe9821fde982e0ae",
+      "bytes": 2557112,
+      "licence_checked_at": "2026-10-23T13:39:15+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.28696v1",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "Instruction Distillation: Text Instructions as Visual Examples",
+      "authors": [
+        "Hardik Jindal, Soumyabrata Pal, Sayak Ray Chowdhury"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.28696",
+      "version": 1,
+      "filename": "arxiv-2608.28696v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "2c50b483f9b8db8b548f2a68d441514e7ef947010e25abb3536447ba8a00d6bb",
+      "bytes": 24164237,
+      "licence_checked_at": "2026-10-23T13:39:23+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2604.12335v2",
+      "topic": "Grounding & hallucination",
+      "title": "SynMulti: Synthetic-to-Real Learning for Multimodal Video Understanding",
+      "authors": [
+        "Tanzila Rahman, Renjie Liao and Leonid Sigal"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/publicdomain/zero/1.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2604.12335",
+      "version": 2,
+      "filename": "arxiv-2604.12335v2.pdf",
+      "licence": "CC0 1.0",
+      "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "206f9f11f4f491100721872b198ab20f8da969660c49ab470d3a86f10716323b",
+      "bytes": 11881274,
+      "licence_checked_at": "2026-10-23T13:39:33+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/publicdomain/zero/1.0/",
+        "oai": "http://creativecommons.org/publicdomain/zero/1.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.30391v1",
+      "topic": "Search agents & tools",
+      "title": "Using Grounded Theory for Agent Behavior Analysis at Scale",
+      "authors": [
+        "Zhuoran Lu, Yangyang Yu, Zhuoyan Li, Yibo Meng, Nan Jiang, Chengxi Zang, Jie Gao, Ziang Xiao"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2608.30391",
+      "version": 1,
+      "filename": "arxiv-2608.30391v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "b372259555e8a3ca9587277e7b7364a6db07ae1bdd9a91cb98126bd9c6e297bc",
+      "bytes": 1772093,
+      "licence_checked_at": "2026-10-23T13:39:54+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.28698v1",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "State-Conditioned Visual Evidence Retrieval for Fine-Grained Perception in Document Vision-Language Models",
+      "authors": [
+        "Mingxu Chai, Chenyu Liu, Ziyu Shen, Jiazheng Zhang, Kaidi Zhang, Ruoyu Chen, Jun Long, Jihua Kang, Tao Gui, Qi Zhang"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.28698",
+      "version": 1,
+      "filename": "arxiv-2608.28698v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "cfbd6d5f5941e235c0123893217bd4d03cdec7cde64a0b0dbe97400770f36c9b",
+      "bytes": 1767452,
+      "licence_checked_at": "2026-10-23T13:40:01+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.30429v1",
+      "topic": "Search agents & tools",
+      "title": "EvoSkill Injection: Red-Teaming Autonomous Skill Generation and Evolution in Self-Evolving Agents",
+      "authors": [
+        "Doyun Kim, Chanwoo Kim, Sugyeong Eo, Yeo-Chan Yoon, Chanjun Park"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2608.30429",
+      "version": 1,
+      "filename": "arxiv-2608.30429v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "52a5859c406e9a1e36b316f14672ccbeb2753c138ef2369cc9b3df1701c110da",
+      "bytes": 515909,
+      "licence_checked_at": "2026-10-23T13:40:19+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.30508v1",
+      "topic": "Search agents & tools",
+      "title": "UTILMEM: Benchmarking Evidence Utilization in Long-Term Conversational Memory",
+      "authors": [
+        "Peijun Qing, Fobo Shi, Soroush Vosoughi"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2608.30508",
+      "version": 1,
+      "filename": "arxiv-2608.30508v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "1bc76b699f2944f3fcd2a12a6327e021fdac436c8b6c27e952b7999cab453c96",
+      "bytes": 1013702,
+      "licence_checked_at": "2026-10-23T13:40:40+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.28788v1",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "FoldKit: A Python library for efficient storage and retrieval of co-folding predictions",
+      "authors": [
+        "Jonathan A. Levine, Melissa Pathil, Samuel Nitz, Olga Lyudovyk, Benjamin D. Greenbaum"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.28788",
+      "version": 1,
+      "filename": "arxiv-2608.28788v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "ef6ca0215cdbbe15a8820f6217ee25373e444386d42ebf4c1ed157f3e5323b51",
+      "bytes": 1695227,
+      "licence_checked_at": "2026-10-23T13:40:47+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2604.27426v2",
+      "topic": "Grounding & hallucination",
+      "title": "Secret Stealing Attacks on Local LLM Fine-Tuning through Supply-Chain Model Code Backdoors",
+      "authors": [
+        "Zi Li, Tian Zhou, Wenze Li, Jingyu Hua, Yunlong Mao, Sheng Zhong"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2604.27426",
+      "version": 2,
+      "filename": "arxiv-2604.27426v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "6f87be37200d297774ab78e12ef276339e32c1814aba0890da32175e3750ad80",
+      "bytes": 1049391,
+      "licence_checked_at": "2026-10-23T13:40:55+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.30701v1",
+      "topic": "Search agents & tools",
+      "title": "A Phased Workflow for Operating LLM-Based Coding Agents",
+      "authors": [
+        "Ante Kapetanovic, Tomislav Duricic, Andro Mercep, Emanuel Lacic"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2608.30701",
+      "version": 1,
+      "filename": "arxiv-2608.30701v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "1e6a35f6ee55a991ef8b291c18f1d9a5e7d5796eeb36471c85fd5dfb389f111d",
+      "bytes": 386343,
+      "licence_checked_at": "2026-10-23T13:41:03+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2605.25903v2",
+      "topic": "Grounding & hallucination",
+      "title": "Universal Activation Verbalizer: A Unified Framework for Cross-Model Activation Explanation",
+      "authors": [
+        "Haiyan Zhao, Zirui He, Guanchu Wang, Ali Payani, Yingcong Li, Mengnan Du"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2605.25903",
+      "version": 2,
+      "filename": "arxiv-2605.25903v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "68a0ca3b53ca0bc3aaa1436bc3f40f82356c9595a6dfb459c0acbd21647a7873",
+      "bytes": 2549275,
+      "licence_checked_at": "2026-10-23T13:41:19+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.30702v1",
+      "topic": "Search agents & tools",
+      "title": "An Agentic Retrobiosynthesis Framework with Learned Frontier Selection",
+      "authors": [
+        "Philippe Meyer, Guillaume Gricourt, Thomas Duigou, Joan H\\'erisson, Jean-Loup Faulon"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2608.30702",
+      "version": 1,
+      "filename": "arxiv-2608.30702v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "4995eca3bbc5b0d811d879e2b3f6eff8d8afa067056521bd680b12e8fba13d68",
+      "bytes": 585375,
+      "licence_checked_at": "2026-10-23T13:41:27+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2605.27068v2",
+      "topic": "Grounding & hallucination",
+      "title": "QUACK: Questioning, Understanding, and Auditing Communicated Knowledge in Multimodal Social Deduction Agents",
+      "authors": [
+        "Ye Yuan, Rui Song, Weien Li, Zeyu Li, Haochen Liu, Xiangyu Kong, Changjiang Han, Yonghan Yang, Zichen Zhao, Zixuan Dong, Fuyuan Lyu, Bowei He, Haolun Wu, Jikun Kang, Xue Liu"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2605.27068",
+      "version": 2,
+      "filename": "arxiv-2605.27068v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "b1f4a46fe9bc5052334e28969976948674d01e8a831762e9446d299183e1b421",
+      "bytes": 1027429,
+      "licence_checked_at": "2026-10-23T13:41:41+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.30724v1",
+      "topic": "Search agents & tools",
+      "title": "BAITBENCH: Measuring Agent Reward Hacking with Optional Shortcuts Planted in ML Tasks",
+      "authors": [
+        "Pradyumna Shyama Prasad, Meiri Anto, Leon Eshuijs, Julian Moncarz, Kaustubh Kislay, Juan J. Vazquez"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2608.30724",
+      "version": 1,
+      "filename": "arxiv-2608.30724v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "09fd72885a6d1b11a32af85157c3a244696b98dc441d0f7384ff29411ff84ebe",
+      "bytes": 390735,
+      "licence_checked_at": "2026-10-23T13:41:48+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2607.29181v2",
+      "topic": "Dense retrieval & embeddings",
+      "title": "SERUM: State Extraction and Refinement for User Modeling",
+      "authors": [
+        "Andy J. Phu, Karin de Langis, James Mooney, Khanh Chi Le, Dongyeop Kang"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2607.29181",
+      "version": 2,
+      "filename": "arxiv-2607.29181v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "bb5dc8f933fd45a17552f6458ba66c03c5c7a5ec2c6ae779e3ea8e4fe0de5e05",
+      "bytes": 1014704,
+      "licence_checked_at": "2026-10-23T13:46:11+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2405.04065v5",
+      "topic": "Retrieval-augmented generation",
+      "title": "FlashBack: Efficient Retrieval-Augmented Language Modeling for Fast Inference",
+      "authors": [
+        "Runheng Liu, Xingchen Xiao, Heyan Huang, Zewen Chi, Zhijing Wu"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by-sa/4.0/",
+        "versions": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "batch": "oai-batch-005.xml",
+        "batch_sha256": "3c0676d3fe4a629985467c02d383035a20e6c114db13f64e1f3679e6d811d51d"
+      },
+      "arxiv_id": "2405.04065",
+      "version": 5,
+      "filename": "arxiv-2405.04065v5.pdf",
+      "licence": "CC BY-SA 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "sha256": "fc3a59758ad9851c237b9d901910aaeb881532ef4c382ce1832e5a903fb53e59",
+      "bytes": 422750,
+      "licence_checked_at": "2026-10-23T13:46:19+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by-sa/4.0/",
+        "oai": "http://creativecommons.org/licenses/by-sa/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.06127v1",
+      "topic": "Retrieval-augmented generation",
+      "title": "PAGR: Proof-Carrying Algebraic-Geometric Retrieval: A Quiver-, Provenance-, and Sheaf-Theoretic Framework for Grounded LLM Retrieval",
+      "authors": [
+        "Xingting Wang, Min Wu"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-005.xml",
+        "batch_sha256": "3c0676d3fe4a629985467c02d383035a20e6c114db13f64e1f3679e6d811d51d"
+      },
+      "arxiv_id": "2609.06127",
+      "version": 1,
+      "filename": "arxiv-2609.06127v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "daa35b3f732fc4ae5c317097404508a273ab1963626d17b6751621e2f46d6ee4",
+      "bytes": 533328,
+      "licence_checked_at": "2026-10-23T13:46:31+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.06222v1",
+      "topic": "Retrieval-augmented generation",
+      "title": "Relevance is not enough: A Communication-Oriented Retrieval System for Consequential Scientific Question Answering",
+      "authors": [
+        "Avina Nakarmi, Naga Datha Saikiran Battula, Anthony Diaz, Aritra Dasgupta"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-005.xml",
+        "batch_sha256": "3c0676d3fe4a629985467c02d383035a20e6c114db13f64e1f3679e6d811d51d"
+      },
+      "arxiv_id": "2609.06222",
+      "version": 1,
+      "filename": "arxiv-2609.06222v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "985e2cee73d4b66b947756f9553994a198abbb174bc15bbb69f1e839d75c1785",
+      "bytes": 957678,
+      "licence_checked_at": "2026-10-23T13:46:38+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.07050v1",
+      "topic": "Retrieval-augmented generation",
+      "title": "Beyond One-Shot Expansion: Contrastive Evidence Exploration for Multi-Hop Retrieval",
+      "authors": [
+        "JungMin Yun and YoungBin Kim"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-005.xml",
+        "batch_sha256": "3c0676d3fe4a629985467c02d383035a20e6c114db13f64e1f3679e6d811d51d"
+      },
+      "arxiv_id": "2609.07050",
+      "version": 1,
+      "filename": "arxiv-2609.07050v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "f23780f38dca8cb7d2a145b258a032c87ab975fa976c531a37e1ccafa252f307",
+      "bytes": 815090,
+      "licence_checked_at": "2026-10-23T13:46:45+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.07134v1",
+      "topic": "Retrieval-augmented generation",
+      "title": "Retrieval-Augmented Multi-Prompt Ensemble for Minor-Grain Breeding Information Extraction",
+      "authors": [
+        "Hang Zhao, Jiahao Wang"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-005.xml",
+        "batch_sha256": "3c0676d3fe4a629985467c02d383035a20e6c114db13f64e1f3679e6d811d51d"
+      },
+      "arxiv_id": "2609.07134",
+      "version": 1,
+      "filename": "arxiv-2609.07134v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "7aaecf97bfc1464b859c3fe4287950261ae8785d4c56160584dca3782ee17303",
+      "bytes": 561171,
+      "licence_checked_at": "2026-10-23T13:46:52+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2511.21415v2",
+      "topic": "Dense retrieval & embeddings",
+      "title": "DiverseVAR: Balancing Diversity and Quality of Next-Scale Visual Autoregressive Models",
+      "authors": [
+        "Mingue Park, Prin Phunyaphibarn, Phillip Y. Lee, Minhyuk Sung"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-002.xml",
+        "batch_sha256": "c8bf1968bd63b542ed61abc7b2388e1799d5f22710f009835c77a831b494224d"
+      },
+      "arxiv_id": "2511.21415",
+      "version": 2,
+      "filename": "arxiv-2511.21415v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "4438acb80f0f9d489e535aee2e03d62bbeb3c803ba5190b7cf474cb49c6e4f6f",
+      "bytes": 20812608,
+      "licence_checked_at": "2026-10-23T13:46:59+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.07663v1",
+      "topic": "Retrieval-augmented generation",
+      "title": "No\\=esis: Deterministic-First Retrieval with Two-Tier Context Hydration for Factuality-Critical Queries on Small Local Models",
+      "authors": [
+        "Nicola Cogotti"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-005.xml",
+        "batch_sha256": "3c0676d3fe4a629985467c02d383035a20e6c114db13f64e1f3679e6d811d51d"
+      },
+      "arxiv_id": "2609.07663",
+      "version": 1,
+      "filename": "arxiv-2609.07663v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "d61c3e5c8a0d00b05b3174153576b2bed7fe931f40d5a4a496a922ca14dd9013",
+      "bytes": 559914,
+      "licence_checked_at": "2026-10-23T13:47:11+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.28833v1",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "Evaluating the Hidden Costs of Personalization in Large Language Models",
+      "authors": [
+        "Yumeng Wang, Yuchen Wu, Cheng Qian, Zhiyuan Fan, Hyeonjeong Ha, Shujin Wu, Jiayu Liu, Heng Ji, Ge Wang"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.28833",
+      "version": 1,
+      "filename": "arxiv-2608.28833v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "6e2868595552579b28dc2f16680f1718206d8323d2c9df5a001f208f8cad6b39",
+      "bytes": 1360417,
+      "licence_checked_at": "2026-10-23T13:47:18+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.23259v2",
+      "topic": "Retrieval-augmented generation",
+      "title": "TianoForge: An Automated Bug Triage Approach for the TianoCore UEFI Firmware Development Community",
+      "authors": [
+        "Nazanin Siavash, Terrance E. Boult, Armin Moin"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-006.xml",
+        "batch_sha256": "2c173ea9255cade5a5cebaa651a2d21e50061c832c21c25f204ce72e337668b0"
+      },
+      "arxiv_id": "2608.23259",
+      "version": 2,
+      "filename": "arxiv-2608.23259v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "f433afcc9491bc7b46f55ba4993b5fa7ca2f2187e65e7ed14d8475bdc71258b2",
+      "bytes": 960970,
+      "licence_checked_at": "2026-10-23T13:47:25+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.28965v1",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "From Location Phrases to Geographic Entities: Task-Adapted Retrieval for People Search",
+      "authors": [
+        "Yanbo Li, Chujie Zheng, Jiahao Xu, Chetan Bhole, Lingyu Zhang, Puneet Singh Ahluwalia, Kevin Nguyen, Raghavan Muthuregunathan, Santhosh Sachindran, Sachin Ahuja, Fedor Borisyuk"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.28965",
+      "version": 1,
+      "filename": "arxiv-2608.28965v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "0f674df60b7f3f9a920469da64264dad1ea29cb79572a982f2c0152f077f8276",
+      "bytes": 613741,
+      "licence_checked_at": "2026-10-23T13:47:32+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.23851v2",
+      "topic": "Retrieval-augmented generation",
+      "title": "Does Episodic Memory Help Close the Lexical Frequency Gap in Sensitivity to Syntactic Contrasts? A Test Using Retrieval-Augmented Language Models",
+      "authors": [
+        "Jing Liu, Najoung Kim"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-006.xml",
+        "batch_sha256": "2c173ea9255cade5a5cebaa651a2d21e50061c832c21c25f204ce72e337668b0"
+      },
+      "arxiv_id": "2608.23851",
+      "version": 2,
+      "filename": "arxiv-2608.23851v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "8bf1bd7c89fcc704bf9ea4f69b7ccae9df302cf89bbf86badb15ed2f379dc322",
+      "bytes": 1354695,
+      "licence_checked_at": "2026-10-23T13:47:39+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29290v1",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "Database-Augmented RAG for Automated Repair of REST API Misuses",
+      "authors": [
+        "Shoei Inoue, Norihiro Yoshida, Erina Makihara, Shiyu Yang, Katsuro Inoue"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29290",
+      "version": 1,
+      "filename": "arxiv-2608.29290v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "6ed8e5f2755fe9f7177f9cfab2d8a5b54e4d8fe18da229d00291fee8984e7d33",
+      "bytes": 624303,
+      "licence_checked_at": "2026-10-23T13:47:46+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29327v1",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "When to Adapt: Conditional Memory Adapters for Retention-Preserving Domain Specialization",
+      "authors": [
+        "Jiayu Hou, Lei Wang"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29327",
+      "version": 1,
+      "filename": "arxiv-2608.29327v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "79bb70079319cf5dc94b51865c7bf6673132b12d01a28241e716d0b8b885c11c",
+      "bytes": 653824,
+      "licence_checked_at": "2026-10-23T13:47:53+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2606.31602v3",
+      "topic": "Dense retrieval & embeddings",
+      "title": "Robust Text Watermarking for Large Language Models via Dual Semantic Embeddings",
+      "authors": [
+        "Jonas Sch\\\"afer, Cezary Pilaszewicz, Gerhard Wunder"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2,
+          3
+        ],
+        "batch": "oai-batch-004.xml",
+        "batch_sha256": "9da865ea9eb47fc08f38b91b367eaa7ed08aca83fa35c8e9093fdf4feee89fe3"
+      },
+      "arxiv_id": "2606.31602",
+      "version": 3,
+      "filename": "arxiv-2606.31602v3.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "b7ce9079fb949f633c5392ef905c63d3c2ff45b85eb191ce9b93e3798d1b4394",
+      "bytes": 422066,
+      "licence_checked_at": "2026-10-23T13:48:00+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29477v1",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "MUDDLE: Measuring Understanding of Documents under Distractor and Length Effects",
+      "authors": [
+        "Jason Luo, Saibilila Abudukelimu, Judy Song, Andrew Feng, Shivank Garg, Vasu Sharma, Kevin Zhu"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29477",
+      "version": 1,
+      "filename": "arxiv-2608.29477v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "66b2d0a4034624a7e91e8ad63d2421a73058acfee687c14196cde10e470cc86b",
+      "bytes": 292416,
+      "licence_checked_at": "2026-10-23T13:48:07+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.04709v1",
+      "topic": "Dense retrieval & embeddings",
+      "title": "AngelFingerprint: A Traceable, Explainable, and White-Box Stealthy Watermark for Text-Guided Image Editing",
+      "authors": [
+        "Bo-Han Kung, Futa Waseda, Ching-Chun Chang, Isao Echizen, Shang-Tse Chen"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-004.xml",
+        "batch_sha256": "9da865ea9eb47fc08f38b91b367eaa7ed08aca83fa35c8e9093fdf4feee89fe3"
+      },
+      "arxiv_id": "2609.04709",
+      "version": 1,
+      "filename": "arxiv-2609.04709v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "2b7ce941bd92db8635e850c456913bf6fb0940608e7dfeff1c2c93766a9941dc",
+      "bytes": 6197058,
+      "licence_checked_at": "2026-10-23T13:48:15+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.29529v1",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "Argument-Aware Semantic Alignment of Normative Texts: A Toulmin-Based Neuro-Symbolic Approach",
+      "authors": [
+        "William Schroeder"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-000.xml",
+        "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+      },
+      "arxiv_id": "2608.29529",
+      "version": 1,
+      "filename": "arxiv-2608.29529v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "1a65531dec09bf7574a82776554bda2dc105e145e3bdab34e1533f7977a4ded4",
+      "bytes": 4400874,
+      "licence_checked_at": "2026-10-23T13:48:25+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.05110v1",
+      "topic": "Dense retrieval & embeddings",
+      "title": "Embedding Surgery: Localized Updates for Adaptive Ranking Correction in Dense Retrieval",
+      "authors": [
+        "Maddalena Amendola, Antonio Mallia, Raffaele Perego"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-004.xml",
+        "batch_sha256": "9da865ea9eb47fc08f38b91b367eaa7ed08aca83fa35c8e9093fdf4feee89fe3"
+      },
+      "arxiv_id": "2609.05110",
+      "version": 1,
+      "filename": "arxiv-2609.05110v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "115cf8ed9380d5ba1dd6bb9415983634afb13f42e75913dcfd993bc47d89c3f2",
+      "bytes": 852534,
+      "licence_checked_at": "2026-10-23T13:48:36+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2601.07533v3",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "Loci Similes: A Benchmark for Extracting Intertextualities in Latin Literature",
+      "authors": [
+        "Julian Schelb, Michael Wittweiler, Marie Revellio, Barbara Feichtinger and Andreas Spitz"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2,
+          3
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2601.07533",
+      "version": 3,
+      "filename": "arxiv-2601.07533v3.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "c11995c25009e1fb78823f81406e1c2ee4d1dc651f2f0dad2b2945b5d0009f64",
+      "bytes": 2746879,
+      "licence_checked_at": "2026-10-23T13:48:43+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2510.13852v3",
+      "topic": "Dense retrieval & embeddings",
+      "title": "ConsistencyAI: A Benchmark to Assess LLMs' Factual Consistency When Responding to Different Demographic Groups",
+      "authors": [
+        "Peter Banyas, Shristi Sharma, Alistair Simmons, Atharva Vispute"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2,
+          3
+        ],
+        "batch": "oai-batch-004.xml",
+        "batch_sha256": "9da865ea9eb47fc08f38b91b367eaa7ed08aca83fa35c8e9093fdf4feee89fe3"
+      },
+      "arxiv_id": "2510.13852",
+      "version": 3,
+      "filename": "arxiv-2510.13852v3.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "a4c7f885faa2c081c364f60a6ddaf85d5921d191707604cefa5869ae1a1e63fb",
+      "bytes": 1606310,
+      "licence_checked_at": "2026-10-23T13:48:51+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2601.08747v3",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "To Retrieve or To Think? Cross-Boundary Context Evolution for Multi-hop Complex Reasoning",
+      "authors": [
+        "Rubing Chen, Jian Wang, Wenjie Li, Xiao-Yong Wei, Qing Li"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2,
+          3
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2601.08747",
+      "version": 3,
+      "filename": "arxiv-2601.08747v3.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "7c4c7a6ef72a461e8dbd447fbef905c9e19c71256ef837338b0913cec1ecddc9",
+      "bytes": 1986647,
+      "licence_checked_at": "2026-10-23T13:48:58+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.06155v1",
+      "topic": "Dense retrieval & embeddings",
+      "title": "ExpertLens: Visualizing Embedding Spaces for Post-Hoc Explainability in MoE Enhanced Retrievers",
+      "authors": [
+        "Effrosyni Sokli, Isaac Roberts, Alexander Schulz, Barbara Hammer and Gabriella Pasi"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-005.xml",
+        "batch_sha256": "3c0676d3fe4a629985467c02d383035a20e6c114db13f64e1f3679e6d811d51d"
+      },
+      "arxiv_id": "2609.06155",
+      "version": 1,
+      "filename": "arxiv-2609.06155v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "3942f8ef12a8a4a5372d785933be5f8e339c6f7fcc82588d99e0ebb5a1f05a04",
+      "bytes": 7989973,
+      "licence_checked_at": "2026-10-23T13:49:05+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2601.12075v2",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "To Copy or Not to Copy: Copying Is Easier to Induce Than Recall",
+      "authors": [
+        "Mehrdad Farahani, Franziska Penzkofer, Richard Johansson"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by-sa/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2601.12075",
+      "version": 2,
+      "filename": "arxiv-2601.12075v2.pdf",
+      "licence": "CC BY-SA 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "sha256": "df23f7d26975cc6f79245435251c6e69b6480c00f9e8fac006d35b30bc68d2f0",
+      "bytes": 4236680,
+      "licence_checked_at": "2026-10-23T13:49:14+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by-sa/4.0/",
+        "oai": "http://creativecommons.org/licenses/by-sa/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.06749v1",
+      "topic": "Dense retrieval & embeddings",
+      "title": "A Novel Semantic Manifold Alignment Attack against Embedding-to-Embedding Obfuscation in Privacy-Preserving LLMs",
+      "authors": [
+        "Sicong Li, Lingfeng Yao, Xingke Yang, Ke Tu, Chenhao Wu, Hao Wang, Jiang Liu, Phone Lin, Xin Fu, Miao Pan"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-005.xml",
+        "batch_sha256": "3c0676d3fe4a629985467c02d383035a20e6c114db13f64e1f3679e6d811d51d"
+      },
+      "arxiv_id": "2609.06749",
+      "version": 1,
+      "filename": "arxiv-2609.06749v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "47b8d7a7738ab07e5b9527119e6930221054371799086601472544e93566e433",
+      "bytes": 1437158,
+      "licence_checked_at": "2026-10-23T13:49:24+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2602.23766v2",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "UniFAR: A Unified Facet-Aware Retrieval Framework for Scientific Documents",
+      "authors": [
+        "Zheng Dou, Zhao Zhang, Deqing Wang, Yikun Ban, Fuzhen Zhuang"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2602.23766",
+      "version": 2,
+      "filename": "arxiv-2602.23766v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "8b850cf45f4cdbf3735bc9326ae840cafce977a49975177f32c2d510b72a01f4",
+      "bytes": 2872945,
+      "licence_checked_at": "2026-10-23T13:49:31+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2606.03027v2",
+      "topic": "Dense retrieval & embeddings",
+      "title": "SEA-LION-Embedding: Open and Reproducible Text Embeddings for Southeast Asia",
+      "authors": [
+        "Peerat Limkonchotiwat, Raymond Ng, Sarana Nutanong, Jian Gang Ngui"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-006.xml",
+        "batch_sha256": "2c173ea9255cade5a5cebaa651a2d21e50061c832c21c25f204ce72e337668b0"
+      },
+      "arxiv_id": "2606.03027",
+      "version": 2,
+      "filename": "arxiv-2606.03027v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "7620f6ff8254c6dc136da60b490183e8d52146e45674d0d57e56bed0e7df2af3",
+      "bytes": 3042802,
+      "licence_checked_at": "2026-10-23T13:49:41+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.04647v1",
+      "topic": "Reranking & search",
+      "title": "CAGE: Coherence-Aware Graph Encoding for Retrieval-Augmented Generation",
+      "authors": [
+        "Tong Qi, Jingyu Wu, Youbing Yin, Spencer Hong, Daben Liu, Erin Babinsky"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-004.xml",
+        "batch_sha256": "9da865ea9eb47fc08f38b91b367eaa7ed08aca83fa35c8e9093fdf4feee89fe3"
+      },
+      "arxiv_id": "2609.04647",
+      "version": 1,
+      "filename": "arxiv-2609.04647v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "e674cdbcba11877ff2a705c2e379d55d2ed74af04a02e7ef9c0a6dc5e3602436",
+      "bytes": 878541,
+      "licence_checked_at": "2026-10-23T13:49:49+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2603.17356v3",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "PACE-RAG: Patient-Aware Contextual and Evidence-Constrained RAG for Clinical Drug Recommendation",
+      "authors": [
+        "Chaeyoung Huh, Hyunmin Hwang, Jung Hwan Shin, Sungyang Jo, Jinse Park, Jong Chul Ye"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2,
+          3
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2603.17356",
+      "version": 3,
+      "filename": "arxiv-2603.17356v3.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "6fd27bd882221daa0cbb22a600f90c34338fd8a339cf1d6f13d346cd18ed18f6",
+      "bytes": 1110936,
+      "licence_checked_at": "2026-10-23T13:49:56+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.11082v1",
+      "topic": "Dense retrieval & embeddings",
+      "title": "ToxicRAG: Compromising Retrieval-Augmented Generation Systems via Single-Shot Knowledge Poisoning Attacks",
+      "authors": [
+        "Haozhe Lu, Jiaqi Li, Xinyuan Zhu, Xiang Li"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-007.xml",
+        "batch_sha256": "fbd887706ded11447ac7af13265e0bdb42b9e8d76160f3ea674ef96f74d3c175"
+      },
+      "arxiv_id": "2609.11082",
+      "version": 1,
+      "filename": "arxiv-2609.11082v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "1e922ff238abc99c5803bc9c3ea78d85f6d19f1155c319f6b97f42c0fd07654b",
+      "bytes": 1054369,
+      "licence_checked_at": "2026-10-23T13:50:03+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.04651v1",
+      "topic": "Reranking & search",
+      "title": "Continual Graph Memory for Adaptive Recommendation under Intent Drift",
+      "authors": [
+        "Hao Nguyen Ngoc, Tung Nguyen, Nguyen Thi Hanh, Hoang Thai Dinh, Nguyen Xuan Tung"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-004.xml",
+        "batch_sha256": "9da865ea9eb47fc08f38b91b367eaa7ed08aca83fa35c8e9093fdf4feee89fe3"
+      },
+      "arxiv_id": "2609.04651",
+      "version": 1,
+      "filename": "arxiv-2609.04651v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "606eff2078663f4b3bb6d30f1e6bdbc321c1c8965a466613ed5f17fc3484c272",
+      "bytes": 1567299,
+      "licence_checked_at": "2026-10-23T13:50:10+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.30198v1",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "When Errors Become Memories: Causal Pathway Tracing in Multi-Turn Memory-Augmented LLMs",
+      "authors": [
+        "Shuyao Xiao, Shengling Wang, Xuan Chen, Ke Chao, Ming Cui, Feifei Qian, Fanlin Meng, Chaoyang Mei, Chaoyong Jiang, Qi Ouyang, Junxi Yi"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2608.30198",
+      "version": 1,
+      "filename": "arxiv-2608.30198v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "234dce1909d7ffdf7a31844e3252fd973d768bedc1c46eea8729a6e994587bc8",
+      "bytes": 535182,
+      "licence_checked_at": "2026-10-23T13:50:19+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2605.11336v2",
+      "topic": "Dense retrieval & embeddings",
+      "title": "Much of Geospatial Web Search Is Beyond Traditional GIS",
+      "authors": [
+        "Ilya Ilyankou, Stefano Cavazzi, James Haworth"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-008.xml",
+        "batch_sha256": "a063c0f6b0ff3fdfe23a151da4a18214a2b523f3107d1e1a2fd15de623c7992b"
+      },
+      "arxiv_id": "2605.11336",
+      "version": 2,
+      "filename": "arxiv-2605.11336v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "3a6087f1a67f1636c4dd4974e02a04bb2442c19051e83aa5b7b3b10915ccd097",
+      "bytes": 1454106,
+      "licence_checked_at": "2026-10-23T13:50:27+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2411.00331v2",
+      "topic": "Reranking & search",
+      "title": "Beyond Utility: Evaluating LLM as Recommender",
+      "authors": [
+        "Chumeng Jiang, Jiayin Wang, Weizhi Ma, Charles L. A. Clarke, Shuai Wang, Chuhan Wu, Min Zhang"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-005.xml",
+        "batch_sha256": "3c0676d3fe4a629985467c02d383035a20e6c114db13f64e1f3679e6d811d51d"
+      },
+      "arxiv_id": "2411.00331",
+      "version": 2,
+      "filename": "arxiv-2411.00331v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "fdce66f71e947edd5540c5f80a3eb521a03593112f00b86bc2a582a379bc4f6f",
+      "bytes": 4299050,
+      "licence_checked_at": "2026-10-23T13:50:40+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.30327v1",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "Do Small Models Use the Law You Give Them? Measuring Context Use on a Bilingual Bangladesh Legal Benchmark",
+      "authors": [
+        "Moniruzzaman Mahadi, Abrar Mohammed Tanzim Alam, Sayma Siddika Monalisa, Mir Mohammad Asif Abdullah, Swakkhar Shatabda, Md Adnan Arefeen"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2608.30327",
+      "version": 1,
+      "filename": "arxiv-2608.30327v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "a5896cdc04bb065fcfd23ad4b6384f5d06bc78e7e340cf0c9e514097d8e55463",
+      "bytes": 265561,
+      "licence_checked_at": "2026-10-23T13:50:48+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.08407v3",
+      "topic": "Dense retrieval & embeddings",
+      "title": "FastE: Readout-Triggered Token Compression for LLM Embedding Inference",
+      "authors": [
+        "Jinsong Shu, Jinyong Wen, Baokun Wang, Zhongle Xie, Lidan Shou, Weiqiang Wang, Gang Chen"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2,
+          3
+        ],
+        "batch": "oai-batch-008.xml",
+        "batch_sha256": "a063c0f6b0ff3fdfe23a151da4a18214a2b523f3107d1e1a2fd15de623c7992b"
+      },
+      "arxiv_id": "2609.08407",
+      "version": 3,
+      "filename": "arxiv-2609.08407v3.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "c53e3889428fe6c297a2ae803efb12183a4973bdac7b4e135f374954753b0619",
+      "bytes": 2487470,
+      "licence_checked_at": "2026-10-23T13:50:55+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2603.18074v2",
+      "topic": "Reranking & search",
+      "title": "Adapting Technical-Service LLM Agents with Latent Logic Augmentation, Robust Noise Reduction, and Hybrid Reward Modeling",
+      "authors": [
+        "Junzhuo Ma, Chenghuang Shen, Yi Yu, Xingyan Liu, Jing Gu, Hangyi Sun, Guangquan Hu, Jianfeng Liu, Weiting Liu, Pu Mingyue, Wang Yu, Zhengdong Xiao, Rui Xie, Longjiu Luo, Qianrong Wang, Gurong Cui, Honglin Qiao, Wenlian Lu"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-005.xml",
+        "batch_sha256": "3c0676d3fe4a629985467c02d383035a20e6c114db13f64e1f3679e6d811d51d"
+      },
+      "arxiv_id": "2603.18074",
+      "version": 2,
+      "filename": "arxiv-2603.18074v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "6eb27afb324c557e174503a9b6a6f3b6da0a0dae671a6e0957adba000aa50e04",
+      "bytes": 819678,
+      "licence_checked_at": "2026-10-23T13:51:02+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.30466v1",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "CHASE: How Content Ecosystems Are Reshaped When Ranking Is the Only Target",
+      "authors": [
+        "Qianwen Gao, Zichang Su, Yiwen Hou, Arlen Kumar, Leanid Palkhouski"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2608.30466",
+      "version": 1,
+      "filename": "arxiv-2608.30466v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "5565e4168f288e85d95a3b365cade42ec6768a422b0262e08efdbf90044a10d8",
+      "bytes": 483216,
+      "licence_checked_at": "2026-10-23T13:51:09+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.12552v1",
+      "topic": "Dense retrieval & embeddings",
+      "title": "RelateAnything: Real-Time Open-Vocabulary Relation Prediction From Any Inputs",
+      "authors": [
+        "Ma\\\"elic Neau"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by-sa/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-008.xml",
+        "batch_sha256": "a063c0f6b0ff3fdfe23a151da4a18214a2b523f3107d1e1a2fd15de623c7992b"
+      },
+      "arxiv_id": "2609.12552",
+      "version": 1,
+      "filename": "arxiv-2609.12552v1.pdf",
+      "licence": "CC BY-SA 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "sha256": "eb84290c483aeef87f34be061dceb57ce2b45e6d3dda9977cef5016126e59ee4",
+      "bytes": 11655911,
+      "licence_checked_at": "2026-10-23T13:51:16+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by-sa/4.0/",
+        "oai": "http://creativecommons.org/licenses/by-sa/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.30525v2",
+      "topic": "Reranking & search",
+      "title": "Local-to-Global Sentence-Level Graph Reranking for Scientific Synthesis",
+      "authors": [
+        "Zheng Dou, Zhao Zhang, Hao Geng, Ningjing Wang, Deqing Wang"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-005.xml",
+        "batch_sha256": "3c0676d3fe4a629985467c02d383035a20e6c114db13f64e1f3679e6d811d51d"
+      },
+      "arxiv_id": "2608.30525",
+      "version": 2,
+      "filename": "arxiv-2608.30525v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "dbfaf521187a5fac1d11c7787637da1d4ff8d8b5d3c56b8522928d75882ddc21",
+      "bytes": 1263921,
+      "licence_checked_at": "2026-10-23T13:51:27+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2608.30468v1",
+      "topic": "RAG evaluation & benchmarks",
+      "title": "Hi-Q: Hierarchical Evidence-guided Query Refinement for Multi-Hop Question Answering",
+      "authors": [
+        "Jueun Kim, Sungho Park, Wook-Shin Han"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1
+        ],
+        "batch": "oai-batch-001.xml",
+        "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+      },
+      "arxiv_id": "2608.30468",
+      "version": 1,
+      "filename": "arxiv-2608.30468v1.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "c5217fe08f64c445a12d60757cf88fea3cfbea61085b632f48927912dcdb762a",
+      "bytes": 807235,
+      "licence_checked_at": "2026-10-23T13:51:34+00:00",
+      "licence_evidence": {
+        "abs": "http://creativecommons.org/licenses/by/4.0/",
+        "oai": "http://creativecommons.org/licenses/by/4.0/",
+        "latest_version_required": true
+      }
+    },
+    {
+      "tagged": "2609.04579v2",
+      "topic": "Reranking & search",
+      "title": "Does the Selected Object Reach the Reader? Auditing Identity Handoffs in Grounded Language-Model Pipelines",
+      "authors": [
+        "Siddharth Vohra, Runmin Jiang, Xiaomo Li, Min Xu"
+      ],
+      "oai": {
+        "licence": "http://creativecommons.org/licenses/by/4.0/",
+        "versions": [
+          1,
+          2
+        ],
+        "batch": "oai-batch-005.xml",
+        "batch_sha256": "3c0676d3fe4a629985467c02d383035a20e6c114db13f64e1f3679e6d811d51d"
+      },
+      "arxiv_id": "2609.04579",
+      "version": 2,
+      "filename": "arxiv-2609.04579v2.pdf",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "sha256": "ed7d45b042261f5895e1f4bba33006e690a4121070a0da0f51cb6c8bfd6e3c17",
+      "bytes": 324838,
+      "licence_checked_at": "2026-10-23T13:51:41+00:00",
       "licence_evidence": {
         "abs": "http://creativecommons.org/licenses/by/4.0/",
         "oai": "http://creativecommons.org/licenses/by/4.0/",

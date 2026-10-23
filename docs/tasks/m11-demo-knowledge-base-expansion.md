@@ -27,7 +27,7 @@ Không đổi code ứng dụng, image hay `deploy/`.
   - nhóm đồng ý dùng phần còn lại của key OpenRouter (khoảng $30,9 lúc kiểm);
   - chủ dự án đồng ý xử lý ngoài cho **đúng lô paper giấy phép mở của task này**. Đây là sự đồng ý của chính chủ tài khoản upload, thay cho việc bấm xác nhận từng file trên UI.
 - **Trần của task** (chủ dự án cập nhật 2026-10-23): ≤ **$30** tổng; ledger fail-closed, dừng gọi mới ở **$24 (80 %)**. Budget ứng dụng $10/ngày và quota hiện có của demo giữ nguyên; nếu quota ngày làm chậm việc index thì chia nhiều ngày, không nới budget.
-- Key chỉ từ `%USERPROFILE%\ras-pilot\secrets\openrouter_api_key` (demo đã dùng sẵn qua env ngoài repo). Không đọc `.env`.
+- Theo chỉ dẫn M11 mới: key chỉ dùng **qua env đã có sẵn trong demo**; agent M11 không đọc file key hay `.env`.
 - Không đụng dev `ras`/Dify/Tailscale/Radmin. Không hạ, xóa hay restore demo. Không `taskkill` theo tên process.
 
 ## 2. Chọn paper

@@ -161,10 +161,58 @@ def test_preflight_refuses_parser_drift_before_reading_or_uploading_file(tmp_pat
         library.preflight(tmp_path / 'absent.pdf', {'parser': 'unreviewed-parser'})
 
 
+@pytest.mark.parametrize('unknown_membership', [False, True])
+def test_topic_quarantine_keeps_item_and_original_and_blocks_unknown_replay(tmp_path, monkeypatch, unknown_membership):
+    root = tmp_path / 'demo'
+    evidence = root / 'evidence/m11'
+    topic = next(iter(papers.TOPICS))
+    papers.save(evidence / 'uploads.json', {'xv1': {'item_id': 'item', 'topic': topic, 'terminal': True}})
+    manifest = tmp_path / 'manifest.json'
+    papers.save(manifest.with_name('topic-exclusions.json'), [{'tagged': 'xv1', 'uploaded_item_id': 'item', 'reason': 'outside'}])
+    monkeypatch.setattr(papers, 'MANIFEST', manifest)
+    original = root / 'demo-papers/original.pdf'
+    demo.write(original, b'%PDF-unmodified-original')
+    calls, collections = [], {topic: 'old'}
+    class FakeApi:
+        def __init__(self, root): pass
+        def close(self): pass
+        def request(self, method, path, **kw):
+            calls.append((method, path))
+            if method == 'GET': return {'collections': [{'name': n, 'id': i} for n, i in collections.items()]}
+            if path == '/collections':
+                collections[kw['json']['name']] = 'review'
+                return {'collection': {'id': 'review'}}
+            if method == 'DELETE':
+                assert path == '/collections/old/items/item'
+                return None
+            assert path == '/collections/review/items'
+            if unknown_membership: raise RuntimeError('membership result uncertain')
+            return {'item_id': 'item'}
+    monkeypatch.setattr(library, 'Api', FakeApi)
+    if unknown_membership:
+        with pytest.raises(RuntimeError, match='membership result uncertain'):
+            library.quarantine_topics(root)
+        count = len(calls)
+        with pytest.raises(RuntimeError, match='uncertain prior topic'):
+            library.quarantine_topics(root)
+        assert len(calls) == count
+    else:
+        library.quarantine_topics(root)
+        assert json.loads((evidence / 'uploads.json').read_text())['xv1']['excluded_from_target'] == 'outside'
+        count = len([c for c in calls if c[0] != 'GET'])
+        library.quarantine_topics(root)
+        assert len([c for c in calls if c[0] != 'GET']) == count
+    assert original.read_bytes() == b'%PDF-unmodified-original'
+    assert all(path.startswith('/collections') for _, path in calls)
+
+
 @pytest.mark.parametrize('title,abstract,topic', [
     ('Dense retrieval', 'text embeddings for language models', 'Dense retrieval & embeddings'),
     ('Reranking', 'retrieval for language models', 'Reranking & search'),
     ('Cancer biomarkers', 'a clinical investigation', None),
+    ('Average scheduling results', 'We evaluate average scheduling performance and benchmarks.', None),
+    ('Paragraph grounding', 'An average benchmark of firmware rehosting fidelity.', None),
+    ('ALEE', 'We evaluate multilingual sentence embeddings on minimal pairs.', 'Dense retrieval & embeddings'),
 ])
 def test_topic_filter_requires_llm_or_retrieval_context(title, abstract, topic):
     assert papers.topic_for(title, abstract) == topic

@@ -92,7 +92,7 @@ def run(root, inspect_only=False):
     if any(r.get('status') == 'sending' or r.get('item_id') and not r.get('terminal') for r in uploads.values()):
         raise RuntimeError('uploads still running; no post-ingest smoke yet')
     manifest = json.loads(papers.MANIFEST.read_text(encoding='utf-8'))['papers']
-    if len(manifest) < 300 or len(uploads) != len(manifest):
+    if len(manifest) < 300 or not {p['tagged'] for p in manifest}.issubset(uploads):
         raise RuntimeError('corpus not fully processed yet')
     with lib.Ledger(evidence / 'cost').exclusive():
         api = lib.Api(root)

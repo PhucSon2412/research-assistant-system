@@ -35,7 +35,7 @@ NS = {'a': 'http://www.w3.org/2005/Atom', 'x': 'http://arxiv.org/schemas/atom'}
 
 def topic_for(title, abstract):
     text = (title + ' ' + abstract).lower()
-    llm = any(w in text for w in ('language model', 'llm', 'retrieval', 'rag'))
+    llm = re.search(r'\b(?:llms?|rag|retrieval)\b|language models?|(?:text|sentence|multilingual) embeddings?', text)
     if not llm:
         return None
     rules = [
@@ -44,7 +44,7 @@ def topic_for(title, abstract):
         ('Dense retrieval & embeddings', r'dense retriev|text embedding|sentence embedding'),
         ('Long context & chunking', r'long.context|chunking|chunk boundar'),
         ('Grounding & hallucination', r'hallucinat|grounding|faithful'),
-        ('RAG evaluation & benchmarks', r'(?:evaluat|benchmark).*(?:retriev|rag)|(?:retriev|rag).*(?:evaluat|benchmark)'),
+        ('RAG evaluation & benchmarks', r'(?:evaluat|benchmark).*(?:retriev|\brag\b)|(?:retriev|\brag\b).*(?:evaluat|benchmark)'),
         ('Retrieval-augmented generation', r'retrieval.augmented|retrieval augmented'),
     ]
     return next((topic for topic, pattern in rules if re.search(pattern, text, re.S)), None)
@@ -181,6 +181,41 @@ def attribution(dest, papers):
     path.write_text(previous + '\n\n' + marker + '\n\n' + text, encoding='utf-8')
 
 
+def curate(dest, manifest):
+    """Reapply the topic policy to cached OAI metadata; never delete PDFs/items.
+
+    Exclusions remain auditable, including any upload IDs already accepted before
+    a selection-policy correction. They never count toward the target corpus.
+    """
+    ns = {'r': 'http://arxiv.org/OAI/arXivRaw/'}
+    records = {}
+    for path in (dest / 'm11-evidence').glob('oai-batch-*.xml'):
+        for raw in ET.fromstring(path.read_bytes()).findall('.//r:arXivRaw', ns):
+            get = lambda name: raw.findtext('r:' + name, default='', namespaces=ns)
+            records[get('id')] = (get('title'), get('abstract'))
+    data = json.loads(manifest.read_text(encoding='utf-8'))
+    out = manifest.with_name('topic-exclusions.json')
+    excluded = json.loads(out.read_text(encoding='utf-8')) if out.exists() else []
+    uploads_path = dest.parent / 'evidence/m11/uploads.json'
+    uploads = json.loads(uploads_path.read_text(encoding='utf-8')) if uploads_path.exists() else {}
+    kept = []
+    for paper in data['papers']:
+        record = records.get(paper['arxiv_id'])
+        if record is not None and topic_for(*record) is None:
+            receipt = uploads.get(paper['tagged'], {})
+            excluded.append({**paper, 'reason': 'outside_llm_ir_topic_after_word_boundary_review',
+                             'excluded_at': stamp(), 'uploaded_item_id': receipt.get('item_id')})
+        else:
+            kept.append(paper)
+    data['papers'] = kept
+    save(out, excluded)
+    save(manifest, data)
+    attribution(dest, kept)
+    print(json.dumps({'retained': len(kept), 'topic_exclusions': len(excluded),
+                      'already_uploaded_exclusions': [p['tagged'] for p in excluded if p.get('uploaded_item_id')]}))
+    return 0
+
+
 def discover(dest, manifest, target):
     evidence = dest / 'm11-evidence'
     evidence.mkdir(parents=True, exist_ok=True)
@@ -249,7 +284,7 @@ def discover(dest, manifest, target):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['discover', 'fetch'])
+    parser.add_argument('action', choices=['discover', 'fetch', 'curate'])
     parser.add_argument('--dest', type=Path, default=Path(os.environ['USERPROFILE']) / 'ras-pilot/demo-papers')
     parser.add_argument('--manifest', type=Path, default=MANIFEST)
     parser.add_argument('--target', type=int, default=300)
@@ -258,6 +293,8 @@ def main():
     dest.mkdir(parents=True, exist_ok=True)
     if args.action == 'fetch':
         return policy.fetch(dest, args.manifest, True)
+    if args.action == 'curate':
+        return curate(dest, args.manifest)
     return discover(dest, args.manifest, args.target)
 
 

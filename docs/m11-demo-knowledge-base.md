@@ -21,6 +21,10 @@ Không thay trust store, hosts hay firewall. Lệnh chủ dự án tự chạy v
 Inventory trước: **22 container / 194 volume / 12 network / 150 image**. Evidence:
 `%USERPROFILE%\ras-pilot\evidence\m11-inventory-before.json`.
 
+Inventory sau chuyển local vẫn **22/194/12/150**; chỉ `ras-pilot-edge-1` đổi ID,
+không thêm/xóa container, không đổi volume hoặc image ID. Ethernet/Tailscale không có địa chỉ
+IPv4 hiện hành trong lượt kiểm; listener ngoài loopback không tồn tại.
+
 ## Corpus và luồng nạp
 
 - CC BY 4.0 / CC BY-SA 4.0 / CC0 1.0; arXivRaw OAI phải trùng trang abs đúng version,
@@ -33,6 +37,8 @@ Inventory trước: **22 container / 194 volume / 12 network / 150 image**. Evid
   [manifest](../evaluation/m11-papers/manifest.json), metadata và script tải lại.
 - Request arXiv tuần tự cách ít nhất 3,2 giây, User-Agent mô tả, có checkpoint.
   OAI ListRecords giảm request lẻ; `from` là ngày cập nhật metadata, không phải ngày đăng bài.
+  Hợp đồng nguồn: [arXiv OAI](https://info.arxiv.org/help/oa/index.html),
+  [API user manual](https://info.arxiv.org/help/api/user-manual.html).
 - Credential chỉ từ `library_user_email`/`library_user_password`; không in/log/commit
   mật khẩu, cookie hay token intent. Giữ một phiên cho mỗi lượt script.
 - **Consent là đồng ý theo lô của chủ dự án/chủ tài khoản upload cho đúng corpus này.**
@@ -42,6 +48,23 @@ Inventory trước: **22 container / 194 volume / 12 network / 150 image**. Evid
   khi chưa xác định outcome; giữ item lỗi/cần review, không xóa để làm đẹp số.
 
 Kết quả cuối, trang/chunk/object, collection và câu hỏi: cập nhật sau khi toàn bộ job kết thúc.
+
+### Sửa bộ lọc chủ đề trong lúc nạp
+
+Bộ lọc ban đầu tìm chuỗi `rag`, khớp cả “average”/“paragraph”, và có thể gán nhầm nhóm đánh giá
+cho paper ngoài retrieval. Đã sửa thành word boundary, bổ sung regression âm/dương, rà lại OAI
+đã cache và tiếp tục tải bù. **48 PDF đã tải bị loại khỏi target**; PDF ngoài repo được giữ nguyên.
+[Danh sách metadata/SHA-256 của các ngoại lệ](../evaluation/m11-papers/topic-exclusions.json).
+
+**5 item đã upload được giữ lại**, không tính vào mục tiêu 300: `2502.00857v2` (HintEval),
+`2505.01811v4` (BadPatches), `2506.08311v3` (Automated Program Repair Agents),
+`2509.04183v3` (MAGneT), `2602.19736v3` (InfScene-SR). Chỉ chuyển membership sang collection
+thứ tám **“Cần xem lại — ngoài phạm vi M11”**, không xóa item/file/job/index, không trả phí về 0.
+Luồng chuyển cũng có checkpoint chặn tự retry khi outcome chưa rõ. Bảy collection chủ đề
+vẫn là target chính; tổng thư viện cuối có thể lớn hơn 312 vì giữ các ngoại lệ này.
+
+Lượt client đầu dừng tại 32 receipt đã xác định, không có upload `sending` bị bỏ dở.
+Chỉ gỡ orphan lock sau khi kiểm đúng PID client đã thoát; không dừng process theo tên.
 
 ## Kế toán
 
@@ -69,7 +92,7 @@ Ciphertext SHA-256 `1e7755e3c05d36dbb62b01a4e30742a259220b02daf8c9c0dfa57b43af72
 Lượt này dùng `--no-alert`. Baseline có backup preflight fail lúc 11:30 UTC, giữ lịch sử;
 lượt vừa chạy thành công. Replica equal seq 13 trước nạp; maintenance null.
 
-Offline: **56/56 pass** (`test_m11_tooling.py` 15 + `test_m7c_tooling.py` 41), kiểm local state,
+Offline: **61/61 pass** (`test_m11_tooling.py` 20 + `test_m7c_tooling.py` 41), kiểm local state,
 CA/leaf, env/provider/image preservation, chỉ edge, mutation không retry, parser drift và ledger giữ trần.
 Lượt sandbox đầu 3 pass/9 setup error do quyền tmp; sau mở quyền chạy được. Assertion mới
 ban đầu dùng sai tên env provider (53 pass/1 fail), đã sửa theo `OPENROUTER_API_KEY`.
@@ -85,6 +108,7 @@ trạng thái D ở lượt sandbox đầu do permission denied.
 $py = "$env:USERPROFILE\.conda\envs\ras\python.exe"
 & $py scripts/m11_papers.py discover --target 300
 & $py scripts/m11_papers.py fetch
+& $py scripts/m11_papers.py curate  # rà topic từ OAI cache, không xóa PDF/item
 & $py scripts/m11_library.py run --watch --target 300
 & $py scripts/m11_library.py inspect
 & $py scripts/m11_demo.py  # chỉ sau khi đủ 300 manifest và toàn bộ job đã kết thúc
