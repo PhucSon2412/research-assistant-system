@@ -95,6 +95,7 @@ def run(root, inspect_only=False):
     if len(manifest) < 300 or not {p['tagged'] for p in manifest}.issubset(uploads):
         raise RuntimeError('corpus not fully processed yet')
     with lib.Ledger(evidence / 'cost').exclusive():
+        lib.require_known_uploads(lib.Ledger(evidence / 'cost'), uploads)
         api = lib.Api(root)
         try:
             items = api.inventory()

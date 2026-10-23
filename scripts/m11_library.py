@@ -127,6 +127,16 @@ class Api:
         self.client.close()
 
 
+def require_known_uploads(ledger, rows):
+    """A fsynced admission outlives a lost checkpoint: never auto-admit it again."""
+    bindings = {r.get('seq'): tagged for tagged, r in rows.items() if r.get('seq') is not None}
+    for record in ledger.records():
+        if record['event'] == 'sending' and record['route'].startswith('upload:'):
+            tagged = record['route'].split(':', 1)[1]
+            if bindings.get(record['seq']) != tagged:
+                raise RuntimeError('unreconciled upload admission; inspect library/checkpoint, no replay')
+
+
 def preflight(path, settings):
     """Same pinned parser/chunker as rc2; only byte/count metadata is persisted.
 
@@ -186,6 +196,7 @@ def run(root, manifest, watch, target):
     ledger = Ledger(evidence / 'cost')
     with ledger.exclusive():
         try:
+            require_known_uploads(ledger, rows)
             inventory = api.inventory()
             baseline_path = evidence / 'library-before.json'
             if not baseline_path.exists():

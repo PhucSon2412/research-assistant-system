@@ -161,6 +161,17 @@ def test_preflight_refuses_parser_drift_before_reading_or_uploading_file(tmp_pat
         library.preflight(tmp_path / 'absent.pdf', {'parser': 'unreviewed-parser'})
 
 
+def test_fsynced_admission_with_lost_checkpoint_blocks_replay(tmp_path):
+    ledger = library.Ledger(tmp_path / 'cost')
+    seq = ledger.admit('upload:0000.00001v1', Decimal('1'), 'test')
+    with pytest.raises(RuntimeError, match='unreconciled upload admission'):
+        library.require_known_uploads(ledger, {})
+    with pytest.raises(RuntimeError, match='unreconciled upload admission'):
+        library.require_known_uploads(ledger, {'different-paper': {'seq': seq}})
+    library.require_known_uploads(ledger, {'0000.00001v1': {'seq': seq, 'status': 'sending'}})
+    assert ledger.state()['committed_usd'] == Decimal('1')
+
+
 @pytest.mark.parametrize('unknown_membership', [False, True])
 def test_topic_quarantine_keeps_item_and_original_and_blocks_unknown_replay(tmp_path, monkeypatch, unknown_membership):
     root = tmp_path / 'demo'
