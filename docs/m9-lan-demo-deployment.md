@@ -63,10 +63,10 @@ lại: gate open, journal = DB, replica `ok`.
 | Mục | Giá trị |
 |---|---|
 | Truy cập | `https://ras-demo.lan:8443` (thiết bị cần dòng hosts + CA demo, mục 5) |
-| Bind | Chỉ `192.168.69.97:8443` (IP Ethernet lúc chạy, `/22`, profile Public). Không publish `0.0.0.0`, không 80/443/8080 |
+| Bind | **Từ M11: chỉ `127.0.0.1:8443`**. Lịch sử M9: `192.168.69.97:8443` (IP Ethernet lúc dựng). Không publish `0.0.0.0`, không 80/443/8080 |
 | Project Docker | `ras-pilot` (ứng dụng), `ras-pilot-offsite` (MinIO đích replica + backup), `ras-pilot-drill` (scratch, chỉ tồn tại khi drill chạy) |
 | Thư mục | `%USERPROFILE%\ras-pilot\` — `release\` (bản sao `deploy/` + `scripts/ras_ops.py` của `7009a84` bằng `git archive`), `pilot\` (env, overlay, journal, ops-config, ops-state, staging, maintenance), `drill\`, `offsite\`, `secrets\`, `ca\`, `tls.d\`, `public\` (CA cert để cài lên thiết bị), `operator-handoff\` (private key `age`), `bin\`, `logs\`, `evidence\` |
-| Image | `ras-pilot-api:rc2` = `sha256:c0936a81…0a06`, `ras-pilot-web:rc2` = `sha256:59cb5141…2cb3`, `ras-pilot-ops:rc2` = `sha256:22656406…66fc` — tag alias trỏ đúng ID của `rasm8c-*` (M8c), kiểm ID trước khi tạo |
+| Image | Hiện hành: API `ras-pilot-api:rc2` = `sha256:c0936a81…0a06`, web `ras-pilot-web:ui2` = `sha256:aeb3cc71…519b`, ops `ras-pilot-ops:rc2` = `sha256:22656406…66fc`. Lịch sử M9: web rc2 `sha256:59cb5141…2cb3`; M10 thay riêng web, M11 không đổi image |
 | Hạ tầng | Caddy/PostgreSQL 16.14/Redis/MinIO theo digest pin trong `deploy/compose.yaml` (đều đã có trong cache máy) |
 | Mạng nội bộ | backend `ras-pilot` `172.30.64.0/24`, drill `172.30.48.0/24`; `ras-pilot-offsite_offsite` internal, chỉ replicator/`ops`/`ops-check` nối vào |
 | SMTP | `smtp.gmail.com:465` `implicit_tls`, CA hệ thống của image; tài khoản/sender/người nhận alert = địa chỉ trong `secrets\smtp_username`; mật khẩu chỉ là Compose secret `smtp_password` |
@@ -88,7 +88,8 @@ redirect HTTP.
 `default_sni`, handshake thất bại (đã kiểm: `tlsv1 alert internal error`). Thiết bị phải dùng hostname.
 
 **CA demo:** EC P-256, 3 năm, **name constraints** chỉ cho `ras-demo.lan` và dải IP private (10/8, 172.16/12,
-192.168/16): lộ khóa CA cũng không giả mạo được site khác. Leaf 397 ngày, SAN `ras-demo.lan` + IP LAN, EKU serverAuth.
+192.168/16): lộ khóa CA cũng không giả mạo được site khác. Leaf 397 ngày, EKU serverAuth;
+**từ M11 chỉ SAN `ras-demo.lan`**, lịch sử M9 có thêm SAN IP LAN. CA không cho IP loopback.
 Khóa CA ở `ca\demo-ca.key`, thư mục chỉ cấp quyền cho user hiện tại (bỏ kế thừa). Không có trong repo.
 
 ## 2. Lệnh đã chạy và kết quả (agent)

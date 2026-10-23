@@ -69,8 +69,8 @@ Ciphertext SHA-256 `1e7755e3c05d36dbb62b01a4e30742a259220b02daf8c9c0dfa57b43af72
 Lượt này dùng `--no-alert`. Baseline có backup preflight fail lúc 11:30 UTC, giữ lịch sử;
 lượt vừa chạy thành công. Replica equal seq 13 trước nạp; maintenance null.
 
-Offline: **54/54 pass** (`test_m11_tooling.py` 13 + `test_m7c_tooling.py` 41), kiểm local state,
-CA/leaf, env/provider/image preservation, chỉ edge, mutation không retry và ledger giữ trần.
+Offline: **56/56 pass** (`test_m11_tooling.py` 15 + `test_m7c_tooling.py` 41), kiểm local state,
+CA/leaf, env/provider/image preservation, chỉ edge, mutation không retry, parser drift và ledger giữ trần.
 Lượt sandbox đầu 3 pass/9 setup error do quyền tmp; sau mở quyền chạy được. Assertion mới
 ban đầu dùng sai tên env provider (53 pass/1 fail), đã sửa theo `OPENROUTER_API_KEY`.
 Không cộng các lượt thành nhiều test độc lập.
@@ -87,6 +87,7 @@ $py = "$env:USERPROFILE\.conda\envs\ras\python.exe"
 & $py scripts/m11_papers.py fetch
 & $py scripts/m11_library.py run --watch --target 300
 & $py scripts/m11_library.py inspect
+& $py scripts/m11_demo.py  # chỉ sau khi đủ 300 manifest và toàn bộ job đã kết thúc
 & $py scripts/m9_lan_demo.py verify
 ```
 

@@ -112,6 +112,55 @@ def test_product_client_uses_https_csrf_origin_and_never_retries_mutations(tmp_p
     assert len(calls) == 3
 
 
+def test_uncertain_title_update_is_checkpointed_and_blocks_automatic_replay(tmp_path, monkeypatch):
+    import hashlib
+    root = tmp_path / 'demo'
+    evidence = root / 'evidence/m11'
+    papers.save(evidence / 'library-before.json', [])
+    papers.save(evidence / 'existing-sha256.json', {})
+    content = b'%PDF-synthetic'
+    demo.write(root / 'demo-papers/paper.pdf', content)
+    manifest = tmp_path / 'manifest.json'
+    topic = next(iter(papers.TOPICS))
+    papers.save(manifest, {'papers': [{'tagged': '0000.00001v1', 'filename': 'paper.pdf',
+        'sha256': hashlib.sha256(content).hexdigest(), 'bytes': len(content), 'title': 'Test paper', 'topic': topic}]})
+    calls = []
+    class FakeApi:
+        def __init__(self, root): pass
+        def inventory(self): return []
+        def close(self): pass
+        def request(self, method, path, **kw):
+            calls.append((method, path))
+            if path == '/collections':
+                return {'collections': [{'name': t, 'id': str(n)} for n, t in enumerate(papers.TOPICS)]}
+            if path == '/uploads/notice': return {'version': 'test-notice'}
+            if path == '/uploads/intents': return {'intent_token': 'synthetic-intent'}
+            if path == '/uploads/original': return {'item_id': 'item', 'job_id': 'job', 'state': 'received'}
+            if method == 'GET': return {'item': {'content_status': 'indexed', 'jobs': [
+                {'id': 'job', 'state': 'ready', 'last_error_code': None, 'warnings': []}]}}
+            if method == 'PATCH': raise RuntimeError('uncertain metadata response')
+            pytest.fail('membership must not run after uncertain title')
+    monkeypatch.setattr(library, 'Api', FakeApi)
+    monkeypatch.setattr(library, 'config', lambda: {'embedding': {'model_id': 'openai/text-embedding-3-small'}})
+    monkeypatch.setattr(library, 'preflight', lambda *a: {'ceiling_usd': '1'})
+    with pytest.raises(RuntimeError, match='uncertain metadata'):
+        library.run(root, manifest, False, 1)
+    saved = json.loads((evidence / 'uploads.json').read_text())
+    assert saved['0000.00001v1']['status'] == 'title_sending'
+    assert not saved['0000.00001v1'].get('terminal')
+    writes_before = [c for c in calls if c[0] != 'GET']
+    assert writes_before == [('POST', '/uploads/intents'), ('PUT', '/uploads/original'), ('PATCH', '/library/items/item')]
+    with pytest.raises(RuntimeError, match='uncertain prior upload'):
+        library.run(root, manifest, False, 1)
+    assert [c for c in calls if c[0] != 'GET'] == writes_before
+    assert library.Ledger(evidence / 'cost').state()['committed_usd'] == Decimal('1')
+
+
+def test_preflight_refuses_parser_drift_before_reading_or_uploading_file(tmp_path):
+    with pytest.raises(RuntimeError, match='parser version mismatch'):
+        library.preflight(tmp_path / 'absent.pdf', {'parser': 'unreviewed-parser'})
+
+
 @pytest.mark.parametrize('title,abstract,topic', [
     ('Dense retrieval', 'text embeddings for language models', 'Dense retrieval & embeddings'),
     ('Reranking', 'retrieval for language models', 'Reranking & search'),

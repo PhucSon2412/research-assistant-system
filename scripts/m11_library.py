@@ -44,9 +44,10 @@ def docker_read(code):
 
 
 def config():
-    return docker_read("import json; from app.config import get_settings; s=get_settings(); "
-        "print(json.dumps({k:getattr(s,k).model_dump(mode='json',exclude={'api_key'}) "
-        "for k in ('files','pdf_body','ingest','embedding','budget','search','rerank','generation')}))")
+    return docker_read("import json; from app.config import get_settings; from app.ingest.pdf import PIPELINE_VERSION; s=get_settings(); "
+        "d={k:getattr(s,k).model_dump(mode='json',exclude={'api_key'}) "
+        "for k in ('files','pdf_body','ingest','embedding','budget','search','rerank','generation')}; "
+        "d['parser']=PIPELINE_VERSION; print(json.dumps(d))")
 
 
 def shared_meter():
@@ -90,7 +91,7 @@ class Api:
             'Origin': 'https://ras-demo.lan:8443', 'User-Agent': 'ras-m11-library/1.0'})
         self.request('GET', '/auth/csrf')
         email = (root / 'secrets/library_user_email').read_text(encoding='utf-8-sig').strip()
-        password = (root / 'secrets/library_user_password').read_text(encoding='utf-8-sig').strip()
+        password = (root / 'secrets/library_user_password').read_text(encoding='utf-8-sig').rstrip('\r\n')
         login = self.request('POST', '/auth/login', json={'email': email, 'password': password})
         if login['user']['role'] != 'user':
             raise RuntimeError('upload account must be the existing demo user')
@@ -136,6 +137,8 @@ def preflight(path, settings):
     from app.ingest import pdf
     from app.ingest.markdown import chunk_section
     from pypdf import PdfReader
+    if pdf.PIPELINE_VERSION != settings['parser']:
+        raise RuntimeError('preflight/runtime parser version mismatch; not sent')
     cfg = Settings(_env_file=None, _env_prefix='M11_UNUSED_', db=None,
         database_url='postgresql+psycopg://unused@localhost/unused',
         **{k: settings[k] for k in ('files', 'ingest', 'pdf_body')})
@@ -208,7 +211,7 @@ def run(root, manifest, watch, target):
                 papers = json.loads(manifest.read_text(encoding='utf-8'))['papers']
                 # Resume only acknowledged uploads. A sending record without IDs is
                 # an uncertain mutation and blocks new uploads until reconciled by owner.
-                if any(row.get('status') == 'sending' for row in rows.values()):
+                if any(row.get('status') in ('sending', 'title_sending', 'membership_sending') for row in rows.values()):
                     raise RuntimeError('uncertain prior upload; inspect library, never auto-resend')
                 active = []
                 for tagged, row in rows.items():
@@ -219,11 +222,17 @@ def run(root, manifest, watch, target):
                     row.update({'state': job['state'], 'content_status': item['content_status'],
                                 'error': job['last_error_code'], 'warnings': job['warnings']})
                     if job['state'] in TERMINAL:
-                        row['terminal'] = True
                         row['finished_at'] = now()
+                        row['status'] = 'title_sending'
+                        m11_papers.save(checkpoint, rows)
                         api.request('PATCH', '/library/items/' + row['item_id'], json={'title': row['title']})
+                        row['status'] = 'membership_sending'
+                        m11_papers.save(checkpoint, rows)
                         api.request('POST', '/collections/' + collections[row['topic']] + '/items',
                                     json={'item_id': row['item_id']})
+                        row['terminal'] = True
+                        row['status'] = 'accepted'
+                        m11_papers.save(checkpoint, rows)
                         ledger.append({'event': 'outcome', 'seq': row['seq'], 'status': 'uncertain',
                             'at': now(), 'note': 'operation complete; full ceiling retained without per-call receipts'})
                         print(json.dumps({'terminal': tagged, 'state': row['state'],
