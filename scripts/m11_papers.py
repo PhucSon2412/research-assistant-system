@@ -168,12 +168,18 @@ def candidates(arxiv, dest):
     return rows
 
 
-def attribution(dest, papers):
+def attribution(dest, papers, exclusions=None):
     text = '# Attribution — M11 open arXiv papers\n\nUnmodified PDFs. Licence checked for the exact version.\n\n'
     for p in papers:
         text += (f"- **{p['title']}** — {', '.join(p['authors'])}. "
                  f"https://arxiv.org/abs/{p['arxiv_id']}v{p['version']}; "
                  f"[{p['licence']}]({p['licence_url']}); `{p['filename']}`.\n")
+    if exclusions:
+        text += '\n## Downloaded topic exclusions — outside the target corpus\n\n'
+        for p in exclusions:
+            text += (f"- **{p['title']}** — {', '.join(p['authors'])}. "
+                     f"https://arxiv.org/abs/{p['arxiv_id']}v{p['version']}; "
+                     f"[{p['licence']}]({p['licence_url']}); `{p['filename']}`.\n")
     path = dest / 'ATTRIBUTION.md'
     marker = '<!-- M11 attribution -->'
     previous = path.read_text(encoding='utf-8') if path.exists() else ''
@@ -210,7 +216,7 @@ def curate(dest, manifest):
     data['papers'] = kept
     save(out, excluded)
     save(manifest, data)
-    attribution(dest, kept)
+    attribution(dest, kept, excluded)
     print(json.dumps({'retained': len(kept), 'topic_exclusions': len(excluded),
                       'already_uploaded_exclusions': [p['tagged'] for p in excluded if p.get('uploaded_item_id')]}))
     return 0
@@ -228,6 +234,8 @@ def discover(dest, manifest, target):
     checkpoint = evidence / 'decisions.json'
     decisions = json.loads(checkpoint.read_text(encoding='utf-8')) if checkpoint.exists() else {}
     selected = {p['arxiv_id'] for p in data['papers']}
+    exclusion_path = manifest.with_name('topic-exclusions.json')
+    exclusions = json.loads(exclusion_path.read_text(encoding='utf-8')) if exclusion_path.exists() else []
     hashes = {p['sha256'] for p in data['papers']} | excluded_hashes
     try:
         rows = bulk_candidates(arxiv)
@@ -275,7 +283,7 @@ def discover(dest, manifest, target):
             save(manifest, data)
             decisions[tagged] = verdict
             save(checkpoint, decisions)
-            attribution(dest, data['papers'])
+            attribution(dest, data['papers'], exclusions)
             print(json.dumps({'downloaded': len(selected), 'tagged': tagged, 'topic': row['topic']}), flush=True)
     finally:
         arxiv.close()

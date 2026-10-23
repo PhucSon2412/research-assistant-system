@@ -216,3 +216,26 @@ def test_topic_quarantine_keeps_item_and_original_and_blocks_unknown_replay(tmp_
 ])
 def test_topic_filter_requires_llm_or_retrieval_context(title, abstract, topic):
     assert papers.topic_for(title, abstract) == topic
+
+
+def test_locked_manifest_has_300_unique_open_licence_papers_outside_old_corpus():
+    import re
+    manifest = json.loads(papers.MANIFEST.read_text(encoding='utf-8'))['papers']
+    old = json.loads(papers.policy.MANIFEST.read_text(encoding='utf-8'))['papers']
+    assert len(manifest) == 300
+    assert len({p['arxiv_id'] for p in manifest}) == 300
+    assert len({p['sha256'] for p in manifest}) == 300
+    assert not ({p['arxiv_id'] for p in manifest} & {p['arxiv_id'] for p in old})
+    assert not ({p['sha256'] for p in manifest} & {p['sha256'] for p in old})
+    for paper in manifest:
+        assert paper['tagged'] == f"{paper['arxiv_id']}v{paper['version']}"
+        assert paper['filename'] == f"arxiv-{paper['tagged']}.pdf"
+        assert paper['title'].strip() and paper['authors'] and all(a.strip() for a in paper['authors'])
+        assert 0 < paper['bytes'] <= 30 * 1024 * 1024
+        assert re.fullmatch('[0-9a-f]{64}', paper['sha256'])
+        assert paper['licence_url'] in papers.policy.ACCEPTED
+        assert paper['licence'] == papers.policy.ACCEPTED[paper['licence_url']]
+        proof = paper['licence_evidence']
+        assert papers.policy.normalise_licence(proof['abs']) == paper['licence_url']
+        assert papers.policy.normalise_licence(proof['oai']) == paper['licence_url']
+        assert proof['latest_version_required'] is True

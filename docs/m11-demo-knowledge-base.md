@@ -47,7 +47,21 @@ IPv4 hiện hành trong lượt kiểm; listener ngoài loopback không tồn t�
 - Tối đa hai job đang chạy; không đổi concurrency/budget/quota ứng dụng. Không retry mutation
   khi chưa xác định outcome; giữ item lỗi/cần review, không xóa để làm đẹp số.
 
-Kết quả cuối, trang/chunk/object, collection và câu hỏi: cập nhật sau khi toàn bộ job kết thúc.
+**Manifest đã khóa 300 paper đúng phạm vi**: 282 CC BY 4.0, 14 CC BY-SA 4.0, 4 CC0 1.0;
+**838.284.160 byte** PDF ngoài repo. Kiểm 300/300 SHA-256 và kích thước khớp, không trùng ID/hash
+12 paper cũ; rà topic lần cuối không loại thêm. Attribution giữ 12 paper cũ + 300 target + 48 ngoại lệ tải về.
+
+| Chủ đề target | Paper |
+|---|---:|
+| Dense retrieval & embeddings | 25 |
+| Reranking & search | 34 |
+| Retrieval-augmented generation | 14 |
+| RAG evaluation & benchmarks | 62 |
+| Grounding & hallucination | 59 |
+| Long context & chunking | 43 |
+| Search agents & tools | 63 |
+
+Trạng thái nạp cuối, trang/chunk/object và câu hỏi: cập nhật sau khi toàn bộ job kết thúc.
 
 ### Sửa bộ lọc chủ đề trong lúc nạp
 
@@ -92,7 +106,7 @@ Ciphertext SHA-256 `1e7755e3c05d36dbb62b01a4e30742a259220b02daf8c9c0dfa57b43af72
 Lượt này dùng `--no-alert`. Baseline có backup preflight fail lúc 11:30 UTC, giữ lịch sử;
 lượt vừa chạy thành công. Replica equal seq 13 trước nạp; maintenance null.
 
-Offline: **61/61 pass** (`test_m11_tooling.py` 20 + `test_m7c_tooling.py` 41), kiểm local state,
+Offline: **62/62 pass** (`test_m11_tooling.py` 21 + `test_m7c_tooling.py` 41), kiểm local state,
 CA/leaf, env/provider/image preservation, chỉ edge, mutation không retry, parser drift và ledger giữ trần.
 Lượt sandbox đầu 3 pass/9 setup error do quyền tmp; sau mở quyền chạy được. Assertion mới
 ban đầu dùng sai tên env provider (53 pass/1 fail), đã sửa theo `OPENROUTER_API_KEY`.
