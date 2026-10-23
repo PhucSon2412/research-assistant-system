@@ -106,7 +106,7 @@ Ciphertext SHA-256 `1e7755e3c05d36dbb62b01a4e30742a259220b02daf8c9c0dfa57b43af72
 Lượt này dùng `--no-alert`. Baseline có backup preflight fail lúc 11:30 UTC, giữ lịch sử;
 lượt vừa chạy thành công. Replica equal seq 13 trước nạp; maintenance null.
 
-Offline: **63/63 pass** (`test_m11_tooling.py` 22 + `test_m7c_tooling.py` 41), kiểm local state,
+Offline: **64/64 pass** (`test_m11_tooling.py` 23 + `test_m7c_tooling.py` 41), kiểm local state,
 CA/leaf, env/provider/image preservation, chỉ edge, mutation không retry, parser drift và ledger giữ trần.
 Checkpoint ghi temp → flush/fsync → atomic replace; ledger có admission nhưng thiếu binding checkpoint
 thì chặn upload lại. Không dùng việc checkpoint thiếu để suy ra request chưa gửi.
@@ -134,4 +134,5 @@ $py = "$env:USERPROFILE\.conda\envs\ras\python.exe"
 Không chạy hai `run` cùng lúc. `uploads.json` lưu receipt/job IDs và trạng thái; record
 `sending` chưa có ID khiến script dừng, phải đối chiếu thư viện trước, không tự resend PUT.
 PDF đã có không tải lại; fetch kiểm lại license và checksum. Version/license thay đổi thì
-từ chối thay vì âm thầm đổi bytes trong manifest.
+từ chối thay vì âm thầm đổi bytes trong manifest. Fetch thành công tạo lại `ATTRIBUTION.md`
+kể cả ở thư mục mới; giữ ghi công cũ nếu thư mục đã có corpus M7c.

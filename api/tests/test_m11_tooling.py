@@ -250,3 +250,19 @@ def test_locked_manifest_has_300_unique_open_licence_papers_outside_old_corpus()
         assert papers.policy.normalise_licence(proof['abs']) == paper['licence_url']
         assert papers.policy.normalise_licence(proof['oai']) == paper['licence_url']
         assert proof['latest_version_required'] is True
+
+
+def test_fetch_recreates_attribution_in_a_fresh_destination(tmp_path, monkeypatch):
+    manifest = tmp_path / 'manifest.json'
+    dest = tmp_path / 'papers'
+    papers.save(manifest, {'papers': [{'title': 'A retrieval paper', 'authors': ['Example Author'],
+        'arxiv_id': '0000.00001', 'version': 1, 'licence': 'CC0 1.0',
+        'licence_url': 'https://creativecommons.org/publicdomain/zero/1.0/', 'filename': 'paper.pdf'}]})
+    calls = []
+    monkeypatch.setattr(papers.policy, 'fetch', lambda d, m, recheck: calls.append((d, m, recheck)) or 0)
+    monkeypatch.setattr(sys, 'argv', ['m11_papers.py', 'fetch', '--dest', str(dest), '--manifest', str(manifest)])
+    assert papers.main() == 0
+    assert calls == [(dest, manifest, True)]
+    credit = (dest / 'ATTRIBUTION.md').read_text(encoding='utf-8')
+    assert 'A retrieval paper' in credit and 'Example Author' in credit
+    assert 'creativecommons.org/publicdomain/zero/1.0/' in credit

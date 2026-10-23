@@ -296,14 +296,20 @@ def discover(dest, manifest, target):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['discover', 'fetch', 'curate'])
-    parser.add_argument('--dest', type=Path, default=Path(os.environ['USERPROFILE']) / 'ras-pilot/demo-papers')
+    parser.add_argument('--dest', type=Path, default=Path(os.environ.get('USERPROFILE', str(Path.home()))) / 'ras-pilot/demo-papers')
     parser.add_argument('--manifest', type=Path, default=MANIFEST)
     parser.add_argument('--target', type=int, default=300)
     args = parser.parse_args()
     dest = policy.outside(args.dest)
     dest.mkdir(parents=True, exist_ok=True)
     if args.action == 'fetch':
-        return policy.fetch(dest, args.manifest, True)
+        result = policy.fetch(dest, args.manifest, True)
+        if result == 0:
+            credits = json.loads(args.manifest.read_text(encoding='utf-8'))['papers']
+            exclusion_path = args.manifest.with_name('topic-exclusions.json')
+            excluded = json.loads(exclusion_path.read_text(encoding='utf-8')) if exclusion_path.exists() else []
+            attribution(dest, credits, [p for p in excluded if (dest / p['filename']).exists()])
+        return result
     if args.action == 'curate':
         return curate(dest, args.manifest)
     return discover(dest, args.manifest, args.target)
