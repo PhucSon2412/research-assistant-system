@@ -1,5 +1,31 @@
 # Nhật ký quyết định
 
+## Cập nhật phạm vi M11 của chủ dự án (2026-10-23)
+
+Chỉ dẫn triển khai trực tiếp thay mục tiêu ban đầu bên dưới: **khoảng 300 paper bổ sung**,
+trần **$30**, dừng gọi mới ở **$24 (80 %)**. Giữ budget/quota ứng dụng hiện có. Key chỉ dùng
+qua env demo hiện có; không đọc `.env`. Edge local đã áp dụng, hosts/firewall vẫn do chủ dự án tự sửa.
+Ledger theo operation giữ toàn bộ ceiling nếu thiếu receipt; delta key nhóm không gọi là billed riêng task.
+Chi tiết và kết quả ở [handoff M11](m11-demo-knowledge-base.md).
+
+## Dùng cá nhân trên máy (2026-10-23)
+
+Chủ dự án: dự án đã xong chức năng; không cần demo LAN; từ nay dùng cho học tập cá nhân. Orchestrator chọn chuyển edge `ras-pilot` sang chỉ `127.0.0.1:8443` (giữ CA demo, dữ liệu, backup, alert). Paper mới nạp vào tài khoản user demo hiện có. Hướng dẫn LAN giữ trong handoff M9 như tùy chọn.
+
+## Mở rộng kho paper demo (2026-10-23)
+
+**Chủ dự án xác nhận:**
+
+- nhóm đồng ý dùng phần còn lại của key OpenRouter (khoảng $30,9 lúc kiểm);
+- chủ dự án đồng ý xử lý ngoài theo lô cho các paper arXiv giấy phép mở do [M11](tasks/m11-demo-knowledge-base-expansion.md) chọn, thay cho việc bấm xác nhận từng file. Luồng intent/acknowledgement của API vẫn chạy cho từng file.
+
+**Orchestrator chọn:**
+
+- khoảng 150 paper chủ đề LLM & information retrieval;
+- trần task $10 fail-closed, budget ứng dụng $10/ngày giữ nguyên;
+- không đổi code, image hay `deploy/`;
+- paper giữ ngoài repo, chỉ commit manifest/attribution.
+
 ## Cập nhật cùng ngày: key, đường vào, lưu trữ, mục tiêu demo (2026-10-21)
 
 **Chủ dự án cho biết:**

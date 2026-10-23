@@ -1,5 +1,19 @@
 # Review PR #71 — M10 giao diện web
 
+## Review lại tại `6b8b41a` (2026-10-23) — ba lỗi đã sửa
+
+**Không thấy điểm chặn merge.**
+
+- CI run `39760619090` success cả ba job.
+- **Typecheck:** kiểu CSS Modules nằm trong `web/types/css-modules.d.ts` (tracked).
+- **Font:** 0 tham chiếu Georgia trong `web/app`; `--font-reading` dùng Times New Roman/Cambria/Noto Serif/DejaVu Serif.
+- **Ngắt dòng:** `overflow-wrap: anywhere` chỉ còn ở class `.opaque-value`; badge có `nowrap`.
+- Diff so với `0dd5a9c` không chạm `api/`, `deploy/`, `web/lib`, `package.json`/lock.
+- **Demo:** chạy `ras-pilot-web:ui2` + API rc2, healthy. Chủ dự án xác nhận chữ tiếng Việt và bảng hiển thị đúng, truy cập được từ máy Ubuntu qua LAN.
+- **Ghi chú vận hành:** lúc review, máy đã chuyển sang Wi-Fi mạng khác (`192.168.42.x`) và Ethernet chỉ có IP APIPA, nên edge (chỉ bind IP Ethernet) không publish 8443. Đây là hệ quả đổi mạng, không phải lỗi PR. Khi demo cần cắm lại Ethernet đúng mạng, hoặc chạy `rebind`.
+
+Phần dưới là review lần đầu tại `f81abd8`.
+
 **Kết luận tại `f81abd8` (2026-10-22): có ba lỗi cần sửa cùng PR trước merge.** Hai lỗi do chủ dự án thấy trên demo thật (Windows, Chrome/Edge); một lỗi CI. [Prompt sửa](../tasks/fix-pr71-vietnamese-font-wrap-ci.md). PR OPEN, chưa merge.
 
 ## 1. CI: typecheck fail trên máy sạch (P2)

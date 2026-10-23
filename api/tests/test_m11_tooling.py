@@ -1,0 +1,121 @@
+"""Offline M11 safety checks: local binding/certificate, budget retention and API flow.
+
+No demo, arXiv, provider or real credentials. Synthetic credentials stay in tmp.
+"""
+import json
+import sys
+from argparse import Namespace
+from decimal import Decimal
+from pathlib import Path
+
+import httpx
+import pytest
+from cryptography import x509
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
+import m11_library as library
+import m11_papers as papers
+import m9_lan_demo as demo
+
+
+def test_local_rebind_keeps_ca_provider_env_web_and_recreates_only_edge(tmp_path, monkeypatch):
+    root = tmp_path / 'demo'
+    monkeypatch.setattr(demo, 'restrict_to_user', lambda p: None)
+    demo.make_demo_ca(root / 'ca', root / 'public', 'ras-demo.lan')
+    ca_before = (root / 'ca/demo-ca.crt').read_bytes()
+    state = {'root': str(root), 'host': 'ras-demo.lan', 'port': 8443,
+             'lan_ip': '192.168.1.7', 'web_image': 'ras-pilot-web:ui2', 'provider': {'routes': ['embedding']}}
+    demo.save_state(root, state)
+    original = b'RAS_EDGE_BIND=192.168.1.7\nRAS_EMBEDDING__API_KEY=synthetic-value\nRAS_WEB_IMAGE=ras-pilot-web:ui2\n'
+    demo.write(root / 'pilot/pilot.env', original)
+    calls = []
+    monkeypatch.setattr(demo, 'run', lambda cmd, **kw: calls.append(cmd))
+    monkeypatch.setattr(demo, 'check_lan_ip', lambda ip: pytest.fail('local mode must not require Ethernet'))
+    demo.rebind(Namespace(root=str(root), local=True, lan_ip=None, apply=True))
+    saved = demo.load_state(root)
+    assert saved['access_mode'] == 'local'
+    assert saved['provider'] == state['provider'] and saved['web_image'] == state['web_image']
+    assert demo.bind_address(saved) == '127.0.0.1'
+    assert (root / 'pilot/pilot.env').read_bytes() == original.replace(b'192.168.1.7', b'127.0.0.1')
+    assert (root / 'ca/demo-ca.crt').read_bytes() == ca_before
+    cert = x509.load_pem_x509_certificate((root / 'tls.d/site.crt').read_bytes())
+    ca = x509.load_pem_x509_certificate(ca_before)
+    cert.verify_directly_issued_by(ca)
+    names = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+    assert names.get_values_for_type(x509.DNSName) == ['ras-demo.lan']
+    assert names.get_values_for_type(x509.IPAddress) == []
+    assert len(calls) == 1
+    assert calls[0][-8:] == ['up', '-d', '--wait', '--no-deps', '--pull', 'never', '--force-recreate', 'edge']
+
+
+def test_rebind_refuses_ambiguous_env_before_changing_certificate_or_state(tmp_path, monkeypatch):
+    demo.save_state(tmp_path, {'host': 'ras-demo.lan', 'lan_ip': '192.168.1.7'})
+    demo.write(tmp_path / 'pilot/pilot.env', 'RAS_EDGE_BIND=a\nRAS_EDGE_BIND=b\n')
+    monkeypatch.setattr(demo, 'make_site_cert', lambda *a: pytest.fail('must validate before writing'))
+    with pytest.raises(SystemExit, match='exactly one'):
+        demo.rebind(Namespace(root=str(tmp_path), local=True, lan_ip=None, apply=False))
+    assert 'access_mode' not in demo.load_state(tmp_path)
+
+
+def test_regenerating_provider_env_preserves_persisted_local_mode_and_web_image(tmp_path):
+    demo.write(tmp_path / 'secrets/openrouter_api_key', 'synthetic-m11-key')
+    state = {'root': str(tmp_path), 'host': 'ras-demo.lan', 'port': 8443,
+             'lan_ip': '192.168.1.7', 'access_mode': 'local', 'subnet': '172.30.64.0/24',
+             'web_image': 'ras-pilot-web:ui2', 'provider': {'routes': ['embedding']},
+             'passwords': {name: 'synthetic-password' for name in ('pg', 'runtime', 'recovery', 'redis', 'minio')}}
+    env = demo.pilot_env(state, 'pilot', 'test@example.invalid')
+    assert env['RAS_EDGE_BIND'] == '127.0.0.1'
+    assert env['RAS_WEB_IMAGE'] == 'ras-pilot-web:ui2'
+    assert env['OPENROUTER_API_KEY'] == 'synthetic-m11-key'
+    assert env['RAS_EMBEDDING__PRICING_VERIFIED'] == 'true'
+
+
+def test_ledger_keeps_full_ceiling_after_operation_finishes_without_receipt(tmp_path):
+    ledger = library.Ledger(tmp_path / 'cost')
+    seq = ledger.admit('upload:x', Decimal('23.99'), 'test')
+    ledger.append({'event': 'outcome', 'seq': seq, 'status': 'uncertain'})
+    assert ledger.state()['committed_usd'] == Decimal('23.99')
+    with pytest.raises(RuntimeError, match='80%'):
+        ledger.admit('upload:y', Decimal('.02'), 'test')
+
+
+@pytest.mark.parametrize('amount', [Decimal('NaN'), Decimal('Infinity'), Decimal('-1'), Decimal('0'), None])
+def test_ledger_refuses_unknown_or_invalid_ceiling(tmp_path, amount):
+    ledger = library.Ledger(tmp_path / 'cost')
+    with pytest.raises(RuntimeError, match='unknown'):
+        ledger.admit('upload:x', amount, 'test')
+    assert ledger.records() == []
+
+
+def test_product_client_uses_https_csrf_origin_and_never_retries_mutations(tmp_path, monkeypatch):
+    demo.save_state(tmp_path, {'access_mode': 'local', 'host': 'ras-demo.lan', 'port': 8443})
+    demo.write(tmp_path / 'secrets/library_user_email', 'test@example.invalid')
+    demo.write(tmp_path / 'secrets/library_user_password', 'synthetic-password')
+    calls = []
+    def handle(req):
+        calls.append(req)
+        assert req.headers['origin'] == 'https://ras-demo.lan:8443'
+        assert req.extensions['sni_hostname'] == 'ras-demo.lan'
+        if req.url.path == '/api/auth/csrf':
+            return httpx.Response(200, json={'status': 'ok'}, headers={'Set-Cookie': 'ras_csrf=synthetic; Path=/; Secure'})
+        assert req.headers['X-CSRF-Token'] == 'synthetic'
+        if req.url.path == '/api/auth/login':
+            return httpx.Response(200, json={'user': {'role': 'user'}})
+        return httpx.Response(503, json={'error': 'upload_outcome_uncertain'})
+    real_client = httpx.Client
+    monkeypatch.setattr(library.ssl, 'create_default_context', lambda **kw: True)
+    monkeypatch.setattr(library.httpx, 'Client', lambda **kw: real_client(**{**kw, 'transport': httpx.MockTransport(handle)}))
+    api = library.Api(tmp_path)
+    with pytest.raises(RuntimeError, match='no retry'):
+        api.request('PUT', '/uploads/original', content=b'%PDF-test')
+    api.close()
+    assert len(calls) == 3
+
+
+@pytest.mark.parametrize('title,abstract,topic', [
+    ('Dense retrieval', 'text embeddings for language models', 'Dense retrieval & embeddings'),
+    ('Reranking', 'retrieval for language models', 'Reranking & search'),
+    ('Cancer biomarkers', 'a clinical investigation', None),
+])
+def test_topic_filter_requires_llm_or_retrieval_context(title, abstract, topic):
+    assert papers.topic_for(title, abstract) == topic

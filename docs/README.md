@@ -1,5 +1,8 @@
 # Tài liệu dự án
 
+**M11 (2026-10-23, đang triển khai):** [dùng cá nhân trên máy, corpus mở rộng và ledger](m11-demo-knowledge-base.md)
+· [task](tasks/m11-demo-knowledge-base-expansion.md) · [manifest](../evaluation/m11-papers/manifest.json).
+
 **M10 — frontend cho demo CV (2026-10-22):** [handoff UI, kiểm chứng và rollback web image](m10-frontend-ui.md) ·
 [ảnh tổng hợp dùng cho CV](screenshots/README.md) · [task](tasks/m10-frontend-ui-redesign.md).
 Base PR #70 đã merge `0dd5a9c`, source **0052**; phần lịch sử dưới đây giữ theo từng lượt.

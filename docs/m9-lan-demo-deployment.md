@@ -1,5 +1,46 @@
 # M9 — demo LAN trên máy của chủ dự án
 
+**Chế độ hiện hành từ M11 (2026-10-23): dùng cá nhân trên máy này.** Edge chỉ publish
+`127.0.0.1:8443`; địa chỉ vẫn là **https://ras-demo.lan:8443**. State lưu `access_mode=local`,
+`provider`/`web-image` giữ chế độ này. Leaf mới chỉ có DNS SAN `ras-demo.lan` (CA cũ có name constraints
+không bao gồm loopback IP); CA không đổi. Hướng dẫn LAN phía dưới giữ làm lịch sử/tùy chọn.
+Kho paper mở rộng, kết quả thử và chi phí: [handoff M11](m11-demo-knowledge-base.md).
+
+### Dùng trên chính máy Windows
+
+1. Mở Docker Desktop. Containers có `restart: unless-stopped` tự chạy lại.
+2. PowerShell **Administrator**, tự mở file hosts rồi thay dòng `ras-demo.lan` thành
+   `127.0.0.1 ras-demo.lan` (không giữ dòng LAN cũ):
+
+   ```powershell
+   notepad.exe "$env:SystemRoot\System32\drivers\etc\hosts"
+   ipconfig /flushdns
+   Remove-NetFirewallRule -DisplayName 'RAS pilot LAN demo HTTPS' -ErrorAction SilentlyContinue
+   ```
+
+3. Giữ CA demo đã cài trên máy Windows; nếu chưa cài:
+   `certutil -user -addstore Root "$env:USERPROFILE\ras-pilot\public\ras-demo-ca.crt"`.
+4. Mở **https://ras-demo.lan:8443**, đăng nhập tài khoản demo hiện có. Chọn collection theo chủ đề,
+   dùng tìm kiếm **hybrid** và hỏi đáp trên một paper/collection. Các item “cần xem lại” vẫn giữ file gốc,
+   không vào RAG. Đổi Wi-Fi/Ethernet không cần rebind.
+5. Kiểm từ repo: `python scripts/m9_lan_demo.py verify`. Lệnh đổi local có thể chạy lại:
+   `python scripts/m9_lan_demo.py rebind --local --apply` (chỉ recreate edge, không đổi dữ liệu).
+
+Agent **không sửa hosts/firewall/trust store**. HTTPS đã được kiểm bằng kết nối loopback với SNI/Host
+và CA thật; browser theo hostname phụ thuộc chủ dự án thực hiện bước hosts.
+
+Gỡ cấu hình trên máy Ubuntu từng dùng LAN (chủ dự án tự chạy):
+
+```bash
+sudoedit /etc/hosts  # xóa token/dòng ras-demo.lan đã thêm, giữ các entry khác
+sudo rm -- /usr/local/share/ca-certificates/ras-demo-ca.crt  # nếu CA đã cài với đúng tên này
+sudo update-ca-certificates --fresh
+```
+
+Nếu đã import CA riêng vào Firefox/Chrome, gỡ “RAS LAN demo CA” trong kho certificate của browser.
+Muốn trở về LAN sau này: `rebind --lan-ip <IP Ethernet> --apply`, sửa hosts/firewall theo hướng dẫn
+lịch sử phía dưới. Không chạy toàn bộ `compose up` chỉ để đổi địa chỉ.
+
 Task: [M9](tasks/m9-lan-demo-deployment.md). Base `origin/main = 7009a8483e4f9891f11a966f114df136c90c4953` (merge PR #68),
 nhánh `ops/m9-lan-demo-deployment`. Source migration **0052**. Không đổi code ứng dụng, không build image.
 

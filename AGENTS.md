@@ -12,6 +12,21 @@
 
 ## Trạng thái triển khai và lịch sử
 
+**M11 đang triển khai (2026-10-23):** nhánh `ops/m11-demo-knowledge-base`, base PR #71 đã fetch/xác minh
+`1f7bfac`. Chủ dự án cập nhật **khoảng 300 paper bổ sung, trần $30/dừng $24**, thay 150/$10 ở task cũ.
+Đã chuyển edge sang local `127.0.0.1:8443`, leaf DNS-only từ CA cũ, chỉ recreate edge; hosts/firewall chủ dự án tự chạy.
+Corpus/index đang nạp qua API bằng user demo, giữ mọi trạng thái lỗi. [Handoff M11](docs/m11-demo-knowledge-base.md).
+Không đổi code app/image/`deploy/`, không merge. Các số cuối và CI cập nhật khi hoàn tất.
+
+**Sau merge PR #71 (2026-10-23):** `origin/main = 1f7bfac970fa0015a6d3211d3514a4136df4d4d6`. README đã viết lại thành trang giới thiệu dự án (tiếng Anh); nhật ký trạng thái cũ của README lưu ở `docs/status-log-archive.md`. Chủ dự án (2026-10-23): dự án đã xong chức năng, không cần demo LAN nữa, từ nay dùng học tập cá nhân trên máy này. Giao [M11 — chuyển sang dùng cá nhân trên máy + mở rộng kho paper](docs/tasks/m11-demo-knowledge-base-expansion.md), **mới giao**:
+- edge `ras-pilot` chuyển sang chỉ `127.0.0.1:8443`; hosts/firewall do chủ dự án tự chạy;
+- khoảng 150 paper arXiv theo giao việc ban đầu (chủ dự án cập nhật thành **300 bổ sung** ở chỉ dẫn M11 mới);
+- consent theo lô do chủ dự án xác nhận; trần cũ $10 đã được chủ dự án thay bằng **$30, dừng $24**;
+- tài khoản upload qua secret file chủ dự án tạo;
+- không đổi code/image/`deploy/`.
+
+**Review lại PR #71 tại `6b8b41a` (2026-10-23): ba lỗi đã sửa, không thấy điểm chặn merge.** CI `39760619090` success; [report](docs/reviews/pr71-m10-frontend-ui.md#review-lại-tại-6b8b41a-2026-10-23--ba-lỗi-đã-sửa). Demo chạy web `ui2` + API rc2; chủ dự án đã nghiệm thu qua LAN từ máy Ubuntu. Edge chỉ bind IP Ethernet: đổi mạng/Wi-Fi thì demo không publish cho tới khi cắm lại Ethernet hoặc `rebind`.
+
 **Sửa review PR #71 (2026-10-22, chờ review lại):** CSS Modules có khai báo kiểu trong Git; clone sạch không có
 `next-env.d.ts`/`.next` pass 79 test, typecheck, build theo thứ tự CI. Bỏ Georgia và letter-spacing âm; Chrome
 Windows 155.0.8059.85 xác nhận Times New Roman cho đủ mẫu dấu/câu login/RAG. Bảng user/Admin kiểm ở
