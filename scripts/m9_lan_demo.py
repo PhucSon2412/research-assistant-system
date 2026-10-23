@@ -10,6 +10,7 @@
     python scripts/m9_lan_demo.py uninstall --yes                    # tasks, projects/volumes (label-checked), tags
     python scripts/m9_lan_demo.py provider --routes <r ...> [--max-output-tokens N] [--apply]  # M7c: key, pricing
     python scripts/m9_lan_demo.py provider --off [--apply]            # back to provider off
+    python scripts/m9_lan_demo.py web-image --image <local-tag> [--apply]  # M10: recreate web only
 
 Everything lives under ``--root`` (default ``%USERPROFILE%\\ras-pilot``), outside the repository. The
 deploy itself is the reviewed ``deploy/compose.yaml`` of the release commit, copied with ``git archive``
@@ -333,7 +334,8 @@ def pilot_env(state: dict, kind: str, gmail: str) -> dict:
     net = ipaddress.ip_network(subnet)
     return {
         "RAS_DEPLOY_PROJECT": PROJECT if kind == "pilot" else DRILL,
-        **{k: alias for k, alias in (("RAS_API_IMAGE", "ras-pilot-api:rc2"), ("RAS_WEB_IMAGE", "ras-pilot-web:rc2"),
+        **{k: alias for k, alias in (("RAS_API_IMAGE", "ras-pilot-api:rc2"),
+                                     ("RAS_WEB_IMAGE", state.get("web_image", "ras-pilot-web:rc2") if kind == "pilot" else "ras-pilot-web:rc2"),
                                      ("RAS_OPS_IMAGE", "ras-pilot-ops:rc2"))},
         **site, **ports, "RAS_HSTS_MAX_AGE": "86400", "RAS_CADDY_TLS_DIR": (root / "tls.d").as_posix(),
         "RAS_BACKEND_SUBNET": str(net), "RAS_WEB_BACKEND_IP": str(net.network_address + 10),
@@ -643,6 +645,46 @@ def rebind(args) -> int:
     return 0
 
 
+def web_image(args) -> int:
+    """M10: change one env line, persist the selection and recreate ONLY web.
+
+    Does not regenerate provider configuration or read its key. The old env
+    bytes (including credentials) are preserved except for RAS_WEB_IMAGE.
+    Only local, explicitly tagged demo web images are accepted; never pull.
+    """
+    root = Path(args.root).resolve()
+    state = load_state(root)
+    image = args.image
+    if not re.fullmatch(r"ras-pilot-web:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}", image):
+        raise SystemExit("expected a local ras-pilot-web:<tag> image")
+    image_id = run(["docker", "image", "inspect", image, "--format", "{{.Id}}"]).stdout.strip()
+    cmd = compose_cmd(state, PROJECT)
+    ids = run(cmd + ["ps", "-aq"]).stdout.split()
+    for identifier in ids:
+        info = json.loads(run(["docker", "inspect", identifier]).stdout)[0]
+        labels = info["Config"].get("Labels") or {}
+        if labels.get(LABEL) != PROJECT or labels.get("com.docker.compose.project") != PROJECT:
+            raise SystemExit("demo container ownership changed; no file written")
+    env_path = root / "pilot" / "pilot.env"
+    original = env_path.read_bytes()
+    pattern = rb"(?m)^RAS_WEB_IMAGE=[^\r\n]*"
+    if len(re.findall(pattern, original)) != 1:
+        raise SystemExit("expected exactly one RAS_WEB_IMAGE line; no file written")
+    updated = re.sub(pattern, b"RAS_WEB_IMAGE=" + image.encode("ascii"), original)
+    previous = state.get("web_image", "ras-pilot-web:rc2")
+    write(env_path, updated)  # existing owner-only ACL is retained
+    state["web_image"] = image
+    save_state(root, state)
+    result = {"web_image": image, "image_id": image_id, "previous": previous}
+    if args.apply:
+        up = run(cmd + ["up", "-d", "--no-deps", "--wait", "--pull", "never", "--force-recreate", "web"], check=False)
+        result["recreate_exit"] = up.returncode
+        if up.returncode:
+            result["rollback"] = f"web-image --image {previous} --apply"
+    print(json.dumps(result))
+    return 0 if result.get("recreate_exit", 0) == 0 else 1
+
+
 def provider(args) -> int:
     """M7c: enable the provider for the routes with live evidence (or ``--off``); recreate api/worker/beat.
 
@@ -763,6 +805,9 @@ def main() -> int:
     sub.add_parser("verify")
     s = sub.add_parser("rebind")
     s.add_argument("--lan-ip", required=True)
+    s = sub.add_parser("web-image")
+    s.add_argument("--image", required=True)
+    s.add_argument("--apply", action="store_true", help="recreate only web, with --no-deps and no pull")
     s = sub.add_parser("schedule")
     s.add_argument("action", choices=["install", "remove"])
     sub.add_parser("firewall-commands")
@@ -777,7 +822,7 @@ def main() -> int:
     args = p.parse_args()
     return {"inventory": inventory, "prepare": prepare, "offsite-up": offsite_up, "verify": verify,
             "rebind": rebind, "schedule": schedule, "firewall-commands": firewall_commands,
-            "uninstall": uninstall, "provider": provider}[args.cmd](args)
+            "uninstall": uninstall, "provider": provider, "web-image": web_image}[args.cmd](args)
 
 
 if __name__ == "__main__":

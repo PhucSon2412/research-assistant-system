@@ -6,6 +6,7 @@ import { api, describeError } from "../../lib/api";
 import { contentLabel, sourceOriginalHref } from "../../lib/files";
 import { DEFAULT_RERANK, SEARCH_NOTICE, makeSearchBody, sourceKindLabel } from "../../lib/search";
 import { ErrorText, Shell, useSession } from "../components/session";
+import { Badge, EmptyState, PageHeading } from "../components/ui";
 
 type Hit = {
   chunk_id: string; item_id: string; version_id: string; source_file_id: string;
@@ -65,15 +66,15 @@ export default function SearchPage() {
 
   return <Shell user={user}>
     <p><Link href="/">← Thư viện</Link> · <Link href="/collections">Quản lý collection</Link></p>
-    <h1>Tìm trong paper đã index bạn có quyền</h1>
-    <p>{SEARCH_NOTICE}</p>
-    <form onSubmit={submit} style={{ display: "grid", gap: "0.75rem", maxWidth: 700 }}>
-      <label>Câu tìm kiếm <input value={query} onChange={(e) => setQuery(e.target.value)} required maxLength={1024} style={{ width: "100%" }} /></label>
+    <PageHeading eyebrow="Tra cứu & bằng chứng" title="Tìm kiếm & hỏi đáp">Tìm trong paper đã index bạn có quyền. Mở một paper từ kết quả để hỏi đáp có dẫn nguồn.</PageHeading>
+    <p className="notice">{SEARCH_NOTICE}</p>
+    <form onSubmit={submit} className="form-panel search-form" aria-busy={busy}>
+      <label>Câu tìm kiếm <input value={query} onChange={(e) => setQuery(e.target.value)} required maxLength={1024} className="full-width" /></label>
       <label>Collection <select value={collectionId} onChange={(e) => { setCollectionId(e.target.value); setItemId(""); }}>
         <option value="">Tất cả paper riêng đã index và bản chung được phép</option>
         {collections.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
       </select></label>
-      <label>ID paper (riêng của bạn hoặc bản chung được phép; để trống để tìm tất cả) <input value={itemId} disabled={!!collectionId} onChange={(e) => setItemId(e.target.value)} style={{ width: "100%" }} /></label>
+      <label className="search-scope">ID paper (riêng của bạn hoặc bản chung được phép; để trống để tìm tất cả) <input value={itemId} disabled={!!collectionId} onChange={(e) => setItemId(e.target.value)} className="full-width" /></label>
       <label>Chế độ <select value={mode} onChange={(e) => setMode(e.target.value as "keyword" | "hybrid")}>
         <option value="keyword">Chỉ từ khóa</option><option value="hybrid">Hybrid: từ khóa + vector</option>
       </select></label>
@@ -85,25 +86,27 @@ export default function SearchPage() {
       <ul>{collectionItems.map((item) => <li key={item.id}><Link href={`/items/${item.id}`}>{item.title || item.id}</Link> — {contentLabel(item)}</li>)}</ul>
     </section>}
     <ErrorText message={error} />
+    {busy && <p role="status" aria-live="polite">Đang tìm bằng chứng trong phạm vi bạn đã chọn…</p>}
     {result && <section aria-live="polite">
       <p>Chế độ: {result.mode === "hybrid" ? "hybrid" : "chỉ từ khóa"} · Rerank: {result.rerank_status} · {result.count} đoạn</p>
-      {(result.rerank_withheld ?? 0) > 0 && <p style={{ fontSize: "0.8rem", color: "#555" }}>
+      {result.hits.length === 0 && <EmptyState title="Chưa tìm thấy đoạn phù hợp">Thử thuật ngữ cụ thể hơn hoặc kiểm tra phạm vi tìm kiếm.</EmptyState>}
+      {(result.rerank_withheld ?? 0) > 0 && <p className="text-small">
         {result.rerank_withheld} đoạn của bản chung không được gửi rerank (quyền không cho xử lý qua provider); giữ thứ tự tìm kiếm.</p>}
       {result.keyword_query?.status === "no_terms" &&
         <p>Truy vấn chỉ gồm từ phổ biến nên phần từ khóa không có thuật ngữ để tìm; hãy thêm thuật ngữ cụ thể.</p>}
       {result.keyword_query?.status === "ok" &&
-        <p style={{ fontSize: "0.8rem", color: "#555" }}>Từ khóa: đoạn khớp ít nhất {result.keyword_query.min_match}/{result.keyword_query.terms} thuật ngữ
+        <p className="text-small">Từ khóa: đoạn khớp ít nhất {result.keyword_query.min_match}/{result.keyword_query.terms} thuật ngữ
           {result.keyword_query.dropped_terms > 0 && ` (bỏ ${result.keyword_query.dropped_terms} thuật ngữ vượt giới hạn)`}.</p>}
       {result.hits.map((hit) => { const original = sourceOriginalHref(hit.original_url, hit.locator_kind, hit.start_page);
-        return <article key={hit.chunk_id} style={{ borderTop: "1px solid #ccc", marginTop: "1rem" }}>
+        return <article key={hit.chunk_id} className="search-hit">
         <h2><Link href={`/items/${hit.item_id}`}>{hit.title || sourceKindLabel(hit.visibility)}</Link></h2>
-        <p>{sourceKindLabel(hit.visibility)} · {hit.coverage === "partial" ? "Chỉ trích xuất được một phần paper. " : ""}
+        <p><Badge>{sourceKindLabel(hit.visibility)}</Badge> · {hit.coverage === "partial" ? "Chỉ trích xuất được một phần paper. " : ""}
           {hit.section_kind === "abstract" ? "Tóm tắt" : "Thân bài"} · {hit.locator_kind === "pdf"
             ? `trang ${hit.start_page}` : `dòng ${hit.start_line}–${hit.end_line}`}</p>
-        <p style={{ whiteSpace: "pre-wrap" }}>{hit.text}</p>
+        <p className="pre-wrap">{hit.text}</p>
         <p><Link href={`/sources/${hit.chunk_id}`}>Mở đúng chunk và vị trí nguồn</Link></p>
         {original ? <a href={original}>Mở file gốc tại vị trí nguồn</a> : <p>Không có file gốc được phép tải.</p>}
-        <p style={{ fontSize: "0.8rem", color: "#555" }}>Version {hit.version_id} · File {hit.source_file_id} · Chunk {hit.chunk_id}</p>
+        <p className="text-small">Version {hit.version_id} · File {hit.source_file_id} · Chunk {hit.chunk_id}</p>
       </article>; })}
     </section>}
   </Shell>;

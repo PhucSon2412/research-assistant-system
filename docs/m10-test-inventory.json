@@ -1,0 +1,125 @@
+{
+  "task": "M10",
+  "date": "2026-10-22",
+  "base": "0dd5a9c07ac0561c55b97da52555b2777d291817",
+  "migration_source": "0052",
+  "evidence_context": "%TEMP%/ras-m10-20261022",
+  "web_test": {
+    "pass": 79,
+    "fail": 0
+  },
+  "typecheck": "pass",
+  "build": "pass",
+  "tooling_tests": {
+    "pass": 4,
+    "fail": 0
+  },
+  "http_smoke": {
+    "pass": 68,
+    "fail": 0,
+    "context": "smoke-final",
+    "evidence": "http-1792659923393174400",
+    "web_image_at_http": "sha256:b5cea4e9cc7975566289353fd34553b1de52b79527a0c83c8485245e72eb7622",
+    "note": "Before final presentation-only empty-state gating and Admin mobile cards; API/proxy unchanged"
+  },
+  "chrome_smoke": {
+    "pass": 16,
+    "fail": 0,
+    "context": "smoke-final",
+    "evidence": "chrome-1792660567117319800",
+    "web_image": "sha256:36ed5b03a68961f491e33a41ef487e68b136fe0906db317218d9ca0b673cafb6"
+  },
+  "visual": {
+    "matrix_screens": 54,
+    "viewport_widths": [
+      1440,
+      390
+    ],
+    "full_matrix_overflow": 0,
+    "unlabeled_controls": 0,
+    "outbound_requests": 0,
+    "targeted_final_checks": 18,
+    "targeted_widths": [
+      1440,
+      390,
+      360
+    ],
+    "targeted_overflow": 0,
+    "provider": "c4_fake_provider only",
+    "browser_error_fixture": "RAG unavailable is a browser 503 fixture; insufficient-evidence uses real API",
+    "chrome": "155.0.8059.85"
+  },
+  "demo": {
+    "changed_services": [
+      "web"
+    ],
+    "non_web_metadata_unchanged": true,
+    "api_rc2": "sha256:c0936a8189df7335187c457ff56e8c4ff21aebbe338ed7e4240e5c14ec730a06",
+    "web_ui1": "sha256:36ed5b03a68961f491e33a41ef487e68b136fe0906db317218d9ca0b673cafb6",
+    "readiness": 200,
+    "https": 200,
+    "state_web_image": "ras-pilot-web:ui1"
+  },
+  "screenshots": {
+    "docs/screenshots/m10-admin-1440.png": "a816f8dad83cdf66d258707393a8e1a4b0ea7668e15229c82933191809ebd917",
+    "docs/screenshots/m10-admin-390.png": "a7fae4e349582f5d6d069dd19a8d8344776e5ac00883326ec2e2e42fd629ca6d",
+    "docs/screenshots/m10-collections-1440.png": "7e25687764cda4f6943699944e868746d6c8a842dcef58c2f3bdd4ed161da6c2",
+    "docs/screenshots/m10-library-1440.png": "0eef63ed1758b78f942ae45e8f4ae5a9216cddba287339b010d7e6e5b1558329",
+    "docs/screenshots/m10-library-390.png": "9a39d1a3be51dea31861ec748d3837b029463f7f92a9d961a77666a8b05ae47f",
+    "docs/screenshots/m10-login-1440.png": "93b63506f0713039416120235335eba12588617258669ff4b387ecdcf8a29082",
+    "docs/screenshots/m10-rag-1440.png": "c30daa8c114b04c32b6ea7aa5c871ce855953e33fedd1b71e955e5143a6586b8",
+    "docs/screenshots/m10-rag-390.png": "1d6ac2d8c67bbb294d5607d1f5dfcbae30234a96d4a45b03cc148c0070e226fb",
+    "docs/screenshots/m10-search-1440.png": "d37610d109d7f8bfdf504ceaa5007f12168c35add8e234dd6a2c651cfbb2cc9f",
+    "docs/screenshots/m10-source-390.png": "121c8193ffd3cbc5e124aed628a02700598adb22bc34e058f1bca1bf546ff9f8"
+  },
+  "source_sha256": {
+    "web/app/account/page.tsx": "66981f0f05ed4108f84d1b6d616180ca892619c8464bee5cc7777c406b7594d3",
+    "web/app/admin/page.tsx": "125793667ddbe0d48e696ff2368e534aa38c6eacb2c2c5e4a6c8cf9ab6214963",
+    "web/app/admin/publications/page.tsx": "1d6e5ebfb409f283fe67ecd0ace8d45f270d4cd429352c2fdd42c8c47ee0777c",
+    "web/app/admin/reviews/[id]/page.tsx": "4d0246c00f567551735aa5468a47492cd24e2d6d75e81f91a69fcac1fe254e0d",
+    "web/app/admin/reviews/page.tsx": "02715aaf96a7d30ab6ee97a34a9d3f7a021b02e73d66927bfe8c36d244f0457e",
+    "web/app/api/[...path]/route.ts": "1298b13dea05ebbe5160a1a2f083ac9cd0e6f49b81cab29d70e429c82eb9f803",
+    "web/app/api/admin/review-requests/[id]/files/[fileId]/original/route.ts": "ef851431e46ebffcfac655230abc256f6ec4ceaa1676c2ba36c5b9eebc1f8b71",
+    "web/app/api/files/[id]/original/route.ts": "5bc28458d385dbbb184f4b327a77f618fa269e2e00a3b5c478015c5787151442",
+    "web/app/api/uploads/original/route.ts": "5eb9f094537820850eb0170c7079a7002d21bdb8d047fe901998643ec5519fa4",
+    "web/app/collections/page.tsx": "f3ca11fbd3535dd29f4a9eaf2170b379b3224e1999021de16701d5bad3d96293",
+    "web/app/components/private-delete.tsx": "9658781dbf5516cecc8d1c6439fb41cb9de1d8bbecd6f966512e329b17758893",
+    "web/app/components/review-request.tsx": "3608ea0683b8eb81f2b598742dbbee96d551942ef323535562fa26f76a61ef95",
+    "web/app/components/session.tsx": "49480f3420f588ece42efb0980e6d6897ae8816079edafa7a57ecb71211584fd",
+    "web/app/components/ui.module.css": "e4e07b9633bf25aa5890e81cf78cb0866aef64fcf5b9fd69ad72dd35fbacac8b",
+    "web/app/components/ui.tsx": "c87ab0d10f4b7b12589ccb1847bf29b13c693350aef0494cda23465131ddcbda",
+    "web/app/components/upload.tsx": "dba36a1cc7e10160dc6943b655408a5e9ca751b6672c3aab459fa2ebfecf25a2",
+    "web/app/discovery/page.tsx": "6d2d273b50143cf6ebbebf6313877b7111112328b4f6dedb21f7e551171d77c2",
+    "web/app/forgot-password/page.tsx": "8da76f8f25efbe1989e189e43b838f2984a2bec81b77b4ebee592ccf47dab1ce",
+    "web/app/globals.css": "719206e9e2124416eed3c8a0dd64a13b8aed46559a1f0a37e7b8e37a0148f88d",
+    "web/app/invite/page.tsx": "4202269c26ff5abf8af45ef531fd566938c539c2af42d56a366bb75154782311",
+    "web/app/items/[id]/page.tsx": "e8441b7efb0a15da9a9b186474a707ea43d324b397145e55edd611d7614ac383",
+    "web/app/layout.tsx": "3c07287d2a38aa5ceb6633d91cff62d8c53d3cf4e2b84b923c2755d19cd60df8",
+    "web/app/login/page.tsx": "fe2db22176a4e5563075dd2767f0a029008c53fd360d07881dce0d02cbd16343",
+    "web/app/page.tsx": "0f67141f0e7afadd31edd4989df9893632857bffd69a3e2489d89b474570b03a",
+    "web/app/reset-password/page.tsx": "12161ec3ac0f01a3f9af6de3a5326e434698aa78a9448caad16ad195b9eb4dd8",
+    "web/app/search/page.tsx": "9d87e9039ed77840a43764dedaab749a37efebae63d5c9ebbd17f320970632ef",
+    "web/app/sources/[chunkId]/page.tsx": "3f724290e31ce3ae6d13b51be5586307412be04f40da3420702c7158f0aaa821",
+    "web/lib/api.ts": "62b9f6d6b153c3be8817da0ae455f79a83c38cf210dbb219a491469f722f234b",
+    "web/lib/citations.ts": "d8b0c7f791db17e9eb7dad1ca64057069ef32f6ee788b65784c49249e879b0c7",
+    "web/lib/duplicates.ts": "0174910aa04316984885279443f5b199ba5893b3353f42a4cf068e9ce3dea2a0",
+    "web/lib/files.ts": "0161c1c0e77dca1f9c9a89c6ef2aacf4b4218c11d2995d871c50bdd9eac131c1",
+    "web/lib/private-delete.ts": "23a2a97df83537914e16222e2055ac23ed24b50eb64e8db6ea67bd7e797fc8ef",
+    "web/lib/proxy.ts": "2f72003bd0d61d2eb9827a72ccef675ceecb6c2463d23c7e0c4effa6b1efc3d3",
+    "web/lib/rag.ts": "49baba4f9850f19c2247830eca89bddb75c870e5648b01b9be00d7a52ea9261d",
+    "web/lib/review.ts": "1eacfb3e4f551fd00972eb7a40a4bd85178b98f9cef22b6be9ef6ae11e3cbd7e",
+    "web/lib/search.ts": "fcfa0820ecae094efa4632bba7502a0b52dcdb201b4eeb0c8c5032cfd754ae56",
+    "web/lib/stream.ts": "8e7c441103237b70d1d3e854c5d91726dc9375661ede153550c74f2ef1593365",
+    "web/next-env.d.ts": "1b59d4c6b83807db275d43f3cf2cc8e9323f465fab764eea091cc5becd5bad37"
+  },
+  "cleanup": {
+    "baseline_non_web_containers_unchanged": 21,
+    "test_projects_cleaned": [
+      "rasm8ad04771de",
+      "rasm8a3f98ee61",
+      "rasc4200e35c0"
+    ],
+    "remaining_test_containers_volumes_networks": 0
+  },
+  "request_call_comparison": "20 changed TSX files match base for API/fetch/CSRF/body/source-link helpers"
+}

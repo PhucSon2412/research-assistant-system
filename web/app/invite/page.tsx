@@ -5,7 +5,10 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, describeError, tokenFromHash } from "../../lib/api";
 import { ErrorText, PasswordFields } from "../components/session";
 
+import { AuthFrame } from "../components/ui";
+
 type Invite = { email: string; display_name: string | null; expires_at: string };
+
 
 export default function InvitePage() {
   const [token, setToken] = useState<string | null>(null);
@@ -48,17 +51,17 @@ export default function InvitePage() {
 
   if (done) {
     return (
-      <main>
+      <AuthFrame>
         <h1>Đã tạo tài khoản</h1>
         <Link href="/login">Đăng nhập</Link>
-      </main>
+      </AuthFrame>
     );
   }
   return (
-    <main style={{ maxWidth: 420 }}>
+    <AuthFrame>
       <h1>Nhận lời mời</h1>
       {invite && (
-        <form onSubmit={submit} style={{ display: "grid", gap: "0.75rem" }}>
+        <form onSubmit={submit} className="form-stack">
           <p>
             Tài khoản: <strong>{invite.email}</strong> (vai trò User). Lời mời hết hạn lúc{" "}
             {new Date(invite.expires_at).toLocaleString("vi-VN")}.
@@ -66,7 +69,7 @@ export default function InvitePage() {
           <label>
             Tên hiển thị (tùy chọn)
             <br />
-            <input name="display_name" defaultValue={invite.display_name ?? ""} maxLength={200} style={{ width: "100%" }} />
+            <input name="display_name" defaultValue={invite.display_name ?? ""} maxLength={200} className="full-width" />
           </label>
           <PasswordFields />
           <button type="submit">Tạo tài khoản</button>
@@ -74,6 +77,6 @@ export default function InvitePage() {
       )}
       <ErrorText message={error} />
       {!invite && token && !error && <p>Đang kiểm tra lời mời…</p>}
-    </main>
+    </AuthFrame>
   );
 }

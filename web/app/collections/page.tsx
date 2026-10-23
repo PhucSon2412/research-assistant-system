@@ -6,13 +6,17 @@ import { api, describeError } from "../../lib/api";
 import { contentLabel } from "../../lib/files";
 import { ErrorText, Shell, useSession } from "../components/session";
 
+import { PageHeading, EmptyState } from "../components/ui";
+
 type Collection = { id: string; name: string };
 type Item = { id: string; title: string | null; visibility: string; content_status: string;
   fulltext_search_available?: boolean; rag_available?: boolean };
 
+
 export default function CollectionsPage() {
   const user = useSession();
   const [collections, setCollections] = useState<Collection[]>([]);
+  const [collectionsLoaded, setCollectionsLoaded] = useState(false);
   const [selected, setSelected] = useState("");
   const [items, setItems] = useState<Item[]>([]);
   const [total, setTotal] = useState(0);
@@ -26,7 +30,7 @@ export default function CollectionsPage() {
   useEffect(() => {
     if (!user) return;
     api<{ collections: Collection[] }>("/collections")
-      .then((data) => { setCollections(data.collections); setError(null); })
+      .then((data) => { setCollections(data.collections); setCollectionsLoaded(true); setError(null); })
       .catch((err) => setError(describeError(err)));
   }, [user, refresh]);
 
@@ -76,16 +80,17 @@ export default function CollectionsPage() {
 
   return <Shell user={user}>
     <p><Link href="/">← Thư viện</Link> · <Link href="/search">Tìm kiếm</Link></p>
-    <h1>Collection của tôi</h1>
+    <PageHeading eyebrow="Bộ sưu tập & phạm vi" title="Collection của tôi" />
     <p>Collection nhóm paper bạn xem được. Thành viên không cấp quyền đọc nội dung; paper chung chỉ có metadata không vào tìm kiếm toàn văn.</p>
     <ErrorText message={error} />
-    <form onSubmit={create}><label>Tên collection mới <input value={name} maxLength={200} onChange={(e) => setName(e.target.value)} required /></label> <button>Tạo</button></form>
+    <form onSubmit={create} className="form-panel"><label>Tên collection mới <input value={name} maxLength={200} onChange={(e) => setName(e.target.value)} required /></label> <button>Tạo</button></form>
     <label>Collection <select value={selected} onChange={(e) => { setSelected(e.target.value); setOffset(0); }}>
       <option value="">Chọn collection</option>{collections.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
     </select></label>
+    {collectionsLoaded && collections.length === 0 && <EmptyState title="Bắt đầu một bộ sưu tập">Nhóm tài liệu theo chủ đề để thu hẹp phạm vi nghiên cứu.</EmptyState>}
     {selected && <section>
       <p><button onClick={rename} disabled={!name.trim()}>Đổi tên theo ô tên</button> <button onClick={remove}>Xóa collection</button></p>
-      <form onSubmit={add}><label>Paper từ thư viện <input list="available-papers" value={itemId} onChange={(e) => setItemId(e.target.value)} required /></label>
+      <form onSubmit={add} className="form-panel"><label>Paper từ thư viện <input list="available-papers" value={itemId} onChange={(e) => setItemId(e.target.value)} required /></label>
         <datalist id="available-papers">{available.map((item) => <option key={item.id} value={item.id}>{item.title || item.id} — {contentLabel(item)}</option>)}</datalist>
         {" "}<button>Thêm paper</button></form>
       <ul>{items.map((item) => <li key={item.id}>

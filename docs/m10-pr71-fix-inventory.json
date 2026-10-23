@@ -1,0 +1,963 @@
+{
+  "task": "Fix PR71 Vietnamese font/wrap/CI",
+  "base": "f81abd84bef2f2862f98fd47fb61d32d6c6d66bd",
+  "context": "%TEMP%/ras-pr71-fix-20261022",
+  "clean_clone": {
+    "initial_next_env": false,
+    "initial_next_directory": false,
+    "order": [
+      "npm ci",
+      "preflight typecheck",
+      "npm test",
+      "npm run typecheck",
+      "npm run build"
+    ],
+    "all_exit": 0,
+    "web_test_pass": 79
+  },
+  "windows": {
+    "platform": "win32",
+    "chrome": "155.0.8059.85",
+    "sample": "ồ ắ ầ ẫ ữ ỵ ẽ ở ợ Ý Ặ Ổ",
+    "fonts_before": {
+      "login_em": [
+        {
+          "familyName": "Georgia",
+          "postScriptName": "Georgia-Italic",
+          "isCustomFont": false,
+          "glyphCount": 20
+        },
+        {
+          "familyName": "Times New Roman",
+          "postScriptName": "TimesNewRomanPS-ItalicMT",
+          "isCustomFont": false,
+          "glyphCount": 2
+        }
+      ],
+      "login_quote": [
+        {
+          "familyName": "Georgia",
+          "postScriptName": "Georgia-Italic",
+          "isCustomFont": false,
+          "glyphCount": 28
+        },
+        {
+          "familyName": "Times New Roman",
+          "postScriptName": "TimesNewRomanPS-ItalicMT",
+          "isCustomFont": false,
+          "glyphCount": 5
+        }
+      ],
+      "sample_normal": [
+        {
+          "familyName": "Times New Roman",
+          "postScriptName": "TimesNewRomanPSMT",
+          "isCustomFont": false,
+          "glyphCount": 8
+        },
+        {
+          "familyName": "Georgia",
+          "postScriptName": "Georgia",
+          "isCustomFont": false,
+          "glyphCount": 18
+        }
+      ],
+      "sample_italic": [
+        {
+          "familyName": "Georgia",
+          "postScriptName": "Georgia-Italic",
+          "isCustomFont": false,
+          "glyphCount": 18
+        },
+        {
+          "familyName": "Times New Roman",
+          "postScriptName": "TimesNewRomanPS-ItalicMT",
+          "isCustomFont": false,
+          "glyphCount": 8
+        }
+      ],
+      "rag_quote": [
+        {
+          "familyName": "Georgia",
+          "postScriptName": "Georgia-Italic",
+          "isCustomFont": false,
+          "glyphCount": 105
+        },
+        {
+          "familyName": "Times New Roman",
+          "postScriptName": "TimesNewRomanPS-ItalicMT",
+          "isCustomFont": false,
+          "glyphCount": 18
+        }
+      ]
+    },
+    "fonts_after": {
+      "login_em": [
+        {
+          "familyName": "Times New Roman",
+          "postScriptName": "TimesNewRomanPS-ItalicMT",
+          "isCustomFont": false,
+          "glyphCount": 21
+        }
+      ],
+      "login_quote": [
+        {
+          "familyName": "Times New Roman",
+          "postScriptName": "TimesNewRomanPS-ItalicMT",
+          "isCustomFont": false,
+          "glyphCount": 31
+        }
+      ],
+      "sample_normal": [
+        {
+          "familyName": "Times New Roman",
+          "postScriptName": "TimesNewRomanPSMT",
+          "isCustomFont": false,
+          "glyphCount": 23
+        }
+      ],
+      "sample_italic": [
+        {
+          "familyName": "Times New Roman",
+          "postScriptName": "TimesNewRomanPS-ItalicMT",
+          "isCustomFont": false,
+          "glyphCount": 23
+        }
+      ],
+      "rag_quote": [
+        {
+          "familyName": "Times New Roman",
+          "postScriptName": "TimesNewRomanPS-ItalicMT",
+          "isCustomFont": false,
+          "glyphCount": 119
+        }
+      ]
+    },
+    "table_metrics": [
+      {
+        "screen": "library",
+        "viewport": 1440,
+        "pageWidth": 1440,
+        "tables": [
+          {
+            "client": 1128,
+            "scroll": 1128
+          }
+        ],
+        "badges": [
+          {
+            "text": "Chung",
+            "whiteSpace": "nowrap",
+            "width": 57.03125,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Chỉ metadata",
+            "whiteSpace": "nowrap",
+            "width": 92.453125,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Riêng",
+            "whiteSpace": "nowrap",
+            "width": 52.75,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Đã index",
+            "whiteSpace": "nowrap",
+            "width": 68.796875,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Riêng",
+            "whiteSpace": "nowrap",
+            "width": 52.75,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Đã index",
+            "whiteSpace": "nowrap",
+            "width": 68.796875,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Riêng",
+            "whiteSpace": "nowrap",
+            "width": 52.75,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Đã index",
+            "whiteSpace": "nowrap",
+            "width": 68.796875,
+            "height": 26.296875,
+            "line": 26.32
+          }
+        ],
+        "buttons": []
+      },
+      {
+        "screen": "library",
+        "viewport": 1024,
+        "pageWidth": 1024,
+        "tables": [
+          {
+            "client": 771,
+            "scroll": 771
+          }
+        ],
+        "badges": [
+          {
+            "text": "Chung",
+            "whiteSpace": "nowrap",
+            "width": 57.03125,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Chỉ metadata",
+            "whiteSpace": "nowrap",
+            "width": 92.453125,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Riêng",
+            "whiteSpace": "nowrap",
+            "width": 52.75,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Đã index",
+            "whiteSpace": "nowrap",
+            "width": 68.796875,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Riêng",
+            "whiteSpace": "nowrap",
+            "width": 52.75,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Đã index",
+            "whiteSpace": "nowrap",
+            "width": 68.796875,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Riêng",
+            "whiteSpace": "nowrap",
+            "width": 52.75,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Đã index",
+            "whiteSpace": "nowrap",
+            "width": 68.796875,
+            "height": 26.296875,
+            "line": 26.32
+          }
+        ],
+        "buttons": []
+      },
+      {
+        "screen": "library",
+        "viewport": 768,
+        "pageWidth": 768,
+        "tables": [
+          {
+            "client": 515,
+            "scroll": 576
+          }
+        ],
+        "badges": [
+          {
+            "text": "Chung",
+            "whiteSpace": "nowrap",
+            "width": 57.03125,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Chỉ metadata",
+            "whiteSpace": "nowrap",
+            "width": 92.453125,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Riêng",
+            "whiteSpace": "nowrap",
+            "width": 52.75,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Đã index",
+            "whiteSpace": "nowrap",
+            "width": 68.796875,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Riêng",
+            "whiteSpace": "nowrap",
+            "width": 52.75,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Đã index",
+            "whiteSpace": "nowrap",
+            "width": 68.796875,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Riêng",
+            "whiteSpace": "nowrap",
+            "width": 52.75,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Đã index",
+            "whiteSpace": "nowrap",
+            "width": 68.796875,
+            "height": 26.296875,
+            "line": 26.32
+          }
+        ],
+        "buttons": []
+      },
+      {
+        "screen": "library",
+        "viewport": 390,
+        "pageWidth": 390,
+        "tables": [
+          {
+            "client": 358,
+            "scroll": 576
+          }
+        ],
+        "badges": [
+          {
+            "text": "Chung",
+            "whiteSpace": "nowrap",
+            "width": 57.03125,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Chỉ metadata",
+            "whiteSpace": "nowrap",
+            "width": 92.453125,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Riêng",
+            "whiteSpace": "nowrap",
+            "width": 52.75,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Đã index",
+            "whiteSpace": "nowrap",
+            "width": 68.796875,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Riêng",
+            "whiteSpace": "nowrap",
+            "width": 52.75,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Đã index",
+            "whiteSpace": "nowrap",
+            "width": 68.796875,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Riêng",
+            "whiteSpace": "nowrap",
+            "width": 52.75,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Đã index",
+            "whiteSpace": "nowrap",
+            "width": 68.796875,
+            "height": 26.296875,
+            "line": 26.32
+          }
+        ],
+        "buttons": []
+      },
+      {
+        "screen": "library",
+        "viewport": 360,
+        "pageWidth": 360,
+        "tables": [
+          {
+            "client": 328,
+            "scroll": 576
+          }
+        ],
+        "badges": [
+          {
+            "text": "Chung",
+            "whiteSpace": "nowrap",
+            "width": 57.03125,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Chỉ metadata",
+            "whiteSpace": "nowrap",
+            "width": 92.453125,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Riêng",
+            "whiteSpace": "nowrap",
+            "width": 52.75,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Đã index",
+            "whiteSpace": "nowrap",
+            "width": 68.796875,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Riêng",
+            "whiteSpace": "nowrap",
+            "width": 52.75,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Đã index",
+            "whiteSpace": "nowrap",
+            "width": 68.796875,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Riêng",
+            "whiteSpace": "nowrap",
+            "width": 52.75,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "Đã index",
+            "whiteSpace": "nowrap",
+            "width": 68.796875,
+            "height": 26.296875,
+            "line": 26.32
+          }
+        ],
+        "buttons": []
+      },
+      {
+        "screen": "admin",
+        "viewport": 1440,
+        "pageWidth": 1440,
+        "tables": [
+          {
+            "client": 1128,
+            "scroll": 1128
+          },
+          {
+            "client": 1128,
+            "scroll": 1128
+          }
+        ],
+        "badges": [
+          {
+            "text": "pending",
+            "whiteSpace": "nowrap",
+            "width": 66.1875,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "accepted",
+            "whiteSpace": "nowrap",
+            "width": 69.859375,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "admin",
+            "whiteSpace": "nowrap",
+            "width": 55.671875,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "active",
+            "whiteSpace": "nowrap",
+            "width": 53.265625,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "user",
+            "whiteSpace": "nowrap",
+            "width": 44.859375,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "active",
+            "whiteSpace": "nowrap",
+            "width": 53.265625,
+            "height": 26.296875,
+            "line": 26.32
+          }
+        ],
+        "buttons": [
+          {
+            "text": "Thu hồi",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Hủy",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Xác nhận",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Vô hiệu hóa",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Hủy",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Xác nhận",
+            "whiteSpace": "nowrap"
+          }
+        ]
+      },
+      {
+        "screen": "admin",
+        "viewport": 1024,
+        "pageWidth": 1024,
+        "tables": [
+          {
+            "client": 771,
+            "scroll": 771
+          },
+          {
+            "client": 771,
+            "scroll": 771
+          }
+        ],
+        "badges": [
+          {
+            "text": "pending",
+            "whiteSpace": "nowrap",
+            "width": 66.1875,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "accepted",
+            "whiteSpace": "nowrap",
+            "width": 69.859375,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "admin",
+            "whiteSpace": "nowrap",
+            "width": 55.671875,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "active",
+            "whiteSpace": "nowrap",
+            "width": 53.265625,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "user",
+            "whiteSpace": "nowrap",
+            "width": 44.859375,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "active",
+            "whiteSpace": "nowrap",
+            "width": 53.265625,
+            "height": 26.296875,
+            "line": 26.32
+          }
+        ],
+        "buttons": [
+          {
+            "text": "Thu hồi",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Hủy",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Xác nhận",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Vô hiệu hóa",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Hủy",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Xác nhận",
+            "whiteSpace": "nowrap"
+          }
+        ]
+      },
+      {
+        "screen": "admin",
+        "viewport": 768,
+        "pageWidth": 768,
+        "tables": [
+          {
+            "client": 515,
+            "scroll": 685
+          },
+          {
+            "client": 515,
+            "scroll": 702
+          }
+        ],
+        "badges": [
+          {
+            "text": "pending",
+            "whiteSpace": "nowrap",
+            "width": 66.1875,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "accepted",
+            "whiteSpace": "nowrap",
+            "width": 69.859375,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "admin",
+            "whiteSpace": "nowrap",
+            "width": 55.671875,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "active",
+            "whiteSpace": "nowrap",
+            "width": 53.265625,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "user",
+            "whiteSpace": "nowrap",
+            "width": 44.859375,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "active",
+            "whiteSpace": "nowrap",
+            "width": 53.265625,
+            "height": 26.296875,
+            "line": 26.32
+          }
+        ],
+        "buttons": [
+          {
+            "text": "Thu hồi",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Hủy",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Xác nhận",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Vô hiệu hóa",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Hủy",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Xác nhận",
+            "whiteSpace": "nowrap"
+          }
+        ]
+      },
+      {
+        "screen": "admin",
+        "viewport": 390,
+        "pageWidth": 390,
+        "tables": [
+          {
+            "client": 358,
+            "scroll": 358
+          },
+          {
+            "client": 358,
+            "scroll": 358
+          }
+        ],
+        "badges": [
+          {
+            "text": "pending",
+            "whiteSpace": "nowrap",
+            "width": 66.1875,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "accepted",
+            "whiteSpace": "nowrap",
+            "width": 69.859375,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "admin",
+            "whiteSpace": "nowrap",
+            "width": 55.671875,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "active",
+            "whiteSpace": "nowrap",
+            "width": 53.265625,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "user",
+            "whiteSpace": "nowrap",
+            "width": 44.859375,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "active",
+            "whiteSpace": "nowrap",
+            "width": 53.265625,
+            "height": 26.296875,
+            "line": 26.32
+          }
+        ],
+        "buttons": [
+          {
+            "text": "Thu hồi",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Hủy",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Xác nhận",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Vô hiệu hóa",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Hủy",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Xác nhận",
+            "whiteSpace": "nowrap"
+          }
+        ]
+      },
+      {
+        "screen": "admin",
+        "viewport": 360,
+        "pageWidth": 360,
+        "tables": [
+          {
+            "client": 328,
+            "scroll": 328
+          },
+          {
+            "client": 328,
+            "scroll": 328
+          }
+        ],
+        "badges": [
+          {
+            "text": "pending",
+            "whiteSpace": "nowrap",
+            "width": 66.1875,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "accepted",
+            "whiteSpace": "nowrap",
+            "width": 69.859375,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "admin",
+            "whiteSpace": "nowrap",
+            "width": 55.671875,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "active",
+            "whiteSpace": "nowrap",
+            "width": 53.265625,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "user",
+            "whiteSpace": "nowrap",
+            "width": 44.859375,
+            "height": 26.296875,
+            "line": 26.32
+          },
+          {
+            "text": "active",
+            "whiteSpace": "nowrap",
+            "width": 53.265625,
+            "height": 26.296875,
+            "line": 26.32
+          }
+        ],
+        "buttons": [
+          {
+            "text": "Thu hồi",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Hủy",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Xác nhận",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Vô hiệu hóa",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Hủy",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Xác nhận",
+            "whiteSpace": "nowrap"
+          }
+        ]
+      }
+    ],
+    "outbound": []
+  },
+  "web_ui2": "sha256:aeb3cc71a7bd254475b3f8cb25261a63fa70da96d786cdc43175793c3a07519b",
+  "source_sha256": {
+    "web/types/css-modules.d.ts": "a6b2306eff74a1a118b2602834b4d6a38e80a30c44252e05629254f3c74bd0a6",
+    "web/tsconfig.json": "aadf46aafef8604cd3f075674f6e7a70921c4d4f8171145a1bbd9aef01cfcf54",
+    "web/app/globals.css": "dd47bc2d1b7bb1d6a4c778bfc64d2dafb5ae0f08fadbd0259f04663d1c34fef1",
+    "web/app/components/ui.module.css": "21f1c82808be6b1c82c1009d8c55e0123a8fd1cbc2199cf4d4aade677d943e51",
+    "web/app/page.tsx": "adc60a07d52aa19e5471f406a154dd7d90529750785c11f3d64d15120c2c58e7",
+    "web/app/admin/reviews/[id]/page.tsx": "c27e31147dc820fce6ad2b057fb5d00de1b3028f189c8979ea8c5c33e7649b0f",
+    "scripts/m8a_browser.py": "8ad17560e4aef5e319b1e8a09f733c176c9839c2e2df1eabbe67c0e25291e531"
+  },
+  "curated_screenshots_sha256": {
+    "docs/screenshots/m10-admin-1440.png": "b62028b533f290a4f2d140349995955450f8f495cdbc8951ae1b99fd44ec2b41",
+    "docs/screenshots/m10-admin-390.png": "21ee5ad5216097100599dc11ea24dbf409585936d168fc4083d8ea1e582da5a3",
+    "docs/screenshots/m10-collections-1440.png": "eba41e847dc87bde06f92cbb1d84058f6f2f6c428f278b1a56d407e6651567f2",
+    "docs/screenshots/m10-library-1440.png": "bb02fee1765d1c9a931081a56caecbe73ed54a06f5328f781261f63ef33b40bd",
+    "docs/screenshots/m10-library-390.png": "f882a06d7a859ab0c58a484e4b0137c9919ccd89ade5a2375e22ba9b82c1be52",
+    "docs/screenshots/m10-login-1440.png": "77912f33a2e56cb1a3d1e1d34e4ffe3804f6f41c336c3b5f65741577d464abbe",
+    "docs/screenshots/m10-rag-1440.png": "f642caed25658e0adf7c6a49053c6e4cb6c32f7e9f5342a274a1e320d11ece4c",
+    "docs/screenshots/m10-rag-390.png": "6ff04d00560e84a171527591d4fafa7b8606db68eb9fd70494eb7f1ec1408372",
+    "docs/screenshots/m10-search-1440.png": "34539e1b2c1097bfd2116ac14b3b66c9e60e65a940fb5579533cd296f68fca69",
+    "docs/screenshots/m10-source-390.png": "3f5f0066f9d8beb7504ba4d68e76eb274e9ba433a8b869d79a111646590c2872"
+  },
+  "smoke": {
+    "http": {
+      "pass": 68,
+      "fail": 0,
+      "evidence": "http-1792662781929893600"
+    },
+    "chrome": {
+      "pass": 16,
+      "fail": 0,
+      "evidence": "chrome-1792663320529490600"
+    },
+    "same_web_image": "sha256:aeb3cc71a7bd254475b3f8cb25261a63fa70da96d786cdc43175793c3a07519b",
+    "provider": "off",
+    "selectors_assertions_unchanged": true,
+    "harness_change": "wait networkidle after login goto before filling SSR form"
+  },
+  "demo": {
+    "changed_services": [
+      "web"
+    ],
+    "web_ui2": "sha256:aeb3cc71a7bd254475b3f8cb25261a63fa70da96d786cdc43175793c3a07519b",
+    "api_rc2": "sha256:c0936a8189df7335187c457ff56e8c4ff21aebbe338ed7e4240e5c14ec730a06",
+    "ready": 200,
+    "https": 200,
+    "non_web_metadata_unchanged": true
+  }
+}

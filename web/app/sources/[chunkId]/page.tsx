@@ -32,13 +32,14 @@ export default function SourcePage() {
   return <Shell user={user}>
     <p><Link href="/search">← Kết quả tìm kiếm</Link></p>
     <ErrorText message={error} />
+    {!source && <h1>Nguồn trích dẫn</h1>}
     {source && <>
       <h1>{source.title || sourceKindLabel(source.visibility)}</h1>
       <p>{sourceKindLabel(source.visibility)} · Version {source.version_id} · File {source.source_file_id} · Chunk {source.chunk_id}</p>
       <p>{source.locator_kind === "pdf" ? `Trang ${source.start_page}` :
         `Dòng ${source.start_line}–${source.end_line}, offset ${source.start_offset}–${source.end_offset}`}</p>
       {source.coverage === "partial" && <p>Paper này chỉ được trích xuất một phần.</p>}
-      <p style={{ whiteSpace: "pre-wrap" }}>{source.text}</p>
+      <p className="pre-wrap source-excerpt">{source.text}</p>
       {/* Search rights never imply download: the link exists only when the API gave a download path. */}
       {originalHref ? <p><a href={originalHref}>Mở file gốc</a></p> : <p>Không có file gốc được phép tải.</p>}
       <p><Link href={`/items/${source.item_id}`}>Xem paper</Link></p>

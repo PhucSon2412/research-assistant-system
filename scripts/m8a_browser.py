@@ -100,6 +100,9 @@ def main() -> int:
 
         def login(email_address, password, expect_home=True):
             page.goto(origin + "/login")
+            # SSR fields can be visible before the async Next.js chunks hydrate
+            # the form. Wait for those loads before exercising its real handler.
+            page.wait_for_load_state("networkidle")
             page.get_by_label("Email", exact=True).fill(email_address)
             page.get_by_label("Mật khẩu", exact=True).fill(password)
             page.get_by_role("button", name="Đăng nhập", exact=True).click()

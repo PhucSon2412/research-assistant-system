@@ -9,6 +9,9 @@ import { api, describeError } from "../../../lib/api";
 import { STATUS_TEXT, closeReasonText, type AdminReviewRequest } from "../../../lib/review";
 import { ErrorText, Shell, useSession } from "../../components/session";
 
+
+import { PageHeading, EmptyState } from "../../components/ui";
+
 const fmt = (iso: string) => new Date(iso).toLocaleString("vi-VN");
 
 export default function ReviewListPage() {
@@ -28,21 +31,21 @@ export default function ReviewListPage() {
   return (
     <Shell user={user}>
       <p><Link href="/admin">← Quản trị</Link></p>
-      <h1>Yêu cầu duyệt paper riêng</h1>
+      <PageHeading eyebrow="Kiểm duyệt & quyền sử dụng" title="Yêu cầu duyệt paper riêng" />
       <p>
         Mỗi yêu cầu chỉ cho phép xem tạm đúng version/file User đã gửi, trong lúc yêu cầu còn mở. Yêu cầu đang chờ
         duyệt <strong>chưa phải là công bố</strong>. Phê duyệt ghi nhận quyền do Admin tự kiểm và tạo một bản chung
         riêng <strong>chờ công bố</strong> (xem <Link href="/admin/publications">bản chung chờ công bố</Link>);
         chưa có thao tác công bố.
       </p>
-      <div style={{ display: "flex", gap: "0.5rem" }}>
+      <div className="actions">
         <button type="button" disabled={status === "open"} onClick={() => setStatus("open")}>Đang mở</button>
         <button type="button" disabled={status === "closed"} onClick={() => setStatus("closed")}>Đã đóng</button>
       </div>
       <ErrorText message={error} />
       {data && <p>Tổng: {data.total}</p>}
-      {data && data.requests.length === 0 && <p>Không có yêu cầu.</p>}
-      {data && <ul>{data.requests.map((r) => <li key={r.id} style={{ marginBottom: "0.5rem" }}>
+      {data && data.requests.length === 0 && <EmptyState title="Không có yêu cầu." />}
+      {data && <ul>{data.requests.map((r) => <li key={r.id} className="spaced">
         <Link href={`/admin/reviews/${encodeURIComponent(r.id)}`}>{r.item?.title ?? r.id}</Link>
         {" · "}{STATUS_TEXT[r.status]} · gửi {fmt(r.submitted_at)}
         {r.requester_email && ` · ${r.requester_email}`}

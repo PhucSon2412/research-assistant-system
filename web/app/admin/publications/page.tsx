@@ -20,6 +20,9 @@ import {
 } from "../../../lib/review";
 import { ErrorText, Shell, useSession } from "../../components/session";
 
+
+import { PageHeading, EmptyState } from "../../components/ui";
+
 const yes = (value: boolean) => (value ? "có" : "không");
 const fmt = (iso: string) => new Date(iso).toLocaleString("vi-VN");
 const STATES: PublicationState[] = ["pending", "listed", "revoked"];
@@ -49,7 +52,7 @@ function PublishForm({ copy, onDone }: { copy: CommonCopy; onDone: () => void })
   }
 
   return (
-    <form onSubmit={submit} style={{ background: "#eef6ee", padding: "0.5rem" }}>
+    <form onSubmit={submit} className="panel-success">
       <ErrorText message={error} />
       {copy.duplicate_published_item_id && <p><strong>Đã có bản chung đã công bố với cùng SHA-256</strong>{" "}
         (<Link href={`/items/${copy.duplicate_published_item_id}`}>xem</Link>); API sẽ từ chối công bố bản này.
@@ -101,7 +104,7 @@ function IndexForm({ copy, onDone }: { copy: CommonCopy; onDone: () => void }) {
   }
 
   return (
-    <div style={{ background: "#eef0f8", padding: "0.5rem", marginTop: "0.5rem" }}>
+    <div className="panel-info">
       <p>Lập chỉ mục: {INDEX_ELIGIBILITY_TEXT[index.eligibility] ?? index.eligibility}
         {index.job && <> · job {index.job.state}{index.job.last_error_code && ` (${index.job.last_error_code})`}
           {" "}· {index.job.attempt_count} lần thử</>}
@@ -154,7 +157,7 @@ function RevokeForm({ copy, onDone }: { copy: CommonCopy; onDone: () => void }) 
   }
 
   return (
-    <form onSubmit={submit} style={{ background: "#fbeeee", padding: "0.5rem", marginTop: "0.5rem" }}>
+    <form onSubmit={submit} className="panel-danger">
       <ErrorText message={error} />
       <label>Lý do{" "}
         <select value={reason} disabled={busy} onChange={(e) => setReason(e.target.value)} required>
@@ -194,7 +197,7 @@ export default function CommonCopiesPage() {
   return (
     <Shell user={user}>
       <p><Link href="/admin">← Quản trị</Link></p>
-      <h1>Bản chung từ yêu cầu duyệt</h1>
+      <PageHeading eyebrow="Công bố & quyền sử dụng" title="Bản chung từ yêu cầu duyệt" />
       <p>
         Quyền dưới đây do Admin ghi nhận cho đúng file/checksum. <strong>Đã ghi nhận quyền chưa phải là đã công
         bố</strong>, và <strong>đã công bố (listed) chưa phải là có toàn văn (indexed)</strong>: công bố chỉ cho mọi
@@ -204,14 +207,14 @@ export default function CommonCopiesPage() {
         <strong> Hỏi đáp (RAG)</strong> dùng đoạn của bản đó làm bằng chứng khi quyền còn cho gửi qua provider
         (đoạn được chọn được gửi tới provider khi User hỏi), và quyền tìm kiếm/hỏi đáp không mở tải file gốc.
       </p>
-      <p style={{ display: "flex", gap: "0.5rem" }}>
+      <p className="actions">
         {STATES.map((s) => <button key={s} onClick={() => setState(s)} disabled={s === state}>
           {PUBLICATION_STATE_TEXT[s]}</button>)}
       </p>
       <ErrorText message={error} />
       {data && <p>Tổng: {data.total}</p>}
-      {data && data.items.length === 0 && <p>Không có bản nào.</p>}
-      {data && data.items.map((p) => <section key={p.id} id={p.id} style={{ borderTop: "1px solid #ddd" }}>
+      {data && data.items.length === 0 && <EmptyState title="Không có bản nào." />}
+      {data && data.items.map((p) => <section key={p.id} id={p.id} className="record-row">
         <h2>{p.title ?? (p.rights.metadata_removed_at ? `(metadata đã xóa) ${p.id}` : p.id)}</h2>
         <p>{PUBLICATION_STATE_TEXT[p.publication_state]} · tạo {fmt(p.created_at)} · từ{" "}
           <Link href={`/admin/reviews/${encodeURIComponent(p.rights.origin_review_request_id)}`}>yêu cầu duyệt</Link>
@@ -220,10 +223,10 @@ export default function CommonCopiesPage() {
         <ul>
           <li>File: {p.file.filename ?? "(không tên)"} · {p.file.verified_mime} · {p.file.byte_size} byte ·
             SHA-256 <code>{p.file.checksum_sha256}</code></li>
-          <li>Nguồn đã kiểm: <span style={{ whiteSpace: "pre-wrap" }}>{p.rights.verified_source ?? "(đã xóa)"}</span>
+          <li>Nguồn đã kiểm: <span className="pre-wrap">{p.rights.verified_source ?? "(đã xóa)"}</span>
             {p.rights.verified_source_url && ` · ${p.rights.verified_source_url}`}</li>
           {p.rights.license_url && <li>Giấy phép: {p.rights.license_url}</li>}
-          {p.rights.evidence_note && <li>Bằng chứng: <span style={{ whiteSpace: "pre-wrap" }}>{p.rights.evidence_note}</span></li>}
+          {p.rights.evidence_note && <li>Bằng chứng: <span className="pre-wrap">{p.rights.evidence_note}</span></li>}
           <li>Kiểm ngày {p.rights.checked_on} bởi {p.rights.reviewer_email}</li>
           <li>Phạm vi đã ghi (mọi tài khoản của hệ thống): tải file gốc {yes(p.rights.scope.original_download)} ·
             tìm kiếm toàn văn {yes(p.rights.scope.fulltext_search)} · gửi qua provider{" "}

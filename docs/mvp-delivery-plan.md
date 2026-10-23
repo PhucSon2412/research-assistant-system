@@ -1,5 +1,11 @@
 # Kế hoạch hoàn thành MVP
 
+**M10 (2026-10-22, chờ review, chưa merge):** làm mới toàn bộ `web/app` cho demo CV, chỉ trình bày; hệ thống token/component,
+navigation theo role, thư viện/upload, tìm kiếm/RAG/citation và Admin responsive. Base PR #70 đã merge `0dd5a9c`,
+source **0052**. Web 79/79 + typecheck/build, HTTPS 68 HTTP/16 Chrome, 54 ảnh 1440/390 và 18 kiểm riêng tới 360 px.
+Demo đã cập nhật chỉ web `ui1`; API rc2 và service/dữ liệu khác giữ nguyên. [Handoff + rollback](m10-frontend-ui.md).
+M7b vẫn 0 verdict thật; không mở lại ngân sách live.
+
 **Sửa review PR #70 (2026-10-22, chờ review lại):** pypdf trôi giữa image (6.21.1) và Conda/nhãn (6.19.0) đã thống nhất bằng `api/constraints-rc2.txt`; nhãn/bundle/AI judge xác lập lại trên 6.21.1; trần live M7c đã dùng hết tới mốc 80 %; demo output 1024. Xem [handoff](m7c-live-quality-verification.md#sửa-review-pr-70-2026-10-22).
 
 **M7c trên nhánh `feat/m7c-live-quality-verification` (2026-10-21, chờ review, chưa merge):** base `b5d8117`, source **0052**. Live trong stack cô lập trên paper arXiv giấy phép mở, AI judge track riêng, demo `ras-pilot` đã bật provider. Xem [handoff](m7c-live-quality-verification.md); điểm yếu so sánh nhiều paper và output 512 token chờ quyết định.

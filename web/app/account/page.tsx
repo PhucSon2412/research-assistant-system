@@ -5,7 +5,10 @@ import { useCallback, useEffect, useState } from "react";
 import { api, describeError } from "../../lib/api";
 import { ErrorText, Shell, useSession } from "../components/session";
 
+import { PageHeading } from "../components/ui";
+
 type SessionRow = { id: string; created_at: string; last_activity_at: string; absolute_expires_at: string; current: boolean };
+
 
 const fmt = (iso: string) => new Date(iso).toLocaleString("vi-VN");
 
@@ -46,8 +49,8 @@ export default function AccountPage() {
 
   return (
     <Shell user={user}>
-      <h1>Phiên đăng nhập</h1>
-      <p style={{ color: "#555" }}>
+      <PageHeading eyebrow="Tài khoản & bảo mật" title="Phiên đăng nhập" />
+      <p className="text-muted">
         Phiên hết hạn sau 30 phút không hoạt động hoặc 8 giờ kể từ khi đăng nhập (theo cấu hình máy chủ).
       </p>
       <ErrorText message={error} />
