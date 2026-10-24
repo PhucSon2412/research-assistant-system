@@ -7,6 +7,13 @@ Bạn là agent tiếp theo. **Cập nhật 2026-10-23:** chủ dự án không 
 
 Không đổi code ứng dụng, image hay `deploy/`.
 
+**Mở rộng do chủ dự án yêu cầu ngày 2026-10-24:** sau khi mở Docker Desktop trở lại,
+chủ dự án yêu cầu “nạp thêm khoảng 1000 paper”. Agent triển khai theo nghĩa thêm khoảng
+1.000 ngoài lô 300, tổng mục tiêu khoảng **1.300 paper mới**, đã hỏi lại để chủ dự án có thể
+đính chính thành tổng 1.000. **Không tăng trần $30/dừng $24**, không nới quota ứng dụng.
+Cùng tài khoản, consent theo lô, tiêu chí license/version/chủ đề và ledger M11 hiện có.
+Giữ 300 paper đầu và checkpoint; không nạp lại receipt đã có.
+
 ## 0. Chuyển sang chỉ truy cập trên máy
 
 - Edge chỉ publish `127.0.0.1:8443`, không còn bind IP Ethernet/LAN, để demo chạy được dù máy đang dùng Wi-Fi hay Ethernet và không mở ra mạng.

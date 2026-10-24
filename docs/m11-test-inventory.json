@@ -1,6 +1,6 @@
 {
   "at": "2026-10-24T01:42:47+00:00",
-  "stage": "checkpoint; runtime unavailable, ingestion unfinished",
+  "stage": "historical checkpoint before runtime resumed; expanded run is in progress",
   "base": "1f7bfac970fa0015a6d3211d3514a4136df4d4d6",
   "source_commit_before_uncommitted_inventory_fix": "487b09859be6b49f8e4c04ce84a86a2897492400",
   "unchanged_trees": {
@@ -59,5 +59,30 @@
     "after_backup": "pending",
     "questions": "pending"
   },
-  "raw_evidence_root": "%USERPROFILE%/ras-pilot/evidence/m11"
+  "raw_evidence_root": "%USERPROFILE%/ras-pilot/evidence/m11",
+  "expansion_checkpoint": {
+    "at": "2026-10-24T02:31:53+00:00",
+    "requested_additional_papers": 1000,
+    "interpreted_total_target": 1300,
+    "hard_cap_usd": "30",
+    "stop_usd": "24",
+    "same_ledger": true,
+    "offline": {
+      "tests": 68,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 1,
+      "deselected_reason": "manifest completeness checked only after target is fully downloaded",
+      "junit_file": "offline-expansion-68-b5f22561b1ee.xml",
+      "junit_sha256": "b5f22561b1eef61912a01431f219ac9b85cdf0d641fc4a43035925cb1ce7ca30"
+    },
+    "source_sha256": {
+      "scripts/m11_papers.py": "3cc5b4f66efb173f70de4a35a1487bacc3d4792bc6bf67d7b444c6358b55d888",
+      "scripts/m11_demo.py": "b397495da00a3fecc127b47a506f7cfb094b08965aaaeed91f350afc6a2be3d9",
+      "api/tests/test_m11_tooling.py": "dd73214fe96c2f3487435756a73e65ec31d6088fa40b46c4a3eb3422c5ed7e85"
+    },
+    "initial_300_manifest_sha256": "3d153fd5d32f10d1e3eea9e026708008a12da8742f8ea34e6efe2574fc846548",
+    "new_oai_requests": "filtered ListRecords and GetRecord timeout; Identify 200; continue retained OAI candidates with fresh exact-version abs licence checks"
+  }
 }

@@ -16,6 +16,8 @@
 `1f7bfac`. Chủ dự án cập nhật **khoảng 300 paper bổ sung, trần $30/dừng $24**, thay 150/$10 ở task cũ.
 Đã chuyển edge sang local `127.0.0.1:8443`, leaf DNS-only từ CA cũ, chỉ recreate edge; hosts/firewall chủ dự án tự chạy.
 Corpus/index đang nạp qua API bằng user demo, giữ mọi trạng thái lỗi. [Handoff M11](docs/m11-demo-knowledge-base.md).
+Ngày 2026-10-24 chủ dự án đã mở Docker trở lại và yêu cầu nạp thêm khoảng **1.000 paper**;
+đang triển khai theo nghĩa tổng khoảng **1.300 mới**, giữ ledger **$30/dừng $24** và quota cũ.
 Không đổi code app/image/`deploy/`, không merge. Các số cuối và CI cập nhật khi hoàn tất.
 
 **Sau merge PR #71 (2026-10-23):** `origin/main = 1f7bfac970fa0015a6d3211d3514a4136df4d4d6`. README đã viết lại thành trang giới thiệu dự án (tiếng Anh); nhật ký trạng thái cũ của README lưu ở `docs/status-log-archive.md`. Chủ dự án (2026-10-23): dự án đã xong chức năng, không cần demo LAN nữa, từ nay dùng học tập cá nhân trên máy này. Giao [M11 — chuyển sang dùng cá nhân trên máy + mở rộng kho paper](docs/tasks/m11-demo-knowledge-base-expansion.md), **mới giao**:

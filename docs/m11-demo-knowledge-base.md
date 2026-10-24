@@ -3,7 +3,10 @@
 **Đang triển khai (2026-10-24, Asia/Saigon).** Base đã fetch/xác minh
 `1f7bfac970fa0015a6d3211d3514a4136df4d4d6` (PR #71 MERGED), nhánh
 `ops/m11-demo-knowledge-base`. Chỉ dẫn mới của chủ dự án thay 150/$10 bằng
-**khoảng 300 paper bổ sung/$30**, dừng gọi mới ở **$24**. Không merge.
+**khoảng 300 paper bổ sung/$30**, dừng gọi mới ở **$24**. Ngày 2026-10-24 chủ dự án
+yêu cầu **nạp thêm khoảng 1.000 paper**: đang triển khai tổng khoảng **1.300 paper mới**,
+đã hỏi lại để có thể đính chính thành tổng 1.000. Giữ cùng ledger/trần/quota, không cộng
+thêm ngân sách vì key còn tiền. Không merge.
 
 ## Chuyển sang local
 
@@ -47,7 +50,7 @@ IPv4 hiện hành trong lượt kiểm; listener ngoài loopback không tồn t�
 - Tối đa hai job đang chạy; không đổi concurrency/budget/quota ứng dụng. Không retry mutation
   khi chưa xác định outcome; giữ item lỗi/cần review, không xóa để làm đẹp số.
 
-**Manifest đã khóa 300 paper đúng phạm vi**: 282 CC BY 4.0, 14 CC BY-SA 4.0, 4 CC0 1.0;
+**Lô đầu đã khóa 300 paper đúng phạm vi**: 282 CC BY 4.0, 14 CC BY-SA 4.0, 4 CC0 1.0;
 **838.284.160 byte** PDF ngoài repo. Kiểm 300/300 SHA-256 và kích thước khớp, không trùng ID/hash
 12 paper cũ; rà topic lần cuối không loại thêm. Attribution giữ 12 paper cũ + 300 target + 48 ngoại lệ tải về.
 
@@ -61,11 +64,25 @@ IPv4 hiện hành trong lượt kiểm; listener ngoài loopback không tồn t�
 | Long context & chunking | 43 |
 | Search agents & tools | 63 |
 
-Checkpoint lúc tiếp quản ngày 2026-10-24: **252/300 target đã nhận receipt**, trong đó
+Checkpoint trước khi Docker được mở lại ngày 2026-10-24: **252/300 target đã nhận receipt**, trong đó
 121 `ready`, 40 `needs_review`, 89 `terminal_failed`, hai job còn ghi `indexing`.
-Client phiên trước đã thoát; Docker Desktop đang tắt nên chưa thể đối chiếu hai job hoặc
-nạp 48 paper còn lại. Cam kết lúc này **$2,7876122**, không có thao tác trả phí mới khi API tắt.
-Đây là checkpoint, không phải kết quả cuối; trang/chunk/object và câu hỏi cập nhật sau khi job kết thúc.
+Client phiên trước đã thoát; lúc đó Docker Desktop tắt nên chưa thể đối chiếu hai job hoặc
+nạp 48 paper còn lại. Cam kết lúc đó **$2,7876122**, không có thao tác trả phí mới khi API tắt.
+Chủ dự án đã mở Docker; cả hai job đối chiếu lại đều `ready`, client đã nạp tiếp từ receipt.
+Kiểm local sau khởi động lại pass, còn khoảng 274 GiB trên ổ C. Snapshot manifest 300 đầu lưu
+ngoài repo ở `evidence/m11/manifest-initial-300.json`; phần mở rộng chỉ bổ sung, không thay 300 đầu.
+OAI tiếp tục phân trang theo target thay cho mốc 650 candidate ban đầu. Đây là checkpoint,
+không phải kết quả cuối; trang/chunk/object và câu hỏi cập nhật sau khi job kết thúc.
+
+Lượt mở rộng đầu timeout khi tiếp tục token của cache hôm trước; `Identify` mới vẫn 200.
+[arXiv ghi token hết hạn hằng ngày](https://info.arxiv.org/help/oa/index.html#minor-differences),
+nên cache phân trang mới theo ngày UTC, không nối token cũ. Cache XML/decision/PDF cũ giữ nguyên;
+test kiểm không dùng lại stream cũ và vượt được ngưỡng 650 candidate.
+Probe ListRecords mới (kể cả set CL hẹp hơn) và GetRecord cũng timeout, trong khi Identify 200;
+không kết luận toàn bộ arXiv ngừng hoạt động. Tiếp tục các candidate chưa dùng trong snapshot
+OAI 666 record đã có bằng `discover --cached-candidates --target 1300`: vẫn lấy license trang abs
+đúng version trước PDF, so với license/version history của OAI snapshot, không bỏ kiểm license.
+Nếu hết snapshot mà metadata mới chưa lấy được thì giữ checkpoint và chưa báo đủ target.
 
 ### Sửa bộ lọc chủ đề trong lúc nạp
 
@@ -133,12 +150,12 @@ trạng thái D ở lượt sandbox đầu do permission denied.
 
 ```powershell
 $py = "$env:USERPROFILE\.conda\envs\ras\python.exe"
-& $py scripts/m11_papers.py discover --target 300
+& $py scripts/m11_papers.py discover --target 1300
 & $py scripts/m11_papers.py fetch
 & $py scripts/m11_papers.py curate  # rà topic từ OAI cache, không xóa PDF/item
-& $py scripts/m11_library.py run --watch --target 300
+& $py scripts/m11_library.py run --watch --target 1300
 & $py scripts/m11_library.py inspect
-& $py scripts/m11_demo.py  # chỉ sau khi đủ 300 manifest và toàn bộ job đã kết thúc
+& $py scripts/m11_demo.py  # chỉ sau khi đủ target manifest và toàn bộ job đã kết thúc
 & $py scripts/m9_lan_demo.py verify
 ```
 

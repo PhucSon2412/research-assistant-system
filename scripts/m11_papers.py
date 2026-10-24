@@ -50,7 +50,7 @@ def topic_for(title, abstract):
     return next((topic for topic, pattern in rules if re.search(pattern, text, re.S)), None)
 
 
-def bulk_candidates(arxiv):
+def bulk_candidates(arxiv, minimum=650):
     """OAI ListRecords supplies the same arXivRaw fields as GetRecord, in batches.
 
     The from date selects metadata updates (not submission dates). Each selected
@@ -58,10 +58,14 @@ def bulk_candidates(arxiv):
     """
     namespace = {'r': 'http://arxiv.org/OAI/arXivRaw/', 'o': 'http://www.openarchives.org/OAI/2.0/'}
     groups = {topic: [] for topic in TOPICS}
+    # arXiv resumption tokens expire daily. Keep old metadata as evidence, but
+    # never extend yesterday's cached stream with its expired token.
+    cache_root = arxiv.evidence / ('oai-' + stamp()[:10])
+    cache_root.mkdir(parents=True, exist_ok=True)
     params = {'verb': 'ListRecords', 'metadataPrefix': 'arXivRaw', 'set': 'cs', 'from': '2026-09-01'}
     page = 0
     while True:
-        cache = arxiv.evidence / f'oai-batch-{page:03}.xml'
+        cache = cache_root / f'oai-batch-{page:03}.xml'
         if cache.exists():
             raw_bytes = cache.read_bytes()
         else:
@@ -85,11 +89,12 @@ def bulk_candidates(arxiv):
                 groups[topic].append({'tagged': f'{aid}v{max(versions)}', 'topic': topic,
                     'title': get('title'), 'authors': [get('authors')],
                     'oai': {'licence': get('license'), 'versions': versions,
-                            'batch': cache.name, 'batch_sha256': hashlib.sha256(raw_bytes).hexdigest()}})
+                            'batch': cache.relative_to(arxiv.evidence).as_posix(),
+                            'batch_sha256': hashlib.sha256(raw_bytes).hexdigest()}})
         count = sum(map(len, groups.values()))
         print(json.dumps({'oai_pages': page + 1, 'open_topic_candidates': count}), flush=True)
         token = root.findtext('.//o:resumptionToken', namespaces=namespace)
-        if not token or count >= 650:
+        if not token or count >= minimum:
             break
         params = {'verb': 'ListRecords', 'resumptionToken': token}
         page += 1
@@ -198,7 +203,7 @@ def curate(dest, manifest):
     """
     ns = {'r': 'http://arxiv.org/OAI/arXivRaw/'}
     records = {}
-    for path in (dest / 'm11-evidence').glob('oai-batch-*.xml'):
+    for path in (dest / 'm11-evidence').rglob('oai-batch-*.xml'):
         for raw in ET.fromstring(path.read_bytes()).findall('.//r:arXivRaw', ns):
             get = lambda name: raw.findtext('r:' + name, default='', namespaces=ns)
             records[get('id')] = (get('title'), get('abstract'))
@@ -225,7 +230,7 @@ def curate(dest, manifest):
     return 0
 
 
-def discover(dest, manifest, target):
+def discover(dest, manifest, target, cached_candidates=False):
     evidence = dest / 'm11-evidence'
     evidence.mkdir(parents=True, exist_ok=True)
     arxiv = Arxiv(evidence)
@@ -234,6 +239,10 @@ def discover(dest, manifest, target):
     excluded_hashes = {p['sha256'] for p in existing}
     data = json.loads(manifest.read_text(encoding='utf-8')) if manifest.exists() else {
         'task': 'M11', 'target_new_papers': target, 'created_at': stamp(), 'papers': []}
+    if target < len(data['papers']):
+        raise RuntimeError('target cannot discard previously selected papers')
+    data['target_new_papers'] = target
+    save(manifest, data)
     checkpoint = evidence / 'decisions.json'
     decisions = json.loads(checkpoint.read_text(encoding='utf-8')) if checkpoint.exists() else {}
     selected = {p['arxiv_id'] for p in data['papers']}
@@ -241,7 +250,8 @@ def discover(dest, manifest, target):
     exclusions = json.loads(exclusion_path.read_text(encoding='utf-8')) if exclusion_path.exists() else []
     hashes = {p['sha256'] for p in data['papers']} | excluded_hashes
     try:
-        rows = bulk_candidates(arxiv)
+        rows = (json.loads((evidence / 'bulk-candidates.json').read_text(encoding='utf-8'))
+                if cached_candidates else bulk_candidates(arxiv, minimum=max(650, target * 2)))
         print(json.dumps({'candidates': len(rows), 'downloaded': len(selected)}), flush=True)
         for row in rows:
             if len(selected) >= target:
@@ -299,6 +309,8 @@ def main():
     parser.add_argument('--dest', type=Path, default=Path(os.environ.get('USERPROFILE', str(Path.home()))) / 'ras-pilot/demo-papers')
     parser.add_argument('--manifest', type=Path, default=MANIFEST)
     parser.add_argument('--target', type=int, default=300)
+    parser.add_argument('--cached-candidates', action='store_true',
+        help='Use the retained OAI candidate snapshot; still check exact-version abs licence before each PDF')
     args = parser.parse_args()
     dest = policy.outside(args.dest)
     dest.mkdir(parents=True, exist_ok=True)
@@ -312,7 +324,7 @@ def main():
         return result
     if args.action == 'curate':
         return curate(dest, args.manifest)
-    return discover(dest, args.manifest, args.target)
+    return discover(dest, args.manifest, args.target, args.cached_candidates)
 
 
 if __name__ == '__main__':

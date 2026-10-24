@@ -95,8 +95,10 @@ def run(root, inspect_only=False):
     uploads = json.loads((evidence / 'uploads.json').read_text(encoding='utf-8'))
     if any(r.get('status') == 'sending' or r.get('item_id') and not r.get('terminal') for r in uploads.values()):
         raise RuntimeError('uploads still running; no post-ingest smoke yet')
-    manifest = json.loads(papers.MANIFEST.read_text(encoding='utf-8'))['papers']
-    if len(manifest) < 300 or not {p['tagged'] for p in manifest}.issubset(uploads):
+    manifest_data = json.loads(papers.MANIFEST.read_text(encoding='utf-8'))
+    manifest = manifest_data['papers']
+    target = max(300, manifest_data['target_new_papers'])
+    if len(manifest) < target or not {p['tagged'] for p in manifest}.issubset(uploads):
         raise RuntimeError('corpus not fully processed yet')
     with lib.Ledger(evidence / 'cost').exclusive():
         lib.require_known_uploads(lib.Ledger(evidence / 'cost'), uploads)

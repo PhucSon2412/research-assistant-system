@@ -229,13 +229,14 @@ def test_topic_filter_requires_llm_or_retrieval_context(title, abstract, topic):
     assert papers.topic_for(title, abstract) == topic
 
 
-def test_locked_manifest_has_300_unique_open_licence_papers_outside_old_corpus():
+def test_manifest_has_requested_unique_open_licence_papers_outside_old_corpus():
     import re
-    manifest = json.loads(papers.MANIFEST.read_text(encoding='utf-8'))['papers']
+    data = json.loads(papers.MANIFEST.read_text(encoding='utf-8'))
+    manifest = data['papers']
     old = json.loads(papers.policy.MANIFEST.read_text(encoding='utf-8'))['papers']
-    assert len(manifest) == 300
-    assert len({p['arxiv_id'] for p in manifest}) == 300
-    assert len({p['sha256'] for p in manifest}) == 300
+    assert len(manifest) == data['target_new_papers'] >= 300
+    assert len({p['arxiv_id'] for p in manifest}) == len(manifest)
+    assert len({p['sha256'] for p in manifest}) == len(manifest)
     assert not ({p['arxiv_id'] for p in manifest} & {p['arxiv_id'] for p in old})
     assert not ({p['sha256'] for p in manifest} & {p['sha256'] for p in old})
     for paper in manifest:
@@ -286,3 +287,82 @@ def test_inventory_counts_failed_job_derivatives_separately_from_searchable_chun
     assert result['derived_chunks'] == 4
     assert result['indexed_chunks'] == 1
     assert result['pages'] == 3 and result['original_bytes'] == 300
+
+
+def test_larger_corpus_continues_past_original_650_candidate_stop_without_yesterdays_token(tmp_path, monkeypatch):
+    monkeypatch.setattr(papers, 'stamp', lambda: '2026-10-24T00:00:00+00:00')
+    cache = tmp_path / 'oai-2026-10-24'
+    cache.mkdir()
+    (tmp_path / 'oai-batch-000.xml').write_text('old stream must not be reused')
+    header = '<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/" xmlns:r="http://arxiv.org/OAI/arXivRaw/"><ListRecords>'
+    def record(number):
+        return ('<record><metadata><r:arXivRaw><r:id>2609.' + str(number).zfill(5) + '</r:id>'
+            '<r:title>Dense retrieval</r:title><r:abstract>Text embeddings for retrieval.</r:abstract>'
+            '<r:license>http://creativecommons.org/licenses/by/4.0/</r:license>'
+            '<r:authors>Example Author</r:authors><r:version version="v1"/>'
+            '</r:arXivRaw></metadata></record>')
+    (cache / 'oai-batch-000.xml').write_text(header + ''.join(record(n) for n in range(650))
+        + '<resumptionToken>next</resumptionToken></ListRecords></OAI-PMH>', encoding='utf-8')
+    (cache / 'oai-batch-001.xml').write_text(header + record(650) + '</ListRecords></OAI-PMH>', encoding='utf-8')
+    class CachedArxiv:
+        evidence = tmp_path
+        def get(self, *args, **kwargs):
+            pytest.fail('cached OAI must not be fetched again')
+    assert len(papers.bulk_candidates(CachedArxiv(), minimum=651)) == 651
+
+
+def test_expansion_preserves_selected_papers_and_records_new_target(tmp_path, monkeypatch):
+    dest, manifest = tmp_path / 'pdfs', tmp_path / 'manifest.json'
+    previous = {'arxiv_id': '2609.99999', 'sha256': 'a' * 64, 'title': 'Previously selected paper'}
+    papers.save(manifest, {'task': 'M11', 'target_new_papers': 300, 'papers': [previous]})
+    class FakeArxiv:
+        def __init__(self, evidence):
+            self.evidence = evidence
+        def close(self):
+            pass
+    seen = []
+    monkeypatch.setattr(papers, 'Arxiv', FakeArxiv)
+    monkeypatch.setattr(papers, 'bulk_candidates', lambda arxiv, minimum: seen.append(minimum) or [])
+    assert papers.discover(dest, manifest, 1300) == 2
+    after = json.loads(manifest.read_text())
+    assert after['target_new_papers'] == 1300 and after['papers'] == [previous]
+    assert seen == [2600]
+    with pytest.raises(RuntimeError, match='discard'):
+        papers.discover(dest, manifest, 0)
+
+
+def test_post_ingest_smoke_waits_for_expanded_target_not_just_first_300(tmp_path, monkeypatch):
+    import m11_demo
+    manifest = tmp_path / 'manifest.json'
+    partial = [{'tagged': str(n)} for n in range(300)]
+    papers.save(manifest, {'target_new_papers': 1300, 'papers': partial})
+    papers.save(tmp_path / 'evidence/m11/uploads.json', {p['tagged']: {'terminal': True} for p in partial})
+    monkeypatch.setattr(papers, 'MANIFEST', manifest)
+    monkeypatch.setattr(library, 'Api', lambda *a: pytest.fail('no API/provider calls before the full target'))
+    with pytest.raises(RuntimeError, match='corpus not fully processed'):
+        m11_demo.run(tmp_path)
+
+
+def test_cached_oai_candidates_still_reject_exact_version_abs_licence_mismatch(tmp_path, monkeypatch):
+    dest, manifest = tmp_path / 'pdfs', tmp_path / 'manifest.json'
+    papers.save(dest / 'm11-evidence/bulk-candidates.json', [{'tagged': '2609.99999v1',
+        'title': 'Dense retrieval', 'topic': 'Dense retrieval & embeddings',
+        'oai': {'licence': 'http://creativecommons.org/licenses/by/4.0/', 'versions': [1]}}])
+    class FakeArxiv:
+        def __init__(self, evidence):
+            self.evidence = evidence
+        def get(self, *args, **kwargs):
+            pytest.fail('licence mismatch must not fetch a PDF')
+        def close(self):
+            pass
+    checked = []
+    def incompatible_abs(arxiv, aid, version):
+        checked.append((aid, version))
+        return 'http://creativecommons.org/licenses/by-nc/4.0/'
+    monkeypatch.setattr(papers, 'Arxiv', FakeArxiv)
+    monkeypatch.setattr(papers, 'bulk_candidates', lambda *a, **k: pytest.fail('use explicit snapshot only'))
+    monkeypatch.setattr(papers.policy, 'abs_licence', incompatible_abs)
+    assert papers.discover(dest, manifest, 1, cached_candidates=True) == 2
+    assert checked == [('2609.99999', 1)]
+    assert json.loads(manifest.read_text())['papers'] == []
+    assert not json.loads((dest / 'm11-evidence/decisions.json').read_text())['2609.99999v1']['accepted']
