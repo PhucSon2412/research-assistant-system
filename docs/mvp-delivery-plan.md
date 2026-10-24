@@ -3,7 +3,7 @@
 **M11 (2026-10-23, đang triển khai):** sau PR #71 `1f7bfac`, dự án dùng học tập cá nhân.
 Edge đã chỉ bind loopback, không cần LAN; đang bổ sung khoảng 300 paper mở vào user demo qua API,
 bảy collection chủ đề + một collection giữ ngoại lệ, trần task $30/dừng $24. Ngày 2026-10-24
-chủ dự án yêu cầu thêm khoảng 1.000 paper (đang triển khai tổng khoảng 1.300 mới, cùng ledger).
+chủ dự án xác nhận thêm 1.000 ngoài lô 300, tổng khoảng 1.300 mới, cùng ledger.
 Không đổi ứng dụng/image/deploy hoặc kết quả đánh giá M7c.
 [Handoff M11](m11-demo-knowledge-base.md); bản cuối sẽ ghi số liệu, backup và CI thực tế.
 

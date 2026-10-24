@@ -249,8 +249,19 @@ def test_manifest_has_requested_unique_open_licence_papers_outside_old_corpus():
         assert paper['licence'] == papers.policy.ACCEPTED[paper['licence_url']]
         proof = paper['licence_evidence']
         assert papers.policy.normalise_licence(proof['abs']) == paper['licence_url']
-        assert papers.policy.normalise_licence(proof['oai']) == paper['licence_url']
         assert proof['latest_version_required'] is True
+        if proof.get('method', 'oai_latest') == 'oai_latest':
+            assert papers.policy.normalise_licence(proof['oai']) == paper['licence_url']
+        else:
+            assert proof['method'] == 'atom_and_live_abs_latest'
+            assert 'oai' not in proof and 'oai' not in paper
+            assert proof['atom_entry_id'] == paper['atom']['entry_id']
+            assert proof['atom_entry_id'].endswith('/' + paper['tagged'])
+            assert proof['latest_version'] == paper['version']
+            assert papers.policy.normalise_licence(proof['latest_abs']) == paper['licence_url']
+            for name in ('latest', 'exact'):
+                assert re.fullmatch('[0-9a-f]{64}', proof[name + '_sha256'])
+                assert proof[name + '_cache'].endswith('.html')
 
 
 def test_fetch_recreates_attribution_in_a_fresh_destination(tmp_path, monkeypatch):
@@ -260,10 +271,10 @@ def test_fetch_recreates_attribution_in_a_fresh_destination(tmp_path, monkeypatc
         'arxiv_id': '0000.00001', 'version': 1, 'licence': 'CC0 1.0',
         'licence_url': 'https://creativecommons.org/publicdomain/zero/1.0/', 'filename': 'paper.pdf'}]})
     calls = []
-    monkeypatch.setattr(papers.policy, 'fetch', lambda d, m, recheck: calls.append((d, m, recheck)) or 0)
+    monkeypatch.setattr(papers, 'fetch_locked', lambda d, m: calls.append((d, m)) or 0)
     monkeypatch.setattr(sys, 'argv', ['m11_papers.py', 'fetch', '--dest', str(dest), '--manifest', str(manifest)])
     assert papers.main() == 0
-    assert calls == [(dest, manifest, True)]
+    assert calls == [(dest, manifest)]
     credit = (dest / 'ATTRIBUTION.md').read_text(encoding='utf-8')
     assert 'A retrieval paper' in credit and 'Example Author' in credit
     assert 'creativecommons.org/publicdomain/zero/1.0/' in credit
@@ -313,7 +324,9 @@ def test_larger_corpus_continues_past_original_650_candidate_stop_without_yester
 
 def test_expansion_preserves_selected_papers_and_records_new_target(tmp_path, monkeypatch):
     dest, manifest = tmp_path / 'pdfs', tmp_path / 'manifest.json'
-    previous = {'arxiv_id': '2609.99999', 'sha256': 'a' * 64, 'title': 'Previously selected paper'}
+    previous = {'arxiv_id': '2609.99999', 'sha256': 'a' * 64, 'title': 'Previously selected paper',
+                'authors': ['Example Author'], 'version': 1, 'filename': 'old.pdf',
+                'licence': 'CC BY 4.0', 'licence_url': 'https://creativecommons.org/licenses/by/4.0/'}
     papers.save(manifest, {'task': 'M11', 'target_new_papers': 300, 'papers': [previous]})
     class FakeArxiv:
         def __init__(self, evidence):
@@ -366,3 +379,180 @@ def test_cached_oai_candidates_still_reject_exact_version_abs_licence_mismatch(t
     assert checked == [('2609.99999', 1)]
     assert json.loads(manifest.read_text())['papers'] == []
     assert not json.loads((dest / 'm11-evidence/decisions.json').read_text())['2609.99999v1']['accepted']
+
+
+@pytest.mark.parametrize('reason', ['file_too_large', 'duplicate_sha256'])
+def test_download_exclusions_keep_credit_and_exact_licence_evidence(tmp_path, monkeypatch, reason):
+    import hashlib
+    dest, manifest, old_manifest = tmp_path / 'pdfs', tmp_path / 'manifest.json', tmp_path / 'old.json'
+    content = b'%PDF-test' + (b'0' * (30 * 1024 * 1024) if reason == 'file_too_large' else b'')
+    digest = hashlib.sha256(content).hexdigest()
+    papers.save(old_manifest, {'papers': [{'arxiv_id': '2609.88888', 'sha256': digest if reason == 'duplicate_sha256' else 'b' * 64}]})
+    papers.save(dest / 'm11-evidence/bulk-candidates.json', [{'tagged': '2609.99999v1',
+        'title': 'Excluded retrieval paper', 'authors': ['Example Author'], 'topic': 'Dense retrieval & embeddings',
+        'oai': {'licence': 'http://creativecommons.org/licenses/by/4.0/', 'versions': [1]}}])
+    (dest / 'arxiv-2609.99999v1.pdf').write_bytes(content)
+    class FakeArxiv:
+        def __init__(self, evidence):
+            self.evidence = evidence
+        def get(self, *args, **kwargs):
+            pytest.fail('existing PDF must not be fetched again')
+        def close(self):
+            pass
+    monkeypatch.setattr(papers, 'Arxiv', FakeArxiv)
+    monkeypatch.setattr(papers.policy, 'MANIFEST', old_manifest)
+    monkeypatch.setattr(papers.policy, 'abs_licence', lambda *a: 'http://creativecommons.org/licenses/by/4.0/')
+    assert papers.discover(dest, manifest, 1, cached_candidates=True) == 2
+    assert json.loads(manifest.read_text())['papers'] == []
+    excluded = json.loads(manifest.with_name('download-exclusions.json').read_text())[0]
+    assert excluded['reason'] == reason and excluded['sha256'] == digest
+    assert excluded['licence_evidence']['abs'] == 'http://creativecommons.org/licenses/by/4.0/'
+    assert papers.policy.normalise_licence(excluded['licence_evidence']['abs']) == excluded['licence_url']
+    credit = (dest / 'ATTRIBUTION.md').read_text(encoding='utf-8')
+    assert 'Excluded retrieval paper' in credit and 'Example Author' in credit
+
+
+def atom_abs_html(aid='2609.99999', selected=1, latest=1,
+                  licence='http://creativecommons.org/licenses/by/4.0/', history=True):
+    versions = ''.join(f'<strong>[v{v}]</strong>' if v == selected else f'<a>[v{v}]</a>'
+                       for v in range(1, latest + 1))
+    return (f'<meta name="citation_arxiv_id" content="{aid}">'
+            + (f'<div class="submission-history">{versions}</div>' if history else '')
+            + f'<div class="abs-license"><a href="{licence}">Licence</a></div>')
+
+
+@pytest.mark.parametrize('case,accepted,request_count', [
+    ('valid', True, 2), ('newer_version', False, 1), ('noncommercial', False, 1),
+    ('licence_disagreement', False, 2), ('old_exact_page_with_newer_licence', False, 2),
+    ('wrong_paper', False, 1), ('missing_history', False, 1), ('wrong_atom_version', False, 0),
+    ('http_failure', False, 1),
+])
+def test_atom_licence_gate_binds_current_version_and_both_abs_pages(tmp_path, case, accepted, request_count):
+    import m11_atom
+    latest, exact = {}, {}
+    if case == 'newer_version':
+        latest.update(selected=2, latest=2)
+    if case == 'noncommercial':
+        latest['licence'] = 'http://creativecommons.org/licenses/by-nc/4.0/'
+    if case == 'licence_disagreement':
+        exact['licence'] = 'http://creativecommons.org/licenses/by-sa/4.0/'
+    if case == 'old_exact_page_with_newer_licence':
+        exact.update(selected=1, latest=2)
+    if case == 'wrong_paper':
+        latest['aid'] = '2609.88888'
+    if case == 'missing_history':
+        latest['history'] = False
+    responses = [atom_abs_html(**latest), atom_abs_html(**exact)]
+    calls = []
+    class FakeArxiv:
+        evidence = tmp_path
+        def get(self, url):
+            calls.append(url)
+            return httpx.Response(500 if case == 'http_failure' else 200,
+                                  text=responses[len(calls) - 1], request=httpx.Request('GET', url))
+    row = {'tagged': '2609.99999v1', 'title': 'Grounded LLM',
+           'atom': {'entry_id': 'http://arxiv.org/abs/2609.99999v' + ('2' if case == 'wrong_atom_version' else '1')}}
+    result = m11_atom.verify(FakeArxiv(), row)
+    assert result['accepted'] is accepted and len(calls) == request_count
+    if accepted:
+        assert result['licence_evidence']['method'] == 'atom_and_live_abs_latest'
+        assert result['licence_evidence']['latest_version'] == 1
+        assert 'oai' not in result['licence_evidence']
+        assert len(list(tmp_path.rglob('*.html'))) == 2
+    else:
+        assert result['reasons'] and not list(tmp_path.rglob('*.html'))
+
+
+def test_fetch_can_recheck_original_oai_manifest_without_fabricating_atom_evidence(tmp_path):
+    import m11_atom
+    calls = []
+    class FakeArxiv:
+        evidence = tmp_path
+        def get(self, url):
+            calls.append(url)
+            return httpx.Response(200, text=atom_abs_html(), request=httpx.Request('GET', url))
+    row = {'tagged': '2609.99999v1', 'title': 'Grounded LLM', 'oai': {'versions': [1]}}
+    assert not m11_atom.verify(FakeArxiv(), row)['accepted']
+    assert not calls
+    result = m11_atom.verify(FakeArxiv(), row, allow_original_oai=True)
+    assert result['accepted'] and len(calls) == 2
+    assert result['licence_evidence']['method'] == 'live_abs_recheck_original_oai'
+    assert 'atom_entry_id' not in result['licence_evidence']
+
+
+@pytest.mark.parametrize('case', ['fresh_valid', 'fresh_corrupt', 'existing_corrupt'])
+def test_fetch_locked_checks_bytes_before_publish_and_preserves_existing_file(tmp_path, monkeypatch, case):
+    import hashlib
+    import m11_atom
+    dest, manifest = tmp_path / 'pdfs', tmp_path / 'manifest.json'
+    expected, corrupt = b'%PDF-correct', b'%PDF-corrupt'
+    paper = {'arxiv_id': '2609.99999', 'version': 1, 'filename': 'arxiv-2609.99999v1.pdf',
+             'title': 'Grounded LLM', 'bytes': len(expected), 'sha256': hashlib.sha256(expected).hexdigest(),
+             'licence_url': 'https://creativecommons.org/licenses/by/4.0/'}
+    papers.save(manifest, {'papers': [paper]})
+    dest.mkdir()
+    path = dest / paper['filename']
+    if case == 'existing_corrupt':
+        path.write_bytes(corrupt)
+    class FakeArxiv:
+        def __init__(self, evidence):
+            self.evidence = evidence
+        def get(self, url):
+            assert case != 'existing_corrupt'
+            return httpx.Response(200, content=expected if case == 'fresh_valid' else corrupt)
+        def close(self):
+            pass
+    monkeypatch.setattr(papers, 'Arxiv', FakeArxiv)
+    monkeypatch.setattr(m11_atom, 'verify', lambda *a, **kw: {'accepted': True, 'licence_url': paper['licence_url']})
+    assert papers.fetch_locked(dest, manifest) == (0 if case == 'fresh_valid' else 1)
+    if case == 'fresh_valid':
+        assert path.read_bytes() == expected
+    elif case == 'fresh_corrupt':
+        assert not path.exists()
+    else:
+        assert path.read_bytes() == corrupt
+
+
+def test_atom_candidates_prefer_latest_metadata_and_keep_source_hash(tmp_path):
+    import hashlib
+    import m11_atom
+    def entry(version):
+        return (f'<entry><id>http://arxiv.org/abs/2609.99999v{version}</id><title>Grounded LLM</title>'
+                '<summary>LLM hallucination with grounding.</summary><author><name>Example Author</name></author></entry>')
+    raw = ('<feed xmlns="http://www.w3.org/2005/Atom">' + entry(1) + entry(2) + '</feed>').encode()
+    class FakeArxiv:
+        evidence = tmp_path
+        def get(self, url, **params):
+            assert url == 'https://export.arxiv.org/api/query' and params['max_results'] == 150
+            return httpx.Response(200, content=raw, request=httpx.Request('GET', url, params=params))
+    rows = m11_atom.candidates(FakeArxiv(), 1300, {'Grounding & hallucination': 'abs:hallucination'},
+                               papers.topic_for, papers.save, pages=1)
+    assert len(rows) == 1 and rows[0]['tagged'] == '2609.99999v2'
+    assert rows[0]['authors'] == ['Example Author']
+    assert rows[0]['atom']['batch_sha256'] == hashlib.sha256(raw).hexdigest()
+
+
+@pytest.mark.parametrize('failure', ['timeout', 'invalid_xml'])
+def test_atom_failed_query_retains_other_metadata_without_accepting_failed_page(tmp_path, failure):
+    import m11_atom
+    calls = []
+    raw = ('<feed xmlns="http://www.w3.org/2005/Atom"><entry>'
+           '<id>http://arxiv.org/abs/2609.99999v1</id><title>Grounded LLM</title>'
+           '<summary>LLM hallucination with grounding.</summary>'
+           '<author><name>Example Author</name></author></entry></feed>').encode()
+    class FakeArxiv:
+        evidence = tmp_path
+        def get(self, url, **params):
+            calls.append(params)
+            assert params['attempts'] == 1
+            if len(calls) == 1:
+                if failure == 'timeout':
+                    raise httpx.ReadTimeout('synthetic timeout')
+                return httpx.Response(200, content=b'not XML', request=httpx.Request('GET', url))
+            return httpx.Response(200, content=raw, request=httpx.Request('GET', url))
+    rows = m11_atom.candidates(FakeArxiv(), 1300, {'Grounding & hallucination': 'abs:hallucination'},
+                               papers.topic_for, papers.save, pages=4)
+    assert len(calls) == 2 and len(rows) == 1
+    assert len(list(tmp_path.rglob('*.failure.json'))) == 1
+    assert len(list(tmp_path.rglob('*.xml'))) == 1
+    assert json.loads((tmp_path / 'atom-candidates.json').read_text())[0]['tagged'] == '2609.99999v1'

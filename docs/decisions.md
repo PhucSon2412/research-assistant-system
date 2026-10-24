@@ -3,8 +3,8 @@
 ## Cập nhật phạm vi M11 của chủ dự án (2026-10-23)
 
 Ngày 2026-10-24, chủ dự án mở Docker trở lại và yêu cầu “nạp thêm khoảng 1000 paper”.
-Đang triển khai thêm ngoài lô 300, tổng khoảng 1.300 paper mới; đã hỏi để có thể đính chính
-thành tổng 1.000. Key còn tiền không thay trần task: vẫn $30, dừng $24, cùng ledger/quota.
+Chủ dự án đã xác nhận thêm 1.000 ngoài lô 300, tổng khoảng **1.300 paper mới**.
+Key còn tiền không thay trần task: vẫn $30, dừng $24, cùng ledger/quota.
 
 Chỉ dẫn triển khai trực tiếp thay mục tiêu ban đầu bên dưới: **khoảng 300 paper bổ sung**,
 trần **$30**, dừng gọi mới ở **$24 (80 %)**. Giữ budget/quota ứng dụng hiện có. Key chỉ dùng

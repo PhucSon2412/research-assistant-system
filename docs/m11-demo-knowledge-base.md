@@ -4,8 +4,8 @@
 `1f7bfac970fa0015a6d3211d3514a4136df4d4d6` (PR #71 MERGED), nhánh
 `ops/m11-demo-knowledge-base`. Chỉ dẫn mới của chủ dự án thay 150/$10 bằng
 **khoảng 300 paper bổ sung/$30**, dừng gọi mới ở **$24**. Ngày 2026-10-24 chủ dự án
-yêu cầu **nạp thêm khoảng 1.000 paper**: đang triển khai tổng khoảng **1.300 paper mới**,
-đã hỏi lại để có thể đính chính thành tổng 1.000. Giữ cùng ledger/trần/quota, không cộng
+yêu cầu **nạp thêm khoảng 1.000 paper** và đã xác nhận thêm ngoài lô 300,
+tổng khoảng **1.300 paper mới**. Giữ cùng ledger/trần/quota, không cộng
 thêm ngân sách vì key còn tiền. Không merge.
 
 ## Chuyển sang local
@@ -30,8 +30,10 @@ IPv4 hiện hành trong lượt kiểm; listener ngoài loopback không tồn t�
 
 ## Corpus và luồng nạp
 
-- CC BY 4.0 / CC BY-SA 4.0 / CC0 1.0; arXivRaw OAI phải trùng trang abs đúng version,
-  và version đó phải latest trong OAI. Không nhận NC/ND/license mặc định arXiv.
+- CC BY 4.0 / CC BY-SA 4.0 / CC0 1.0. Lô OAI yêu cầu arXivRaw trùng license abs đúng version,
+  và version đó latest trong lịch sử OAI. Lô Atom yêu cầu entry ID có version, trang abs
+  hiện hành và trang abs đúng version đều xác nhận cùng version mới nhất/cùng license mở.
+  Không nhận NC/ND/license mặc định, lịch sử không rõ hoặc bằng chứng bất đồng.
 - Bảy chủ đề: dense retrieval/embedding; reranking/search; RAG; đánh giá/benchmark;
   grounding/hallucination; long context/chunking; agent tìm kiếm/tool use.
 - Không trùng arXiv ID/SHA-256 của corpus cũ. SHA-256 12 original được kiểm qua route
@@ -83,6 +85,32 @@ không kết luận toàn bộ arXiv ngừng hoạt động. Tiếp tục các c
 OAI 666 record đã có bằng `discover --cached-candidates --target 1300`: vẫn lấy license trang abs
 đúng version trước PDF, so với license/version history của OAI snapshot, không bỏ kiểm license.
 Nếu hết snapshot mà metadata mới chưa lấy được thì giữ checkpoint và chưa báo đủ target.
+Một request ListRecords mới với read timeout 180 giây cũng đã timeout (180,28 s), giữ
+`evidence/m11/fresh-oai-probe-180s.json`. Không hạ tiêu chí license để bù thiếu metadata.
+
+Phần mở rộng còn phát hiện PDF tải về bị loại vì quá lớn/trùng hash chưa được ghi credit đầy đủ.
+Tooling mới lưu `download-exclusions.json`, phân biệt hai lý do, giữ attribution cho cả file bị loại.
+Với quyết định cũ đã mất verdict abs, script kiểm lại abs đúng version trước khi bổ sung credit;
+không dựng lại bằng chứng giả từ trường OAI. File bị loại không đi upload/provider.
+Offline phần mở rộng từng đạt **70 pass/1 deselected** (ca đủ manifest đợi khóa corpus).
+Hai assertion mới từng sai do đòi raw evidence HTTP phải thành HTTPS; đã sửa để giữ raw URL
+và so URL chuẩn hóa riêng. JUnit fail và lượt sửa lưu hai tên khác nhau ngoài repo.
+
+API Atom chính thức trả 200 trong khi OAI vẫn timeout. Fallback
+`discover --atom-candidates --atom-pages 4 --target 1300` giữ nguyên bộ lọc chủ đề,
+license và hash. Với mỗi candidate, script lấy cả abs không version và abs có version,
+kiểm citation ID/lịch sử/phiên bản đang chọn cùng trùng latest; license hai trang phải đồng ý.
+Manifest ghi rõ `method=atom_and_live_abs_latest`, không giả trường OAI; HTML và XML gốc
+ngoài repo có SHA-256. Tải lại cũng kiểm mới hai trang trước khi nhận bytes/hash đã khóa.
+Regression mới kiểm newer version, NC/ND, thiếu lịch sử, sai ID, license bất đồng và file
+hỏng được giữ nguyên. Lượt offline mới nhất **86 pass/1 deselected**, chưa phải corpus hoàn tất.
+Nếu một trang Atom lỗi/timeout/XML không hợp lệ, script lưu metadata lỗi ngoài repo và tiếp tục
+truy vấn chủ đề/thứ tự khác; không ghi trang lỗi thành cache hợp lệ hoặc suy ra license.
+
+Đề xuất khởi chạy controller nền để nối tải/nạp → smoke → backup/check đã bị bộ duyệt tự động
+từ chối (phạm vi 1.300 và chuỗi chạy không giám sát chưa được xác nhận tường minh). Controller
+**không được khởi chạy**. Các tiến trình M11 trực tiếp vẫn chạy theo checkpoint; smoke/backup
+cuối phải được agent kiểm điều kiện và chạy sau khi hoàn tất, chưa được xếp chạy tự động.
 
 ### Sửa bộ lọc chủ đề trong lúc nạp
 
@@ -91,12 +119,12 @@ cho paper ngoài retrieval. Đã sửa thành word boundary, bổ sung regressio
 đã cache và tiếp tục tải bù. **48 PDF đã tải bị loại khỏi target**; PDF ngoài repo được giữ nguyên.
 [Danh sách metadata/SHA-256 của các ngoại lệ](../evaluation/m11-papers/topic-exclusions.json).
 
-**5 item đã upload được giữ lại**, không tính vào mục tiêu 300: `2502.00857v2` (HintEval),
+**5 item đã upload được giữ lại**, không tính vào mục tiêu 1.300: `2502.00857v2` (HintEval),
 `2505.01811v4` (BadPatches), `2506.08311v3` (Automated Program Repair Agents),
 `2509.04183v3` (MAGneT), `2602.19736v3` (InfScene-SR). Chỉ chuyển membership sang collection
 thứ tám **“Cần xem lại — ngoài phạm vi M11”**, không xóa item/file/job/index, không trả phí về 0.
 Luồng chuyển cũng có checkpoint chặn tự retry khi outcome chưa rõ. Bảy collection chủ đề
-vẫn là target chính; tổng thư viện cuối có thể lớn hơn 312 vì giữ các ngoại lệ này.
+vẫn là target chính; tổng thư viện cuối có thể lớn hơn 1.312 vì giữ các ngoại lệ này.
 
 Lượt client đầu dừng tại 32 receipt đã xác định, không có upload `sending` bị bỏ dở.
 Chỉ gỡ orphan lock sau khi kiểm đúng PID client đã thoát; không dừng process theo tên.
@@ -140,7 +168,10 @@ là raw artifact còn tồn tại hoặc dùng hash của lượt 64 test cho l�
 
 CI `39969594383` tại `487b098` đã kết thúc thành công: API **1.307/1.307 pass**,
 Web test/typecheck/build và Pilot deploy config contract đều success. Đây là head trước sửa
-inventory chunk (offline cuối 65 test); phải chờ CI của head cuối sau khi cập nhật toàn bộ kết quả.
+inventory chunk (offline cuối 65 test).
+CI checkpoint kế tiếp `40051049793` tại `25d50c6` cũng đã kết thúc: API **1.308/1.308 pass**,
+Web test/typecheck/build và Pilot deploy config contract đều success. Chưa phải CI của head cuối;
+vẫn phải chờ sau khi cập nhật toàn bộ kết quả.
 
 Backup sau nạp và 10–15 câu hỏi: **chưa xong**, sẽ cập nhật. Không chạy lại đánh giá M7c
 hay ghi human verdict. Git ngoài sandbox xác nhận bundle human-review không bị xóa/thay đổi;

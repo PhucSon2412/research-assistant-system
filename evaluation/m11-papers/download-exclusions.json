@@ -1,0 +1,228 @@
+[
+  {
+    "tagged": "2602.17044v2",
+    "topic": "Grounding & hallucination",
+    "title": "RefRetouch: Personalized Image Retouching without Test-time Fine-tuning",
+    "authors": [
+      "Temesgen Muruts Weldengus, Binnan Liu, Fei Kou, Youwei Lyu, Jinwei Chen, Qingnan Fan, Changqing Zou"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2602.17044",
+    "version": 2,
+    "filename": "arxiv-2602.17044v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "3ba94633fd0ab9f1352dd7c6c9f8b6da46a7fd65103a647a510ef74fa27b3515",
+    "bytes": 50059036,
+    "licence_checked_at": "2026-10-24T02:51:49+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "file_too_large",
+    "excluded_at": "2026-10-24T02:51:49+00:00"
+  },
+  {
+    "tagged": "2609.03554v1",
+    "topic": "Reranking & search",
+    "title": "WIDE: Wildcard Inference with Dynamic Expansion for Cross-Modal Generative Retrieval",
+    "authors": [
+      "Teng Guo, Xin Wang, Jiayou Xu, Keying Zhou, Jifeng Shen, Haoxin Ruan"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1
+      ],
+      "batch": "oai-batch-003.xml",
+      "batch_sha256": "7ead442cf521da3290ca4cd5fb11cf8073ecd31e2888432be0913aa08ec107d5"
+    },
+    "arxiv_id": "2609.03554",
+    "version": 1,
+    "filename": "arxiv-2609.03554v1.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "9d592843c8be3a0f61dbfdadeab8625447d40d99d7c61c78162ff10c94e06642",
+    "bytes": 36324182,
+    "licence_checked_at": "2026-10-24T02:51:53+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "file_too_large",
+    "excluded_at": "2026-10-24T02:51:53+00:00"
+  },
+  {
+    "tagged": "2608.29996v1",
+    "topic": "Grounding & hallucination",
+    "title": "Partition-Aware Unlearning for Removing Spurious Correlations in Large Vision-Language Models",
+    "authors": [
+      "Aditi Sarker, Nazreen Shah, Rafi Ibn Sultan, Rhongho Jang, Dongxiao Zhu, Prashant Khanduri"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2608.29996",
+    "version": 1,
+    "filename": "arxiv-2608.29996v1.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "bb6e3d15d610b7eee3aba92b7fdbd7b4a7bc5f21fad42a34579fb4bffcbdcece",
+    "bytes": 54857634,
+    "licence_checked_at": "2026-10-24T02:51:56+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "file_too_large",
+    "excluded_at": "2026-10-24T02:51:56+00:00"
+  },
+  {
+    "tagged": "2604.22875v3",
+    "topic": "Grounding & hallucination",
+    "title": "SketchVLM: Vision language models can annotate images to explain thoughts and guide users",
+    "authors": [
+      "Brandon Collins, Logan Bolton, Hung Huy Nguyen, Mohammad Reza Taesiri, Trung Bui, Anh Totti Nguyen"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2,
+        3
+      ],
+      "batch": "oai-batch-001.xml",
+      "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+    },
+    "arxiv_id": "2604.22875",
+    "version": 3,
+    "filename": "arxiv-2604.22875v3.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "e55948b097d6d987fe794bcb4c4c35fb93594dcf5cf3c50136d25cef98378809",
+    "bytes": 38801366,
+    "licence_checked_at": "2026-10-24T02:51:59+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "file_too_large",
+    "excluded_at": "2026-10-24T02:51:59+00:00"
+  },
+  {
+    "tagged": "2605.22344v2",
+    "topic": "Grounding & hallucination",
+    "title": "Bernini: Latent Semantic Planning for Video Diffusion",
+    "authors": [
+      "Bernini Team: Chenchen Liu, Junyi Chen, Lei Li, Lu Chi, Mingzhen Sun, Zhuoying Li, Yi Fu, Ruoyu Guo, Yiheng Wu, Ge Bai, Zehuan Yuan"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-002.xml",
+      "batch_sha256": "c8bf1968bd63b542ed61abc7b2388e1799d5f22710f009835c77a831b494224d"
+    },
+    "arxiv_id": "2605.22344",
+    "version": 2,
+    "filename": "arxiv-2605.22344v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "efff75a3bde1b044957b3613cd1425ff7b5748911f367d3eb279da0b1e0b9fa9",
+    "bytes": 49148240,
+    "licence_checked_at": "2026-10-24T02:52:02+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "file_too_large",
+    "excluded_at": "2026-10-24T02:52:02+00:00"
+  },
+  {
+    "tagged": "2609.01757v1",
+    "topic": "Grounding & hallucination",
+    "title": "AlphaRAD: Grounded Zero-Shot Classification in Chest Radiology via $\\alpha$-Corrected Binary Cross Entropy and Factorized Latent Supervision",
+    "authors": [
+      "Jianzhong You, Yuan Gao, Chris McIntosh"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1
+      ],
+      "batch": "oai-batch-002.xml",
+      "batch_sha256": "c8bf1968bd63b542ed61abc7b2388e1799d5f22710f009835c77a831b494224d"
+    },
+    "arxiv_id": "2609.01757",
+    "version": 1,
+    "filename": "arxiv-2609.01757v1.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "126aabc23cb42735f7a08b6d7fd7abe31f0647abc049bcf082447ebc05580ac7",
+    "bytes": 39590820,
+    "licence_checked_at": "2026-10-24T02:52:06+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "file_too_large",
+    "excluded_at": "2026-10-24T02:52:06+00:00"
+  },
+  {
+    "tagged": "2403.11169v6",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Customized large language models can outperform Community Notes in correcting misinformation",
+    "authors": [
+      "Xinyi Zhou, Ashish Sharma, Amy X. Zhang, Tim Althoff"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "batch": "oai-batch-007.xml",
+      "batch_sha256": "fbd887706ded11447ac7af13265e0bdb42b9e8d76160f3ea674ef96f74d3c175"
+    },
+    "arxiv_id": "2403.11169",
+    "version": 6,
+    "filename": "arxiv-2403.11169v6.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "ac4014d8aa8c19bb27bff6e0675f013d8b7223c0494b81b2d574cb630ac3efa4",
+    "bytes": 38100059,
+    "licence_checked_at": "2026-10-24T02:52:09+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "file_too_large",
+    "excluded_at": "2026-10-24T02:52:09+00:00"
+  }
+]

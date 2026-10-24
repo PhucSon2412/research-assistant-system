@@ -36,15 +36,15 @@
     "junit_sha256": "86299274ff764f66b0acc1e8094260d4991a7f82b175548b5d3ff874e2c5d942"
   },
   "ci_completed": {
-    "run_id": 39969594383,
-    "head": "487b09859be6b49f8e4c04ce84a86a2897492400",
-    "api_tests": 1307,
+    "run_id": 40051049793,
+    "head": "25d50c6f03744e757e042ce5e40ad8527df59005",
+    "api_tests": 1308,
     "jobs": {
       "api": "success",
       "web": "success",
       "deploy": "success"
     },
-    "junit_sha256": "c041afd9c48ed0b0735a9c604a037116aafc911299b5587053b2a3ff5897d1ae"
+    "junit_sha256": "289dd3a34248b3f7d216739c21602e084cdb0c0cad9b26afda5fd8729884cb67"
   },
   "runtime_checkpoint": {
     "target_processed": 252,
@@ -83,6 +83,35 @@
       "api/tests/test_m11_tooling.py": "dd73214fe96c2f3487435756a73e65ec31d6088fa40b46c4a3eb3422c5ed7e85"
     },
     "initial_300_manifest_sha256": "3d153fd5d32f10d1e3eea9e026708008a12da8742f8ea34e6efe2574fc846548",
-    "new_oai_requests": "filtered ListRecords and GetRecord timeout; Identify 200; continue retained OAI candidates with fresh exact-version abs licence checks"
+    "new_oai_requests": "filtered ListRecords and GetRecord timeout; Identify 200; continue retained OAI candidates with fresh exact-version abs licence checks",
+    "scope_confirmed_total_target": 1300,
+    "latest_offline": {
+      "tests": 86,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 1,
+      "deselected_reason": "manifest completeness waits for full target",
+      "junit_file": "offline-atom-86-037ddae73dc5.xml",
+      "junit_sha256": "037ddae73dc593817e766f4e94ed445fd1825698d5e087a9db65d732a86022d2"
+    },
+    "latest_source_sha256": {
+      "scripts\\m11_atom.py": "b1d1c19ba7c4fc39c8b16a95a7d49beff634df0dec4c41814e2b267032767d8f",
+      "scripts\\m11_papers.py": "1da286575fcc2f4eaed066d6ca52b51d7f03df91cf91add98f97919033d2e8b3",
+      "scripts\\m11_demo.py": "b397495da00a3fecc127b47a506f7cfb094b08965aaaeed91f350afc6a2be3d9",
+      "api\\tests\\test_m11_tooling.py": "3cc379d5e0361f25de80e9cf39b8af2ebbf0e220d6a98a7e9c5e99ff63869376"
+    },
+    "licence_source_fallback": "Primary Atom with live latest and exact-version abs history and matching open licences; raw HTML/XML hashes; never fabricate OAI evidence"
+  },
+  "ci_previous": {
+    "run_id": 39969594383,
+    "head": "487b09859be6b49f8e4c04ce84a86a2897492400",
+    "api_tests": 1307,
+    "jobs": {
+      "api": "success",
+      "web": "success",
+      "deploy": "success"
+    },
+    "junit_sha256": "c041afd9c48ed0b0735a9c604a037116aafc911299b5587053b2a3ff5897d1ae"
   }
 }

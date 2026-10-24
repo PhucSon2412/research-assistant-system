@@ -129,8 +129,8 @@ class Arxiv(policy.Arxiv):
         self.client.headers['User-Agent'] = ('ras-m11-library/1.0 (personal open-licence research library; '
                                               'https://github.com/PhucSon2412/research-assistant-system)')
 
-    def get(self, url, **params):
-        for attempt in range(4):
+    def get(self, url, *, attempts=4, **params):
+        for attempt in range(attempts):
             try:
                 response = super().get(url, **params)
                 if response.status_code == 200:
@@ -138,9 +138,9 @@ class Arxiv(policy.Arxiv):
                 if response.status_code not in (429, 500, 502, 503, 504):
                     response.raise_for_status()
             except httpx.TransportError:
-                if attempt == 3:
+                if attempt == attempts - 1:
                     raise
-            if attempt == 3:
+            if attempt == attempts - 1:
                 raise RuntimeError('arXiv unavailable; checkpoint preserved')
             time.sleep(min(45, 10 * (attempt + 1)))
 
@@ -183,7 +183,7 @@ def attribution(dest, papers, exclusions=None):
                  f"https://arxiv.org/abs/{p['arxiv_id']}v{p['version']}; "
                  f"[{p['licence']}]({p['licence_url']}); `{p['filename']}`.\n")
     if exclusions:
-        text += '\n## Downloaded topic exclusions — outside the target corpus\n\n'
+        text += '\n## Downloaded exclusions — outside the target corpus\n\n'
         for p in exclusions:
             text += (f"- **{p['title']}** — {', '.join(p['authors'])}. "
                      f"https://arxiv.org/abs/{p['arxiv_id']}v{p['version']}; "
@@ -224,13 +224,15 @@ def curate(dest, manifest):
     data['papers'] = kept
     save(out, excluded)
     save(manifest, data)
-    attribution(dest, kept, excluded)
+    download_path = manifest.with_name('download-exclusions.json')
+    download_excluded = json.loads(download_path.read_text(encoding='utf-8')) if download_path.exists() else []
+    attribution(dest, kept, excluded + download_excluded)
     print(json.dumps({'retained': len(kept), 'topic_exclusions': len(excluded),
                       'already_uploaded_exclusions': [p['tagged'] for p in excluded if p.get('uploaded_item_id')]}))
     return 0
 
 
-def discover(dest, manifest, target, cached_candidates=False):
+def discover(dest, manifest, target, cached_candidates=False, atom_candidates=False, atom_pages=4):
     evidence = dest / 'm11-evidence'
     evidence.mkdir(parents=True, exist_ok=True)
     arxiv = Arxiv(evidence)
@@ -248,11 +250,56 @@ def discover(dest, manifest, target, cached_candidates=False):
     selected = {p['arxiv_id'] for p in data['papers']}
     exclusion_path = manifest.with_name('topic-exclusions.json')
     exclusions = json.loads(exclusion_path.read_text(encoding='utf-8')) if exclusion_path.exists() else []
+    download_exclusion_path = manifest.with_name('download-exclusions.json')
+    download_exclusions = json.loads(download_exclusion_path.read_text(encoding='utf-8')) if download_exclusion_path.exists() else []
     hashes = {p['sha256'] for p in data['papers']} | excluded_hashes
+    def paper_metadata(row, verdict, content):
+        aid, version = policy.ARXIV_ID.fullmatch(row['tagged']).groups()
+        proof = verdict['licence_evidence'] if 'licence_evidence' in verdict else {
+            'abs': verdict['abs_licence'], 'oai': verdict['oai_licence'], 'latest_version_required': True}
+        return {**row, 'arxiv_id': aid, 'version': int(version), 'filename': f"arxiv-{row['tagged']}.pdf",
+                'title': verdict['title'] or row['title'], 'licence': verdict['licence'],
+                'licence_url': verdict['licence_url'], 'sha256': hashlib.sha256(content).hexdigest(), 'bytes': len(content),
+                'licence_checked_at': verdict['checked_at'],
+                'licence_evidence': proof}
+    def record_exclusion(paper, reason):
+        download_exclusions.append({**paper, 'reason': reason, 'excluded_at': stamp()})
+        save(download_exclusion_path, download_exclusions)
+        attribution(dest, data['papers'], exclusions + download_exclusions)
     try:
-        rows = (json.loads((evidence / 'bulk-candidates.json').read_text(encoding='utf-8'))
-                if cached_candidates else bulk_candidates(arxiv, minimum=max(650, target * 2)))
+        if atom_candidates:
+            import m11_atom
+            rows = m11_atom.candidates(arxiv, target, TOPICS, topic_for, save, pages=atom_pages)
+        else:
+            rows = (json.loads((evidence / 'bulk-candidates.json').read_text(encoding='utf-8'))
+                    if cached_candidates else bulk_candidates(arxiv, minimum=max(650, target * 2)))
         print(json.dumps({'candidates': len(rows), 'downloaded': len(selected)}), flush=True)
+        # Older tooling retained a rejected PDF but overwrote its accepted licence
+        # verdict. Recheck the exact version before restoring its missing credit.
+        by_tag = {r['tagged']: r for r in rows}
+        recorded = {p['tagged'] for p in download_exclusions}
+        for tagged, decision in list(decisions.items()):
+            if 'too_large_or_duplicate_sha256' not in decision.get('reasons', []) or tagged in recorded or tagged not in by_tag:
+                continue
+            row = by_tag[tagged]
+            path = dest / f'arxiv-{tagged}.pdf'
+            if not path.exists():
+                continue
+            aid, version = policy.ARXIV_ID.fullmatch(tagged).groups()
+            if 'oai' in row:
+                verdict = policy.licence_verdict(aid, int(version), policy.abs_licence(arxiv, aid, int(version)),
+                                                 row['oai']['licence'], row['oai']['versions'])
+            else:
+                import m11_atom
+                verdict = m11_atom.verify(arxiv, row)
+            if not verdict['accepted']:
+                continue
+            verdict.update({'title': row['title'], 'checked_at': stamp()})
+            content = path.read_bytes()
+            reason = 'file_too_large' if len(content) > 30 * 1024 * 1024 else 'duplicate_sha256'
+            record_exclusion(paper_metadata(row, verdict, content), reason)
+            decisions[tagged] = {**verdict, 'accepted': False, 'reasons': [reason]}
+            save(checkpoint, decisions)
         for row in rows:
             if len(selected) >= target:
                 break
@@ -260,9 +307,13 @@ def discover(dest, manifest, target, cached_candidates=False):
             aid, version = policy.ARXIV_ID.fullmatch(tagged).groups()
             if aid in selected or aid in excluded_ids or tagged in decisions:
                 continue
-            record = row['oai']
-            verdict = policy.licence_verdict(aid, int(version),
-                policy.abs_licence(arxiv, aid, int(version)), record['licence'], record['versions'])
+            if 'oai' in row:
+                record = row['oai']
+                verdict = policy.licence_verdict(aid, int(version),
+                    policy.abs_licence(arxiv, aid, int(version)), record['licence'], record['versions'])
+            else:
+                import m11_atom
+                verdict = m11_atom.verify(arxiv, row)
             verdict.update({'title': row['title'], 'checked_at': stamp()})
             if not verdict['accepted']:
                 decisions[tagged] = verdict
@@ -279,28 +330,57 @@ def discover(dest, manifest, target, cached_candidates=False):
                 tmp.replace(path)
             content = path.read_bytes()
             digest = hashlib.sha256(content).hexdigest()
+            paper = paper_metadata(row, verdict, content)
             # Product FilePolicy: 30 MiB. Upload preflight also checks live config.
             if len(content) > 30 * 1024 * 1024 or digest in hashes:
-                decisions[tagged] = {'accepted': False, 'reasons': ['too_large_or_duplicate_sha256']}
+                reason = 'file_too_large' if len(content) > 30 * 1024 * 1024 else 'duplicate_sha256'
+                record_exclusion(paper, reason)
+                decisions[tagged] = {**verdict, 'accepted': False, 'reasons': [reason]}
                 save(checkpoint, decisions)
                 continue
-            paper = {**row, 'arxiv_id': aid, 'version': int(version), 'filename': filename,
-                     'title': verdict['title'] or row['title'], 'licence': verdict['licence'],
-                     'licence_url': verdict['licence_url'], 'sha256': digest, 'bytes': len(content),
-                     'licence_checked_at': verdict['checked_at'],
-                     'licence_evidence': {'abs': verdict['abs_licence'], 'oai': verdict['oai_licence'],
-                                          'latest_version_required': True}}
             data['papers'].append(paper)
             selected.add(aid)
             hashes.add(digest)
             save(manifest, data)
             decisions[tagged] = verdict
             save(checkpoint, decisions)
-            attribution(dest, data['papers'], exclusions)
+            attribution(dest, data['papers'], exclusions + download_exclusions)
             print(json.dumps({'downloaded': len(selected), 'tagged': tagged, 'topic': row['topic']}), flush=True)
+        attribution(dest, data['papers'], exclusions + download_exclusions)
     finally:
         arxiv.close()
     return 0 if len(selected) >= target else 2
+
+
+def fetch_locked(dest, manifest):
+    """Recheck live latest/exact abs licence and immutable bytes, for either metadata source."""
+    import m11_atom
+    evidence = dest / 'm11-evidence'
+    evidence.mkdir(parents=True, exist_ok=True)
+    arxiv, report = Arxiv(evidence), []
+    try:
+        for paper in json.loads(manifest.read_text(encoding='utf-8'))['papers']:
+            tagged = f"{paper['arxiv_id']}v{paper['version']}"
+            if not policy.ARXIV_ID.fullmatch(tagged) or paper['filename'] != f'arxiv-{tagged}.pdf':
+                raise RuntimeError('unexpected manifest identity/path; not fetched')
+            verdict = m11_atom.verify(arxiv, {**paper, 'tagged': tagged}, allow_original_oai=True)
+            if not verdict['accepted'] or verdict['licence_url'] != paper['licence_url']:
+                report.append({'tagged': tagged, 'status': 'licence_refused', 'reasons': verdict['reasons']})
+                continue
+            path = dest / paper['filename']
+            existing = path.exists()
+            content = path.read_bytes() if existing else arxiv.get(f'https://arxiv.org/pdf/{tagged}').content
+            valid = (content.startswith(b'%PDF') and len(content) == paper['bytes']
+                     and hashlib.sha256(content).hexdigest() == paper['sha256'])
+            if valid and not existing:
+                m11_atom.blob(path, content)
+            report.append({'tagged': tagged, 'status': 'ok' if valid else 'checksum_mismatch'})
+    finally:
+        arxiv.close()
+    save(evidence / 'fetch-report.json', report)
+    failures = sum(r['status'] != 'ok' for r in report)
+    print(json.dumps({'papers': len(report), 'failures': failures}))
+    return int(bool(failures))
 
 
 def main():
@@ -309,22 +389,29 @@ def main():
     parser.add_argument('--dest', type=Path, default=Path(os.environ.get('USERPROFILE', str(Path.home()))) / 'ras-pilot/demo-papers')
     parser.add_argument('--manifest', type=Path, default=MANIFEST)
     parser.add_argument('--target', type=int, default=300)
-    parser.add_argument('--cached-candidates', action='store_true',
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument('--cached-candidates', action='store_true',
         help='Use the retained OAI candidate snapshot; still check exact-version abs licence before each PDF')
+    source.add_argument('--atom-candidates', action='store_true',
+        help='Use primary Atom metadata plus two live abs pages with matching latest version/licence')
+    parser.add_argument('--atom-pages', type=int, default=4)
     args = parser.parse_args()
     dest = policy.outside(args.dest)
     dest.mkdir(parents=True, exist_ok=True)
     if args.action == 'fetch':
-        result = policy.fetch(dest, args.manifest, True)
+        result = fetch_locked(dest, args.manifest)
         if result == 0:
             credits = json.loads(args.manifest.read_text(encoding='utf-8'))['papers']
             exclusion_path = args.manifest.with_name('topic-exclusions.json')
             excluded = json.loads(exclusion_path.read_text(encoding='utf-8')) if exclusion_path.exists() else []
+            download_path = args.manifest.with_name('download-exclusions.json')
+            if download_path.exists():
+                excluded += json.loads(download_path.read_text(encoding='utf-8'))
             attribution(dest, credits, [p for p in excluded if (dest / p['filename']).exists()])
         return result
     if args.action == 'curate':
         return curate(dest, args.manifest)
-    return discover(dest, args.manifest, args.target, args.cached_candidates)
+    return discover(dest, args.manifest, args.target, args.cached_candidates, args.atom_candidates, args.atom_pages)
 
 
 if __name__ == '__main__':
