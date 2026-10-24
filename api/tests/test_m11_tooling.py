@@ -532,7 +532,25 @@ def test_atom_candidates_prefer_latest_metadata_and_keep_source_hash(tmp_path):
     assert rows[0]['atom']['batch_sha256'] == hashlib.sha256(raw).hexdigest()
 
 
-@pytest.mark.parametrize('failure', ['timeout', 'invalid_xml'])
+def test_atom_reuses_retained_primary_xml_with_truthful_original_cache_path(tmp_path):
+    import m11_atom
+    raw = ('<feed xmlns="http://www.w3.org/2005/Atom"><entry>'
+           '<id>http://arxiv.org/abs/2609.99999v1</id><title>Grounded LLM</title>'
+           '<summary>LLM hallucination with grounding.</summary>'
+           '<author><name>Example Author</name></author></entry></feed>').encode()
+    for order in ('relevance', 'submittedDate'):
+        (tmp_path / f'query-0-{order}.xml').write_bytes(raw)
+    class FakeArxiv:
+        evidence = tmp_path
+        def get(self, *a, **kw):
+            pytest.fail('reuse retained metadata, live licence gate remains separate')
+    rows = m11_atom.candidates(FakeArxiv(), 1300, {'Grounding & hallucination': 'abs:hallucination'},
+                               papers.topic_for, papers.save, pages=1)
+    assert rows[0]['atom']['batch'] == 'query-0-relevance.xml'
+    assert 'licence' not in rows[0]
+
+
+@pytest.mark.parametrize('failure', ['timeout', 'invalid_xml', 'atom_error'])
 def test_atom_failed_query_retains_other_metadata_without_accepting_failed_page(tmp_path, failure):
     import m11_atom
     calls = []
@@ -548,6 +566,8 @@ def test_atom_failed_query_retains_other_metadata_without_accepting_failed_page(
             if len(calls) == 1:
                 if failure == 'timeout':
                     raise httpx.ReadTimeout('synthetic timeout')
+                if failure == 'atom_error':
+                    return httpx.Response(200, content=b'<feed xmlns="http://www.w3.org/2005/Atom"><entry><id>http://arxiv.org/api/errors#test</id></entry></feed>', request=httpx.Request('GET', url))
                 return httpx.Response(200, content=b'not XML', request=httpx.Request('GET', url))
             return httpx.Response(200, content=raw, request=httpx.Request('GET', url))
     rows = m11_atom.candidates(FakeArxiv(), 1300, {'Grounding & hallucination': 'abs:hallucination'},
@@ -556,3 +576,19 @@ def test_atom_failed_query_retains_other_metadata_without_accepting_failed_page(
     assert len(list(tmp_path.rglob('*.failure.json'))) == 1
     assert len(list(tmp_path.rglob('*.xml'))) == 1
     assert json.loads((tmp_path / 'atom-candidates.json').read_text())[0]['tagged'] == '2609.99999v1'
+
+
+def test_atom_unsupported_legacy_id_cannot_abort_other_candidates_or_infer_a_licence(tmp_path):
+    import m11_atom
+    raw = ('<feed xmlns="http://www.w3.org/2005/Atom"><entry><id>http://arxiv.org/abs/cs/0111012v1</id></entry>'
+           '<entry><id>http://arxiv.org/abs/2609.99999v1</id><title>Grounded LLM</title>'
+           '<summary>LLM hallucination with grounding.</summary>'
+           '<author><name>Example Author</name></author></entry></feed>').encode()
+    class FakeArxiv:
+        evidence = tmp_path
+        def get(self, url, **params):
+            return httpx.Response(200, content=raw, request=httpx.Request('GET', url))
+    rows = m11_atom.candidates(FakeArxiv(), 1300, {'Grounding & hallucination': 'abs:hallucination'},
+                               papers.topic_for, papers.save, pages=1)
+    assert len(rows) == 1 and rows[0]['tagged'] == '2609.99999v1'
+    assert 'licence' not in rows[0] and len(list(tmp_path.rglob('*.unsupported-id.json'))) == 2

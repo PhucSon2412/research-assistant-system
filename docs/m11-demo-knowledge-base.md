@@ -103,9 +103,13 @@ kiểm citation ID/lịch sử/phiên bản đang chọn cùng trùng latest; li
 Manifest ghi rõ `method=atom_and_live_abs_latest`, không giả trường OAI; HTML và XML gốc
 ngoài repo có SHA-256. Tải lại cũng kiểm mới hai trang trước khi nhận bytes/hash đã khóa.
 Regression mới kiểm newer version, NC/ND, thiếu lịch sử, sai ID, license bất đồng và file
-hỏng được giữ nguyên. Lượt offline mới nhất **86 pass/1 deselected**, chưa phải corpus hoàn tất.
+hỏng được giữ nguyên. Lượt offline mới nhất **89 pass/1 deselected**, chưa phải corpus hoàn tất.
 Nếu một trang Atom lỗi/timeout/XML không hợp lệ, script lưu metadata lỗi ngoài repo và tiếp tục
 truy vấn chủ đề/thứ tự khác; không ghi trang lỗi thành cache hợp lệ hoặc suy ra license.
+Snapshot Atom từ lần tìm đầu vẫn có 2.100 entry; bộ lọc hiện hành giữ 1.700 candidate.
+`--atom-pages 1` tái dùng XML gốc với đường dẫn/hash thật, vẫn lấy mới hai trang abs trước PDF.
+Một ID arXiv kiểu cũ (`cs/0111012v1`) nằm ngoài schema manifest nên được ghi lý do và bỏ qua,
+không làm mất các candidate còn lại. Atom error entry cũng không được coi là paper.
 
 Đề xuất khởi chạy controller nền để nối tải/nạp → smoke → backup/check đã bị bộ duyệt tự động
 từ chối (phạm vi 1.300 và chuỗi chạy không giám sát chưa được xác nhận tường minh). Controller

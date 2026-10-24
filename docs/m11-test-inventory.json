@@ -86,20 +86,20 @@
     "new_oai_requests": "filtered ListRecords and GetRecord timeout; Identify 200; continue retained OAI candidates with fresh exact-version abs licence checks",
     "scope_confirmed_total_target": 1300,
     "latest_offline": {
-      "tests": 86,
+      "tests": 89,
       "failures": 0,
       "errors": 0,
       "skipped": 0,
       "deselected": 1,
       "deselected_reason": "manifest completeness waits for full target",
-      "junit_file": "offline-atom-86-037ddae73dc5.xml",
-      "junit_sha256": "037ddae73dc593817e766f4e94ed445fd1825698d5e087a9db65d732a86022d2"
+      "junit_file": "offline-atom-89-eabee3963cbb.xml",
+      "junit_sha256": "eabee3963cbb3f8f7ebb13cdf497da37401eb4193b458482b7dd7136bc802e8a"
     },
     "latest_source_sha256": {
-      "scripts\\m11_atom.py": "b1d1c19ba7c4fc39c8b16a95a7d49beff634df0dec4c41814e2b267032767d8f",
-      "scripts\\m11_papers.py": "1da286575fcc2f4eaed066d6ca52b51d7f03df91cf91add98f97919033d2e8b3",
-      "scripts\\m11_demo.py": "b397495da00a3fecc127b47a506f7cfb094b08965aaaeed91f350afc6a2be3d9",
-      "api\\tests\\test_m11_tooling.py": "3cc379d5e0361f25de80e9cf39b8af2ebbf0e220d6a98a7e9c5e99ff63869376"
+      "scripts/m11_atom.py": "b1156dd4c3d176fdb757d061a431f2c8cd3290f5350be77b130f37701bf802f1",
+      "scripts/m11_papers.py": "1da286575fcc2f4eaed066d6ca52b51d7f03df91cf91add98f97919033d2e8b3",
+      "scripts/m11_demo.py": "b397495da00a3fecc127b47a506f7cfb094b08965aaaeed91f350afc6a2be3d9",
+      "api/tests/test_m11_tooling.py": "5a6de914a107e9e2c1422b6c86f856067c72fac00d76a2bac81419afa9cf0076"
     },
     "licence_source_fallback": "Primary Atom with live latest and exact-version abs history and matching open licences; raw HTML/XML hashes; never fabricate OAI evidence"
   },

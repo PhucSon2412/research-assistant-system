@@ -133,6 +133,12 @@ def candidates(arxiv, target, queries, topic_for, save, pages=4):
                           'sortBy': order, 'sortOrder': 'descending'}
                 signature = hashlib.sha256(json.dumps(params, sort_keys=True).encode()).hexdigest()[:16]
                 cache = root / (signature + '.xml')
+                # The first M11 discovery retained the same primary Atom queries
+                # before OAI selection. Metadata has no expiring pagination token;
+                # every resulting candidate still needs two fresh abs checks.
+                legacy = arxiv.evidence / f'query-{index}-{order}.xml'
+                if page == 0 and not cache.exists() and legacy.exists():
+                    cache = legacy
                 try:
                     if cache.exists():
                         raw = cache.read_bytes()
@@ -146,6 +152,8 @@ def candidates(arxiv, target, queries, topic_for, save, pages=4):
                     if feed.tag != '{http://www.w3.org/2005/Atom}feed':
                         raise RuntimeError('unexpected Atom feed root')
                     entries = feed.findall('a:entry', NS)
+                    if any('/api/errors' in e.findtext('a:id', default='', namespaces=NS) for e in entries):
+                        raise RuntimeError('arXiv Atom error entry')
                 except (httpx.HTTPError, RuntimeError, ET.ParseError) as exc:
                     failure = {'params': params, 'error_type': type(exc).__name__,
                                'at': datetime.now(timezone.utc).isoformat(timespec='seconds')}
@@ -161,7 +169,12 @@ def candidates(arxiv, target, queries, topic_for, save, pages=4):
                     tagged = uri.rsplit('/', 1)[-1]
                     match = policy.ARXIV_ID.fullmatch(tagged)
                     if not match:
-                        raise RuntimeError('unexpected Atom entry; no licence inferred')
+                        # Legacy subject/YYMMNNN identifiers are outside this
+                        # manifest's supported modern versioned ID grammar.
+                        save(root / (signature + '.unsupported-id.json'),
+                             {'entry_id': uri, 'reason': 'unsupported_atom_identifier',
+                              'batch_sha256': hashlib.sha256(raw).hexdigest()})
+                        continue
                     title = ' '.join(entry.findtext('a:title', default='', namespaces=NS).split())
                     abstract = entry.findtext('a:summary', default='', namespaces=NS)
                     topic = topic_for(title, abstract)
