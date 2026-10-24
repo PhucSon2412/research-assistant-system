@@ -155,5 +155,32 @@
       "all_three_jobs": "success",
       "junit_sha256": "17ad95540c1a47b04b5d67ef0396d3d740f7b8ea0db3169429b26e07e13bcc5d"
     }
+  },
+  "windows_checkpoint_recovery": {
+    "cause": "WinError 5 on metadata atomic replace; index client kept running",
+    "prior_manifest_count": 2114,
+    "unpublished_temp_count": 2115,
+    "temp_prefix_matches": true,
+    "unpublished_pdf_sha_and_size_match": true,
+    "history": "recovery-20261024T152307Z",
+    "metadata_replace_attempts": 8,
+    "max_total_retry_sleep_seconds": 3.55,
+    "api_mutations_retried": false,
+    "index_client_restarted": false,
+    "adopted_index_pid": 36716,
+    "offline": {
+      "tests": 94,
+      "deselected": 1,
+      "failures": 0,
+      "errors": 0,
+      "junit_file": "offline-sharing-94-b217ca57f962.xml",
+      "junit_sha256": "b217ca57f962266df68801e20d7ce9858c1e882459e334b21280b44f7a134088"
+    },
+    "source_sha256": {
+      "scripts/m11_papers.py": "0aa4842cdbc824d86678e5e04b141ddac7374505dc7d1074c52a36977b59ac45",
+      "scripts/m11_status.py": "f9c33ca6d8db2a15585b91c27efa1250eb4a33eb9c4f36f4aaa6b6b93173dd5d",
+      "api/tests/test_m11_tooling.py": "785ccd8e057014a302067a5f9eb5444e4b35407781a45bff3e42357d6b7d1253"
+    },
+    "helper_sha256": "d82e909f8fb8ae4a878d6a1ab14937bbfaaf92f45652fa779f38c6280d2dc148"
   }
 }

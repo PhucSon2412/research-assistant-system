@@ -119,7 +119,17 @@ def save(path, data):
         out.write(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
         out.flush()
         os.fsync(out.fileno())
-    tmp.replace(path)
+    # Windows readers (the API batch/status command or an indexer) can briefly
+    # deny delete-sharing on the destination. Retry only publishing these already
+    # fsynced metadata bytes; this never repeats an API/provider mutation.
+    for attempt in range(8):
+        try:
+            tmp.replace(path)
+            break
+        except PermissionError as exc:
+            if getattr(exc, 'winerror', None) not in (5, 32, 33) or attempt == 7:
+                raise
+            time.sleep(min(0.05 * 2 ** attempt, 1.0))
 
 
 class Arxiv(policy.Arxiv):

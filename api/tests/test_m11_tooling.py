@@ -82,6 +82,35 @@ def test_ledger_keeps_full_ceiling_after_operation_finishes_without_receipt(tmp_
         ledger.admit('upload:y', Decimal('.02'), 'test')
 
 
+@pytest.mark.parametrize('persistent', [False, True])
+def test_metadata_publish_retries_only_windows_sharing_errors_and_preserves_old_file(tmp_path, monkeypatch, persistent):
+    target = tmp_path / 'checkpoint.json'
+    target.write_text('{"old": true}', encoding='utf-8')
+    original = target.read_bytes()
+    real_replace, attempts, sleeps = Path.replace, [], []
+    def sharing_replace(path, destination):
+        attempts.append(path)
+        assert target.read_bytes() == original
+        assert json.loads(path.read_text()) == {'new': True}
+        if persistent or len(attempts) < 3:
+            error = PermissionError('synthetic Windows sharing denial')
+            error.winerror = 5
+            raise error
+        return real_replace(path, destination)
+    monkeypatch.setattr(Path, 'replace', sharing_replace)
+    monkeypatch.setattr(papers.time, 'sleep', sleeps.append)
+    if persistent:
+        with pytest.raises(PermissionError):
+            papers.save(target, {'new': True})
+        assert len(attempts) == 8 and target.read_bytes() == original
+        assert json.loads(target.with_suffix('.json.tmp').read_text()) == {'new': True}
+    else:
+        papers.save(target, {'new': True})
+        assert len(attempts) == 3 and json.loads(target.read_text()) == {'new': True}
+        assert not target.with_suffix('.json.tmp').exists()
+    assert sum(sleeps) <= 4
+
+
 def test_index_threshold_leaves_the_full_fifteen_question_headroom(tmp_path):
     ledger = library.Ledger(tmp_path / 'cost')
     ledger.admit('upload:last', library.INDEX_STOP_USD, 'test')

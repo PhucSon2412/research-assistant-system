@@ -28,12 +28,12 @@ def stamp(path):
     return datetime.fromtimestamp(path.stat().st_mtime, LOCAL_TZ).isoformat(timespec='seconds')
 
 
-def helper_alive(pid):
+def helper_alive(pid, script_name='output/m11_budget_finish.py'):
     if not isinstance(pid, int) or pid <= 0 or os.name != 'nt':
         return None
     # Never return the command line: an unrelated process could have reused a PID.
     script = (f"$p=Get-CimInstance Win32_Process -Filter 'ProcessId={pid}'; "
-              "if($p -and $p.CommandLine.Replace('\\','/') -like '*output/m11_budget_finish.py*--execute*')"
+              f"if($p -and $p.CommandLine.Replace('\\','/') -like '*{script_name}*')"
               "{'yes'}else{'no'}")
     try:
         r = subprocess.run(['powershell', '-NoProfile', '-Command', script],
@@ -74,6 +74,9 @@ def status(root):
     return {
         'checked_at': datetime.now(LOCAL_TZ).isoformat(timespec='seconds'),
         'result': result, 'phase': phase, 'helper_pid': launch.get('pid'), 'helper_alive': alive,
+        'workers': {name: {'pid': state.get('steps', {}).get(name, {}).get('pid'),
+                          'alive': helper_alive(state.get('steps', {}).get(name, {}).get('pid'), script)}
+                    for name, script in [('index', 'scripts/m11_library.py'), ('discover', 'scripts/m11_papers.py')]},
         'manifest_papers': len(tags), 'target_receipts': sum(bool(r.get('item_id')) for r in rows.values()),
         'checkpoint_states': dict(Counter(r.get('state', r.get('status')) for r in rows.values())),
         'committed_usd_not_billed': str(committed) if committed is not None else None,

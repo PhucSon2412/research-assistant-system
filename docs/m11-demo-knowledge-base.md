@@ -225,6 +225,20 @@ trạng thái D ở lượt sandbox đầu do permission denied.
 
 ### Chủ dự án tự kiểm tra tiến trình nền
 
+Lượt kiểm lúc 22:19 ngày 2026-10-24 phát hiện helper/downloader đã dừng lúc 22:03 vì
+Windows từ chối atomic replace `manifest.json.tmp` → `manifest.json` (`WinError 5`);
+**client index 36716 vẫn tiếp tục chạy**, không chạm trần tiền. Bản manifest thật có 2.114 paper,
+bản `.tmp` có 2.115 và giữ nguyên prefix; PDF chưa publish `2605.27039v1` có bytes/hash khớp.
+Giữ cả hai bản, helper/journal lỗi và SHA-256 trong `evidence/m11/recovery-20261024T152307Z/`.
+Không promote mù `.tmp`, không resend upload: downloader kiểm license lại và tiếp tục từ manifest thật.
+
+`save()` mới retry tối đa tám lần (tổng chờ ≤3,55 s) **chỉ** publish metadata đã fsync khi
+Windows trả lỗi chia sẻ/đổi file 5/32/33. Lỗi dai dẳng vẫn giữ manifest cũ và `.tmp`, rồi dừng;
+không đổi ACL và không retry request API/provider. Regression **94 pass/1 deselected**.
+Helper mới tiếp quản PID index đang sống (`--adopt-index-pid`), không mở client upload thứ hai,
+không kill/restart client hiện có; history cũ giữ nguyên. `workers.index.alive` và
+`workers.discover.alive` giúp phân biệt helper dừng với mọi tác vụ đều đã dừng.
+
 Từ thư mục repo, chạy lệnh chỉ đọc sau; không gọi API/provider hoặc đọc secret:
 
 ```powershell
