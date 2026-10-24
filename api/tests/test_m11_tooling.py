@@ -266,3 +266,23 @@ def test_fetch_recreates_attribution_in_a_fresh_destination(tmp_path, monkeypatc
     credit = (dest / 'ATTRIBUTION.md').read_text(encoding='utf-8')
     assert 'A retrieval paper' in credit and 'Example Author' in credit
     assert 'creativecommons.org/publicdomain/zero/1.0/' in credit
+
+
+def test_inventory_counts_failed_job_derivatives_separately_from_searchable_chunks(tmp_path):
+    import m11_demo
+    papers.save(tmp_path / 'library-before.json', [])
+    items = [
+        {'id': 'a', 'title': 'Indexed paper', 'content_status': 'indexed', 'jobs': [],
+         'files': [{'page_count': 1, 'byte_size': 100}]},
+        {'id': 'b', 'title': 'Partial failed paper', 'content_status': 'metadata_only',
+         'jobs': [{'state': 'terminal_failed', 'last_error_code': 'provider_outcome_uncertain'}],
+         'files': [{'page_count': 2, 'byte_size': 200}]},
+    ]
+    class FakeApi:
+        def request(self, method, path, **kw):
+            assert method == 'GET' and path.endswith('/chunks')
+            return {'chunks': [{'section_kind': 'body'}, {'section_kind': 'references' if '/a/' in path else 'abstract'}]}
+    result = m11_demo.inventory(FakeApi(), items, {}, {}, tmp_path)
+    assert result['derived_chunks'] == 4
+    assert result['indexed_chunks'] == 1
+    assert result['pages'] == 3 and result['original_bytes'] == 300

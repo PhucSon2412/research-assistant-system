@@ -1,6 +1,6 @@
 # M11 — thư viện cá nhân trên máy và kho paper mở rộng
 
-**Đang triển khai (2026-10-23, Asia/Saigon).** Base đã fetch/xác minh
+**Đang triển khai (2026-10-24, Asia/Saigon).** Base đã fetch/xác minh
 `1f7bfac970fa0015a6d3211d3514a4136df4d4d6` (PR #71 MERGED), nhánh
 `ops/m11-demo-knowledge-base`. Chỉ dẫn mới của chủ dự án thay 150/$10 bằng
 **khoảng 300 paper bổ sung/$30**, dừng gọi mới ở **$24**. Không merge.
@@ -61,7 +61,11 @@ IPv4 hiện hành trong lượt kiểm; listener ngoài loopback không tồn t�
 | Long context & chunking | 43 |
 | Search agents & tools | 63 |
 
-Trạng thái nạp cuối, trang/chunk/object và câu hỏi: cập nhật sau khi toàn bộ job kết thúc.
+Checkpoint lúc tiếp quản ngày 2026-10-24: **252/300 target đã nhận receipt**, trong đó
+121 `ready`, 40 `needs_review`, 89 `terminal_failed`, hai job còn ghi `indexing`.
+Client phiên trước đã thoát; Docker Desktop đang tắt nên chưa thể đối chiếu hai job hoặc
+nạp 48 paper còn lại. Cam kết lúc này **$2,7876122**, không có thao tác trả phí mới khi API tắt.
+Đây là checkpoint, không phải kết quả cuối; trang/chunk/object và câu hỏi cập nhật sau khi job kết thúc.
 
 ### Sửa bộ lọc chủ đề trong lúc nạp
 
@@ -106,15 +110,22 @@ Ciphertext SHA-256 `1e7755e3c05d36dbb62b01a4e30742a259220b02daf8c9c0dfa57b43af72
 Lượt này dùng `--no-alert`. Baseline có backup preflight fail lúc 11:30 UTC, giữ lịch sử;
 lượt vừa chạy thành công. Replica equal seq 13 trước nạp; maintenance null.
 
-Offline: **64/64 pass** (`test_m11_tooling.py` 23 + `test_m7c_tooling.py` 41), kiểm local state,
+Offline: **65/65 pass** (`test_m11_tooling.py` 24 + `test_m7c_tooling.py` 41), kiểm local state,
 CA/leaf, env/provider/image preservation, chỉ edge, mutation không retry, parser drift và ledger giữ trần.
 Checkpoint ghi temp → flush/fsync → atomic replace; ledger có admission nhưng thiếu binding checkpoint
 thì chặn upload lại. Không dùng việc checkpoint thiếu để suy ra request chưa gửi.
 Lượt sandbox đầu 3 pass/9 setup error do quyền tmp; sau mở quyền chạy được. Assertion mới
 ban đầu dùng sai tên env provider (53 pass/1 fail), đã sửa theo `OPENROUTER_API_KEY`.
-Không cộng các lượt thành nhiều test độc lập.
+Không cộng các lượt thành nhiều test độc lập. JUnit cuối được giữ theo hash ở
+`evidence/m11/offline-tooling-65-86299274ff76.xml` (SHA-256 đầy đủ trong inventory).
+Các JUnit phát triển trước đó đã bị ghi đè; giữ tóm tắt/exit trong nhật ký tool, không coi chúng
+là raw artifact còn tồn tại hoặc dùng hash của lượt 64 test cho lượt cuối 65 test.
 
-Backup sau nạp, 10–15 câu hỏi và CI: **chưa xong**, sẽ cập nhật. Không chạy lại đánh giá M7c
+CI `39969594383` tại `487b098` đã kết thúc thành công: API **1.307/1.307 pass**,
+Web test/typecheck/build và Pilot deploy config contract đều success. Đây là head trước sửa
+inventory chunk (offline cuối 65 test); phải chờ CI của head cuối sau khi cập nhật toàn bộ kết quả.
+
+Backup sau nạp và 10–15 câu hỏi: **chưa xong**, sẽ cập nhật. Không chạy lại đánh giá M7c
 hay ghi human verdict. Git ngoài sandbox xác nhận bundle human-review không bị xóa/thay đổi;
 trạng thái D ở lượt sandbox đầu do permission denied.
 
@@ -133,6 +144,10 @@ $py = "$env:USERPROFILE\.conda\envs\ras\python.exe"
 
 Không chạy hai `run` cùng lúc. `uploads.json` lưu receipt/job IDs và trạng thái; record
 `sending` chưa có ID khiến script dừng, phải đối chiếu thư viện trước, không tự resend PUT.
+Sau máy/phiên chạy dừng, mở Docker Desktop và kiểm PID trong `cost/ledger.lock`. Chỉ gỡ lock
+nếu đúng PID đó đã thoát và không có client M11 khác; không tự gỡ lock đang hoạt động.
+`run` poll lại job có receipt trước khi nhận paper mới. Không chạy lại toàn bộ câu hỏi trả phí
+khi `smoke.json` đã có record; kiểm outcome chưa rõ trước.
 PDF đã có không tải lại; fetch kiểm lại license và checksum. Version/license thay đổi thì
 từ chối thay vì âm thầm đổi bytes trong manifest. Fetch thành công tạo lại `ATTRIBUTION.md`
 kể cả ở thư mục mới; giữ ghi công cũ nếu thư mục đã có corpus M7c.

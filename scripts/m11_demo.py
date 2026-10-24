@@ -60,19 +60,22 @@ def inventory(api, items, uploads, collections, evidence):
     per_item = []
     baseline = {i['id'] for i in json.loads((evidence / 'library-before.json').read_text(encoding='utf-8'))}
     for item in items:
-        chunks = 0
-        if item['content_status'] == 'indexed':
-            while True:
-                page = api.request('GET', '/library/items/' + item['id'] + '/chunks',
-                                   params={'limit': 100, 'offset': chunks})['chunks']
-                chunks += len(page)
-                if len(page) < 100:
-                    break
+        chunks, body_abstract = 0, 0
+        # The owner may read derivatives even when indexing failed partway.
+        # Count them, while keeping active searchable chunks separate.
+        while True:
+            page = api.request('GET', '/library/items/' + item['id'] + '/chunks',
+                               params={'limit': 100, 'offset': chunks})['chunks']
+            chunks += len(page)
+            body_abstract += sum(c['section_kind'] in ('body', 'abstract') for c in page)
+            if len(page) < 100:
+                break
         jobs = item['jobs']
         per_item.append({'item_id': item['id'], 'title': item['title'], 'baseline': item['id'] in baseline,
             'content_status': item['content_status'], 'jobs': [{k: j[k] for k in ('state', 'last_error_code')} for j in jobs],
             'pages': sum(f['page_count'] or 0 for f in item['files']),
-            'original_bytes': sum(f['byte_size'] for f in item['files']), 'readable_chunks': chunks})
+            'original_bytes': sum(f['byte_size'] for f in item['files']), 'derived_chunks': chunks,
+            'indexed_chunks': body_abstract if item['content_status'] == 'indexed' else 0})
     counts = {}
     for name, cid in collections.items():
         counts[name] = api.request('GET', '/collections/' + cid + '/items', params={'limit': 1})['total']
@@ -80,7 +83,8 @@ def inventory(api, items, uploads, collections, evidence):
               'new_upload_states': dict(Counter(r.get('state', r['status']) for r in uploads.values())),
               'pages': sum(i['pages'] for i in per_item),
               'original_bytes': sum(i['original_bytes'] for i in per_item),
-              'readable_chunks': sum(i['readable_chunks'] for i in per_item),
+              'derived_chunks': sum(i['derived_chunks'] for i in per_item),
+              'indexed_chunks': sum(i['indexed_chunks'] for i in per_item),
               'collections': counts, 'papers': per_item}
     papers.save(evidence / 'inventory.json', report)
     return report

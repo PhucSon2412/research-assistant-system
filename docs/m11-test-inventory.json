@@ -1,0 +1,63 @@
+{
+  "at": "2026-10-24T01:42:47+00:00",
+  "stage": "checkpoint; runtime unavailable, ingestion unfinished",
+  "base": "1f7bfac970fa0015a6d3211d3514a4136df4d4d6",
+  "source_commit_before_uncommitted_inventory_fix": "487b09859be6b49f8e4c04ce84a86a2897492400",
+  "unchanged_trees": {
+    "api/app": {
+      "base": "8100e7cf5dba2378c94afd7789ae7c3dde3254bd",
+      "head": "8100e7cf5dba2378c94afd7789ae7c3dde3254bd"
+    },
+    "web": {
+      "base": "a96ba92e509473233138c340f8a942967c84194d",
+      "head": "a96ba92e509473233138c340f8a942967c84194d"
+    },
+    "deploy": {
+      "base": "4a9f25daad39af63300f9cf5b5fc475d6afaa5f0",
+      "head": "4a9f25daad39af63300f9cf5b5fc475d6afaa5f0"
+    }
+  },
+  "source_sha256": {
+    "scripts/m9_lan_demo.py": "7308e6e11c2cfddc28195de1c096550e6acbed8b9f62c739480dfa02eca47d1c",
+    "scripts/m11_papers.py": "86c3324caa2c8a15c4d24d1254937d27b660693f7b122cf430c1ffcc20e9cc2d",
+    "scripts/m11_library.py": "a123f9c95f80a4cdef4bfc88e51e47e06aba76314fa5b6eda62058fb6f8c55f8",
+    "scripts/m11_demo.py": "ae0ff4be982537a8fc49a255560d2db05b1c35aaf2f3c632d051d7a4612185b4",
+    "api/tests/test_m11_tooling.py": "ca034facc33adc6ece5c8f9bdcbc9df0e6d18753691d92be269321bb11d4bbd6",
+    ".github/workflows/ci.yml": "591ac73033c165d4df97fa53e9dd2f441d4ba15224ec7d042f71ca1898149200",
+    "evaluation/m11-papers/manifest.json": "3d153fd5d32f10d1e3eea9e026708008a12da8742f8ea34e6efe2574fc846548",
+    "evaluation/m11-papers/topic-exclusions.json": "81491af11f71b5bb9cefa03fa807d6590425d877c7e99623896b5e9e554d5ecd"
+  },
+  "offline": {
+    "tests": 65,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "junit_file": "offline-tooling-65-86299274ff76.xml",
+    "junit_sha256": "86299274ff764f66b0acc1e8094260d4991a7f82b175548b5d3ff874e2c5d942"
+  },
+  "ci_completed": {
+    "run_id": 39969594383,
+    "head": "487b09859be6b49f8e4c04ce84a86a2897492400",
+    "api_tests": 1307,
+    "jobs": {
+      "api": "success",
+      "web": "success",
+      "deploy": "success"
+    },
+    "junit_sha256": "c041afd9c48ed0b0735a9c604a037116aafc911299b5587053b2a3ff5897d1ae"
+  },
+  "runtime_checkpoint": {
+    "target_processed": 252,
+    "target_states": {
+      "ready": 121,
+      "needs_review": 40,
+      "terminal_failed": 89,
+      "indexing": 2
+    },
+    "retained_extras": 5,
+    "committed_usd": "2.7876122",
+    "after_backup": "pending",
+    "questions": "pending"
+  },
+  "raw_evidence_root": "%USERPROFILE%/ras-pilot/evidence/m11"
+}
