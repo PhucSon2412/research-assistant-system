@@ -223,6 +223,28 @@ trạng thái D ở lượt sandbox đầu do permission denied.
 
 ## Chạy tiếp/tải lại
 
+### Chủ dự án tự kiểm tra tiến trình nền
+
+Từ thư mục repo, chạy lệnh chỉ đọc sau; không gọi API/provider hoặc đọc secret:
+
+```powershell
+& "$env:USERPROFILE\.conda\envs\ras\python.exe" scripts/m11_status.py
+```
+
+Xem `result`:
+
+- `running`: helper đúng PID/command vẫn sống; `last_updates` cho biết log/receipt có tiến triển không.
+- `runtime_done_review_pending`: đã kết thúc các bước runtime; còn agent review kết quả, docs/PR và CI head cuối.
+- `stopped_needs_review`: đã dừng do lỗi/chốt cần review; xem `helper_error`, chưa phải hoàn tất.
+- `helper_not_running_check_logs`: file state còn giai đoạn chạy nhưng PID không còn đúng; không coi là đã xong.
+- `unknown`: không xác minh được liveness, chẳng hạn thiếu quyền kiểm process; không kết luận là đang chạy hoặc đã xong.
+
+`manifest_papers` là số metadata PDF đã chọn; `target_receipts` là số đã có receipt;
+`checkpoint_states.ready` là số đã index xong tại checkpoint. `committed_usd_not_billed` giữ toàn bộ
+ceiling, không phải invoice. Giờ hiển thị theo Việt Nam (+07:00). Helper không tự nhắn kết quả vào chat.
+State chỉ được ghi khi đổi giai đoạn, nên thời gian file state cũ không có nghĩa tiến trình đã treo;
+hãy xem cả `helper_alive` và thời gian `uploads.json`/hai log trong `last_updates`.
+
 ```powershell
 $py = "$env:USERPROFILE\.conda\envs\ras\python.exe"
 & $py scripts/m11_papers.py discover --target 1300
