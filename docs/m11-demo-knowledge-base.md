@@ -8,6 +8,35 @@ yêu cầu **nạp thêm khoảng 1.000 paper** và đã xác nhận thêm ngoà
 tổng khoảng **1.300 paper mới**. Giữ cùng ledger/trần/quota, không cộng
 thêm ngân sách vì key còn tiền. Không merge.
 
+**Chỉ dẫn mới hơn ngày 2026-10-24:** chủ dự án yêu cầu dùng **$50 cho index**. Trần tổng M11
+đổi thành **$50/dừng $40 (80%)**, gồm phần ledger đã có; quota/model của ứng dụng giữ nguyên.
+Chủ dự án đã chọn **tiếp tục mở rộng tới giới hạn ngân sách**, vượt mốc 1.300 nếu còn trần.
+Index có chốt **$39,187**, giữ **$0,813** trần cho 15 query/rerank và 11 generation của smoke.
+Tới chốt, không gửi thêm notice/intent/PUT; vẫn poll job đã nhận và hoàn tất title/collection.
+Tiền cam kết không bị trả về 0 vì job xong/lỗi; không đổi model hoặc index lại để tiêu tiền.
+Probe chỉ đọc từ env API cho `limit=100`, `limit_reset=daily`, `limit_remaining≈96,27`:
+đây là hạn mức key còn trong ngày, chưa xác nhận số dư ví. Delta key nhóm không phải billed riêng M11.
+Các mốc $30/$24 bên dưới giữ làm lịch sử. Client đang chạy vẫn giữ chốt cũ tới khi kết thúc;
+client mới nhận trần mới, không dừng job đang gửi hoặc gỡ lock đang hoạt động để thay budget.
+
+Kiểm tra tại lượt này: manifest 1.074, receipt target 823, `ready` 401, `needs_review` 154,
+`terminal_failed` 264, `fulltext_rejected` 3; một paper preflight bỏ qua, hai request/job còn dở.
+Cam kết **$8,7062490**. Helper đã dừng trước mọi bước hậu kiểm vì snapshot Atom hết candidate
+ở 1.074/1.300, không phải vì hết tiền; chưa smoke/backup cuối. Đang tải bù từ OAI cache,
+vẫn kiểm license abs đúng version và giữ 300 đầu. Không tự chạy lại helper state đã dừng.
+Tooling ngân sách mới qua **92 test offline/1 deselected**; ca đủ manifest chờ khóa corpus.
+Một fixture metadata cũ thiếu các trần search/rerank/generation khiến lượt phát triển fail;
+đã bổ sung cấu hình giả đầy đủ, giữ JUnit fail và lượt sửa riêng ngoài repo.
+Client cũ sau đó dừng tại GET `401 session_expired` (giới hạn phiên tuyệt đối tám giờ),
+không có `sending/title_sending/membership_sending` chưa rõ và lock đã được gỡ bởi chính client.
+Client mới đăng nhập lại chủ động sau sáu giờ **trước** request tiếp theo; không replay request lỗi.
+Helper ngân sách dùng state mới `finish-budget50-state.json`, giữ nguyên journal helper cũ.
+Lô metadata dự trù tối đa 6.000 để cung cấp đủ candidate cho chốt tiền; con số này không phải cam kết
+mọi file sẽ được upload. Hết nguồn trước chốt thì dừng để agent bổ sung metadata, không giả hoàn tất.
+Khi index tới chốt, PDF chưa nạp vẫn giữ file/credit, metadata chuyển sang download exclusion với
+`budget_not_uploaded`; manifest cuối chỉ giữ phần đã xử lý. Fixture 1.302 file giả kiểm giữ toàn bộ
+file và 1.300 receipt, credit hai file chưa nạp và chặn finalization khi mutation chưa rõ.
+
 ## Chuyển sang local
 
 Đã chạy `m9_lan_demo.py rebind --local --apply`: state lưu `access_mode=local`, chỉ sửa

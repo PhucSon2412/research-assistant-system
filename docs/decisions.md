@@ -1,5 +1,15 @@
 # Nhật ký quyết định
 
+## Ngân sách index M11 $50 và mở rộng tiếp (2026-10-24)
+
+Chủ dự án yêu cầu dùng $50 cho index rồi chọn **tiếp tục mở rộng kho paper tới giới hạn ngân sách**.
+Trần tổng M11 là $50 gồm ledger cũ, giữ quy tắc dừng 80% ở $40; không cộng thêm $50,
+không nới quota/ngân sách ngày hoặc đổi model ứng dụng. Index dừng admission ở $39,187,
+giữ $0,813 cho 15 câu thử cuối; các job đã có receipt được theo dõi đến cuối.
+Mốc 1.300 là mốc tối thiểu trước khi mở rộng thêm, không còn là điểm dừng nếu còn trần.
+Key hiện có `limit=100`, `limit_reset=daily`: ~$96 là hạn mức ngày, không xác nhận số dư ví.
+Không gán delta của key nhóm thành hóa đơn riêng M11; giữ toàn bộ ceiling khi thiếu receipt.
+
 ## Cập nhật phạm vi M11 của chủ dự án (2026-10-23)
 
 Ngày 2026-10-24, chủ dự án mở Docker trở lại và yêu cầu “nạp thêm khoảng 1000 paper”.

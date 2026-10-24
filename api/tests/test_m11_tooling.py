@@ -72,11 +72,27 @@ def test_regenerating_provider_env_preserves_persisted_local_mode_and_web_image(
 
 def test_ledger_keeps_full_ceiling_after_operation_finishes_without_receipt(tmp_path):
     ledger = library.Ledger(tmp_path / 'cost')
-    seq = ledger.admit('upload:x', Decimal('23.99'), 'test')
+    # Includes reservations above the previous $24 stop without resetting history.
+    assert library.HARD_CAP_USD == Decimal('50') and library.STOP_USD == Decimal('40')
+    amount = library.INDEX_STOP_USD - Decimal('.01')
+    seq = ledger.admit('upload:x', amount, 'test')
     ledger.append({'event': 'outcome', 'seq': seq, 'status': 'uncertain'})
-    assert ledger.state()['committed_usd'] == Decimal('23.99')
+    assert ledger.state()['committed_usd'] == amount
     with pytest.raises(RuntimeError, match='80%'):
         ledger.admit('upload:y', Decimal('.02'), 'test')
+
+
+def test_index_threshold_leaves_the_full_fifteen_question_headroom(tmp_path):
+    ledger = library.Ledger(tmp_path / 'cost')
+    ledger.admit('upload:last', library.INDEX_STOP_USD, 'test')
+    before = ledger.records()
+    with pytest.raises(library.IndexBudgetStop):
+        ledger.admit('upload:blocked', Decimal('.000001'), 'test')
+    assert ledger.records() == before
+    ledger.admit('smoke:all', library.SMOKE_RESERVE_USD, 'test')
+    assert ledger.state()['committed_usd'] == library.STOP_USD
+    with pytest.raises(library.BudgetStop):
+        ledger.admit('smoke:blocked', Decimal('.000001'), 'test')
 
 
 @pytest.mark.parametrize('amount', [Decimal('NaN'), Decimal('Infinity'), Decimal('-1'), Decimal('0'), None])
@@ -112,6 +128,29 @@ def test_product_client_uses_https_csrf_origin_and_never_retries_mutations(tmp_p
     assert len(calls) == 3
 
 
+def test_long_run_renews_session_before_a_mutation_without_replaying_that_mutation(tmp_path, monkeypatch):
+    demo.save_state(tmp_path, {'access_mode': 'local', 'host': 'ras-demo.lan', 'port': 8443})
+    demo.write(tmp_path / 'secrets/library_user_email', 'test@example.invalid')
+    demo.write(tmp_path / 'secrets/library_user_password', 'synthetic-password')
+    paths = []
+    def handle(req):
+        paths.append(req.url.path)
+        if req.url.path == '/api/auth/csrf':
+            return httpx.Response(200, json={}, headers={'Set-Cookie': 'ras_csrf=synthetic; Path=/; Secure'})
+        if req.url.path == '/api/auth/login':
+            return httpx.Response(200, json={'user': {'role': 'user'}})
+        return httpx.Response(503, json={'error': 'upload_outcome_uncertain'})
+    real_client = httpx.Client
+    monkeypatch.setattr(library.ssl, 'create_default_context', lambda **kw: True)
+    monkeypatch.setattr(library.httpx, 'Client', lambda **kw: real_client(**{**kw, 'transport': httpx.MockTransport(handle)}))
+    api = library.Api(tmp_path)
+    api.session_started -= 7 * 3600
+    with pytest.raises(RuntimeError, match='no retry'):
+        api.request('POST', '/uploads/intents', json={'acknowledged': True})
+    api.close()
+    assert paths == ['/api/auth/csrf', '/api/auth/login', '/api/auth/csrf', '/api/auth/login', '/api/uploads/intents']
+
+
 def test_uncertain_title_update_is_checkpointed_and_blocks_automatic_replay(tmp_path, monkeypatch):
     import hashlib
     root = tmp_path / 'demo'
@@ -141,7 +180,9 @@ def test_uncertain_title_update_is_checkpointed_and_blocks_automatic_replay(tmp_
             if method == 'PATCH': raise RuntimeError('uncertain metadata response')
             pytest.fail('membership must not run after uncertain title')
     monkeypatch.setattr(library, 'Api', FakeApi)
-    monkeypatch.setattr(library, 'config', lambda: {'embedding': {'model_id': 'openai/text-embedding-3-small'}})
+    monkeypatch.setattr(library, 'config', lambda: {'embedding': {'model_id': 'openai/text-embedding-3-small'},
+        'search': {'max_query_request_usd': '.0002'}, 'rerank': {'max_request_usd': '.01'},
+        'generation': {'max_request_usd': '.06'}})
     monkeypatch.setattr(library, 'preflight', lambda *a: {'ceiling_usd': '1'})
     with pytest.raises(RuntimeError, match='uncertain metadata'):
         library.run(root, manifest, False, 1)
@@ -159,6 +200,52 @@ def test_uncertain_title_update_is_checkpointed_and_blocks_automatic_replay(tmp_
 def test_preflight_refuses_parser_drift_before_reading_or_uploading_file(tmp_path):
     with pytest.raises(RuntimeError, match='parser version mismatch'):
         library.preflight(tmp_path / 'absent.pdf', {'parser': 'unreviewed-parser'})
+
+
+def test_budget_stop_drains_known_job_and_finishes_metadata_without_sending_next_upload(tmp_path, monkeypatch):
+    import hashlib
+    root, manifest = tmp_path / 'demo', tmp_path / 'manifest.json'
+    evidence = root / 'evidence/m11'
+    papers.save(evidence / 'library-before.json', [])
+    papers.save(evidence / 'existing-sha256.json', {})
+    topic = next(iter(papers.TOPICS))
+    ledger = library.Ledger(evidence / 'cost')
+    seq = ledger.admit('upload:0000.00001v1', library.INDEX_STOP_USD, 'prior acknowledged job')
+    papers.save(evidence / 'uploads.json', {'0000.00001v1': {'seq': seq, 'status': 'accepted',
+        'item_id': 'known-item', 'job_id': 'known-job', 'title': 'Known title', 'topic': topic}})
+    content = b'%PDF-synthetic'
+    demo.write(root / 'demo-papers/pending.pdf', content)
+    papers.save(manifest, {'papers': [{'tagged': '0000.00002v1', 'filename': 'pending.pdf',
+        'sha256': hashlib.sha256(content).hexdigest(), 'bytes': len(content), 'title': 'Pending', 'topic': topic}]})
+    reads, writes = [], []
+    class FakeApi:
+        def __init__(self, root): pass
+        def inventory(self): return []
+        def close(self): pass
+        def request(self, method, path, **kw):
+            if path == '/collections':
+                return {'collections': [{'name': t, 'id': str(n)} for n, t in enumerate(papers.TOPICS)]}
+            if method == 'GET':
+                reads.append(path)
+                return {'item': {'content_status': 'indexed', 'jobs': [{'id': 'known-job',
+                    'state': 'indexing' if len(reads) == 1 else 'ready', 'last_error_code': None, 'warnings': []}]}}
+            writes.append((method, path))
+            assert path in ('/library/items/known-item', '/collections/0/items')
+            return {}
+    monkeypatch.setattr(library, 'Api', FakeApi)
+    monkeypatch.setattr(library, 'config', lambda: {'embedding': {'model_id': 'openai/text-embedding-3-small'},
+        'search': {'max_query_request_usd': '.0002'}, 'rerank': {'max_request_usd': '.01'},
+        'generation': {'max_request_usd': '.06'}})
+    monkeypatch.setattr(library, 'preflight', lambda *a: {'ceiling_usd': '1'})
+    monkeypatch.setattr(library, 'shared_meter', lambda: {})
+    monkeypatch.setattr(library.time, 'sleep', lambda *a: None)
+    library.run(root, manifest, True, 6000, until_budget=True)
+    saved = json.loads((evidence / 'uploads.json').read_text())
+    assert saved['0000.00001v1']['terminal'] is True and '0000.00002v1' not in saved
+    assert reads == ['/library/items/known-item'] * 2
+    assert writes == [('PATCH', '/library/items/known-item'), ('POST', '/collections/0/items')]
+    assert json.loads((evidence / 'index-stop.json').read_text())['reason'] == 'index_budget_threshold'
+    assert ledger.state()['committed_usd'] == library.INDEX_STOP_USD
 
 
 def test_fsynced_admission_with_lost_checkpoint_blocks_replay(tmp_path):

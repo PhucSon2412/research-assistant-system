@@ -18,6 +18,12 @@
 Corpus/index đang nạp qua API bằng user demo, giữ mọi trạng thái lỗi. [Handoff M11](docs/m11-demo-knowledge-base.md).
 Ngày 2026-10-24 chủ dự án đã mở Docker trở lại và yêu cầu nạp thêm khoảng **1.000 paper**;
 đã xác nhận **thêm 1.000 ngoài lô 300, tổng khoảng 1.300 paper mới**; giữ ledger **$30/dừng $24** và quota cũ.
+Chỉ dẫn mới hơn ngày 2026-10-24: chủ dự án cho dùng **$50 cho index**; agent áp dụng trần tổng M11
+**$50/dừng $40 (80%)**, gồm ledger đã có, không tự cộng thêm $50 và không nới quota ứng dụng.
+Key báo `limit_reset=daily`: $96 còn lại là hạn mức ngày, không xác nhận số dư ví.
+Chủ dự án đã chọn **tiếp tục mở rộng kho tới giới hạn ngân sách**, vượt mốc 1.300 nếu còn trần.
+Index dừng nhận file ở **$39,187**, giữ **$0,813** trần cho 15 câu thử trong tổng $40;
+job có receipt vẫn được poll/đặt title/collection, không xóa dữ liệu hoặc trả reservation về 0.
 Không đổi code app/image/`deploy/`, không merge. Các số cuối và CI cập nhật khi hoàn tất.
 
 **Sau merge PR #71 (2026-10-23):** `origin/main = 1f7bfac970fa0015a6d3211d3514a4136df4d4d6`. README đã viết lại thành trang giới thiệu dự án (tiếng Anh); nhật ký trạng thái cũ của README lưu ở `docs/status-log-archive.md`. Chủ dự án (2026-10-23): dự án đã xong chức năng, không cần demo LAN nữa, từ nay dùng học tập cá nhân trên máy này. Giao [M11 — chuyển sang dùng cá nhân trên máy + mở rộng kho paper](docs/tasks/m11-demo-knowledge-base-expansion.md), **mới giao**:

@@ -44,4 +44,11 @@ Khi OAI timeout nhưng API Atom hoạt động, dùng nguồn chính thức thay
 giữ PDF quá lớn/trùng hash. File và attribution ngoài repo được giữ cả khi không upload.
 
 Manifest không phải kết quả đánh giá M7c và không thay nhãn/gold/human verdict.
+
+Chỉ dẫn mới hơn ngày 2026-10-24: chủ dự án nâng trần tổng lên **$50/dừng $40** và chọn
+mở rộng tiếp tới ngân sách thay vì dừng ở 1.300. Client mới hỗ trợ
+`scripts/m11_library.py run --watch --until-budget`: giữ $0,813 cho 15 câu thử,
+index dừng admission ở $39,187 rồi drain job có receipt. PDF đã tải nhưng chưa nạp khi
+tới chốt được giữ ngoài repo, có credit và metadata lý do `budget_not_uploaded` trong
+`download-exclusions.json`; không xóa item/file hay giải phóng phí chưa rõ outcome.
 Kết quả nạp và giới hạn nằm trong [handoff M11](../../docs/m11-demo-knowledge-base.md).

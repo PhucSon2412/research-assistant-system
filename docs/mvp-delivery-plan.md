@@ -1,5 +1,9 @@
 # Kế hoạch hoàn thành MVP
 
+**Cập nhật M11 mới hơn ngày 2026-10-24:** chủ dự án cho $50 cho index và chọn mở rộng tới ngân sách,
+vượt mốc 1.300 nếu còn trần. Tổng dừng $40; index giữ $0,813 cho 15 câu thử. Quota/app/image/deploy giữ nguyên.
+Helper lô 1.300 cũ đã dừng vì thiếu metadata, không phải hết tiền; đang bổ sung nguồn và chuyển sang lượt theo budget.
+
 **M11 (2026-10-23, đang triển khai):** sau PR #71 `1f7bfac`, dự án dùng học tập cá nhân.
 Edge đã chỉ bind loopback, không cần LAN; đang bổ sung khoảng 300 paper mở vào user demo qua API,
 bảy collection chủ đề + một collection giữ ngoại lệ, trần task $30/dừng $24. Ngày 2026-10-24

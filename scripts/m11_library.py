@@ -27,8 +27,19 @@ import m7a_live
 import m9_lan_demo
 
 REPO = Path(__file__).resolve().parents[1]
-STOP_USD = Decimal('24')  # owner's $30 ceiling, stop at 80%; no inherited M7c budget
+HARD_CAP_USD = Decimal('50')  # owner's updated total ceiling, including the existing M11 ledger
+STOP_USD = HARD_CAP_USD * Decimal('0.8')  # retain the 80% stop; no inherited M7c budget
+SMOKE_RESERVE_USD = Decimal('0.813')  # 15 query + 15 rerank + 11 generation configured caps
+INDEX_STOP_USD = STOP_USD - SMOKE_RESERVE_USD
 TERMINAL = {'ready', 'needs_review', 'fulltext_rejected', 'terminal_failed', 'cancelled', 'duplicate'}
+
+
+class BudgetStop(RuntimeError):
+    pass
+
+
+class IndexBudgetStop(BudgetStop):
+    pass
 
 
 def now():
@@ -71,11 +82,14 @@ class Ledger(m7a_live.Ledger):
         if not isinstance(ceiling, Decimal) or not ceiling.is_finite() or ceiling <= 0:
             raise RuntimeError('unknown operation ceiling; not sent')
         state = self.state()
-        if state['committed_usd'] + ceiling > STOP_USD:
-            raise RuntimeError('M11 stop at 80% ($24); not sent')
+        limit = INDEX_STOP_USD if route.startswith('upload:') else STOP_USD
+        if state['committed_usd'] + ceiling > limit:
+            error = IndexBudgetStop if route.startswith('upload:') else BudgetStop
+            raise error(f'M11 stop at 80% (${STOP_USD}); index limit ${INDEX_STOP_USD}; not sent')
         seq = state['slots'] + 1
         self.append({'event': 'sending', 'seq': seq, 'route': route, 'ceiling_usd': str(ceiling),
-                     'ceiling_source': source, 'at': now()})
+                     'ceiling_source': source, 'at': now(),
+                     'budget_cap_usd': str(HARD_CAP_USD), 'stop_usd': str(STOP_USD)})
         return seq
 
 
@@ -89,14 +103,28 @@ class Api:
         self.client = httpx.Client(base_url='https://127.0.0.1:8443/api', verify=context,
             trust_env=False, timeout=150, headers={'Host': 'ras-demo.lan:8443',
             'Origin': 'https://ras-demo.lan:8443', 'User-Agent': 'ras-m11-library/1.0'})
-        self.request('GET', '/auth/csrf')
-        email = (root / 'secrets/library_user_email').read_text(encoding='utf-8-sig').strip()
-        password = (root / 'secrets/library_user_password').read_text(encoding='utf-8-sig').rstrip('\r\n')
-        login = self.request('POST', '/auth/login', json={'email': email, 'password': password})
-        if login['user']['role'] != 'user':
-            raise RuntimeError('upload account must be the existing demo user')
+        self._auth_in_progress = False
+        self.session_started = time.monotonic()
+        self._login()
+
+    def _login(self):
+        self._auth_in_progress = True
+        try:
+            self.request('GET', '/auth/csrf')
+            email = (self.root / 'secrets/library_user_email').read_text(encoding='utf-8-sig').strip()
+            password = (self.root / 'secrets/library_user_password').read_text(encoding='utf-8-sig').rstrip('\r\n')
+            login = self.request('POST', '/auth/login', json={'email': email, 'password': password})
+            if login['user']['role'] != 'user':
+                raise RuntimeError('upload account must be the existing demo user')
+            self.session_started = time.monotonic()
+        finally:
+            self._auth_in_progress = False
 
     def request(self, method, path, **kwargs):
+        # Renew before a request after six hours, ahead of the demo's eight-hour
+        # absolute expiry. Never resend a mutation after any response.
+        if not self._auth_in_progress and time.monotonic() - self.session_started >= 6 * 3600:
+            self._login()
         headers = kwargs.pop('headers', {})
         if method not in ('GET', 'HEAD'):
             headers['X-CSRF-Token'] = self.client.cookies.get('ras_csrf', '')
@@ -182,7 +210,7 @@ def preflight(path, settings):
             'eligible_chunks': chunks, 'input_bytes_bound': byte_count, 'ceiling_usd': str(ceiling)}
 
 
-def run(root, manifest, watch, target):
+def run(root, manifest, watch, target, until_budget=False):
     dest = root / 'demo-papers'
     evidence = root / 'evidence/m11'
     evidence.mkdir(parents=True, exist_ok=True)
@@ -192,6 +220,12 @@ def run(root, manifest, watch, target):
     m11_papers.save(evidence / 'settings.json', settings)
     if settings['embedding']['model_id'] != 'openai/text-embedding-3-small':
         raise RuntimeError('unexpected embedding configuration; not sent')
+    smoke_ceiling = (15 * Decimal(str(settings['search']['max_query_request_usd']))
+        + 15 * Decimal(str(settings['rerank']['max_request_usd']))
+        + 11 * Decimal(str(settings['generation']['max_request_usd'])))
+    if smoke_ceiling > SMOKE_RESERVE_USD:
+        raise RuntimeError('smoke caps exceed retained headroom; not sent')
+    admission_closed = False
     api = Api(root)
     ledger = Ledger(evidence / 'cost')
     with ledger.exclusive():
@@ -252,7 +286,7 @@ def run(root, manifest, watch, target):
                         active.append(tagged)
                 m11_papers.save(checkpoint, rows)
                 pending = [p for p in papers if p['tagged'] not in rows]
-                if pending and len(active) < 2:
+                if pending and len(active) < 2 and not admission_closed:
                     paper = pending[0]
                     tagged = paper['tagged']
                     path = dest / paper['filename']
@@ -268,8 +302,20 @@ def run(root, manifest, watch, target):
                         rows[tagged] = {'status': 'skipped', 'reason': bound['skip'], 'preflight': bound}
                         m11_papers.save(checkpoint, rows)
                         continue
-                    seq = ledger.admit('upload:' + tagged, Decimal(bound['ceiling_usd']),
-                        'all body/abstract UTF8 bytes x max_attempts x configured provider price cap')
+                    try:
+                        seq = ledger.admit('upload:' + tagged, Decimal(bound['ceiling_usd']),
+                            'all body/abstract UTF8 bytes x max_attempts x configured provider price cap')
+                    except IndexBudgetStop:
+                        admission_closed = True
+                        m11_papers.save(evidence / 'index-stop.json', {'at': now(),
+                            'reason': 'index_budget_threshold', 'next_candidate': tagged,
+                            'next_ceiling_usd': bound['ceiling_usd'],
+                            'committed_usd': str(ledger.state()['committed_usd']),
+                            'index_stop_usd': str(INDEX_STOP_USD), 'total_stop_usd': str(STOP_USD),
+                            'hard_cap_usd': str(HARD_CAP_USD), 'smoke_headroom_usd': str(SMOKE_RESERVE_USD)})
+                        print(json.dumps({'index_admission_closed': True,
+                            'committed_usd': str(ledger.state()['committed_usd'])}), flush=True)
+                        continue  # drain/poll acknowledged jobs; no new notice, intent or PUT
                     # Durable sending state precedes notice/intent/PUT. Consent is the
                     # owner's explicit batch approval recorded in task M11, per-file ack stays intact.
                     rows[tagged] = {'status': 'sending', 'seq': seq, 'title': paper['title'],
@@ -286,7 +332,17 @@ def run(root, manifest, watch, target):
                     print(json.dumps({'uploaded': tagged, 'accepted': sum(r.get('status') == 'accepted' for r in rows.values()),
                                       'committed_usd': str(ledger.state()['committed_usd'])}), flush=True)
                     continue
-                if len(papers) >= target and not pending and not active:
+                if admission_closed and not active:
+                    break
+                closed_input = evidence / 'input-closed.json'
+                if until_budget and not pending and not active and closed_input.exists():
+                    marker = json.loads(closed_input.read_text(encoding='utf-8'))
+                    if marker.get('manifest_sha256') == hashlib.sha256(manifest.read_bytes()).hexdigest():
+                        m11_papers.save(evidence / 'index-stop.json', {'at': now(),
+                            'reason': 'metadata_sources_exhausted',
+                            'committed_usd': str(ledger.state()['committed_usd'])})
+                        break
+                if not until_budget and len(papers) >= target and not pending and not active:
                     break
                 if not watch and not pending and not active:
                     break
@@ -350,9 +406,11 @@ def main():
     p.add_argument('--manifest', type=Path, default=m11_papers.MANIFEST)
     p.add_argument('--watch', action='store_true')
     p.add_argument('--target', type=int, default=300)
+    p.add_argument('--until-budget', action='store_true',
+        help='Wait for further manifest appends until the index budget closes; drain known jobs before exit')
     args = p.parse_args()
     if args.action == 'run':
-        run(args.root, args.manifest, args.watch, args.target)
+        run(args.root, args.manifest, args.watch, args.target, args.until_budget)
     elif args.action == 'quarantine-topics':
         quarantine_topics(args.root)
     else:

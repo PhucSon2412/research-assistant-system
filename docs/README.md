@@ -1,6 +1,6 @@
 # Tài liệu dự án
 
-**M11 (2026-10-24, đang triển khai, thêm 1.000 paper theo yêu cầu mới):** [dùng cá nhân trên máy, corpus mở rộng và ledger](m11-demo-knowledge-base.md)
+**M11 (2026-10-24, đang triển khai, mở rộng tới ngân sách $50/dừng $40 theo yêu cầu mới):** [dùng cá nhân trên máy, corpus mở rộng và ledger](m11-demo-knowledge-base.md)
 · [task](tasks/m11-demo-knowledge-base-expansion.md) · [manifest](../evaluation/m11-papers/manifest.json).
 
 **M10 — frontend cho demo CV (2026-10-22):** [handoff UI, kiểm chứng và rollback web image](m10-frontend-ui.md) ·

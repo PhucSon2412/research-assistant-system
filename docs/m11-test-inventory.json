@@ -113,5 +113,47 @@
       "deploy": "success"
     },
     "junit_sha256": "c041afd9c48ed0b0735a9c604a037116aafc911299b5587053b2a3ff5897d1ae"
+  },
+  "budget50_checkpoint": {
+    "hard_cap_usd": "50",
+    "total_stop_usd": "40",
+    "index_stop_usd": "39.187",
+    "smoke_headroom_usd": "0.813",
+    "scope": "owner confirmed expand until budget, beyond 1300 if headroom remains",
+    "same_ledger": true,
+    "app_quotas_unchanged": true,
+    "provider_key_limit_reset": "daily",
+    "provider_remaining_is_not_wallet_balance": true,
+    "offline": {
+      "tests": 92,
+      "deselected": 1,
+      "failures": 0,
+      "errors": 0,
+      "junit_file": "offline-budget50-92-519853beb5ca.xml",
+      "junit_sha256": "519853beb5ca3dbbb489f7e9ef836cff6a739409a7266a120c8ce2bb4e437b73"
+    },
+    "source_sha256": {
+      "scripts/m11_library.py": "11277af87fc938071e0904deed21ae00dae18778d5280021197d4fdab6e4b12c",
+      "api/tests/test_m11_tooling.py": "a0694ce445200032e5c32085af4b443d63b5a56b440987effbe58a6b112724bb"
+    },
+    "helper_sha256": "e1ba764c3a2e97f6951c432e25f8aee40618a8dc6eced76b8601de6cf7c9e20b",
+    "helper_plan_validated_without_execution": true,
+    "helper_finalize_fixture": {
+      "files_retained": 1302,
+      "receipts_unchanged": 1300,
+      "deferred_credits": 2,
+      "uncertain_mutation_guard": "pass",
+      "real_api_calls": 0
+    },
+    "prior_ci_completed": {
+      "run_id": 40060677369,
+      "head": "dea9b99e880b7c26802db189450e634f08bce79e",
+      "tests": 1333,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "all_three_jobs": "success",
+      "junit_sha256": "17ad95540c1a47b04b5d67ef0396d3d740f7b8ea0db3169429b26e07e13bcc5d"
+    }
   }
 }

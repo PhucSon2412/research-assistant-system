@@ -13,6 +13,15 @@ tổng mục tiêu khoảng 1.300 paper mới**. **Không tăng trần $30/dừn
 Cùng tài khoản, consent theo lô, tiêu chí license/version/chủ đề và ledger M11 hiện có.
 Giữ 300 paper đầu và checkpoint; không nạp lại receipt đã có.
 
+**Cập nhật ngân sách mới hơn ngày 2026-10-24:** chủ dự án yêu cầu dùng **$50 cho index**.
+Áp dụng trần tổng M11 **$50**, giữ quy tắc dừng ở **$40 (80%)**, tính cả ledger cũ;
+không tự tăng quota/budget ngày của ứng dụng hoặc đổi model để tiêu hết tiền.
+Chủ dự án đã chọn **tiếp tục mở rộng tới giới hạn ngân sách**, vượt mốc 1.300 nếu còn trần.
+Giữ $0,813 trần cho 15 câu thử; phần index dừng nhận mới ở $39,187 và drain job đã có receipt.
+Không đặt mục tiêu tiêu hết đúng $50 bằng đổi model hoặc nạp lại file đã có.
+Probe `/key` qua env demo xác nhận `limit_reset=daily`: số khoảng $96 là hạn mức key còn trong ngày,
+không phải bằng chứng số dư ví. Những trần $30/$24 phía dưới là lịch sử trước chỉ dẫn mới này.
+
 ## 0. Chuyển sang chỉ truy cập trên máy
 
 - Edge chỉ publish `127.0.0.1:8443`, không còn bind IP Ethernet/LAN, để demo chạy được dù máy đang dùng Wi-Fi hay Ethernet và không mở ra mạng.
