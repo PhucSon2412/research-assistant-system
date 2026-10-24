@@ -116,6 +116,17 @@ từ chối (phạm vi 1.300 và chuỗi chạy không giám sát chưa được
 **không được khởi chạy**. Các tiến trình M11 trực tiếp vẫn chạy theo checkpoint; smoke/backup
 cuối phải được agent kiểm điều kiện và chạy sau khi hoàn tất, chưa được xếp chạy tự động.
 
+**Cập nhật sau đó ngày 2026-10-24:** chủ dự án đã xác nhận riêng **cho phép chạy helper nền**
+để nối hoàn tất 1.300 paper → 15 câu thử → backup/check khi phiên Codex không mở.
+Đã khởi chạy bản `output/m11_finish_reviewed.py` được review, SHA-256
+`5dad21f758dacf2ecb6e3d536204359a8a72928c92c0716b2c72185ca32c5be6`, PID **40608**.
+State `evidence/m11/finish-reviewed-state.json` ban đầu là `waiting`; launch record lưu PID/hash/ủy quyền.
+Helper chờ đúng hai PID tải/nạp hiện có, kiểm đủ 1.300 PDF/hash và 300 đầu không đổi;
+chặn source thay đổi, command lỗi, state lần trước hoặc outcome không rõ. Không tự retry,
+không Git/merge, không tự sửa hosts/firewall, không đọc key hay `.env`. Giữ cùng ledger $30/dừng $24.
+Helper chỉ ghi runtime evidence; **review kết quả, số liệu README/M9/M11, commit manifest và CI head cuối
+vẫn chưa hoàn tất**. Không coi `waiting` là các bước sau đã chạy hoặc đã pass.
+
 ### Sửa bộ lọc chủ đề trong lúc nạp
 
 Bộ lọc ban đầu tìm chuỗi `rag`, khớp cả “average”/“paragraph”, và có thể gán nhầm nhóm đánh giá
