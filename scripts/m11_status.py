@@ -32,9 +32,13 @@ def helper_alive(pid, script_name='output/m11_budget_finish.py'):
     if not isinstance(pid, int) or pid <= 0 or os.name != 'nt':
         return None
     # Never return the command line: an unrelated process could have reused a PID.
-    script = (f"$p=Get-CimInstance Win32_Process -Filter 'ProcessId={pid}'; "
-              f"if($p -and $p.CommandLine.Replace('\\','/') -like '*{script_name}*')"
-              "{'yes'}else{'no'}")
+    script = ("try {"
+              f"$p=Get-CimInstance Win32_Process -Filter 'ProcessId={pid}' -ErrorAction Stop; "
+              "if($null -eq $p){'no'}"
+              "elseif([string]::IsNullOrWhiteSpace($p.CommandLine)){'unknown'}"
+              f"elseif($p.CommandLine.Replace('\\','/') -like '*{script_name}*')"
+              "{'yes'}else{'no'}"
+              "}catch{'unknown'}")
     try:
         r = subprocess.run(['powershell', '-NoProfile', '-Command', script],
                            capture_output=True, text=True, timeout=15, check=True)

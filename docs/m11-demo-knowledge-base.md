@@ -267,6 +267,10 @@ Xem `result`:
 - `helper_not_running_check_logs`: file state còn giai đoạn chạy nhưng PID không còn đúng; không coi là đã xong.
 - `unknown`: không xác minh được liveness, chẳng hạn thiếu quyền kiểm process; không kết luận là đang chạy hoặc đã xong.
 
+Lệnh kiểm process trả `unknown` khi CIM lỗi hoặc không đọc được command line do thiếu quyền.
+Không dùng command line trống làm bằng chứng PID đã thoát. Nếu chạy trong sandbox bị giới hạn,
+chạy lại lệnh trên trong PowerShell của chủ dự án để đối chiếu.
+
 `manifest_papers` là số metadata PDF đã chọn; `target_receipts` là số đã có receipt;
 `checkpoint_states.ready` là số đã index xong tại checkpoint. `committed_usd_not_billed` giữ toàn bộ
 ceiling, không phải invoice. Giờ hiển thị theo Việt Nam (+07:00). Helper không tự nhắn kết quả vào chat.
