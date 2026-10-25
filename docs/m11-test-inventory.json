@@ -182,5 +182,37 @@
       "api/tests/test_m11_tooling.py": "785ccd8e057014a302067a5f9eb5444e4b35407781a45bff3e42357d6b7d1253"
     },
     "helper_sha256": "d82e909f8fb8ae4a878d6a1ab14937bbfaaf92f45652fa779f38c6280d2dc148"
+  },
+  "maintenance_recovery_20261025": {
+    "cause": "GET 503 maintenance during scheduled backup",
+    "backup_id": "20261024T200001Z-4327f91a",
+    "backup_status": "ok",
+    "backup_reopen": "ok",
+    "backup_window_seconds": 151.02,
+    "backup_total_seconds": 421.94,
+    "maintenance_now": null,
+    "replica_equal_seq": 14,
+    "local_verify": "pass",
+    "history": "recovery-20261025T014028Z",
+    "uncertain_mutations": 0,
+    "missing_ledger_bindings": 0,
+    "known_jobs_read_back": {
+      "ready": 1,
+      "terminal_failed_embedding_outcome_uncertain": 1
+    },
+    "read_only_maintenance_wait_seconds": 1200,
+    "mutations_retried": false,
+    "offline": {
+      "tests": 100,
+      "deselected": 1,
+      "failures": 0,
+      "errors": 0,
+      "junit_file": "offline-maintenance-100-f329e09dfd13.xml",
+      "junit_sha256": "f329e09dfd137584b2111fe4a815a98933708076f65aa9c8f4c5a0175619924c"
+    },
+    "source_sha256": {
+      "scripts/m11_library.py": "a36170898b30d99b13c7c37f56896e2c96bf56e58292996ed5e826c09c395fd5",
+      "api/tests/test_m11_tooling.py": "2bc79e147c777ce46807ba304363f5c7e66b4459b057b3446706ba2100dd7ebc"
+    }
   }
 }

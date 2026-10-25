@@ -180,6 +180,59 @@ def test_long_run_renews_session_before_a_mutation_without_replaying_that_mutati
     assert paths == ['/api/auth/csrf', '/api/auth/login', '/api/auth/csrf', '/api/auth/login', '/api/uploads/intents']
 
 
+@pytest.mark.parametrize('method', ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
+def test_only_read_only_maintenance_requests_wait_for_reopen(tmp_path, monkeypatch, method):
+    demo.save_state(tmp_path, {'access_mode': 'local', 'host': 'ras-demo.lan', 'port': 8443})
+    demo.write(tmp_path / 'secrets/library_user_email', 'test@example.invalid')
+    demo.write(tmp_path / 'secrets/library_user_password', 'synthetic-password')
+    probes, sleeps = [], []
+    def handle(req):
+        if req.url.path == '/api/auth/csrf':
+            return httpx.Response(200, json={}, headers={'Set-Cookie': 'ras_csrf=synthetic; Path=/; Secure'})
+        if req.url.path == '/api/auth/login':
+            return httpx.Response(200, json={'user': {'role': 'user'}})
+        probes.append(req.method)
+        if method == 'GET' and len(probes) == 3:
+            return httpx.Response(200, json={'reopened': True})
+        return httpx.Response(503, json={'error': 'maintenance'})
+    real_client = httpx.Client
+    monkeypatch.setattr(library.ssl, 'create_default_context', lambda **kw: True)
+    monkeypatch.setattr(library.httpx, 'Client', lambda **kw: real_client(**{**kw, 'transport': httpx.MockTransport(handle)}))
+    monkeypatch.setattr(library.time, 'sleep', sleeps.append)
+    api = library.Api(tmp_path)
+    if method == 'GET':
+        assert api.request(method, '/probe') == {'reopened': True}
+        assert probes == ['GET'] * 3 and sleeps == [10, 10]
+    else:
+        with pytest.raises(RuntimeError, match='no retry'):
+            api.request(method, '/probe')
+        assert probes == [method] and sleeps == []
+    api.close()
+
+
+def test_maintenance_read_wait_is_bounded(tmp_path, monkeypatch):
+    demo.save_state(tmp_path, {'access_mode': 'local', 'host': 'ras-demo.lan', 'port': 8443})
+    demo.write(tmp_path / 'secrets/library_user_email', 'test@example.invalid')
+    demo.write(tmp_path / 'secrets/library_user_password', 'synthetic-password')
+    probes = []
+    def handle(req):
+        if req.url.path == '/api/auth/csrf':
+            return httpx.Response(200, json={}, headers={'Set-Cookie': 'ras_csrf=synthetic; Path=/; Secure'})
+        if req.url.path == '/api/auth/login':
+            return httpx.Response(200, json={'user': {'role': 'user'}})
+        probes.append(req.method)
+        return httpx.Response(503, json={'error': 'maintenance'})
+    real_client = httpx.Client
+    monkeypatch.setattr(library.ssl, 'create_default_context', lambda **kw: True)
+    monkeypatch.setattr(library.httpx, 'Client', lambda **kw: real_client(**{**kw, 'transport': httpx.MockTransport(handle)}))
+    monkeypatch.setattr(library, 'MAINTENANCE_READ_WAIT_SECONDS', 0)
+    api = library.Api(tmp_path)
+    with pytest.raises(RuntimeError, match='read-only wait limit'):
+        api.request('GET', '/probe')
+    api.close()
+    assert probes == ['GET']
+
+
 def test_uncertain_title_update_is_checkpointed_and_blocks_automatic_replay(tmp_path, monkeypatch):
     import hashlib
     root = tmp_path / 'demo'
@@ -195,7 +248,7 @@ def test_uncertain_title_update_is_checkpointed_and_blocks_automatic_replay(tmp_
     calls = []
     class FakeApi:
         def __init__(self, root): pass
-        def inventory(self): return []
+        def inventory(self): pytest.fail('resume uses the existing baseline without a full library recrawl')
         def close(self): pass
         def request(self, method, path, **kw):
             calls.append((method, path))

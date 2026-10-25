@@ -31,6 +31,7 @@ HARD_CAP_USD = Decimal('50')  # owner's updated total ceiling, including the exi
 STOP_USD = HARD_CAP_USD * Decimal('0.8')  # retain the 80% stop; no inherited M7c budget
 SMOKE_RESERVE_USD = Decimal('0.813')  # 15 query + 15 rerank + 11 generation configured caps
 INDEX_STOP_USD = STOP_USD - SMOKE_RESERVE_USD
+MAINTENANCE_READ_WAIT_SECONDS = 20 * 60
 TERMINAL = {'ready', 'needs_review', 'fulltext_rejected', 'terminal_failed', 'cancelled', 'duplicate'}
 
 
@@ -128,17 +129,30 @@ class Api:
         headers = kwargs.pop('headers', {})
         if method not in ('GET', 'HEAD'):
             headers['X-CSRF-Token'] = self.client.cookies.get('ras_csrf', '')
-        response = self.client.request(method, path, headers=headers,
-            extensions={'sni_hostname': 'ras-demo.lan'}, **kwargs)
-        if response.status_code >= 400:
-            try:
-                code = response.json().get('error', 'http_error')
-            except ValueError:
-                code = 'non_json_error'
-            raise RuntimeError(f'product API {method} {path}: {response.status_code} {code}; no retry')
-        if response.status_code == 204:
-            return None
-        return response.json()
+        deadline = time.monotonic() + MAINTENANCE_READ_WAIT_SECONDS
+        waits = 0
+        while True:
+            response = self.client.request(method, path, headers=headers,
+                extensions={'sni_hostname': 'ras-demo.lan'}, **kwargs)
+            if response.status_code >= 400:
+                try:
+                    code = response.json().get('error', 'http_error')
+                except ValueError:
+                    code = 'non_json_error'
+                if method in ('GET', 'HEAD') and response.status_code == 503 and code == 'maintenance':
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise RuntimeError('maintenance exceeded read-only wait limit; stopped')
+                    if waits % 6 == 0:
+                        print(json.dumps({'waiting_for_maintenance': True,
+                            'read_only': True, 'remaining_seconds': int(remaining)}), flush=True)
+                    waits += 1
+                    time.sleep(min(10, remaining))
+                    continue
+                raise RuntimeError(f'product API {method} {path}: {response.status_code} {code}; no retry')
+            if response.status_code == 204:
+                return None
+            return response.json()
 
     def inventory(self):
         rows = []
@@ -231,9 +245,9 @@ def run(root, manifest, watch, target, until_budget=False):
     with ledger.exclusive():
         try:
             require_known_uploads(ledger, rows)
-            inventory = api.inventory()
             baseline_path = evidence / 'library-before.json'
             if not baseline_path.exists():
+                inventory = api.inventory()
                 if len(inventory) != 12:
                     raise RuntimeError('expected the existing 12-paper library; not sent')
                 m11_papers.save(baseline_path, inventory)

@@ -225,6 +225,20 @@ trạng thái D ở lượt sandbox đầu do permission denied.
 
 ### Chủ dự án tự kiểm tra tiến trình nền
 
+**Phục hồi sáng 2026-10-25:** client dừng lúc 03:00 tại GET job trả `503 maintenance` trong
+backup định kỳ `20261024T200001Z-4327f91a`. Backup **ok**, reopen **ok**, cửa sổ bảo trì **151,02 s**,
+cả lượt **421,94 s**; kiểm sáng không còn flag/lock, replica equal seq 14 và HTTPS local 200.
+Checkpoint lúc kiểm có 2.971 PDF / 1.512 receipt target, 755 `ready`, cam kết $15,8533074;
+không có mutation chưa rõ hoặc admission thiếu binding. Hai job cuối được đọc lại qua API:
+một `ready`, một `terminal_failed/embedding_outcome_uncertain`; giữ phí và trạng thái, không upload lại.
+History trong `evidence/m11/recovery-20261025T014028Z/`.
+
+Client mới chờ `503 maintenance` **chỉ với GET/HEAD**, có giới hạn 20 phút và heartbeat log;
+POST/PUT/PATCH/DELETE vẫn không retry sau phản hồi lỗi. Resume dùng baseline đã có thay vì
+quét lại toàn bộ thư viện trước khi poll receipt. Regression **100 pass/1 deselected**, gồm
+GET đợi mở lại, mọi mutation chỉ gửi một lần và cửa sổ chờ bị giới hạn. Đã khởi chạy lại helper
+theo cùng ngân sách/ledger; không thay lịch backup, app/image, dữ liệu hoặc quota.
+
 Lượt kiểm lúc 22:19 ngày 2026-10-24 phát hiện helper/downloader đã dừng lúc 22:03 vì
 Windows từ chối atomic replace `manifest.json.tmp` → `manifest.json` (`WinError 5`);
 **client index 36716 vẫn tiếp tục chạy**, không chạm trần tiền. Bản manifest thật có 2.114 paper,
