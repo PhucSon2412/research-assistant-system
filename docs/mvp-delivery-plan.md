@@ -1,5 +1,9 @@
 # Kế hoạch hoàn thành MVP
 
+**Cập nhật M11 mới nhất 2026-10-26:** chủ dự án dừng upload ở lô hiện có (3.150 receipt),
+thay mục tiêu chạy tới ngân sách. Không nhận file mới; runtime vẫn tạm dừng, Docker đang tắt.
+Còn hoàn tất metadata hai receipt cuối, manifest, 15 câu thử, backup/check, docs và CI head cuối.
+
 **Cập nhật M11 mới hơn ngày 2026-10-24:** chủ dự án cho $50 cho index và chọn mở rộng tới ngân sách,
 vượt mốc 1.300 nếu còn trần. Tổng dừng $40; index giữ $0,813 cho 15 câu thử. Quota/app/image/deploy giữ nguyên.
 Helper lô 1.300 cũ đã dừng vì thiếu metadata, không phải hết tiền; đang bổ sung nguồn và chuyển sang lượt theo budget.

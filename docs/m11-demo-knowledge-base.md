@@ -1,5 +1,14 @@
 # M11 — thư viện cá nhân trên máy và kho paper mở rộng
 
+**Chỉ dẫn hiện hành 2026-10-26:** chủ dự án chốt dừng upload ở lô hiện có; thay yêu cầu mở rộng tới ngân sách.
+Giữ **3.150 receipt mục tiêu**, không nhận file mới hoặc cố tiêu phần ngân sách còn lại.
+Ledger giữ **$33,7896042 cam kết** (không phải billed). Có 4.601 PDF đã tải; phần chưa upload vẫn giữ file và credit.
+Marker `evidence/m11/upload-admission-closed.json` chặn upload admission, và `index-stop.json` ghi
+`owner_requested_stop`. Client nếu chạy lại chỉ drain receipt cũ/hoàn tất metadata, không gửi notice/intent/PUT mới.
+Helper mở rộng ngân sách không được chạy lại. Runtime vẫn **tạm dừng**; Docker Desktop đang tắt lúc kiểm.
+Hai receipt cuối đã terminal qua API ở lượt tạm dừng, nhưng còn title/collection; chưa khóa manifest,
+chạy 15 câu thử/backup cuối hoặc bàn giao hoàn tất. Không dùng CI xanh của head cũ làm kết quả head cuối.
+
 **Đang triển khai (2026-10-24, Asia/Saigon).** Base đã fetch/xác minh
 `1f7bfac970fa0015a6d3211d3514a4136df4d4d6` (PR #71 MERGED), nhánh
 `ops/m11-demo-knowledge-base`. Chỉ dẫn mới của chủ dự án thay 150/$10 bằng
@@ -259,9 +268,20 @@ Từ thư mục repo, chạy lệnh chỉ đọc sau; không gọi API/provider 
 & "$env:USERPROFILE\.conda\envs\ras\python.exe" scripts/m11_status.py
 ```
 
+**Tạm dừng theo yêu cầu chủ dự án, 2026-10-26 08:38 (+07:00):** helper và client index đã dừng
+đúng PID tại checkpoint không có mutation đang gửi; downloader đã kết thúc trước đó.
+4.601 PDF trong manifest, 3.150 receipt mục tiêu, ledger giữ **$33,7896042 cam kết**, chưa phải invoice.
+Hai job cuối được đọc lại qua API: `2209.11055v1` ready, `2307.03027v1` terminal_failed (`pdf_text_invalid`).
+Receipt/ledger/manifest/state trước dừng lưu ngoài repo ở
+`evidence/m11/owner-pause-20261026T083743/`; khóa PID đã thoát được chuyển vào history, không xóa ledger.
+Hai receipt cuối vẫn cần poll lại/hoàn tất title và collection khi tiếp tục; không resend upload.
+Marker `owner-pause.json` và state `paused_by_owner` ghi rõ chỉ tiếp tục khi chủ dự án yêu cầu;
+không tự khởi chạy helper hoặc chạy smoke/backup cuối trong lúc tạm dừng. Dữ liệu/container giữ nguyên.
+
 Xem `result`:
 
 - `running`: helper đúng PID/command vẫn sống; `last_updates` cho biết log/receipt có tiến triển không.
+- `paused_by_owner`: đã tạm dừng theo yêu cầu chủ dự án; chờ chỉ dẫn tiếp tục.
 - `runtime_done_review_pending`: đã kết thúc các bước runtime; còn agent review kết quả, docs/PR và CI head cuối.
 - `stopped_needs_review`: đã dừng do lỗi/chốt cần review; xem `helper_error`, chưa phải hoàn tất.
 - `helper_not_running_check_logs`: file state còn giai đoạn chạy nhưng PID không còn đúng; không coi là đã xong.

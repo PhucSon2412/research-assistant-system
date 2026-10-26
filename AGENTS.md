@@ -12,6 +12,13 @@
 
 ## Trạng thái triển khai và lịch sử
 
+**Chủ dự án chốt dừng upload M11 (2026-10-26):** giữ lô hiện có, không tiếp tục mở rộng tới ngân sách.
+Checkpoint có **3.150 receipt mục tiêu**, 4.601 PDF đã tải; không đồng nhất receipt với index thành công.
+Ledger giữ **$33,7896042 cam kết**, chưa phải invoice. Mọi tiến trình M11 vẫn tạm dừng theo yêu cầu trước đó.
+Marker ngoài repo `evidence/m11/upload-admission-closed.json` chặn admission paper mới, kể cả khi chạy lại client;
+chỉ còn hoàn tất metadata của receipt cũ, khóa manifest, 15 câu thử, backup/check, docs và CI cuối.
+Docker Desktop đang tắt lúc kiểm 2026-10-26; chưa chạy các bước API hậu kiểm. Không khởi chạy lại helper mở rộng.
+
 **M11 đang triển khai (2026-10-23):** nhánh `ops/m11-demo-knowledge-base`, base PR #71 đã fetch/xác minh
 `1f7bfac`. Chủ dự án cập nhật **khoảng 300 paper bổ sung, trần $30/dừng $24**, thay 150/$10 ở task cũ.
 Đã chuyển edge sang local `127.0.0.1:8443`, leaf DNS-only từ CA cũ, chỉ recreate edge; hosts/firewall chủ dự án tự chạy.

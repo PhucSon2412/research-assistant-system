@@ -56,6 +56,7 @@ def status(root):
     runtime_done = phase == 'runtime_complete_pending_agent_review_docs_and_final_ci'
     stopped = phase == 'stopped_for_agent_review'
     result = ('not_started' if phase == 'not_started' else
+              'paused_by_owner' if phase == 'paused_by_owner' else
               'runtime_done_review_pending' if runtime_done else 'stopped_needs_review' if stopped else
               'helper_not_running_check_logs' if alive is False else 'running' if alive else 'unknown')
     manifest = read(REPO / 'evaluation/m11-papers/manifest.json', {'papers': []})
@@ -89,6 +90,7 @@ def status(root):
         'last_updates': {name: stamp(evidence / name) for name in
                          ('uploads.json', 'budget-index.log', 'budget-discover.log')},
         'stop_reason': read(evidence / 'index-stop.json', {}).get('reason'),
+        'upload_admission_closed': (evidence / 'upload-admission-closed.json').exists(),
         'helper_error': state.get('error'),
         'scope': 'runtime_only_docs_pr_review_and_final_ci_not_checked',
     }

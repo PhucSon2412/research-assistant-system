@@ -1,5 +1,13 @@
 # Nhật ký quyết định
 
+## Dừng upload M11 theo quyết định chủ dự án (2026-10-26)
+
+Chủ dự án chốt lô hiện có khoảng 3.000 paper; checkpoint có 3.150 receipt mục tiêu.
+Không tiếp tục nhận file hoặc mở rộng để tiêu hết ngân sách; chỉ dẫn này thay mục tiêu ngân sách bên dưới.
+Giữ ledger cam kết $33,7896042, mọi lỗi/cần xem lại, PDF chưa upload và ghi công.
+Đóng admission bằng marker ngoài repo; client chỉ được hoàn tất receipt cũ và bước hậu kiểm được giao.
+Runtime vẫn tạm dừng; Docker đang tắt lúc kiểm. Chưa coi M11 hoàn tất trước metadata/backup/smoke/docs/CI cuối.
+
 ## Ngân sách index M11 $50 và mở rộng tiếp (2026-10-24)
 
 Chủ dự án yêu cầu dùng $50 cho index rồi chọn **tiếp tục mở rộng kho paper tới giới hạn ngân sách**.

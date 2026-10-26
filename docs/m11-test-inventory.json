@@ -214,5 +214,48 @@
       "scripts/m11_library.py": "a36170898b30d99b13c7c37f56896e2c96bf56e58292996ed5e826c09c395fd5",
       "api/tests/test_m11_tooling.py": "2bc79e147c777ce46807ba304363f5c7e66b4459b057b3446706ba2100dd7ebc"
     }
+  },
+  "owner_upload_stop_20261026": {
+    "at": "2026-10-26T08:12:30+00:00",
+    "reason": "owner_requested_stop",
+    "new_uploads_allowed": false,
+    "target_receipts": 3150,
+    "processed_target_rows": 3158,
+    "downloaded_manifest_papers": 4601,
+    "committed_usd_not_billed": "33.7896042",
+    "runtime": "paused_by_owner; Docker Desktop is not running",
+    "admission_marker": "evidence/m11/upload-admission-closed.json",
+    "uploads_sha256": "ca3ea566857cc562877c3ec8c39397fea88b8dc9e6190955b5c31bea2f64c4a8",
+    "ledger_sha256": "fe8136765a87105473196208b2055e205b8cfd9dddee4433c705f27b497545fb",
+    "offline": {
+      "tests": 102,
+      "failures": 0,
+      "errors": 0,
+      "deselected": 1,
+      "deselected_reason": "manifest remains unfinalized until final receipt metadata is complete",
+      "junit_file": "offline-owner-stop-102-f32de2a44977.xml",
+      "junit_sha256": "f32de2a44977b190f0ff0ce1b6b17f46deeb853bec34ec172702868688258d8a"
+    },
+    "earlier_environment_runs": [
+      {
+        "file": "output/m11-owner-stop-offline.xml",
+        "passed": 28,
+        "errors": 74,
+        "reason": "sandbox denied access to the existing pytest temp root"
+      },
+      {
+        "file": "output/m11-owner-stop-offline-recheck.xml",
+        "passed": 73,
+        "failures": 29,
+        "reason": "repository temp directory was correctly refused by the external-ledger guard"
+      }
+    ],
+    "remaining": [
+      "two receipt title/collection updates",
+      "manifest finalization",
+      "15 smoke questions once",
+      "backup/check",
+      "final README/handoff and final-head CI"
+    ]
   }
 }

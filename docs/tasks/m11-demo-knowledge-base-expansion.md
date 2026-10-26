@@ -1,5 +1,10 @@
 # M11 — chuyển sang dùng cá nhân trên máy và mở rộng kho paper
 
+**Chỉ dẫn mới nhất 2026-10-26:** chủ dự án dừng upload tại lô hiện có (3.150 receipt mục tiêu),
+thay mục tiêu mở rộng tới ngân sách. Không nhận thêm paper, không cố dùng hết trần $40.
+Giữ mọi dữ liệu/trạng thái/chi phí; chỉ còn hoàn tất metadata của receipt cũ, khóa manifest,
+15 câu thử, backup/check, docs và CI cuối. Runtime vẫn tạm dừng; không tự chạy lại helper mở rộng.
+
 Bạn là agent tiếp theo. **Cập nhật 2026-10-23:** chủ dự án không cần demo LAN nữa; dự án đã xong chức năng, từ nay dùng cho học tập cá nhân trên chính máy này. Làm **một PR** gồm script, manifest và docs, với hai việc:
 
 1. Chuyển bản `ras-pilot` đang chạy sang **chỉ truy cập từ máy này** (mục 0).

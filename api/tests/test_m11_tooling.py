@@ -284,7 +284,8 @@ def test_preflight_refuses_parser_drift_before_reading_or_uploading_file(tmp_pat
         library.preflight(tmp_path / 'absent.pdf', {'parser': 'unreviewed-parser'})
 
 
-def test_budget_stop_drains_known_job_and_finishes_metadata_without_sending_next_upload(tmp_path, monkeypatch):
+@pytest.mark.parametrize('owner_closed', [False, True])
+def test_budget_or_owner_stop_drains_known_job_without_sending_next_upload(tmp_path, monkeypatch, owner_closed):
     import hashlib
     root, manifest = tmp_path / 'demo', tmp_path / 'manifest.json'
     evidence = root / 'evidence/m11'
@@ -292,7 +293,10 @@ def test_budget_stop_drains_known_job_and_finishes_metadata_without_sending_next
     papers.save(evidence / 'existing-sha256.json', {})
     topic = next(iter(papers.TOPICS))
     ledger = library.Ledger(evidence / 'cost')
-    seq = ledger.admit('upload:0000.00001v1', library.INDEX_STOP_USD, 'prior acknowledged job')
+    prior_ceiling = Decimal('1') if owner_closed else library.INDEX_STOP_USD
+    seq = ledger.admit('upload:0000.00001v1', prior_ceiling, 'prior acknowledged job')
+    if owner_closed:
+        papers.save(evidence / 'upload-admission-closed.json', {'reason': 'owner_requested_stop'})
     papers.save(evidence / 'uploads.json', {'0000.00001v1': {'seq': seq, 'status': 'accepted',
         'item_id': 'known-item', 'job_id': 'known-job', 'title': 'Known title', 'topic': topic}})
     content = b'%PDF-synthetic'
@@ -318,7 +322,10 @@ def test_budget_stop_drains_known_job_and_finishes_metadata_without_sending_next
     monkeypatch.setattr(library, 'config', lambda: {'embedding': {'model_id': 'openai/text-embedding-3-small'},
         'search': {'max_query_request_usd': '.0002'}, 'rerank': {'max_request_usd': '.01'},
         'generation': {'max_request_usd': '.06'}})
-    monkeypatch.setattr(library, 'preflight', lambda *a: {'ceiling_usd': '1'})
+    def preflight(*args):
+        assert not owner_closed, 'closed admission must not prepare another file'
+        return {'ceiling_usd': '1'}
+    monkeypatch.setattr(library, 'preflight', preflight)
     monkeypatch.setattr(library, 'shared_meter', lambda: {})
     monkeypatch.setattr(library.time, 'sleep', lambda *a: None)
     library.run(root, manifest, True, 6000, until_budget=True)
@@ -326,8 +333,21 @@ def test_budget_stop_drains_known_job_and_finishes_metadata_without_sending_next
     assert saved['0000.00001v1']['terminal'] is True and '0000.00002v1' not in saved
     assert reads == ['/library/items/known-item'] * 2
     assert writes == [('PATCH', '/library/items/known-item'), ('POST', '/collections/0/items')]
-    assert json.loads((evidence / 'index-stop.json').read_text())['reason'] == 'index_budget_threshold'
-    assert ledger.state()['committed_usd'] == library.INDEX_STOP_USD
+    if not owner_closed:
+        assert json.loads((evidence / 'index-stop.json').read_text())['reason'] == 'index_budget_threshold'
+    assert ledger.state()['committed_usd'] == prior_ceiling
+
+
+def test_owner_closed_upload_admission_retains_cost_and_allows_only_post_ingest_budget(tmp_path):
+    ledger = library.Ledger(tmp_path / 'cost')
+    ledger.admit('upload:prior', Decimal('1'), 'acknowledged upload')
+    papers.save(tmp_path / 'upload-admission-closed.json', {'reason': 'owner_requested_stop'})
+    before = ledger.path.read_bytes()
+    with pytest.raises(RuntimeError, match='closed by owner'):
+        ledger.admit('upload:next', Decimal('.01'), 'must not send')
+    assert ledger.path.read_bytes() == before
+    ledger.admit('smoke:1', Decimal('.01'), 'authorized post-ingest question')
+    assert ledger.state()['committed_usd'] == Decimal('1.01')
 
 
 def test_fsynced_admission_with_lost_checkpoint_blocks_replay(tmp_path):

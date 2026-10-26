@@ -82,6 +82,8 @@ class Ledger(m7a_live.Ledger):
     def admit(self, route, ceiling, source):
         if not isinstance(ceiling, Decimal) or not ceiling.is_finite() or ceiling <= 0:
             raise RuntimeError('unknown operation ceiling; not sent')
+        if route.startswith('upload:') and (self.path.parent.parent / 'upload-admission-closed.json').exists():
+            raise RuntimeError('upload admission closed by owner; not sent')
         state = self.state()
         limit = INDEX_STOP_USD if route.startswith('upload:') else STOP_USD
         if state['committed_usd'] + ceiling > limit:
@@ -239,7 +241,8 @@ def run(root, manifest, watch, target, until_budget=False):
         + 11 * Decimal(str(settings['generation']['max_request_usd'])))
     if smoke_ceiling > SMOKE_RESERVE_USD:
         raise RuntimeError('smoke caps exceed retained headroom; not sent')
-    admission_closed = False
+    admission_marker = evidence / 'upload-admission-closed.json'
+    admission_closed = admission_marker.exists()
     api = Api(root)
     ledger = Ledger(evidence / 'cost')
     with ledger.exclusive():
@@ -267,6 +270,7 @@ def run(root, manifest, watch, target, until_budget=False):
                     collections[name] = api.request('POST', '/collections', json={'name': name})['collection']['id']
             m11_papers.save(evidence / 'collections.json', collections)
             while True:
+                admission_closed = admission_closed or admission_marker.exists()
                 papers = json.loads(manifest.read_text(encoding='utf-8'))['papers']
                 # Resume only acknowledged uploads. A sending record without IDs is
                 # an uncertain mutation and blocks new uploads until reconciled by owner.
