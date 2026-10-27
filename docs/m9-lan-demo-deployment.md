@@ -6,6 +6,51 @@
 không bao gồm loopback IP); CA không đổi. Hướng dẫn LAN phía dưới giữ làm lịch sử/tùy chọn.
 Kho paper mở rộng, kết quả thử và chi phí: [handoff M11](m11-demo-knowledge-base.md).
 
+<!-- M11 final usage -->
+### Kho paper đã chốt và cách dùng (27-10-2026)
+
+Thư viện user demo giữ **3.167 item, 1.643 indexed**, trong **8 collection**.
+M11 có 3.150 paper đã nhận: 1.631 indexed, 629 cần xem lại, 890 lỗi/từ chối;
+8 file được bỏ qua trước upload. Giữ cả 12 paper cũ và 5 item ngoài chủ đề trong collection xem lại.
+Lô M11 đã đóng upload; không khởi chạy lại helper mở rộng hoặc gỡ marker để tiêu ngân sách còn lại.
+
+| Collection | Item | Indexed |
+| --- | ---: | ---: |
+| Dense retrieval & embeddings | 369 | 227 |
+| Reranking & search | 412 | 219 |
+| Retrieval-augmented generation | 265 | 136 |
+| RAG evaluation & benchmarks | 532 | 266 |
+| Grounding & hallucination | 595 | 282 |
+| Long context & chunking | 286 | 152 |
+| Search agents & tools | 691 | 349 |
+| Cần xem lại — ngoài phạm vi M11 | 5 | 2 |
+
+Để học một paper, tìm bằng tiêu đề thật trong thư viện, mở item **indexed**, rồi hỏi trên chính item đó.
+Để khảo sát một chủ đề, chọn collection tương ứng và dùng hybrid search có rerank trước khi hỏi đáp.
+Mở panel nguồn để xem đoạn trích, trang và PDF gốc. Item cần xem lại/lỗi vẫn giữ original,
+nhưng không có full-text/RAG cho tới khi được xử lý riêng; M11 không OCR hoặc tự retry chúng.
+
+Các câu dưới đây đã được thử một lần qua API thật; giữ tiếng Anh như input đã chạy:
+
+- What is the role of test-time reasoning in Rank-K listwise reranking?
+- How does HLATR combine retrieval and reranking information?
+- How does TimeSeek evaluate the temporal reliability of agentic forecasters?
+- What recall does SCAR achieve on boundary-fragmented queries, and with how many chunks?
+- What effect did the MS MARCO-trained cross-encoder reranker have in SciRet?
+
+Trong lượt thử, cả ba câu so sánh đều trả `insufficient_evidence/comparison_requires_multiple_papers`.
+Kịch bản gợi ý hiện dùng câu một paper và hybrid search; chưa có câu so sánh nhiều paper đạt trong lượt này.
+Các câu về giá thuê bao Rank-K hoặc ngày ra mắt thương mại SCAR/TimeSeek dùng để thử trường hợp
+nguồn không có đáp án; xem outcome thật trong bảng 15 câu ở [M11](m11-demo-knowledge-base.md#15-câu-thử-thật).
+Smoke này không thay bộ evaluation M7c hoặc phiếu human. Không tự chạy lại toàn bộ câu hỏi trả phí.
+
+Backup cuối `20261027T082255Z-2d3d4bae`: **293,23 s** bảo trì, **7.999.136.734 byte ciphertext**,
+status/reopen `ok`, sau đó `ras_ops check` exit 0 và HTTPS local được kiểm lại.
+Chi phí cam kết M11 **$34,6026042**; billed thực riêng M11 chưa xác minh được vì rc2 không lưu receipt provider.
+Kết quả và giới hạn đầy đủ ở [handoff M11](m11-demo-knowledge-base.md).
+
+<!-- /M11 final usage -->
+
 ### Dùng trên chính máy Windows
 
 1. Mở Docker Desktop. Containers có `restart: unless-stopped` tự chạy lại.

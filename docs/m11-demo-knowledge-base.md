@@ -1,319 +1,160 @@
-# M11 — thư viện cá nhân trên máy và kho paper mở rộng
+# M11 — thư viện cá nhân và lô paper đã chốt
 
-**Chỉ dẫn hiện hành 2026-10-26:** chủ dự án chốt dừng upload ở lô hiện có; thay yêu cầu mở rộng tới ngân sách.
-Giữ **3.150 receipt mục tiêu**, không nhận file mới hoặc cố tiêu phần ngân sách còn lại.
-Ledger giữ **$33,7896042 cam kết** (không phải billed). Có 4.601 PDF đã tải; phần chưa upload vẫn giữ file và credit.
-Marker `evidence/m11/upload-admission-closed.json` chặn upload admission, và `index-stop.json` ghi
-`owner_requested_stop`. Client nếu chạy lại chỉ drain receipt cũ/hoàn tất metadata, không gửi notice/intent/PUT mới.
-Helper mở rộng ngân sách không được chạy lại. Runtime vẫn **tạm dừng**; Docker Desktop đang tắt lúc kiểm.
-Hai receipt cuối đã terminal qua API ở lượt tạm dừng, nhưng còn title/collection; chưa khóa manifest,
-chạy 15 câu thử/backup cuối hoặc bàn giao hoàn tất. Không dùng CI xanh của head cũ làm kết quả head cuối.
+Runtime/hậu kiểm hoàn tất ngày **27-10-2026 (Asia/Saigon)** trên nhánh `ops/m11-demo-knowledge-base`,
+base `1f7bfac970fa0015a6d3211d3514a4136df4d4d6`. [PR #72](https://github.com/PhucSon2412/research-assistant-system/pull/72),
+không merge. Chủ dự án đã chốt dừng upload ngày 26-10; lần này chỉ hoàn tất receipt cũ.
 
-**Đang triển khai (2026-10-24, Asia/Saigon).** Base đã fetch/xác minh
-`1f7bfac970fa0015a6d3211d3514a4136df4d4d6` (PR #71 MERGED), nhánh
-`ops/m11-demo-knowledge-base`. Chỉ dẫn mới của chủ dự án thay 150/$10 bằng
-**khoảng 300 paper bổ sung/$30**, dừng gọi mới ở **$24**. Ngày 2026-10-24 chủ dự án
-yêu cầu **nạp thêm khoảng 1.000 paper** và đã xác nhận thêm ngoài lô 300,
-tổng khoảng **1.300 paper mới**. Giữ cùng ledger/trần/quota, không cộng
-thêm ngân sách vì key còn tiền. Không merge.
+## Kết quả thư viện
 
-**Chỉ dẫn mới hơn ngày 2026-10-24:** chủ dự án yêu cầu dùng **$50 cho index**. Trần tổng M11
-đổi thành **$50/dừng $40 (80%)**, gồm phần ledger đã có; quota/model của ứng dụng giữ nguyên.
-Chủ dự án đã chọn **tiếp tục mở rộng tới giới hạn ngân sách**, vượt mốc 1.300 nếu còn trần.
-Index có chốt **$39,187**, giữ **$0,813** trần cho 15 query/rerank và 11 generation của smoke.
-Tới chốt, không gửi thêm notice/intent/PUT; vẫn poll job đã nhận và hoàn tất title/collection.
-Tiền cam kết không bị trả về 0 vì job xong/lỗi; không đổi model hoặc index lại để tiêu tiền.
-Probe chỉ đọc từ env API cho `limit=100`, `limit_reset=daily`, `limit_remaining≈96,27`:
-đây là hạn mức key còn trong ngày, chưa xác nhận số dư ví. Delta key nhóm không phải billed riêng M11.
-Các mốc $30/$24 bên dưới giữ làm lịch sử. Client đang chạy vẫn giữ chốt cũ tới khi kết thúc;
-client mới nhận trần mới, không dừng job đang gửi hoặc gỡ lock đang hoạt động để thay budget.
+| Trạng thái của lô M11 trong phạm vi | Số paper |
+| --- | ---: |
+| Indexed (`ready`) | 1.631 |
+| Cần xem lại (`pdf_body_uncertain`) | 629 |
+| Lỗi index/trích xuất (`terminal_failed`) | 873 |
+| Từ chối full text (`pdf_body_below_threshold`) | 17 |
+| Bỏ qua trước upload (`too_many_pages`) | 8 |
+| Tổng bản ghi manifest đã xử lý | **3.158** |
 
-Kiểm tra tại lượt này: manifest 1.074, receipt target 823, `ready` 401, `needs_review` 154,
-`terminal_failed` 264, `fulltext_rejected` 3; một paper preflight bỏ qua, hai request/job còn dở.
-Cam kết **$8,7062490**. Helper đã dừng trước mọi bước hậu kiểm vì snapshot Atom hết candidate
-ở 1.074/1.300, không phải vì hết tiền; chưa smoke/backup cuối. Đang tải bù từ OAI cache,
-vẫn kiểm license abs đúng version và giữ 300 đầu. Không tự chạy lại helper state đã dừng.
-Tooling ngân sách mới qua **92 test offline/1 deselected**; ca đủ manifest chờ khóa corpus.
-Một fixture metadata cũ thiếu các trần search/rerank/generation khiến lượt phát triển fail;
-đã bổ sung cấu hình giả đầy đủ, giữ JUnit fail và lượt sửa riêng ngoài repo.
-Client cũ sau đó dừng tại GET `401 session_expired` (giới hạn phiên tuyệt đối tám giờ),
-không có `sending/title_sending/membership_sending` chưa rõ và lock đã được gỡ bởi chính client.
-Client mới đăng nhập lại chủ động sau sáu giờ **trước** request tiếp theo; không replay request lỗi.
-Helper ngân sách dùng state mới `finish-budget50-state.json`, giữ nguyên journal helper cũ.
-Lô metadata dự trù tối đa 6.000 để cung cấp đủ candidate cho chốt tiền; con số này không phải cam kết
-mọi file sẽ được upload. Hết nguồn trước chốt thì dừng để agent bổ sung metadata, không giả hoàn tất.
-Khi index tới chốt, PDF chưa nạp vẫn giữ file/credit, metadata chuyển sang download exclusion với
-`budget_not_uploaded`; manifest cuối chỉ giữ phần đã xử lý. Fixture 1.302 file giả kiểm giữ toàn bộ
-file và 1.300 receipt, credit hai file chưa nạp và chặn finalization khi mutation chưa rõ.
+**3.150 receipt** đã terminal; lỗi/từ chối gộp là **890**. Có 765 `pdf_text_invalid`,
+103 `provider_outcome_uncertain`, 5 `embedding_outcome_uncertain` và 17 từ chối full text.
+Không xóa item lỗi, không OCR, không tự retry/re-index outcome chưa rõ để làm đẹp số.
 
-## Chuyển sang local
+Thư viện user thực tế có **3.167 item, 1.643 indexed**, gồm 12 item cũ,
+3.150 receipt mục tiêu và 5 item ngoài chủ đề được giữ lại. Năm item đó ở collection xem lại
+(2 indexed, 1 cần xem lại, 2 lỗi), không tính vào lô mục tiêu.
+Đã đối chiếu **3.155 tiêu đề thật và membership** qua API; 12 original cũ vẫn đúng SHA-256 baseline.
+Không có admission upload hoặc item ID mới trong lượt hoàn tất ngày 27-10.
 
-Đã chạy `m9_lan_demo.py rebind --local --apply`: state lưu `access_mode=local`, chỉ sửa
-`RAS_EDGE_BIND` trong env hiện có, cấp leaf DNS-only từ CA demo cũ, recreate **chỉ edge**
-với `--no-deps --pull never`. API rc2, web ui2, dữ liệu, tài khoản và lịch giữ nguyên.
-`provider` khi sinh lại env lấy bind từ state; `web-image` chỉ sửa dòng image như trước.
+| Collection | Item được giữ | Indexed |
+| --- | ---: | ---: |
+| Dense retrieval & embeddings | 369 | 227 |
+| Reranking & search | 412 | 219 |
+| Retrieval-augmented generation | 265 | 136 |
+| RAG evaluation & benchmarks | 532 | 266 |
+| Grounding & hallucination | 595 | 282 |
+| Long context & chunking | 286 | 152 |
+| Search agents & tools | 691 | 349 |
+| Cần xem lại — ngoài phạm vi M11 | 5 | 2 |
 
-Kiểm thật: listener duy nhất `127.0.0.1:8443`; HTTPS `/login` với CA/SNI/Host
-`ras-demo.lan:8443` trả **200**; Wi-Fi, Radmin và WSL đóng. IP trần không SNI vẫn bị từ chối.
-CA hiện có không cho SAN IP loopback, nên leaf local chỉ dùng DNS SAN.
-Không thay trust store, hosts hay firewall. Lệnh chủ dự án tự chạy và cách gỡ cấu hình Ubuntu:
-[handoff M9](m9-lan-demo-deployment.md#dùng-trên-chính-máy-windows).
+Tổng qua API: **54.751 trang**, **7.299.246.539 byte file gốc**,
+**112.573 chunk dẫn xuất**, trong đó **68.162 chunk body/abstract thuộc item indexed**.
+Chunk còn lại của job lỗi không được tính là searchable. Các số này bao gồm cả 12 item cũ và 5 item ngoài phạm vi.
 
-Inventory trước: **22 container / 194 volume / 12 network / 150 image**. Evidence:
-`%USERPROFILE%\ras-pilot\evidence\m11-inventory-before.json`.
+## Corpus, license và file
 
-Inventory sau chuyển local vẫn **22/194/12/150**; chỉ `ras-pilot-edge-1` đổi ID,
-không thêm/xóa container, không đổi volume hoặc image ID. Ethernet/Tailscale không có địa chỉ
-IPv4 hiện hành trong lượt kiểm; listener ngoài loopback không tồn tại.
+Manifest cuối có 2.915 CC BY 4.0, 196 CC BY-SA 4.0 và 47 CC0 1.0, kể cả 8 file bỏ qua.
+Kiểm license theo đúng version: OAI latest + exact abs cho lô OAI; Atom entry có version +
+latest abs + exact abs cùng license/version cho lô Atom. Giữ hash/cache bằng chứng HTML/XML ngoài Git;
+không nhận NC/ND, license mặc định hoặc bằng chứng bất đồng.
 
-## Corpus và luồng nạp
+Đã đối chiếu SHA-256/kích thước **4.601 PDF** của manifest trước khi chốt; giữ nguyên 300 paper đầu,
+không trùng arXiv ID hoặc SHA-256 của 12 paper cũ. Manifest xử lý có **7.337.957.314 byte PDF**,
+gồm cả 8 file không upload. Các giới hạn PDF/parser của image rc2 giữ nguyên.
 
-- CC BY 4.0 / CC BY-SA 4.0 / CC0 1.0. Lô OAI yêu cầu arXivRaw trùng license abs đúng version,
-  và version đó latest trong lịch sử OAI. Lô Atom yêu cầu entry ID có version, trang abs
-  hiện hành và trang abs đúng version đều xác nhận cùng version mới nhất/cùng license mở.
-  Không nhận NC/ND/license mặc định, lịch sử không rõ hoặc bằng chứng bất đồng.
-- Bảy chủ đề: dense retrieval/embedding; reranking/search; RAG; đánh giá/benchmark;
-  grounding/hallucination; long context/chunking; agent tìm kiếm/tool use.
-- Không trùng arXiv ID/SHA-256 của corpus cũ. SHA-256 12 original được kiểm qua route
-  tải file của chính user, không SQL/internal upload.
-- PDF/attribution ngoài repo ở `%USERPROFILE%\ras-pilot\demo-papers\`; repo chỉ có
-  [manifest](../evaluation/m11-papers/manifest.json), metadata và script tải lại.
-- Request arXiv tuần tự cách ít nhất 3,2 giây, User-Agent mô tả, có checkpoint.
-  OAI ListRecords giảm request lẻ; `from` là ngày cập nhật metadata, không phải ngày đăng bài.
-  Hợp đồng nguồn: [arXiv OAI](https://info.arxiv.org/help/oa/index.html),
-  [API user manual](https://info.arxiv.org/help/api/user-manual.html).
-- Credential chỉ từ `library_user_email`/`library_user_password`; không in/log/commit
-  mật khẩu, cookie hay token intent. Giữ một phiên cho mỗi lượt script.
-- **Consent là đồng ý theo lô của chủ dự án/chủ tài khoản upload cho đúng corpus này.**
-  Mỗi file vẫn notice → intent `acknowledged=true` bind SHA-256/size/notice version → PUT
-  → poll trạng thái cuối → PATCH title thật → thêm collection qua API HTTPS.
-- Tối đa hai job đang chạy; không đổi concurrency/budget/quota ứng dụng. Không retry mutation
-  khi chưa xác định outcome; giữ item lỗi/cần review, không xóa để làm đẹp số.
+1.443 PDF chưa nạp được ghi `owner_stop_not_uploaded`, cùng 48 file quá lớn trong
+`evaluation/m11-papers/download-exclusions.json`. 48 mục ngoài chủ đề giữ ở `topic-exclusions.json`,
+trong đó 5 đã upload được giữ lại ở collection xem lại. Không xóa PDF hoặc ghi công.
+PDF và `ATTRIBUTION.md` ở `%USERPROFILE%\ras-pilot\demo-papers\`; repo chỉ giữ metadata/manifest và script tải lại.
 
-**Lô đầu đã khóa 300 paper đúng phạm vi**: 282 CC BY 4.0, 14 CC BY-SA 4.0, 4 CC0 1.0;
-**838.284.160 byte** PDF ngoài repo. Kiểm 300/300 SHA-256 và kích thước khớp, không trùng ID/hash
-12 paper cũ; rà topic lần cuối không loại thêm. Attribution giữ 12 paper cũ + 300 target + 48 ngoại lệ tải về.
+## Chi phí
 
-| Chủ đề target | Paper |
-|---|---:|
-| Dense retrieval & embeddings | 25 |
-| Reranking & search | 34 |
-| Retrieval-augmented generation | 14 |
-| RAG evaluation & benchmarks | 62 |
-| Grounding & hallucination | 59 |
-| Long context & chunking | 43 |
-| Search agents & tools | 63 |
+| Loại số liệu | Kết quả |
+| --- | --- |
+| Billed thực riêng M11 đã xác minh với provider | **Chưa xác minh được** |
+| Cam kết ledger trước 15 câu thử | $33,7896042 |
+| Trần giữ cho đúng 15 câu thử | $0,813 |
+| Cam kết ledger cuối | **$34,6026042** |
+| Ước tính embedding theo token/giá trong rc2 | $1,60245220 cho 69.990 call completed |
+| Call embedding chưa rõ kết quả | 109; giữ $0,17858560 ceiling ở kế toán sản phẩm |
 
-Checkpoint trước khi Docker được mở lại ngày 2026-10-24: **252/300 target đã nhận receipt**, trong đó
-121 `ready`, 40 `needs_review`, 89 `terminal_failed`, hai job còn ghi `indexing`.
-Client phiên trước đã thoát; lúc đó Docker Desktop tắt nên chưa thể đối chiếu hai job hoặc
-nạp 48 paper còn lại. Cam kết lúc đó **$2,7876122**, không có thao tác trả phí mới khi API tắt.
-Chủ dự án đã mở Docker; cả hai job đối chiếu lại đều `ready`, client đã nạp tiếp từ receipt.
-Kiểm local sau khởi động lại pass, còn khoảng 274 GiB trên ổ C. Snapshot manifest 300 đầu lưu
-ngoài repo ở `evidence/m11/manifest-initial-300.json`; phần mở rộng chỉ bổ sung, không thay 300 đầu.
-OAI tiếp tục phân trang theo target thay cho mốc 650 candidate ban đầu. Đây là checkpoint,
-không phải kết quả cuối; trang/chunk/object và câu hỏi cập nhật sau khi job kết thúc.
+Cam kết là tổng ceiling bảo thủ của từng operation, giữ cả phần job đã xong/lỗi; **không phải tiền đã billed**.
+Ứng dụng rc2 lưu `usage_price_estimate`/ceiling nhưng không lưu provider generation ID/receipt của embedding.
+Không thể gán delta usage của key nhóm cho M11. Không báo billed bằng 0, cũng không đổi estimate thành invoice.
+Raw probe/key meter chỉ trả số tổng; key ở env demo, không đọc file key hoặc `.env`.
 
-Lượt mở rộng đầu timeout khi tiếp tục token của cache hôm trước; `Identify` mới vẫn 200.
-[arXiv ghi token hết hạn hằng ngày](https://info.arxiv.org/help/oa/index.html#minor-differences),
-nên cache phân trang mới theo ngày UTC, không nối token cũ. Cache XML/decision/PDF cũ giữ nguyên;
-test kiểm không dùng lại stream cũ và vượt được ngưỡng 650 candidate.
-Probe ListRecords mới (kể cả set CL hẹp hơn) và GetRecord cũng timeout, trong khi Identify 200;
-không kết luận toàn bộ arXiv ngừng hoạt động. Tiếp tục các candidate chưa dùng trong snapshot
-OAI 666 record đã có bằng `discover --cached-candidates --target 1300`: vẫn lấy license trang abs
-đúng version trước PDF, so với license/version history của OAI snapshot, không bỏ kiểm license.
-Nếu hết snapshot mà metadata mới chưa lấy được thì giữ checkpoint và chưa báo đủ target.
-Một request ListRecords mới với read timeout 180 giây cũng đã timeout (180,28 s), giữ
-`evidence/m11/fresh-oai-probe-180s.json`. Không hạ tiêu chí license để bù thiếu metadata.
+Giữ trần tổng $50, dừng 80% ở $40; model/quota/budget ngày của app không đổi.
+Quyết định dừng upload của chủ dự án thay mục tiêu mở rộng tới ngân sách, nên phần còn lại không được tiêu để index thêm.
+`upload-admission-closed.json` vẫn tồn tại, và ledger từ chối admission `upload:*` ngay cả khi chạy lại client.
 
-Phần mở rộng còn phát hiện PDF tải về bị loại vì quá lớn/trùng hash chưa được ghi credit đầy đủ.
-Tooling mới lưu `download-exclusions.json`, phân biệt hai lý do, giữ attribution cho cả file bị loại.
-Với quyết định cũ đã mất verdict abs, script kiểm lại abs đúng version trước khi bổ sung credit;
-không dựng lại bằng chứng giả từ trường OAI. File bị loại không đi upload/provider.
-Offline phần mở rộng từng đạt **70 pass/1 deselected** (ca đủ manifest đợi khóa corpus).
-Hai assertion mới từng sai do đòi raw evidence HTTP phải thành HTTPS; đã sửa để giữ raw URL
-và so URL chuẩn hóa riêng. JUnit fail và lượt sửa lưu hai tên khác nhau ngoài repo.
+## 15 câu thử thật
 
-API Atom chính thức trả 200 trong khi OAI vẫn timeout. Fallback
-`discover --atom-candidates --atom-pages 4 --target 1300` giữ nguyên bộ lọc chủ đề,
-license và hash. Với mỗi candidate, script lấy cả abs không version và abs có version,
-kiểm citation ID/lịch sử/phiên bản đang chọn cùng trùng latest; license hai trang phải đồng ý.
-Manifest ghi rõ `method=atom_and_live_abs_latest`, không giả trường OAI; HTML và XML gốc
-ngoài repo có SHA-256. Tải lại cũng kiểm mới hai trang trước khi nhận bytes/hash đã khóa.
-Regression mới kiểm newer version, NC/ND, thiếu lịch sử, sai ID, license bất đồng và file
-hỏng được giữ nguyên. Lượt offline mới nhất **89 pass/1 deselected**, chưa phải corpus hoàn tất.
-Nếu một trang Atom lỗi/timeout/XML không hợp lệ, script lưu metadata lỗi ngoài repo và tiếp tục
-truy vấn chủ đề/thứ tự khác; không ghi trang lỗi thành cache hợp lệ hoặc suy ra license.
-Snapshot Atom từ lần tìm đầu vẫn có 2.100 entry; bộ lọc hiện hành giữ 1.700 candidate.
-`--atom-pages 1` tái dùng XML gốc với đường dẫn/hash thật, vẫn lấy mới hai trang abs trước PDF.
-Một ID arXiv kiểu cũ (`cs/0111012v1`) nằm ngoài schema manifest nên được ghi lý do và bỏ qua,
-không làm mất các candidate còn lại. Atom error entry cũng không được coi là paper.
+Đây là smoke trên API sản phẩm bằng user demo, **không chạy lại evaluation M7c hoặc chấm phiếu human**.
+Đúng 11 câu RAG (5 một paper, 3 không có đáp án, 3 so sánh) và 4 hybrid search có rerank.
+Không retry request trả phí. Raw answer/chunk ở evidence ngoài Git; bảng chỉ tóm tắt kết quả.
 
-Đề xuất khởi chạy controller nền để nối tải/nạp → smoke → backup/check đã bị bộ duyệt tự động
-từ chối (phạm vi 1.300 và chuỗi chạy không giám sát chưa được xác nhận tường minh). Controller
-**không được khởi chạy**. Các tiến trình M11 trực tiếp vẫn chạy theo checkpoint; smoke/backup
-cuối phải được agent kiểm điều kiện và chạy sau khi hoàn tất, chưa được xếp chạy tự động.
+| # | Nhóm | Kết quả API | Claim | Citation khớp nguồn |
+| ---: | --- | --- | ---: | ---: |
+| 1 | Một paper | answered | 3 | 3/3 |
+| 2 | Một paper | answered | 2 | 2/2 |
+| 3 | Một paper | answered | 4 | 4/4 |
+| 4 | Một paper | answered | 1 | 1/1 |
+| 5 | Một paper | answered | 1 | 1/1 |
+| 6 | Không có đáp án | insufficient_evidence | 0 | 0/0 |
+| 7 | Không có đáp án | insufficient_evidence | 0 | 0/0 |
+| 8 | Không có đáp án | insufficient_evidence | 0 | 0/0 |
+| 9 | So sánh | insufficient_evidence | 0 | 0/0 |
+| 10 | So sánh | insufficient_evidence | 0 | 0/0 |
+| 11 | So sánh | insufficient_evidence | 0 | 0/0 |
+| 12 | Hybrid search | 20 hit; rerank applied | 0 | 0/0 |
+| 13 | Hybrid search | 20 hit; rerank applied | 0 | 0/0 |
+| 14 | Hybrid search | 20 hit; rerank applied | 0 | 0/0 |
+| 15 | Hybrid search | 20 hit; rerank applied | 0 | 0/0 |
 
-**Cập nhật sau đó ngày 2026-10-24:** chủ dự án đã xác nhận riêng **cho phép chạy helper nền**
-để nối hoàn tất 1.300 paper → 15 câu thử → backup/check khi phiên Codex không mở.
-Đã khởi chạy bản `output/m11_finish_reviewed.py` được review, SHA-256
-`5dad21f758dacf2ecb6e3d536204359a8a72928c92c0716b2c72185ca32c5be6`, PID **40608**.
-State `evidence/m11/finish-reviewed-state.json` ban đầu là `waiting`; launch record lưu PID/hash/ủy quyền.
-Helper chờ đúng hai PID tải/nạp hiện có, kiểm đủ 1.300 PDF/hash và 300 đầu không đổi;
-chặn source thay đổi, command lỗi, state lần trước hoặc outcome không rõ. Không tự retry,
-không Git/merge, không tự sửa hosts/firewall, không đọc key hay `.env`. Giữ cùng ledger $30/dừng $24.
-Helper chỉ ghi runtime evidence; **review kết quả, số liệu README/M9/M11, commit manifest và CI head cuối
-vẫn chưa hoàn tất**. Không coi `waiting` là các bước sau đã chạy hoặc đã pass.
+**15/15 request có response**, 0 lỗi request; **11/11 citation khớp quote/locator**. Câu một paper có claim: 5/5; câu không có đáp án trả về không có claim: 3/3; so sánh có claim: 0/3. Kết quả từ chối/lỗi được giữ nguyên, không đổi câu hỏi rồi chạy lại để tăng số pass.
 
-### Sửa bộ lọc chủ đề trong lúc nạp
+Quote được đối chiếu với `/search/chunks/{id}` của chính user, gồm nguyên văn,
+item/version/file/page và original URL. Điều này xác minh locator/quote, không tự trở thành điểm human quality.
+Các câu phù hợp để dùng và giới hạn so sánh được ghi trong [handoff M9](m9-lan-demo-deployment.md).
 
-Bộ lọc ban đầu tìm chuỗi `rag`, khớp cả “average”/“paragraph”, và có thể gán nhầm nhóm đánh giá
-cho paper ngoài retrieval. Đã sửa thành word boundary, bổ sung regression âm/dương, rà lại OAI
-đã cache và tiếp tục tải bù. **48 PDF đã tải bị loại khỏi target**; PDF ngoài repo được giữ nguyên.
-[Danh sách metadata/SHA-256 của các ngoại lệ](../evaluation/m11-papers/topic-exclusions.json).
+## Backup và vận hành
 
-**5 item đã upload được giữ lại**, không tính vào mục tiêu 1.300: `2502.00857v2` (HintEval),
-`2505.01811v4` (BadPatches), `2506.08311v3` (Automated Program Repair Agents),
-`2509.04183v3` (MAGneT), `2602.19736v3` (InfScene-SR). Chỉ chuyển membership sang collection
-thứ tám **“Cần xem lại — ngoài phạm vi M11”**, không xóa item/file/job/index, không trả phí về 0.
-Luồng chuyển cũng có checkpoint chặn tự retry khi outcome chưa rõ. Bảy collection chủ đề
-vẫn là target chính; tổng thư viện cuối có thể lớn hơn 1.312 vì giữ các ngoại lệ này.
+| Mốc | Backup | Cửa sổ bảo trì | Cả lượt | Ciphertext |
+| --- | --- | ---: | ---: | ---: |
+| Trước nạp | `20261023T130947Z-e981fa49` | 19,42 s | 27,73 s | 10.058.385 byte |
+| Sau chốt và 15 câu thử | `20261027T082255Z-2d3d4bae` | **293,23 s** | 1147,95 s | **7.999.136.734 byte** |
 
-Lượt client đầu dừng tại 32 receipt đã xác định, không có upload `sending` bị bỏ dở.
-Chỉ gỡ orphan lock sau khi kiểm đúng PID client đã thoát; không dừng process theo tên.
+Backup sau: status `ok`, reopen `ok`, **3.167 object**, dump **694.856.503 byte**;
+ciphertext SHA-256 `df7fa157941c773b6b6e26beaa4c7c2448a8ea2a334624acb6715b2a040d6a6b`. Dùng entry point `ras_ops.py` đóng băng trong release,
+explicit `--env-file`/project/compose, `backup --no-alert` rồi `check` và `status`.
+Kết quả `ras_ops check`: exit 0, conditions/new/repeat đều rỗng, không có delivery error. Một email báo resolved hai cảnh báo cũ `backup_failed:preflight_failed` và `backup_stale`; không có cảnh báo mới. Status không còn maintenance/lock, replica equal seq 17/lag 0, đủ 9 service chạy lại. Retention không prune bản backup nào.
 
-## Kế toán
+Có preflight fail trong lịch sử trước lượt này; preflight mới pass, staging còn 266.209.677.312 byte.
+Không restore/drill, không `down`, không xóa dữ liệu/backup thủ công, không kill process theo tên.
+Đích backup/replica cùng máy theo cấu hình M9 hiện có; kết quả này không chứng minh miền sự cố ngoài máy.
 
-Ledger append-only/fsync trước PUT, lock một process, ngoài repo ở
-`evidence\m11\cost\ledger.jsonl`. Mỗi upload giữ ceiling cho **toàn bộ** input byte UTF-8
-body/abstract đã parse bằng `pypdf-6.21.1-layout-v2` × 4 attempt × giá trần embedding hiện có.
-Một byte UTF-8 chặn trên một token; reuse chunk chỉ giảm phí. Lỗi parser xác định vẫn đi
-luồng sản phẩm; preflight không xác định được bound thì không upload.
+Edge vẫn chỉ **127.0.0.1:8443**; CA demo cũ, leaf DNS-only `ras-demo.lan`.
+HTTPS CA/SNI/Host trả 200, IP trần bị TLS từ chối, Ethernet/Radmin/WSL đóng.
+Không sửa hosts/firewall/trust store; hướng dẫn chủ dự án tự chạy ở M9.
+API rc2/web ui2/ops image và cây `api/app`, `web`, `deploy/` giữ nguyên so với base M11.
 
-**Thiếu receipt không trả reservation về 0.** Job xong vẫn giữ toàn bộ ceiling trong cam kết.
-Dừng trước thao tác mới nếu tổng cam kết + ceiling mới vượt $24. Ledger theo operation
-(mỗi upload bao trọn nhiều provider call), không tái dùng ngân sách/ledger 400 call M7c.
+## Evidence, kiểm và dùng lại
 
-`/key` OpenRouter được đọc **bên trong API container**, key chỉ từ env demo hiện có; chỉ các
-trường usage số được trả ra. Key nhóm dùng chung: delta có thể gồm người khác, **không phải
-billed riêng M11**. Product API rc2 không lưu receipt/provider generation ID embedding;
-không thay code/image hay gắn observer. Bàn giao tách cam kết fail-closed và delta provider
-quan sát được; không giả chi phí estimate là invoice.
+Evidence ở `%USERPROFILE%\ras-pilot\evidence\m11\`:
 
-## Backup và kiểm
+- `finalization-20261027/corpus-audit.json`: hash, license, 300 đầu và loại file chưa upload.
+- `verified-metadata.json`, `baseline-originals-final-verified.json`: title/collection và original cũ.
+- `inventory.json`, `smoke.json`, `smoke-answer-*.json`, `source-*.json`: API thật; không commit raw text/answer.
+- `final-cost-report.json`, `cost/ledger.jsonl`: tách estimate, unknown và cam kết.
+- `final-backup.json`, `final-check.json`, `final-status.json`, `final-verify.json`: backup/check/HTTPS.
+- `offline-final-20261027.xml`: **104/104 test offline pass**; kiểm corpus đầy đủ không còn deselected.
 
-Trước nạp: backup `20261023T130947Z-e981fa49` **ok**, 12 object, dump **2.193.316 byte**,
-ciphertext **10.058.385 byte**, cửa sổ bảo trì **19,42 s**, cả lượt **27,73 s**, reopen `ok`.
-Ciphertext SHA-256 `1e7755e3c05d36dbb62b01a4e30742a259220b02daf8c9c0dfa57b43af7245d3`.
-Lượt này dùng `--no-alert`. Baseline có backup preflight fail lúc 11:30 UTC, giữ lịch sử;
-lượt vừa chạy thành công. Replica equal seq 13 trước nạp; maintenance null.
+Hai lần thử test ngày 26-10 lỗi do sandbox temp và guard ledger trong repo được giữ riêng;
+lượt chạy ngoài repo sau đó 102 pass. Lượt đọc inventory tuần tự ngày 27-10 được dừng đúng PID
+sau khi mọi metadata mutation đã có receipt; chỉ các GET được chuyển sang nhóm tối đa 4.
+Mutation vẫn tuần tự, không tự retry. Các bước này không đổi code ứng dụng hoặc nạp thêm file.
 
-Offline: **65/65 pass** (`test_m11_tooling.py` 24 + `test_m7c_tooling.py` 41), kiểm local state,
-CA/leaf, env/provider/image preservation, chỉ edge, mutation không retry, parser drift và ledger giữ trần.
-Checkpoint ghi temp → flush/fsync → atomic replace; ledger có admission nhưng thiếu binding checkpoint
-thì chặn upload lại. Không dùng việc checkpoint thiếu để suy ra request chưa gửi.
-Lượt sandbox đầu 3 pass/9 setup error do quyền tmp; sau mở quyền chạy được. Assertion mới
-ban đầu dùng sai tên env provider (53 pass/1 fail), đã sửa theo `OPENROUTER_API_KEY`.
-Không cộng các lượt thành nhiều test độc lập. JUnit cuối được giữ theo hash ở
-`evidence/m11/offline-tooling-65-86299274ff76.xml` (SHA-256 đầy đủ trong inventory).
-Các JUnit phát triển trước đó đã bị ghi đè; giữ tóm tắt/exit trong nhật ký tool, không coi chúng
-là raw artifact còn tồn tại hoặc dùng hash của lượt 64 test cho lượt cuối 65 test.
+CI của **head bàn giao cuối** phải kết thúc trước bàn giao; run ID/head và kết quả từng job
+được ghi trong mô tả PR #72 và báo cáo bàn giao. Không dùng run xanh của head cũ để thay head mới.
+Giữ author/committer, không AI trailer; PR mở cho review, không merge.
 
-CI `39969594383` tại `487b098` đã kết thúc thành công: API **1.307/1.307 pass**,
-Web test/typecheck/build và Pilot deploy config contract đều success. Đây là head trước sửa
-inventory chunk (offline cuối 65 test).
-CI checkpoint kế tiếp `40051049793` tại `25d50c6` cũng đã kết thúc: API **1.308/1.308 pass**,
-Web test/typecheck/build và Pilot deploy config contract đều success. Chưa phải CI của head cuối;
-vẫn phải chờ sau khi cập nhật toàn bộ kết quả.
-
-Backup sau nạp và 10–15 câu hỏi: **chưa xong**, sẽ cập nhật. Không chạy lại đánh giá M7c
-hay ghi human verdict. Git ngoài sandbox xác nhận bundle human-review không bị xóa/thay đổi;
-trạng thái D ở lượt sandbox đầu do permission denied.
-
-## Chạy tiếp/tải lại
-
-### Chủ dự án tự kiểm tra tiến trình nền
-
-**Phục hồi sáng 2026-10-25:** client dừng lúc 03:00 tại GET job trả `503 maintenance` trong
-backup định kỳ `20261024T200001Z-4327f91a`. Backup **ok**, reopen **ok**, cửa sổ bảo trì **151,02 s**,
-cả lượt **421,94 s**; kiểm sáng không còn flag/lock, replica equal seq 14 và HTTPS local 200.
-Checkpoint lúc kiểm có 2.971 PDF / 1.512 receipt target, 755 `ready`, cam kết $15,8533074;
-không có mutation chưa rõ hoặc admission thiếu binding. Hai job cuối được đọc lại qua API:
-một `ready`, một `terminal_failed/embedding_outcome_uncertain`; giữ phí và trạng thái, không upload lại.
-History trong `evidence/m11/recovery-20261025T014028Z/`.
-
-Client mới chờ `503 maintenance` **chỉ với GET/HEAD**, có giới hạn 20 phút và heartbeat log;
-POST/PUT/PATCH/DELETE vẫn không retry sau phản hồi lỗi. Resume dùng baseline đã có thay vì
-quét lại toàn bộ thư viện trước khi poll receipt. Regression **100 pass/1 deselected**, gồm
-GET đợi mở lại, mọi mutation chỉ gửi một lần và cửa sổ chờ bị giới hạn. Đã khởi chạy lại helper
-theo cùng ngân sách/ledger; không thay lịch backup, app/image, dữ liệu hoặc quota.
-
-Lượt kiểm lúc 22:19 ngày 2026-10-24 phát hiện helper/downloader đã dừng lúc 22:03 vì
-Windows từ chối atomic replace `manifest.json.tmp` → `manifest.json` (`WinError 5`);
-**client index 36716 vẫn tiếp tục chạy**, không chạm trần tiền. Bản manifest thật có 2.114 paper,
-bản `.tmp` có 2.115 và giữ nguyên prefix; PDF chưa publish `2605.27039v1` có bytes/hash khớp.
-Giữ cả hai bản, helper/journal lỗi và SHA-256 trong `evidence/m11/recovery-20261024T152307Z/`.
-Không promote mù `.tmp`, không resend upload: downloader kiểm license lại và tiếp tục từ manifest thật.
-
-`save()` mới retry tối đa tám lần (tổng chờ ≤3,55 s) **chỉ** publish metadata đã fsync khi
-Windows trả lỗi chia sẻ/đổi file 5/32/33. Lỗi dai dẳng vẫn giữ manifest cũ và `.tmp`, rồi dừng;
-không đổi ACL và không retry request API/provider. Regression **94 pass/1 deselected**.
-Helper mới tiếp quản PID index đang sống (`--adopt-index-pid`), không mở client upload thứ hai,
-không kill/restart client hiện có; history cũ giữ nguyên. `workers.index.alive` và
-`workers.discover.alive` giúp phân biệt helper dừng với mọi tác vụ đều đã dừng.
-
-Từ thư mục repo, chạy lệnh chỉ đọc sau; không gọi API/provider hoặc đọc secret:
+Từ repo, kiểm chỉ đọc:
 
 ```powershell
 & "$env:USERPROFILE\.conda\envs\ras\python.exe" scripts/m11_status.py
+& "$env:USERPROFILE\.conda\envs\ras\python.exe" scripts/m9_lan_demo.py verify
 ```
 
-**Tạm dừng theo yêu cầu chủ dự án, 2026-10-26 08:38 (+07:00):** helper và client index đã dừng
-đúng PID tại checkpoint không có mutation đang gửi; downloader đã kết thúc trước đó.
-4.601 PDF trong manifest, 3.150 receipt mục tiêu, ledger giữ **$33,7896042 cam kết**, chưa phải invoice.
-Hai job cuối được đọc lại qua API: `2209.11055v1` ready, `2307.03027v1` terminal_failed (`pdf_text_invalid`).
-Receipt/ledger/manifest/state trước dừng lưu ngoài repo ở
-`evidence/m11/owner-pause-20261026T083743/`; khóa PID đã thoát được chuyển vào history, không xóa ledger.
-Hai receipt cuối vẫn cần poll lại/hoàn tất title và collection khi tiếp tục; không resend upload.
-Marker `owner-pause.json` và state `paused_by_owner` ghi rõ chỉ tiếp tục khi chủ dự án yêu cầu;
-không tự khởi chạy helper hoặc chạy smoke/backup cuối trong lúc tạm dừng. Dữ liệu/container giữ nguyên.
-
-Xem `result`:
-
-- `running`: helper đúng PID/command vẫn sống; `last_updates` cho biết log/receipt có tiến triển không.
-- `paused_by_owner`: đã tạm dừng theo yêu cầu chủ dự án; chờ chỉ dẫn tiếp tục.
-- `runtime_done_review_pending`: đã kết thúc các bước runtime; còn agent review kết quả, docs/PR và CI head cuối.
-- `stopped_needs_review`: đã dừng do lỗi/chốt cần review; xem `helper_error`, chưa phải hoàn tất.
-- `helper_not_running_check_logs`: file state còn giai đoạn chạy nhưng PID không còn đúng; không coi là đã xong.
-- `unknown`: không xác minh được liveness, chẳng hạn thiếu quyền kiểm process; không kết luận là đang chạy hoặc đã xong.
-
-Lệnh kiểm process trả `unknown` khi CIM lỗi hoặc không đọc được command line do thiếu quyền.
-Không dùng command line trống làm bằng chứng PID đã thoát. Nếu chạy trong sandbox bị giới hạn,
-chạy lại lệnh trên trong PowerShell của chủ dự án để đối chiếu.
-
-`manifest_papers` là số metadata PDF đã chọn; `target_receipts` là số đã có receipt;
-`checkpoint_states.ready` là số đã index xong tại checkpoint. `committed_usd_not_billed` giữ toàn bộ
-ceiling, không phải invoice. Giờ hiển thị theo Việt Nam (+07:00). Helper không tự nhắn kết quả vào chat.
-State chỉ được ghi khi đổi giai đoạn, nên thời gian file state cũ không có nghĩa tiến trình đã treo;
-hãy xem cả `helper_alive` và thời gian `uploads.json`/hai log trong `last_updates`.
-
-```powershell
-$py = "$env:USERPROFILE\.conda\envs\ras\python.exe"
-& $py scripts/m11_papers.py discover --target 1300
-& $py scripts/m11_papers.py fetch
-& $py scripts/m11_papers.py curate  # rà topic từ OAI cache, không xóa PDF/item
-& $py scripts/m11_library.py run --watch --target 1300
-& $py scripts/m11_library.py inspect
-& $py scripts/m11_demo.py  # chỉ sau khi đủ target manifest và toàn bộ job đã kết thúc
-& $py scripts/m9_lan_demo.py verify
-```
-
-Không chạy hai `run` cùng lúc. `uploads.json` lưu receipt/job IDs và trạng thái; record
-`sending` chưa có ID khiến script dừng, phải đối chiếu thư viện trước, không tự resend PUT.
-Sau máy/phiên chạy dừng, mở Docker Desktop và kiểm PID trong `cost/ledger.lock`. Chỉ gỡ lock
-nếu đúng PID đó đã thoát và không có client M11 khác; không tự gỡ lock đang hoạt động.
-`run` poll lại job có receipt trước khi nhận paper mới. Không chạy lại toàn bộ câu hỏi trả phí
-khi `smoke.json` đã có record; kiểm outcome chưa rõ trước.
-PDF đã có không tải lại; fetch kiểm lại license và checksum. Version/license thay đổi thì
-từ chối thay vì âm thầm đổi bytes trong manifest. Fetch thành công tạo lại `ATTRIBUTION.md`
-kể cả ở thư mục mới; giữ ghi công cũ nếu thư mục đã có corpus M7c.
+Tải lại manifest vào thư mục ngoài Git bằng `scripts/m11_papers.py fetch --dest <thư-mục-ngoài-repo>`;
+script kiểm lại license/version/checksum và ghi attribution. Nếu metadata/version hiện hành lệch thì dừng để review.
+Không chạy helper mở rộng, không gỡ marker đóng upload, không replay 15 câu hỏi khi `smoke.json` đã có record.
+`run` nếu được dùng lại ở demo hiện tại chỉ hoàn tất receipt cũ; app UI/quyền truy cập không bị thay đổi.

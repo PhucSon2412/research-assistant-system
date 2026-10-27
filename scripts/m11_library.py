@@ -8,6 +8,7 @@ reads/writes use the real HTTPS product API. No SQL or internal upload endpoints
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import io
 import json
@@ -165,7 +166,17 @@ class Api:
             offset += len(page['items'])
             if offset >= page['total']:
                 break
-        return [self.request('GET', '/library/items/' + row['id'])['item'] for row in rows]
+        details = []
+        # Only metadata GETs run concurrently; consent/upload/title/membership
+        # mutations remain sequential and never retry an uncertain response.
+        def read_item(row):
+            return self.request('GET', '/library/items/' + row['id'])['item']
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            for item in pool.map(read_item, rows):
+                details.append(item)
+                if len(details) % 250 == 0:
+                    print(json.dumps({'inventory_items_read': len(details), 'total': len(rows)}), flush=True)
+        return details
 
     def close(self):
         self.client.close()

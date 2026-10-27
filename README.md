@@ -125,3 +125,11 @@ Good starting points in `docs/`: [product requirements](docs/product-requirement
 - **Performance:** targets have been measured only on small data sets; they are not service-level guarantees.
 
 The papers used in the demo are open-licence arXiv papers and are not stored in this repository.
+
+The personal demo snapshot for 27 October 2026 retains **3,167 library items**, including
+**1,643 indexed items**, in **8 collections** (seven topics and one review collection).
+M11 received 3,150 papers in scope; another 8 selected files were skipped before upload.
+Items needing review or failing extraction/indexing remain in the library with their original files.
+Uploads for this batch are closed. See the [M11 handoff](docs/m11-demo-knowledge-base.md)
+for state counts, licence evidence, the 15-question smoke check, costs and backup results;
+the [M9 guide](docs/m9-lan-demo-deployment.md) explains local HTTPS access and suggested questions.

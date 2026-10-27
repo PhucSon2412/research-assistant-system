@@ -12,6 +12,10 @@
 
 ## Trạng thái triển khai và lịch sử
 
+<!-- M11 final checkpoint -->
+**M11 — hoàn tất runtime/hậu kiểm (2026-10-27):** [PR #72](https://github.com/PhucSon2412/research-assistant-system/pull/72), nhánh `ops/m11-demo-knowledge-base`, base `1f7bfac`. Không nhận thêm paper; giữ marker đóng upload. Chốt 3.150 receipt mục tiêu: 1.631 indexed, 629 cần xem lại, 890 lỗi/từ chối; 8 file bỏ qua trước upload. Toàn thư viện 3.167 item/1.643 indexed/8 collection; metadata 3.155 receipt và 12 original cũ đã đối chiếu. 15/15 request thử có response, 11/11 citation khớp; 5 câu một paper trả lời, 3 không có đáp án từ chối, 3 so sánh thiếu nguồn nhiều paper, 4 hybrid/rerank đạt. Ledger giữ $34,6026042 cam kết, billed riêng M11 chưa xác minh được. Backup `20261027T082255Z-2d3d4bae` ok/reopen ok, bảo trì 293,23 s, ciphertext 7.999.136.734 byte; check exit 0 và HTTPS local được kiểm lại. Offline 104/104 pass; CI head bàn giao và từng job được ghi tại PR sau khi kết thúc. Không đổi app/image/deploy, không merge. [Handoff M11](docs/m11-demo-knowledge-base.md). Các mốc dưới đây là lịch sử.
+<!-- /M11 final checkpoint -->
+
 **Chủ dự án chốt dừng upload M11 (2026-10-26):** giữ lô hiện có, không tiếp tục mở rộng tới ngân sách.
 Checkpoint có **3.150 receipt mục tiêu**, 4.601 PDF đã tải; không đồng nhất receipt với index thành công.
 Ledger giữ **$33,7896042 cam kết**, chưa phải invoice. Mọi tiến trình M11 vẫn tạm dừng theo yêu cầu trước đó.

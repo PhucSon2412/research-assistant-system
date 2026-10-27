@@ -10,6 +10,7 @@ import argparse
 import json
 import os
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 from pathlib import Path
 
@@ -59,7 +60,7 @@ def questions(items, collections):
 def inventory(api, items, uploads, collections, evidence):
     per_item = []
     baseline = {i['id'] for i in json.loads((evidence / 'library-before.json').read_text(encoding='utf-8'))}
-    for item in items:
+    def read_item(item):
         chunks, body_abstract = 0, 0
         # The owner may read derivatives even when indexing failed partway.
         # Count them, while keeping active searchable chunks separate.
@@ -71,11 +72,16 @@ def inventory(api, items, uploads, collections, evidence):
             if len(page) < 100:
                 break
         jobs = item['jobs']
-        per_item.append({'item_id': item['id'], 'title': item['title'], 'baseline': item['id'] in baseline,
+        return {'item_id': item['id'], 'title': item['title'], 'baseline': item['id'] in baseline,
             'content_status': item['content_status'], 'jobs': [{k: j[k] for k in ('state', 'last_error_code')} for j in jobs],
             'pages': sum(f['page_count'] or 0 for f in item['files']),
             'original_bytes': sum(f['byte_size'] for f in item['files']), 'derived_chunks': chunks,
-            'indexed_chunks': body_abstract if item['content_status'] == 'indexed' else 0})
+            'indexed_chunks': body_abstract if item['content_status'] == 'indexed' else 0}
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        for record in pool.map(read_item, items):
+            per_item.append(record)
+            if len(per_item) % 250 == 0:
+                print(json.dumps({'inventory_chunks_read': len(per_item), 'total': len(items)}), flush=True)
     counts = {}
     for name, cid in collections.items():
         counts[name] = api.request('GET', '/collections/' + cid + '/items', params={'limit': 1})['total']

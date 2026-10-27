@@ -50,12 +50,16 @@ def helper_alive(pid, script_name='output/m11_budget_finish.py'):
 def status(root):
     evidence = root / 'evidence/m11'
     state = read(evidence / 'finish-budget50-state.json', {})
+    finalization = read(evidence / 'finish-owner-closed-state.json', {})
+    if finalization.get('status') in ('runtime_complete_pending_agent_review_docs_and_final_ci', 'complete'):
+        state = finalization
     launch = read(evidence / 'finish-budget50-launch.json', {})
     phase = state.get('status', 'not_started')
     alive = helper_alive(launch.get('pid'))
     runtime_done = phase == 'runtime_complete_pending_agent_review_docs_and_final_ci'
     stopped = phase == 'stopped_for_agent_review'
     result = ('not_started' if phase == 'not_started' else
+              'complete' if phase == 'complete' else
               'paused_by_owner' if phase == 'paused_by_owner' else
               'runtime_done_review_pending' if runtime_done else 'stopped_needs_review' if stopped else
               'helper_not_running_check_logs' if alive is False else 'running' if alive else 'unknown')
@@ -92,7 +96,8 @@ def status(root):
         'stop_reason': read(evidence / 'index-stop.json', {}).get('reason'),
         'upload_admission_closed': (evidence / 'upload-admission-closed.json').exists(),
         'helper_error': state.get('error'),
-        'scope': 'runtime_only_docs_pr_review_and_final_ci_not_checked',
+        'finalization_status': finalization.get('status'), 'final_ci': finalization.get('ci'),
+        'scope': 'handoff_checked' if phase == 'complete' else 'runtime_only_docs_pr_review_and_final_ci_not_checked',
     }
 
 

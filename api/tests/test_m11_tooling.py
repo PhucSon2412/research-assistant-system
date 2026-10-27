@@ -338,6 +338,22 @@ def test_budget_or_owner_stop_drains_known_job_without_sending_next_upload(tmp_p
     assert ledger.state()['committed_usd'] == prior_ceiling
 
 
+def test_metadata_inventory_reads_every_page_in_order_and_never_sends_mutations():
+    api = library.Api.__new__(library.Api)
+    calls = []
+    def request(method, path, **kwargs):
+        calls.append((method, path))
+        assert method == 'GET'
+        if path == '/library/items':
+            offset = kwargs['params']['offset']
+            return {'total': 5, 'items': [{'id': str(i)} for i in range(offset, min(offset + 2, 5))]}
+        return {'item': {'id': path.rsplit('/', 1)[1]}}
+    api.request = request
+    assert [item['id'] for item in api.inventory()] == ['0', '1', '2', '3', '4']
+    assert sum(path == '/library/items' for _, path in calls) == 3
+    assert {path for _, path in calls if path != '/library/items'} == {'/library/items/' + str(i) for i in range(5)}
+
+
 def test_owner_closed_upload_admission_retains_cost_and_allows_only_post_ingest_budget(tmp_path):
     ledger = library.Ledger(tmp_path / 'cost')
     ledger.admit('upload:prior', Decimal('1'), 'acknowledged upload')
