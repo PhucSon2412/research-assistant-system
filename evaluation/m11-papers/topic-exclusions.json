@@ -1,0 +1,1593 @@
+[
+  {
+    "tagged": "2502.00857v2",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "HintEval: An Open-Source Python Toolkit for Hint Generation and Hint Evaluation",
+    "authors": [
+      "Jamshid Mozafari, Bhawna Piryani, Abdelrahman Abdallah, Adam Jatowt"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2502.00857",
+    "version": 2,
+    "filename": "arxiv-2502.00857v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "e50212a32e349f5528780dbb39d023acc9daecdd281f88db79abc1d2517d33b5",
+    "bytes": 627982,
+    "licence_checked_at": "2026-10-23T13:12:26+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": "c646beb8-0862-4b78-ac0a-31ccc1037ef7"
+  },
+  {
+    "tagged": "2505.01811v4",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "BadPatches: Routing-Aware Backdoor Attacks on Vision Mixture-of-Experts",
+    "authors": [
+      "Jona te Lintelo, Cedric Chan, Stjepan Picek"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2505.01811",
+    "version": 4,
+    "filename": "arxiv-2505.01811v4.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "dcf88a24a6665ad3d9198569fd6c13c8d529efd0bd1006f66d3fa6ee78753330",
+    "bytes": 7592659,
+    "licence_checked_at": "2026-10-23T13:13:26+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": "af6ecde1-3471-419f-bcd5-8177da0b5c6e"
+  },
+  {
+    "tagged": "2506.08311v3",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Understanding Automated Program Repair Agents Through the Lens of Traceability: An Empirical Study",
+    "authors": [
+      "Ira Ceka, Hailie Mitchell, Saurabh Pujar, Luca Buratti, Shyam Ramji, Junfeng Yang, Gail Kaiser, and Baishakhi Ray"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2,
+        3
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2506.08311",
+    "version": 3,
+    "filename": "arxiv-2506.08311v3.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "c1bafcfe04d22fd4cedf31140414d076f8308d3bd97deeed67be103a51a59b6e",
+    "bytes": 1127033,
+    "licence_checked_at": "2026-10-23T13:14:19+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": "18eb435e-c188-452d-a02c-867d61bff7a8"
+  },
+  {
+    "tagged": "2509.04183v3",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "MAGneT: Coordinated Multi-Agent Generation of Synthetic Multi-Turn Mental Health Counseling Sessions",
+    "authors": [
+      "Aishik Mandal, Tanmoy Chakraborty, Iryna Gurevych"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2,
+        3
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2509.04183",
+    "version": 3,
+    "filename": "arxiv-2509.04183v3.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "e292ef6977535326a16df9590ee737fbf666aead0e6be1a9467b961270a6062b",
+    "bytes": 1795985,
+    "licence_checked_at": "2026-10-23T13:15:31+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": "fc0d5cb3-1966-4eca-a98d-c38bc21a0fa8"
+  },
+  {
+    "tagged": "2602.19736v3",
+    "topic": "Grounding & hallucination",
+    "title": "InfScene-SR: Seamless Super-Resolution of Arbitrarily Large Remote-Sensing Scenes via Variance-Preserving Joint Denoising",
+    "authors": [
+      "Shoukun Sun, Zhe Wang, Xiang Que, Jiyin Zhang, Xiaogang Ma"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2,
+        3
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2602.19736",
+    "version": 3,
+    "filename": "arxiv-2602.19736v3.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "1cfcde668c9029a84c4ea083f44efc1a3d68f7c3e45d84f13964a13bdf46c146",
+    "bytes": 11892835,
+    "licence_checked_at": "2026-10-23T13:15:37+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": "06eedc93-4a81-40ab-bf80-7d57e83bd6aa"
+  },
+  {
+    "tagged": "2511.15503v5",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "DCC: Data-Centric Compilation of Machine Learning Kernels for Processing-In-Memory Architectures",
+    "authors": [
+      "Peiming Yang, Sankeerth Durvasula, Ivan Fernandez, Mohammad Sadrosadati, Onur Mutlu, Gennady Pekhimenko, Christina Giannoula"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2511.15503",
+    "version": 5,
+    "filename": "arxiv-2511.15503v5.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "5682c7c0c805b3145b15eb5b55a1db81d491211b7fc0155cc919462c657ad349",
+    "bytes": 2158248,
+    "licence_checked_at": "2026-10-23T13:17:17+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2512.23805v4",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Fitted Q-Evaluation without Bellman Completeness via Occupancy Weighting",
+    "authors": [
+      "Lars van der Laan and Nathan Kallus"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2512.23805",
+    "version": 4,
+    "filename": "arxiv-2512.23805v4.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "ac8b54850ccced6efef4175318a120f4ab8f72c3d88a3389a5cdbbf36325a173",
+    "bytes": 951646,
+    "licence_checked_at": "2026-10-23T13:18:44+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2602.01390v3",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Toward Scalable Audio Description Quality Control: A Workflow for Evaluating Human and VLM Raters",
+    "authors": [
+      "Lana Do, Gio Jung, Juvenal Francisco Barajas, Andrew Taylor Scott, Shasta Ihorn, Alexander Mario Blum, Vassilis Athitsos, Ilmi Yoon"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2,
+        3
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2602.01390",
+    "version": 3,
+    "filename": "arxiv-2602.01390v3.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "16476f2256bb2cea12a8f9ea29c4a338ed88a6b63ac2209b11470593cf247647",
+    "bytes": 4258339,
+    "licence_checked_at": "2026-10-23T13:21:04+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2603.04445v3",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Dynamic Model Routing and Cascading for Efficient LLM Inference: A Survey",
+    "authors": [
+      "Yasmin Moslem, John D. Kelleher"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2,
+        3
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2603.04445",
+    "version": 3,
+    "filename": "arxiv-2603.04445v3.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "034b24ebf60d6dfe41a9e8f277fa129f45eaeff63e7acb38306d8d94d7c84831",
+    "bytes": 4259746,
+    "licence_checked_at": "2026-10-23T13:23:15+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2603.05575v2",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Prediction-Powered Conditional Inference",
+    "authors": [
+      "Yang Sui, Jin Zhou, Hua Zhou, and Xiaowu Dai"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2603.05575",
+    "version": 2,
+    "filename": "arxiv-2603.05575v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "31b7f00ed2c8fb5962dfc99ef8937d6e5e248d19b80717b437da52f7874e62f5",
+    "bytes": 1334851,
+    "licence_checked_at": "2026-10-23T13:23:50+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2603.09703v2",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "ProGS: Towards Progressive Coding for 3D Gaussian Splatting",
+    "authors": [
+      "Zhiye Tang, Lingzhuo Liu, Shengjie Jiao, Qiudan Zhang, Junhui Hou, You Yang, Xu Wang"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by-sa/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2603.09703",
+    "version": 2,
+    "filename": "arxiv-2603.09703v2.pdf",
+    "licence": "CC BY-SA 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "sha256": "6d204daf64174f7dae576c36b64c0b48074aa20e35ce05f23f174112ed6e44bd",
+    "bytes": 17206137,
+    "licence_checked_at": "2026-10-23T13:24:28+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by-sa/4.0/",
+      "oai": "http://creativecommons.org/licenses/by-sa/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2608.26495v2",
+    "topic": "Grounding & hallucination",
+    "title": "Video-FLAIR: Not Whether to Reason, But How",
+    "authors": [
+      "Yogesh Kulkarni, Pooyan Fazli"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2608.26495",
+    "version": 2,
+    "filename": "arxiv-2608.26495v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "0a42196b722820495b0461f227841ad8e20bba701c82a4df4cc625cbba169a75",
+    "bytes": 9613596,
+    "licence_checked_at": "2026-10-23T13:25:26+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2603.25269v2",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "When Hate Meets Facts: LLMs-in-the-Loop for Check-worthiness Detection in Hate Speech",
+    "authors": [
+      "Nicol\\'as Benjam\\'in Ocampo, Tommaso Caselli, Davide Ceolin"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2603.25269",
+    "version": 2,
+    "filename": "arxiv-2603.25269v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "867666f61311177fbdedb3a01b3a584b8e3a46a8406b96226b36d1c51be29f1f",
+    "bytes": 468041,
+    "licence_checked_at": "2026-10-23T13:25:58+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2604.03540v4",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Drift-Based Policy Optimization: Native One-Step Policy Learning for Online Robot Control",
+    "authors": [
+      "Yuxuan Gao, Yedong Shen, Shiqi Zhang, Wenhao Yu, Yifan Duan, Jia pan, Jiajia Wu, Jiajun Deng, Yanyong Zhang"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2604.03540",
+    "version": 4,
+    "filename": "arxiv-2604.03540v4.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "4a492ac9fe29a6309ec21d71fa8c8501a84008a4bc1648867f44f29d4267ece3",
+    "bytes": 8379635,
+    "licence_checked_at": "2026-10-23T13:26:45+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2608.28656v1",
+    "topic": "Grounding & hallucination",
+    "title": "RedLight-VLA: Models for traffic-rule grounding and behavioral emphasis in driving policies",
+    "authors": [
+      "Bala Murali Manoghar Sai Sudhakar, Sourab Bapu Sridhar, Sandipan Das, Rahul Ahuja, Meda Lazar, Ashish Garg, Pratik Likhar, Senthil Yogamani"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2608.28656",
+    "version": 1,
+    "filename": "arxiv-2608.28656v1.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "2d1b42a63a0d9c4aa1e8681dc357dbf82e1b44d160e774ba36b2d1d87dad763b",
+    "bytes": 20838766,
+    "licence_checked_at": "2026-10-23T13:26:55+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2605.06387v4",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Asymmetric On-Policy Distillation: Bridging Exploitation and Imitation at the Token Level",
+    "authors": [
+      "Nan Jia, Haojin Yang, Xing Ma, Jiesong Lian, Shuailiang Zhang, Weipeng Zhang, Ke Zeng, Xunliang Cai, Zequn Sun"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2605.06387",
+    "version": 4,
+    "filename": "arxiv-2605.06387v4.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "82c06e6fc9f9f0ddd1793a0835d4bf1595c78bd65f1cd7b80187ef88bedf828c",
+    "bytes": 4216215,
+    "licence_checked_at": "2026-10-23T13:27:31+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2605.22122v2",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Adversarial Trust Poisoning in Vehicular Collaborative Perception",
+    "authors": [
+      "Yutong Liu, Chenyi Wang, Ming F. Li, Qingzhao Zhang"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2605.22122",
+    "version": 2,
+    "filename": "arxiv-2605.22122v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "6d75d3a826794aac9959c6e1987a74c84c757c96010fc3730819994caa7e0e8d",
+    "bytes": 9099186,
+    "licence_checked_at": "2026-10-23T13:28:11+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2608.28714v1",
+    "topic": "Grounding & hallucination",
+    "title": "Evaluating the Safety of Deep Learning-Based Brain MRI Reconstruction",
+    "authors": [
+      "Dat Tat Mai, Thai Viet Pham, Thu Nguyen Thi Dang, and James Jin Kang"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2608.28714",
+    "version": 1,
+    "filename": "arxiv-2608.28714v1.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "a35309e571f5fd25e0d08896a6cf9db4c6c324dc2694c639d0a34a0960ff665f",
+    "bytes": 562239,
+    "licence_checked_at": "2026-10-23T13:28:21+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2605.24818v3",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Correcting test set contamination by spiking the training data",
+    "authors": [
+      "Johnny Tian-Zheng Wei, Jerry Li, Ameya Godbole, Robin Jia"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2,
+        3
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2605.24818",
+    "version": 3,
+    "filename": "arxiv-2605.24818v3.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "75690e64a4c43a85d8b1119e18b8104e7fadce6b9ac04a779fee1ccfad149631",
+    "bytes": 369289,
+    "licence_checked_at": "2026-10-23T13:28:44+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2608.29126v1",
+    "topic": "Grounding & hallucination",
+    "title": "Efficient Language-to-Vision Feature Injection for Referring Single-Object Tracking",
+    "authors": [
+      "Han Wang, Yuxuan Liu, Yuhan Sun, Jian Yang, Xiaotong Xu, Yixuan Lv, Zhuang Zhou, Shengyang Li"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2608.29126",
+    "version": 1,
+    "filename": "arxiv-2608.29126v1.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "0257a2171520ae36309d363e39fb633d676662d4dec1705c2529c6be58199fce",
+    "bytes": 2261378,
+    "licence_checked_at": "2026-10-23T13:29:33+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2609.00744v2",
+    "topic": "Long context & chunking",
+    "title": "The Price of Remembering: A Calibrated Energy Law for Computation",
+    "authors": [
+      "Mohamed Amine Bergach"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-002.xml",
+      "batch_sha256": "c8bf1968bd63b542ed61abc7b2388e1799d5f22710f009835c77a831b494224d"
+    },
+    "arxiv_id": "2609.00744",
+    "version": 2,
+    "filename": "arxiv-2609.00744v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "91b0c05102be33c56f5ef8655ebbb015f661f0eec42e738522ca29e91cf2963f",
+    "bytes": 885990,
+    "licence_checked_at": "2026-10-23T13:29:40+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2606.01162v2",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Deft Scheduling of Dynamic Cloud Workflows with Varying Deadlines via Mixture-of-Experts",
+    "authors": [
+      "Ya Shen, Gang Chen, Hui Ma, Mengjie Zhang"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2606.01162",
+    "version": 2,
+    "filename": "arxiv-2606.01162v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "8130c431f0a1506d91b13b3c5b58a4a20a515789b7523c5d8dd6b8bc2ad9d961",
+    "bytes": 820508,
+    "licence_checked_at": "2026-10-23T13:29:55+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2606.03695v2",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Don't Forget Your Embeddings: Robust Knowledge Erasure via Precise Editing of Embeddings",
+    "authors": [
+      "Clara Haya Suslik, Or Shafran, Mor Geva"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2606.03695",
+    "version": 2,
+    "filename": "arxiv-2606.03695v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "b73c7fb8a48a47e01f7f904e40a7a4d3f6e8c782ce3f8a9887c34f5a0661d71f",
+    "bytes": 1209107,
+    "licence_checked_at": "2026-10-23T13:30:23+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2606.03968v2",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "QUBRIC: Co-Designing Queries and Rubrics for RL Beyond Verifiable Rewards",
+    "authors": [
+      "Rongzhi Zhang, Rui Feng, Zhihan Zhang, Jingfeng Yang, Qingyu Yin, Xin Liu, Zixuan Zhang, Priyanka Nigam, Bing Yin, Tuo Zhao, Chao Zhang"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2606.03968",
+    "version": 2,
+    "filename": "arxiv-2606.03968v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "6a44193f6f5bc9573a89234657d6715001a97b1038270f905c04e2c2094fdc1b",
+    "bytes": 542325,
+    "licence_checked_at": "2026-10-23T13:30:53+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2606.05725v3",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "An Embarrassingly Simple Detector for Model Extraction Attacks in Large Language Model API Traffic",
+    "authors": [
+      "Shuze Liu, Qianwen Guo, Yushun Dong"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2,
+        3
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2606.05725",
+    "version": 3,
+    "filename": "arxiv-2606.05725v3.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "e057d7170cd6050cd6cd89bac72896face4ad49f3d209209edadfe0dc0590849",
+    "bytes": 522974,
+    "licence_checked_at": "2026-10-23T13:31:26+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2606.07524v2",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "ABLE: Representing and Mapping LLMs via Attribution-Based Large-model Embedding",
+    "authors": [
+      "Zirui Wang, Yusen Hou, Shaofeng Liang, Bowen Tian, Yanlin Zhang, Wenshuo Chen, Yutao Yue"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2606.07524",
+    "version": 2,
+    "filename": "arxiv-2606.07524v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "b2f35fffd516b5bd08eeff9c4e4f24acdbc3e80d507ee499b2acf432a85035b6",
+    "bytes": 1986967,
+    "licence_checked_at": "2026-10-23T13:31:50+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2608.29737v1",
+    "topic": "Grounding & hallucination",
+    "title": "Reactive Peripheral Modeling for Faithful Firmware Rehosting",
+    "authors": [
+      "Qinying Wang, Florian Hofhammer, Eduard Vlad, Jianqiang Wang, Marcel Busch, Shouling Ji and Mathias Payer"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2608.29737",
+    "version": 1,
+    "filename": "arxiv-2608.29737v1.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "0483f5640cfa8d7ec59c2ed0d06a454e103274ef47ce74aec6c3b4f3851c5dde",
+    "bytes": 1248584,
+    "licence_checked_at": "2026-10-23T13:31:58+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2609.03927v1",
+    "topic": "Long context & chunking",
+    "title": "Toward Unified Robot Learning: Bridging Representation, Vision-Language-Action, and World Models",
+    "authors": [
+      "Shaunak A. Mehta, Ananya Hazarika, Haochen Zhang, Fan Yang, Ryo Moriyama, Wenkai Li, Yash Patel, Kanata Suzuki"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1
+      ],
+      "batch": "oai-batch-003.xml",
+      "batch_sha256": "7ead442cf521da3290ca4cd5fb11cf8073ecd31e2888432be0913aa08ec107d5"
+    },
+    "arxiv_id": "2609.03927",
+    "version": 1,
+    "filename": "arxiv-2609.03927v1.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "ed41fe6bc2125c708886e5740435d3da791a192f856590d7e1c86971f18dd934",
+    "bytes": 23934644,
+    "licence_checked_at": "2026-10-23T13:32:04+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2606.09590v4",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Clinically Grounded Privacy Evaluation of Medical LMs",
+    "authors": [
+      "Sasha Ronaghi, Sana Tonekaboni, Lena Stempfle, Vivian Utti, Jordan Li Cahoon, Nathaniel Hendrix, Ayin Vala, Marzyeh Ghassemi, Emily Alsentzer"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2606.09590",
+    "version": 4,
+    "filename": "arxiv-2606.09590v4.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "0b542c9d1ddb0f4c51526007432967f1dd1f5821df304f0a1387576eac62e8b4",
+    "bytes": 5274406,
+    "licence_checked_at": "2026-10-23T13:32:22+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2606.15872v2",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "SciOrch: Learning to Orchestrate Expert LLMs for Solving Frontier Multimodal Scientific Reasoning Tasks",
+    "authors": [
+      "Jingru Guo, Xiangyuan Xue, Lian Zhang, Wanghan Xu, Siki Chen, Philip Torr, Wanli Ouyang, Lei Bai, Zhenfei Yin"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by-sa/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2606.15872",
+    "version": 2,
+    "filename": "arxiv-2606.15872v2.pdf",
+    "licence": "CC BY-SA 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "sha256": "9552c355f56f4ba685c38fda2a93dfaf8c08700f66368a3a9062105a30cc5e20",
+    "bytes": 1113597,
+    "licence_checked_at": "2026-10-23T13:32:56+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by-sa/4.0/",
+      "oai": "http://creativecommons.org/licenses/by-sa/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2608.29865v1",
+    "topic": "Grounding & hallucination",
+    "title": "ManGo: Manga Active Narrative Grounding Optimization",
+    "authors": [
+      "Hao Qiu, Junyan Wang, Zheyuan Liu, Lei Fan, Hong Jia, Lianbo Guo, Zhulin Tao"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2608.29865",
+    "version": 1,
+    "filename": "arxiv-2608.29865v1.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "de3f6bc04f0f5372485699ae86b68e383d072bc986e0fde02bc5b89d62bf2a83",
+    "bytes": 1782900,
+    "licence_checked_at": "2026-10-23T13:33:03+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2607.01651v2",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "One Demonstration Is Enough for Real-World Robotic Reinforcement Learning",
+    "authors": [
+      "Yuwan Liu, Hongze Yu, Song Liu, Yuhan Wang, Junge Zhang, Yaodong Yang, Yuanpei Chen, Ceyao Zhang"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2607.01651",
+    "version": 2,
+    "filename": "arxiv-2607.01651v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "d2eeccdd05f89e02493649d44894767a2bf7f119e2fc5a1468479ced4c367fb1",
+    "bytes": 4199150,
+    "licence_checked_at": "2026-10-23T13:33:18+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2607.02554v2",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Reliability-Aware Monocular Depth Supervision for Sparse-View Neural Reconstruction",
+    "authors": [
+      "Wei-Teng Chu, Yashasvini Gopalan, Changju Yuan"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2607.02554",
+    "version": 2,
+    "filename": "arxiv-2607.02554v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "bab5dff02104687eb23edfee1dd4f65582b3a70cc41d580c5ebf9ec0ba3c9489",
+    "bytes": 28017112,
+    "licence_checked_at": "2026-10-23T13:33:41+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2607.19313v2",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Off-Context GRPO: Learning to Reason on Hard Problems using Privileged Information",
+    "authors": [
+      "Priyank Agrawal, Ankur Samanta, Shervin Ghasemlou, Boris Vidolov, Jalaj Bhandari, Kavosh Asadi, Daniel Jiang, Aditya Modi"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2607.19313",
+    "version": 2,
+    "filename": "arxiv-2607.19313v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "8a7f1d8153b7ce355faf6b14574a0268a758961f12c8a1659bc4dca43349bd1b",
+    "bytes": 868236,
+    "licence_checked_at": "2026-10-23T13:34:19+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2607.25891v2",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Messier: A High-Resolution Corpus for Cross-Benchmark Agent Evaluation",
+    "authors": [
+      "Stefan Krsteski, Charlotte Meyer, Guillaume Allegre, Tony O'Halloran, Alexandre Sallinen"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2607.25891",
+    "version": 2,
+    "filename": "arxiv-2607.25891v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "a334e9d4052e7528b4465996f6adf17070f7f69f5a780d97d73b45bc6da2e5bf",
+    "bytes": 530247,
+    "licence_checked_at": "2026-10-23T13:34:40+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2608.07742v2",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "BRUCE: Benchmarking Robustness Under Corruption Escalation for Scientific Vision-Language Reasoning",
+    "authors": [
+      "Saim Rehman and Muhammad Shafique"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2608.07742",
+    "version": 2,
+    "filename": "arxiv-2608.07742v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "15e6477b96afbea4b18d46fb5c2d70d849dc094d05141244864797ef14590098",
+    "bytes": 4110953,
+    "licence_checked_at": "2026-10-23T13:35:05+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2608.20743v2",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Is Multimodal Speculative Decoding Ready for Diffusion-Based Parallel Drafting? A Survey and Empirical Diagnosis",
+    "authors": [
+      "Yantao Li, Huanlin Gao, Fang Zhao, Chao Tan, Qiang Hui, Shuting Liu, Fuyuan Shi, Ting Lu, Shaoan Zhao, Xueqiang Guo, Xinpei Su, Jianbing Zhang, Xinyu Dai, Kai Wang, Shiguo Lian"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2608.20743",
+    "version": 2,
+    "filename": "arxiv-2608.20743v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "5729241eaa138340768969811f737c49ce9d35785ef78800de513acdcc2926c2",
+    "bytes": 877832,
+    "licence_checked_at": "2026-10-23T13:35:44+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2608.21762v2",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Learning to Look Again: Loss-Gap Supervision for Free-form Crop Routing in Vision-Language Models",
+    "authors": [
+      "Jinchang Zhu, Rong Fu, Yi Ding, Chenghao Wu, Ying Liu, Menglin Yang"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2608.21762",
+    "version": 2,
+    "filename": "arxiv-2608.21762v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "70a38f23aade572f0ac62ed8cfb9a66f937e5c237dd4a310940a9399ffd8f013",
+    "bytes": 1191004,
+    "licence_checked_at": "2026-10-23T13:36:06+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2608.24080v2",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "When Less Is More: An Empirical Study of Minimal Responses in Counseling Dialogues and the Behavior of LLMs",
+    "authors": [
+      "Zhiyang Qi"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2608.24080",
+    "version": 2,
+    "filename": "arxiv-2608.24080v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "8619f12c1f8e6843b00bcd36ae716d8fa9bdf3806f1ed4095a871bea3d3bc756",
+    "bytes": 2525898,
+    "licence_checked_at": "2026-10-23T13:36:28+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2608.24730v2",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Learning to Prefer Reliably: Error-Augmented Emotion Preference Optimization with Calibrated Fusion",
+    "authors": [
+      "Zilong Huang, Junyi Peng, Junjie Li, Kai Li, Wenze Ren, Kong Aik Lee, Man-Wai Mak, Tatsuya Kawahara"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2608.24730",
+    "version": 2,
+    "filename": "arxiv-2608.24730v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "142a57b639e5e720dce98f2758a15f1897097e1f12ca31ecbe57da1f1e3b06b5",
+    "bytes": 3954164,
+    "licence_checked_at": "2026-10-23T13:37:11+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2608.28626v1",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Do large language models scrutinise what they review? A multimodal audit of scoring calibration, error detection, and author-identity effects",
+    "authors": [
+      "Emad Alharbi"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2608.28626",
+    "version": 1,
+    "filename": "arxiv-2608.28626v1.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "46af1ce1b11389f385d38a733b0972ec2eb29879d928f62a21fd917fa4818705",
+    "bytes": 839038,
+    "licence_checked_at": "2026-10-23T13:37:54+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2608.28627v1",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Machine Learning-Enhanced Tabu Search for Tactical Wireless Network Design",
+    "authors": [
+      "Wissem Ahmed Zaid, Alain Hertz, Defeng Liu"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/publicdomain/zero/1.0/",
+      "versions": [
+        1
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2608.28627",
+    "version": 1,
+    "filename": "arxiv-2608.28627v1.pdf",
+    "licence": "CC0 1.0",
+    "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "sha256": "62519067eea7506f52a69c555c476d752e0e2dfecb7a01218010cd3af88f9fad",
+    "bytes": 2161822,
+    "licence_checked_at": "2026-10-23T13:38:17+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/publicdomain/zero/1.0/",
+      "oai": "http://creativecommons.org/publicdomain/zero/1.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2608.28649v1",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Can Large Language Models Identify Meaningful Touchpoints in Conversion Attribution?",
+    "authors": [
+      "Jinqi Wu, Sishuo Chen, Zhangming Chan, Yong Bai, Chao Yi, Han Zhu, Shuodian Yu, Lei Zhang, Sheng Chen, Chenghuan Hou, Jian Xu, Chaoyou Fu"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2608.28649",
+    "version": 1,
+    "filename": "arxiv-2608.28649v1.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "d76c461aed75514c58a3eb08677ce2c65d5462ed20279f4ddf1c62c0c92e96ee",
+    "bytes": 1623446,
+    "licence_checked_at": "2026-10-23T13:38:38+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2608.28787v1",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Beyond Representation Learning: A Systematic Study of Joint-Embedding Predictive Generation for 3D Brain MRI",
+    "authors": [
+      "Meng Zhou, Wenhao You, Yuxing Chen, Yueying Tian"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2608.28787",
+    "version": 1,
+    "filename": "arxiv-2608.28787v1.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "3b92cc877b8597c3a9983e70964f217710e3541f1f6948d250444c56829bfbc1",
+    "bytes": 1945993,
+    "licence_checked_at": "2026-10-23T13:40:26+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2604.26582v2",
+    "topic": "Grounding & hallucination",
+    "title": "Star-Fusion: A Multi-modal Transformer Architecture for Discrete Celestial Orientation via Spherical Topology",
+    "authors": [
+      "May Hammad, Menatallh Hammad"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1,
+        2
+      ],
+      "batch": "oai-batch-001.xml",
+      "batch_sha256": "217a1736f44260040be6650aaea3e21e22f5ae0dc0bff0155beef6d7cb8800ed"
+    },
+    "arxiv_id": "2604.26582",
+    "version": 2,
+    "filename": "arxiv-2604.26582v2.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "e9666c325f33c1fa5ec929af57d5115aaf9fb82054c43d4a6d7b0ffb23ea7bfc",
+    "bytes": 434802,
+    "licence_checked_at": "2026-10-23T13:40:33+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2608.28800v1",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "UML Class Diagram Evaluation and Repair Strategies based on LLMs",
+    "authors": [
+      "Jie Liang, Peng Liang, Chong Wang"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2608.28800",
+    "version": 1,
+    "filename": "arxiv-2608.28800v1.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "9823d1f66f39d08d0fe4936f03a51dcacf150675f0cdc9296d40a0eeffcc9dd0",
+    "bytes": 9864659,
+    "licence_checked_at": "2026-10-23T13:41:10+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2608.28806v1",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Enhancing SAE-based Steering via Neighbor Integrated Feature Selection",
+    "authors": [
+      "Yutian Liu, Xu Wang, Difan Zou"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2608.28806",
+    "version": 1,
+    "filename": "arxiv-2608.28806v1.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "eed6e66332e39c557652a51c2116802b976b547e321214f54fd2d051b70b61ad",
+    "bytes": 1528186,
+    "licence_checked_at": "2026-10-23T13:41:34+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  },
+  {
+    "tagged": "2608.28809v1",
+    "topic": "RAG evaluation & benchmarks",
+    "title": "Capability-Stratified Degradation in Ternary Language Models",
+    "authors": [
+      "Anirudh Malik, M Sparsh Mehra, Poojith Devan"
+    ],
+    "oai": {
+      "licence": "http://creativecommons.org/licenses/by/4.0/",
+      "versions": [
+        1
+      ],
+      "batch": "oai-batch-000.xml",
+      "batch_sha256": "e8e1a4f0f02cfb4ac700c32cfdffe2e792c7bbab0b6ce4a4d82e1c28e98c0d10"
+    },
+    "arxiv_id": "2608.28809",
+    "version": 1,
+    "filename": "arxiv-2608.28809v1.pdf",
+    "licence": "CC BY 4.0",
+    "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sha256": "50aa981398ab45b9ebcd71da2de230d1e3fcd84d12568af3ca4445d174f97457",
+    "bytes": 470029,
+    "licence_checked_at": "2026-10-23T13:41:55+00:00",
+    "licence_evidence": {
+      "abs": "http://creativecommons.org/licenses/by/4.0/",
+      "oai": "http://creativecommons.org/licenses/by/4.0/",
+      "latest_version_required": true
+    },
+    "reason": "outside_llm_ir_topic_after_word_boundary_review",
+    "excluded_at": "2026-10-23T13:44:05+00:00",
+    "uploaded_item_id": null
+  }
+]

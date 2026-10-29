@@ -1,5 +1,24 @@
 # Kế hoạch hoàn thành MVP
 
+<!-- M11 final checkpoint -->
+**M11 — hoàn tất runtime/hậu kiểm (2026-10-27):** [PR #72](https://github.com/PhucSon2412/research-assistant-system/pull/72), nhánh `ops/m11-demo-knowledge-base`, base `1f7bfac`. Không nhận thêm paper; giữ marker đóng upload. Chốt 3.150 receipt mục tiêu: 1.631 indexed, 629 cần xem lại, 890 lỗi/từ chối; 8 file bỏ qua trước upload. Toàn thư viện 3.167 item/1.643 indexed/8 collection; metadata 3.155 receipt và 12 original cũ đã đối chiếu. 15/15 request thử có response, 11/11 citation khớp; 5 câu một paper trả lời, 3 không có đáp án từ chối, 3 so sánh thiếu nguồn nhiều paper, 4 hybrid/rerank đạt. Ledger giữ $34,6026042 cam kết, billed riêng M11 chưa xác minh được. Backup `20261027T082255Z-2d3d4bae` ok/reopen ok, bảo trì 293,23 s, ciphertext 7.999.136.734 byte; check exit 0 và HTTPS local được kiểm lại. Offline 104/104 pass; CI head bàn giao và từng job được ghi tại PR sau khi kết thúc. Không đổi app/image/deploy, không merge. [Handoff M11](m11-demo-knowledge-base.md). Các mốc dưới đây là lịch sử.
+<!-- /M11 final checkpoint -->
+
+**Cập nhật M11 mới nhất 2026-10-26:** chủ dự án dừng upload ở lô hiện có (3.150 receipt),
+thay mục tiêu chạy tới ngân sách. Không nhận file mới; runtime vẫn tạm dừng, Docker đang tắt.
+Còn hoàn tất metadata hai receipt cuối, manifest, 15 câu thử, backup/check, docs và CI head cuối.
+
+**Cập nhật M11 mới hơn ngày 2026-10-24:** chủ dự án cho $50 cho index và chọn mở rộng tới ngân sách,
+vượt mốc 1.300 nếu còn trần. Tổng dừng $40; index giữ $0,813 cho 15 câu thử. Quota/app/image/deploy giữ nguyên.
+Helper lô 1.300 cũ đã dừng vì thiếu metadata, không phải hết tiền; đang bổ sung nguồn và chuyển sang lượt theo budget.
+
+**M11 (2026-10-23, đang triển khai):** sau PR #71 `1f7bfac`, dự án dùng học tập cá nhân.
+Edge đã chỉ bind loopback, không cần LAN; đang bổ sung khoảng 300 paper mở vào user demo qua API,
+bảy collection chủ đề + một collection giữ ngoại lệ, trần task $30/dừng $24. Ngày 2026-10-24
+chủ dự án xác nhận thêm 1.000 ngoài lô 300, tổng khoảng 1.300 mới, cùng ledger.
+Không đổi ứng dụng/image/deploy hoặc kết quả đánh giá M7c.
+[Handoff M11](m11-demo-knowledge-base.md); bản cuối sẽ ghi số liệu, backup và CI thực tế.
+
 **M10 (2026-10-22, chờ review, chưa merge):** làm mới toàn bộ `web/app` cho demo CV, chỉ trình bày; hệ thống token/component,
 navigation theo role, thư viện/upload, tìm kiếm/RAG/citation và Admin responsive. Base PR #70 đã merge `0dd5a9c`,
 source **0052**. Web 79/79 + typecheck/build, HTTPS 68 HTTP/16 Chrome, 54 ảnh 1440/390 và 18 kiểm riêng tới 360 px.

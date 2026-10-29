@@ -57,6 +57,7 @@ jobs:
           tests/test_m8b_replica.py tests/test_m8b_artifacts.py tests/test_m8b_alerts.py
           tests/test_m8b_ops_host.py tests/test_m8b_s3_minio.py
           tests/test_evaluation.py tests/test_m7c_ai_review.py tests/test_m7c_tooling.py
+          tests/test_m11_tooling.py
           --deselect tests/test_pre_c4_initial_receipts.py::test_two_dump_restore_rounds_keep_valid_provenance_and_restrict_forgery
       - name: Scan JUnit for context secrets before upload
         # Runs even when tests failed, so clean failure evidence stays available.

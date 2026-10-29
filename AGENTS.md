@@ -12,6 +12,40 @@
 
 ## Trạng thái triển khai và lịch sử
 
+<!-- M11 final checkpoint -->
+**M11 — hoàn tất runtime/hậu kiểm (2026-10-27):** [PR #72](https://github.com/PhucSon2412/research-assistant-system/pull/72), nhánh `ops/m11-demo-knowledge-base`, base `1f7bfac`. Không nhận thêm paper; giữ marker đóng upload. Chốt 3.150 receipt mục tiêu: 1.631 indexed, 629 cần xem lại, 890 lỗi/từ chối; 8 file bỏ qua trước upload. Toàn thư viện 3.167 item/1.643 indexed/8 collection; metadata 3.155 receipt và 12 original cũ đã đối chiếu. 15/15 request thử có response, 11/11 citation khớp; 5 câu một paper trả lời, 3 không có đáp án từ chối, 3 so sánh thiếu nguồn nhiều paper, 4 hybrid/rerank đạt. Ledger giữ $34,6026042 cam kết, billed riêng M11 chưa xác minh được. Backup `20261027T082255Z-2d3d4bae` ok/reopen ok, bảo trì 293,23 s, ciphertext 7.999.136.734 byte; check exit 0 và HTTPS local được kiểm lại. Offline 104/104 pass; CI head bàn giao và từng job được ghi tại PR sau khi kết thúc. Không đổi app/image/deploy, không merge. [Handoff M11](docs/m11-demo-knowledge-base.md). Các mốc dưới đây là lịch sử.
+<!-- /M11 final checkpoint -->
+
+**Chủ dự án chốt dừng upload M11 (2026-10-26):** giữ lô hiện có, không tiếp tục mở rộng tới ngân sách.
+Checkpoint có **3.150 receipt mục tiêu**, 4.601 PDF đã tải; không đồng nhất receipt với index thành công.
+Ledger giữ **$33,7896042 cam kết**, chưa phải invoice. Mọi tiến trình M11 vẫn tạm dừng theo yêu cầu trước đó.
+Marker ngoài repo `evidence/m11/upload-admission-closed.json` chặn admission paper mới, kể cả khi chạy lại client;
+chỉ còn hoàn tất metadata của receipt cũ, khóa manifest, 15 câu thử, backup/check, docs và CI cuối.
+Docker Desktop đang tắt lúc kiểm 2026-10-26; chưa chạy các bước API hậu kiểm. Không khởi chạy lại helper mở rộng.
+
+**M11 đang triển khai (2026-10-23):** nhánh `ops/m11-demo-knowledge-base`, base PR #71 đã fetch/xác minh
+`1f7bfac`. Chủ dự án cập nhật **khoảng 300 paper bổ sung, trần $30/dừng $24**, thay 150/$10 ở task cũ.
+Đã chuyển edge sang local `127.0.0.1:8443`, leaf DNS-only từ CA cũ, chỉ recreate edge; hosts/firewall chủ dự án tự chạy.
+Corpus/index đang nạp qua API bằng user demo, giữ mọi trạng thái lỗi. [Handoff M11](docs/m11-demo-knowledge-base.md).
+Ngày 2026-10-24 chủ dự án đã mở Docker trở lại và yêu cầu nạp thêm khoảng **1.000 paper**;
+đã xác nhận **thêm 1.000 ngoài lô 300, tổng khoảng 1.300 paper mới**; giữ ledger **$30/dừng $24** và quota cũ.
+Chỉ dẫn mới hơn ngày 2026-10-24: chủ dự án cho dùng **$50 cho index**; agent áp dụng trần tổng M11
+**$50/dừng $40 (80%)**, gồm ledger đã có, không tự cộng thêm $50 và không nới quota ứng dụng.
+Key báo `limit_reset=daily`: $96 còn lại là hạn mức ngày, không xác nhận số dư ví.
+Chủ dự án đã chọn **tiếp tục mở rộng kho tới giới hạn ngân sách**, vượt mốc 1.300 nếu còn trần.
+Index dừng nhận file ở **$39,187**, giữ **$0,813** trần cho 15 câu thử trong tổng $40;
+job có receipt vẫn được poll/đặt title/collection, không xóa dữ liệu hoặc trả reservation về 0.
+Không đổi code app/image/`deploy/`, không merge. Các số cuối và CI cập nhật khi hoàn tất.
+
+**Sau merge PR #71 (2026-10-23):** `origin/main = 1f7bfac970fa0015a6d3211d3514a4136df4d4d6`. README đã viết lại thành trang giới thiệu dự án (tiếng Anh); nhật ký trạng thái cũ của README lưu ở `docs/status-log-archive.md`. Chủ dự án (2026-10-23): dự án đã xong chức năng, không cần demo LAN nữa, từ nay dùng học tập cá nhân trên máy này. Giao [M11 — chuyển sang dùng cá nhân trên máy + mở rộng kho paper](docs/tasks/m11-demo-knowledge-base-expansion.md), **mới giao**:
+- edge `ras-pilot` chuyển sang chỉ `127.0.0.1:8443`; hosts/firewall do chủ dự án tự chạy;
+- khoảng 150 paper arXiv theo giao việc ban đầu (chủ dự án cập nhật thành **300 bổ sung** ở chỉ dẫn M11 mới);
+- consent theo lô do chủ dự án xác nhận; trần cũ $10 đã được chủ dự án thay bằng **$30, dừng $24**;
+- tài khoản upload qua secret file chủ dự án tạo;
+- không đổi code/image/`deploy/`.
+
+**Review lại PR #71 tại `6b8b41a` (2026-10-23): ba lỗi đã sửa, không thấy điểm chặn merge.** CI `39760619090` success; [report](docs/reviews/pr71-m10-frontend-ui.md#review-lại-tại-6b8b41a-2026-10-23--ba-lỗi-đã-sửa). Demo chạy web `ui2` + API rc2; chủ dự án đã nghiệm thu qua LAN từ máy Ubuntu. Edge chỉ bind IP Ethernet: đổi mạng/Wi-Fi thì demo không publish cho tới khi cắm lại Ethernet hoặc `rebind`.
+
 **Sửa review PR #71 (2026-10-22, chờ review lại):** CSS Modules có khai báo kiểu trong Git; clone sạch không có
 `next-env.d.ts`/`.next` pass 79 test, typecheck, build theo thứ tự CI. Bỏ Georgia và letter-spacing âm; Chrome
 Windows 155.0.8059.85 xác nhận Times New Roman cho đủ mẫu dấu/câu login/RAG. Bảng user/Admin kiểm ở

@@ -5,6 +5,7 @@
     python scripts/m9_lan_demo.py offsite-up                         # same-machine MinIO: buckets, users, policies
     python scripts/m9_lan_demo.py verify                             # binds, other interfaces closed, HTTPS via LAN IP
     python scripts/m9_lan_demo.py rebind --lan-ip <ip>               # DHCP changed: new leaf cert + env, then `up -d`
+    python scripts/m9_lan_demo.py rebind --local --apply             # M11: persist loopback and recreate edge only
     python scripts/m9_lan_demo.py schedule install|remove            # "RAS pilot backup" 03:00, "RAS pilot check" 15 min
     python scripts/m9_lan_demo.py firewall-commands                  # elevated add/remove commands (printed, not run)
     python scripts/m9_lan_demo.py uninstall --yes                    # tasks, projects/volumes (label-checked), tags
@@ -191,7 +192,7 @@ def make_demo_ca(ca_dir: Path, public_dir: Path, host: str) -> None:
     write(public_dir / "ras-demo-ca.crt", pem)  # what demo devices install (certificate only)
 
 
-def make_site_cert(ca_dir: Path, tls_dir: Path, host: str, lan_ip: str) -> None:
+def make_site_cert(ca_dir: Path, tls_dir: Path, host: str, lan_ip: str | None) -> None:
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import ec
@@ -200,11 +201,15 @@ def make_site_cert(ca_dir: Path, tls_dir: Path, host: str, lan_ip: str) -> None:
     ca_key = serialization.load_pem_private_key((ca_dir / "demo-ca.key").read_bytes(), password=None)
     key = ec.generate_private_key(ec.SECP256R1())
     now = dt.datetime.now(dt.timezone.utc)
+    # The existing CA permits private LAN ranges, but not 127/8. Local access uses
+    # the DNS SAN and SNI; never issue an out-of-constraints loopback IP SAN.
+    names = [x509.DNSName(host)]
+    if lan_ip is not None:
+        names.append(x509.IPAddress(ipaddress.ip_address(lan_ip)))
     cert = (x509.CertificateBuilder().subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, host)]))
             .issuer_name(ca_cert.subject).public_key(key.public_key()).serial_number(x509.random_serial_number())
             .not_valid_before(now - dt.timedelta(minutes=5)).not_valid_after(now + dt.timedelta(days=397))
-            .add_extension(x509.SubjectAlternativeName([x509.DNSName(host),
-                                                        x509.IPAddress(ipaddress.ip_address(lan_ip))]), critical=False)
+            .add_extension(x509.SubjectAlternativeName(names), critical=False)
             .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
             .add_extension(x509.KeyUsage(digital_signature=True, key_cert_sign=False, crl_sign=False,
                                          content_commitment=False, key_encipherment=False, data_encipherment=False,
@@ -318,12 +323,16 @@ def env_text(values: dict) -> str:
         "".join(f"{k}={v}\n" for k, v in values.items())
 
 
+def bind_address(state: dict) -> str:
+    return "127.0.0.1" if state.get("access_mode") == "local" else state["lan_ip"]
+
+
 def pilot_env(state: dict, kind: str, gmail: str) -> dict:
     root = Path(state["root"])
     d = root / kind
     pw = state["passwords"]
     if kind == "pilot":
-        site = site_values(state["host"], state["port"], state["lan_ip"])
+        site = site_values(state["host"], state["port"], bind_address(state))
         subnet = state["subnet"]
         ports = {"RAS_EDGE_HTTP_PORT": "8080"}  # rendered by the base file only; the overlay publishes 8443 alone
     else:
@@ -594,17 +603,20 @@ def verify(args) -> int:
     root = Path(args.root).resolve()
     state = load_state(root)
     results = {}
+    address = bind_address(state)
+    local = state.get("access_mode") == "local"
+    results["access_mode"] = "local" if local else "lan"
     out = powershell("Get-NetIPAddress -AddressFamily IPv4 | ForEach-Object { $_.InterfaceAlias + '|' + "
                      "$_.IPAddress }").stdout
     addrs = {line.split("|")[1]: line.split("|")[0] for line in out.splitlines() if "|" in line}
-    results["ethernet_ip_still_ours"] = addrs.get(state["lan_ip"]) == "Ethernet"
+    results["bind_address_valid"] = local or addrs.get(address) == "Ethernet"
     listen = powershell(f"Get-NetTCPConnection -State Listen -LocalPort {state['port']} -ErrorAction SilentlyContinue"
                         " | ForEach-Object { $_.LocalAddress }").stdout.split()
     results["listen_addresses"] = sorted(set(listen))
-    results["only_lan_ip_listens"] = set(listen) == {state["lan_ip"]}
+    results["only_expected_address_listens"] = set(listen) == {address}
     others = {}
     for address, alias in sorted(addrs.items()):
-        if address in (state["lan_ip"],) or address.startswith("169.254."):
+        if address == bind_address(state) or address.startswith("169.254."):
             continue
         with socket.socket() as s:
             s.settimeout(2)
@@ -612,10 +624,10 @@ def verify(args) -> int:
     results["other_interfaces"] = others
     results["other_interfaces_closed"] = all(v == "closed" for v in others.values())
     ctx = ssl.create_default_context(cafile=str(root / "public" / "ras-demo-ca.crt"))
-    for label, host in (("hostname", state["host"]), ("ip", state["lan_ip"])):
+    for label, host in (("hostname", state["host"]), ("ip", bind_address(state))):
         # Connect to the LAN address; for the hostname send it as SNI/Host exactly as a device with the hosts line does.
         try:
-            with socket.create_connection((state["lan_ip"], state["port"]), timeout=10) as raw:
+            with socket.create_connection((bind_address(state), state["port"]), timeout=10) as raw:
                 with ctx.wrap_socket(raw, server_hostname=host) as tls:
                     tls.sendall(f"GET /login HTTP/1.1\r\nHost: {host}:{state['port']}\r\nConnection: close\r\n\r\n"
                                 .encode())
@@ -623,7 +635,7 @@ def verify(args) -> int:
             results[f"https_{label}"] = head
         except (OSError, ssl.SSLError) as exc:
             results[f"https_{label}"] = f"error: {type(exc).__name__}: {exc}"  # expected for "ip": no SNI
-    results["ok"] = (results["ethernet_ip_still_ours"] and results["only_lan_ip_listens"]
+    results["ok"] = (results["bind_address_valid"] and results["only_expected_address_listens"]
                      and results["other_interfaces_closed"] and " 200" in results.get("https_hostname", ""))
     print(json.dumps(results, indent=1))
     return 0 if results["ok"] else 1
@@ -634,14 +646,25 @@ def verify(args) -> int:
 def rebind(args) -> int:
     root = Path(args.root).resolve()
     state = load_state(root)
-    state["lan_cidr"] = check_lan_ip(args.lan_ip)
-    state["lan_ip"] = args.lan_ip
-    gmail = gmail_address(root / "secrets")
-    make_site_cert(root / "ca", root / "tls.d", state["host"], args.lan_ip)
+    local = args.local
+    if not local:
+        state["lan_cidr"] = check_lan_ip(args.lan_ip)
+        state["lan_ip"] = args.lan_ip
+    state["access_mode"] = "local" if local else "lan"
+    address = bind_address(state)
+    env_path = root / "pilot" / "pilot.env"
+    original = env_path.read_bytes()
+    updated, count = re.subn(rb"(?m)^RAS_EDGE_BIND=[^\r\n]*", ("RAS_EDGE_BIND=" + address).encode(), original)
+    if count != 1:
+        raise SystemExit("expected exactly one RAS_EDGE_BIND; no files changed")
+    make_site_cert(root / "ca", root / "tls.d", state["host"], None if local else address)
+    write(env_path, updated)  # preserve provider credentials and every other setting byte-for-byte
     save_state(root, state)
-    write(root / "pilot" / "pilot.env", env_text(pilot_env(state, "pilot", gmail)))
-    print(json.dumps({"rebound": args.lan_ip, "next": "compose up -d edge api (see handoff); update the hosts line "
-                      "on demo devices; then firewall-commands for the new address"}))
+    if args.apply:
+        run(compose_cmd(state, PROJECT) + ["up", "-d", "--wait", "--no-deps", "--pull", "never",
+                                         "--force-recreate", "edge"], timeout=180)
+    print(json.dumps({"rebound": address, "access_mode": state["access_mode"], "applied": args.apply,
+                      "next": "owner: update hosts/firewall using handoff M9"}))
     return 0
 
 
@@ -760,6 +783,10 @@ def schedule(args) -> int:
 
 def firewall_commands(args) -> int:
     state = load_state(Path(args.root).resolve())
+    if state.get("access_mode") == "local":
+        print("# Local mode: run in elevated PowerShell; hosts must map 127.0.0.1 ras-demo.lan.")
+        print(f"Remove-NetFirewallRule -DisplayName '{FIREWALL_RULE}' -ErrorAction SilentlyContinue")
+        return 0
     print("# Run in an ELEVATED PowerShell (Administrator). One inbound rule, Ethernet only, LAN subnet only.")
     print(f"New-NetFirewallRule -DisplayName '{FIREWALL_RULE}' -Direction Inbound -Action Allow -Protocol TCP "
           f"-LocalPort {state['port']} -LocalAddress {state['lan_ip']} -RemoteAddress LocalSubnet "
@@ -804,7 +831,10 @@ def main() -> int:
     sub.add_parser("offsite-up")
     sub.add_parser("verify")
     s = sub.add_parser("rebind")
-    s.add_argument("--lan-ip", required=True)
+    group = s.add_mutually_exclusive_group(required=True)
+    group.add_argument("--lan-ip")
+    group.add_argument("--local", action="store_true")
+    s.add_argument("--apply", action="store_true", help="recreate only edge, no dependencies or pull")
     s = sub.add_parser("web-image")
     s.add_argument("--image", required=True)
     s.add_argument("--apply", action="store_true", help="recreate only web, with --no-deps and no pull")

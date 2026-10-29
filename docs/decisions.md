@@ -1,5 +1,57 @@
 # Nhật ký quyết định
 
+<!-- M11 final checkpoint -->
+**M11 — hoàn tất runtime/hậu kiểm (2026-10-27):** [PR #72](https://github.com/PhucSon2412/research-assistant-system/pull/72), nhánh `ops/m11-demo-knowledge-base`, base `1f7bfac`. Không nhận thêm paper; giữ marker đóng upload. Chốt 3.150 receipt mục tiêu: 1.631 indexed, 629 cần xem lại, 890 lỗi/từ chối; 8 file bỏ qua trước upload. Toàn thư viện 3.167 item/1.643 indexed/8 collection; metadata 3.155 receipt và 12 original cũ đã đối chiếu. 15/15 request thử có response, 11/11 citation khớp; 5 câu một paper trả lời, 3 không có đáp án từ chối, 3 so sánh thiếu nguồn nhiều paper, 4 hybrid/rerank đạt. Ledger giữ $34,6026042 cam kết, billed riêng M11 chưa xác minh được. Backup `20261027T082255Z-2d3d4bae` ok/reopen ok, bảo trì 293,23 s, ciphertext 7.999.136.734 byte; check exit 0 và HTTPS local được kiểm lại. Offline 104/104 pass; CI head bàn giao và từng job được ghi tại PR sau khi kết thúc. Không đổi app/image/deploy, không merge. [Handoff M11](m11-demo-knowledge-base.md). Các mốc dưới đây là lịch sử.
+<!-- /M11 final checkpoint -->
+
+## Dừng upload M11 theo quyết định chủ dự án (2026-10-26)
+
+Chủ dự án chốt lô hiện có khoảng 3.000 paper; checkpoint có 3.150 receipt mục tiêu.
+Không tiếp tục nhận file hoặc mở rộng để tiêu hết ngân sách; chỉ dẫn này thay mục tiêu ngân sách bên dưới.
+Giữ ledger cam kết $33,7896042, mọi lỗi/cần xem lại, PDF chưa upload và ghi công.
+Đóng admission bằng marker ngoài repo; client chỉ được hoàn tất receipt cũ và bước hậu kiểm được giao.
+Runtime vẫn tạm dừng; Docker đang tắt lúc kiểm. Chưa coi M11 hoàn tất trước metadata/backup/smoke/docs/CI cuối.
+
+## Ngân sách index M11 $50 và mở rộng tiếp (2026-10-24)
+
+Chủ dự án yêu cầu dùng $50 cho index rồi chọn **tiếp tục mở rộng kho paper tới giới hạn ngân sách**.
+Trần tổng M11 là $50 gồm ledger cũ, giữ quy tắc dừng 80% ở $40; không cộng thêm $50,
+không nới quota/ngân sách ngày hoặc đổi model ứng dụng. Index dừng admission ở $39,187,
+giữ $0,813 cho 15 câu thử cuối; các job đã có receipt được theo dõi đến cuối.
+Mốc 1.300 là mốc tối thiểu trước khi mở rộng thêm, không còn là điểm dừng nếu còn trần.
+Key hiện có `limit=100`, `limit_reset=daily`: ~$96 là hạn mức ngày, không xác nhận số dư ví.
+Không gán delta của key nhóm thành hóa đơn riêng M11; giữ toàn bộ ceiling khi thiếu receipt.
+
+## Cập nhật phạm vi M11 của chủ dự án (2026-10-23)
+
+Ngày 2026-10-24, chủ dự án mở Docker trở lại và yêu cầu “nạp thêm khoảng 1000 paper”.
+Chủ dự án đã xác nhận thêm 1.000 ngoài lô 300, tổng khoảng **1.300 paper mới**.
+Key còn tiền không thay trần task: vẫn $30, dừng $24, cùng ledger/quota.
+
+Chỉ dẫn triển khai trực tiếp thay mục tiêu ban đầu bên dưới: **khoảng 300 paper bổ sung**,
+trần **$30**, dừng gọi mới ở **$24 (80 %)**. Giữ budget/quota ứng dụng hiện có. Key chỉ dùng
+qua env demo hiện có; không đọc `.env`. Edge local đã áp dụng, hosts/firewall vẫn do chủ dự án tự sửa.
+Ledger theo operation giữ toàn bộ ceiling nếu thiếu receipt; delta key nhóm không gọi là billed riêng task.
+Chi tiết và kết quả ở [handoff M11](m11-demo-knowledge-base.md).
+
+## Dùng cá nhân trên máy (2026-10-23)
+
+Chủ dự án: dự án đã xong chức năng; không cần demo LAN; từ nay dùng cho học tập cá nhân. Orchestrator chọn chuyển edge `ras-pilot` sang chỉ `127.0.0.1:8443` (giữ CA demo, dữ liệu, backup, alert). Paper mới nạp vào tài khoản user demo hiện có. Hướng dẫn LAN giữ trong handoff M9 như tùy chọn.
+
+## Mở rộng kho paper demo (2026-10-23)
+
+**Chủ dự án xác nhận:**
+
+- nhóm đồng ý dùng phần còn lại của key OpenRouter (khoảng $30,9 lúc kiểm);
+- chủ dự án đồng ý xử lý ngoài theo lô cho các paper arXiv giấy phép mở do [M11](tasks/m11-demo-knowledge-base-expansion.md) chọn, thay cho việc bấm xác nhận từng file. Luồng intent/acknowledgement của API vẫn chạy cho từng file.
+
+**Orchestrator chọn:**
+
+- khoảng 150 paper chủ đề LLM & information retrieval;
+- trần task $10 fail-closed, budget ứng dụng $10/ngày giữ nguyên;
+- không đổi code, image hay `deploy/`;
+- paper giữ ngoài repo, chỉ commit manifest/attribution.
+
 ## Cập nhật cùng ngày: key, đường vào, lưu trữ, mục tiêu demo (2026-10-21)
 
 **Chủ dự án cho biết:**

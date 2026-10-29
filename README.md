@@ -1,113 +1,135 @@
 # Research Assistant System
 
-**M8a trên nhánh review (2026-10-19, chưa merge):** cấu hình triển khai nhóm thử riêng [`deploy/`](deploy/compose.yaml) với Caddy HTTPS, cookie Secure/Origin, invite/reset qua SMTP TLS, rate limit auth Redis và CI GitHub Actions; [handoff](docs/m8a-pilot-entry-hardening.md). Chỉ kiểm cô lập với CA/SMTP thử; chưa domain/host/SMTP thật, chưa cutover hay nghiệm thu production, pricing vẫn tắt.
+A self-hosted research library: upload scientific papers, search them by keyword and meaning, and ask questions answered **only from your papers, with clickable citations down to the file and page**. It is built for a small, invite-only research group, with strict per-user privacy and an admin-reviewed shared library.
 
-**Cập nhật 2026-10-19:** PR #65 (M7b) đã merge `3b59a1d`; bộ đọc/nhập/chấm phiếu sẵn, **0 verdict thật/awaiting_human_review**. Gói tiếp theo là [M8a — HTTPS, invite/reset qua SMTP TLS, rate limit và CI cho nhóm thử](docs/tasks/m8a-pilot-entry-hardening.md), mới giao/chưa triển khai. Không bật pricing hoặc cutover thật bằng kết quả merge; [kế hoạch MVP](docs/mvp-delivery-plan.md) giữ các điều kiện D/E còn lại. Các mốc chờ review trong báo cáo lịch sử không phải trạng thái hiện hành.
+![Question answering with numbered citations and a source panel](docs/screenshots/m10-rag-1440.png)
 
-**M7b trên nhánh review (2026-10-19, chưa merge):** bộ duyệt người đọc offline tại [`evaluation/human-review/`](evaluation/human-review/README.md) — mở `bundle/index.html`, điền hai phiếu CSV, rồi `human-import`/`human-report`. Chưa có phiếu thật: `awaiting_human_review`. [Handoff](docs/m7b-human-quality-review.md).
+## What it does
 
-**Hiện hành sau merge PR #64 (2026-10-19):** source **0052**, main `2df77d0`; C4/M6d/M6e/M7a đã merge trong phạm vi đã review. [Kế hoạch MVP](docs/mvp-delivery-plan.md) giữ các điều kiện nghiệm thu còn thiếu. Tiếp [M7b — bộ duyệt nhãn/answer và nhập phiếu người đọc](docs/tasks/m7b-human-quality-review.md), mới giao/chưa triển khai. Pricing mặc định tắt; cache-write live source cuối, human review, provider/policy và vận hành nhóm thử E chưa hoàn tất. Không cộng pass mới tại merge hoặc coi các trạng thái OPEN/pending lịch sử bên dưới là hiện trạng.
+- **Private library.** Each user uploads PDF or Markdown papers into a private library. Before every upload the app states which text will be sent to the AI provider and asks for explicit consent. The original file is always kept, and pages that could not be extracted are reported.
+- **Hybrid search.** Full-text keyword search and vector search, combined and reranked. Results show the matching passage, the page, and a link to the original file.
+- **Question answering with citations (RAG).** Ask about one paper, a collection, or everything you are allowed to see. Each claim cites the passage it relies on. When the papers don't contain the answer, the app says so instead of guessing.
+- **Collections and discovery.** Group papers into collections. A scheduled arXiv job surfaces new papers as metadata-only entries.
+- **Shared library with review.** A user can propose one specific version of a paper for the shared library. The admin temporarily sees only that file, checks its distribution rights, and then approves, publishes or later revokes it. Uploading a paper never publishes it automatically.
+- **Invite-only accounts.** Invitations and password resets are delivered by e-mail (SMTP over TLS). Sessions use secure cookies with CSRF and Origin checks, and login and reset requests are rate limited.
 
-**C4 đã triển khai và kiểm cô lập (source `0051`, chờ review/chưa merge):** [Handoff/runbook C4](docs/c4-integrated-runtime-cutover.md) ghi checkpoint, image/roles và phạm vi kiểm cô lập. Không cutover dev hoặc bật provider/pricing thật. Inventory cuối đối chiếu đủ 5.163 node API đều pass, giữ 298 debt; năm full drill và CLI evaluation đã chạy. Các mốc bên dưới giữ lịch sử theo source riêng.
+| Library and upload | Search | Admin |
+|---|---|---|
+| ![Library](docs/screenshots/m10-library-1440.png) | ![Search](docs/screenshots/m10-search-1440.png) | ![Admin](docs/screenshots/m10-admin-1440.png) |
 
-**Hiện hành sau merge PR #60 (2026-10-15):** B1 đã merge `44633b99`, tree khớp `c6f200e`, source **0050**; chưa rerun tại merge. [Handoff B1](docs/pre-c4-auth-receipts-regression.md) và [review](docs/reviews/pr60-pre-c4-auth-receipts-regression.md) giữ chứng cứ/giới hạn. Đã giao [C4 — bản chạy tích hợp/readiness/restore](docs/tasks/m6c2b2c4-integrated-cutover.md), mới giao/chưa triển khai hoặc kiểm. Mã hiện vẫn pending; C4 chỉ kiểm operational readiness có hậu điều kiện trên project cô lập, không cutover dev hoặc mở provider thật. [Kế hoạch MVP](docs/mvp-delivery-plan.md) giữ checklist; các mốc bên dưới là lịch sử.
+More screens, including mobile layouts, are in [docs/screenshots](docs/screenshots/README.md). The screenshots use synthetic data.
 
-**Trạng thái hiện hành (2026-10-13):** PR #59 đã merge `041f77ef`, source **0049**; head `035cef0` là ancestor, tree khớp, chưa rerun tại merge. [C3 operator recovery](docs/c3-operator-auth-recovery.md) đã qua review trong scope C3; tiếp [B1 — initial receipt và hồi quy trước C4](docs/tasks/pre-c4-auth-receipts-and-regression.md), mới giao/chưa triển khai hoặc kiểm, rồi C4 tích hợp theo [kế hoạch MVP](docs/mvp-delivery-plan.md). **Safety pending tới C4**; provider thật/pricing và nghiệm thu MVP còn riêng. Các mốc OPEN bên dưới là lịch sử.
+## Architecture
 
-**Mốc trước C2d-6 (lịch sử, 2026-10-11):** PR #56 đã merge `808337dc`, source `0046`; **safety pending tới C4**. [Kế hoạch MVP và checklist nghiệm thu](docs/mvp-delivery-plan.md) giữ dự kiến 2–3 tuần cho bản chạy đầy đủ, 4–6 tuần cho MVP nhóm nhỏ theo các giả định đã ghi. Đã giao [C2d-6 search/query embedding/rerank runtime](docs/tasks/m6c2b2c2d6-search-query-rerank-runtime.md) thành một PR hoàn chỉnh, chưa triển khai/kiểm. Các mốc OPEN/kết quả bên dưới giữ lịch sử trước merge, không là chứng nhận bản đang chạy.
+```mermaid
+flowchart LR
+  B[Browser] -->|HTTPS| E[Caddy edge]
+  E --> W[Next.js web<br/>proxy + UI]
+  W --> A[FastAPI API]
+  A --> P[(PostgreSQL 16<br/>+ pgvector)]
+  A --> S[(MinIO / S3<br/>original files)]
+  A --> R[(Redis)]
+  R --> C[Celery worker + beat]
+  C --> P
+  C --> S
+  C -->|embedding, rerank| O[OpenRouter]
+  A -->|generation| O
+  C -->|metadata| X[arXiv]
+  A --> J[[Revocation journal<br/>append-only, hash-chained]]
+  J -.->|replica| Q[(Off-host S3)]
+  P -.->|encrypted backup, age| Q
+```
 
-**Review PR #55 tại `bca5d90`: không phát hiện điểm chặn merge mới trong phạm vi citation reconcile runtime.** Reviewer thực chạy **121/121 pass** (119 ca repo + hai smoke Linux CLI/Celery SIGKILL); đối chiếu riêng **313 artifact hash**, agent **1.203 unique pass / 3.534 not-run**, 327 source hash và 10 countercheck. PR **OPEN, chưa merge**, source `0045`, **safety pending tới C4**. [Báo cáo review](docs/reviews/pr55-c2d5f1-citation-reconcile-runtime.md). Discovery harvesting và cutover vẫn riêng; không gọi provider/arXiv hoặc thao tác dev trong lượt review.
+| Layer | Technology |
+|---|---|
+| Web | Next.js 16, React 19, TypeScript, CSS Modules (no external fonts or scripts) |
+| API | Python 3.12, FastAPI, SQLAlchemy 2, Alembic (52 schema revisions), Argon2 password hashing |
+| Data | PostgreSQL 16 with pgvector, MinIO (S3-compatible) for originals, Redis |
+| Jobs | Celery worker and beat: PDF/Markdown extraction (pypdf), chunking, indexing, arXiv discovery, cleanup |
+| AI | OpenRouter: `openai/text-embedding-3-small` (embeddings), `qwen/qwen3-reranker-8b` (rerank), `openai/gpt-6-sol` (answers), pinned to zero-data-retention providers |
+| Deploy | Docker Compose, Caddy (single HTTPS entry point), GitHub Actions CI |
 
-**C2d-5f1 trên nhánh review (chưa merge): citation reconcile qua runtime.** CLI/direct/Celery dùng một batch boundary runtime (entry login/grant/gate mỗi batch, journal exclusive, binding, commit known), discovery hook khóa item common trước citation exclusive (sửa deadlock tái hiện ở base). Source giữ `0045`. Seal `sealed-1` tại `8e2a500`: **1.203 API unique pass**, 0 fail/error/skip, collect 4.737, **3.534 not-run** (27 debt deselect); 327 source hash trùng; smoke Linux CLI + Celery/Redis 2 pass; countercheck 10/10. [Handoff](docs/c2d5f1-citation-reconcile-runtime.md) · [Inventory](docs/c2d5f1-test-inventory.json). **Safety pending tới C4**; discovery harvesting là C2d-5f2.
+## Engineering highlights
 
-**PR #54 đã merge `37edd5c9`, source `0045`.** Đã giao [C2d-5f1 citation reconcile runtime](docs/tasks/m6c2b2c2d5f1-citation-reconcile-runtime.md) (mốc giao, lịch sử). Chuyển citation backfill trước, discovery harvesting C2d-5f2 sau; **safety pending tới C4**, không mở pricing hoặc thao tác dev. Merge tree khớp head review `cf66f1c`; các trạng thái nhánh review bên dưới giữ lịch sử, chưa rerun tại merge.
+- **Permissions filtered before retrieval.** Access control is applied inside the SQL query, before ranking, counting or pagination, and re-checked when a file, chunk or citation is opened. Text a user may not see never reaches the AI prompt. A paper you have no access to returns `404`, exactly as if it did not exist.
+- **Grounded answers.** Every answer is built from retrieved passages that carry version, file and page locators. Citations are verified quotes of the source text, and the model is instructed to abstain when the evidence is insufficient.
+- **Revocation that survives restores.** Revoking or deleting a paper writes a record to an append-only, hash-chained journal kept outside the database. After a database restore, a recovery gate keeps the service closed until the journal has been replayed, so revoked or deleted papers cannot reappear.
+- **Cost control.** Every AI call reserves budget before it is sent and is settled afterwards. In a live test of 300 provider calls, each call's settled cost was reconciled against the provider's own billing record. Per-user quotas and an application-wide daily budget apply, and a call with an unknown outcome is held at its maximum cost until it is reconciled.
+- **Operations.** Scheduled backups run in a short maintenance window and are encrypted with `age` before they leave the server. The journal is replicated off-host, alerts go out by e-mail, and a monthly restore drill has a runbook.
+- **Testing.** The full API suite of 5,579 tests passed in a single run on the release candidate. CI runs a risk-based selection plus web tests, type checking and a deployment contract check on every pull request. Five end-to-end restore drills and browser smoke tests over HTTPS run against isolated Docker stacks.
 
-**C2d-5e2 trên nhánh review (chưa merge): reconcile original mồ côi qua runtime.** Base merge PR #53 `b2e76edb`, source `0044 → 0045`; code `ebbc27a`. CLI/direct `reconcile_originals` dùng runtime thật (mặc định preview, xóa cần `--apply`), fence orphan riêng `orphan_object_fences` + completion append-only, trigger SourceFile INSERT kiểm cả fence common/orphan cùng key lock, zero SourceFile reference toàn DB, S3 ngoài mọi transaction, resume qua fence bền. Vẫn **thủ công khi quiescent**, không Celery/beat/online GC. Seal `sealed-2` tại `9faf0d1` (production code `ebbc27a`, chỉ khác barrier một test): **2.096 API unique pass**, 0 fail/error/skip, exit 0, collect 4.690, **2.594 not-run** (gồm 25 debt base deselect); 321 source hash trước/sau trùng; smoke CLI Linux SIGKILL thật 1 pass; countercheck 9/9. **Safety pending tới C4.** [Handoff](docs/c2d5e2-orphan-original-reconcile-runtime.md) · [Inventory](docs/c2d5e2-test-inventory.json). Mốc giao C2d-5e2 trước triển khai: [task](docs/tasks/m6c2b2c2d5e2-orphan-original-reconcile-runtime.md); PR #53 đã merge `b2e76edb`, các trạng thái PR #53 dưới đây giữ lịch sử.
+## Evaluation (small, honest numbers)
 
-**Review lại PR #53 tại `bf9d81f`: P2 đã sửa; không phát hiện điểm chặn merge mới trong phạm vi cleanup runtime.** Reviewer thực chạy **20/20**; đối chiếu riêng artifact agent **1.584 unique pass / 2.977 not-run**, 61 artifact hash/311 source hash khớp. PR vẫn OPEN, chưa merge; **safety pending tới C4**. [Report và giới hạn](docs/reviews/pr53-c2d5e1-revoked-common-cleanup-runtime.md). Các mốc P2 bên dưới giữ lịch sử trước sửa.
+Measured on 12 open-licence arXiv papers about RAG and retrieval (CC BY / CC BY-SA, licence checked per version). Ten were indexed; two were reported as not extractable, as designed (no OCR). The test set has 36 questions: single-paper, comparison, unanswerable, partial and prompt-injection.
 
-**Sửa review PR #53 tại `9139c01` (chờ review lại, chưa merge):** cleanup operator/sweep chỉ nhận login có bằng chứng dương — owner/migrator (superuser hoặc owner `deletion_tombstones`) hoặc recovery đã provision (EXECUTE `ras_auth_restrict` + INSERT journal mirror, **không** EXECUTE `ras_auth_session_create`); probe/release lỗi → `operator_identity_unavailable`, không chứng minh → `operator_cleanup_requires_operator`, đều trước mutation/S3. P2 tái hiện trên `3c4c165` (6 fail) trước sửa. Seal `sealed-fix-1`: **1584 API unique pass**, exit 0, collect 4.561, **2.977 not-run** theo identity chính xác (ID UUID1 đã ổn định; smoke Linux giữ kết quả lịch sử `3b54a6f`); 9/9 countercheck gồm catch-all cũ. Lượt `sealed-3` cũ giữ exit 1, not-run raw 2.978/logic 2.976. Safety pending tới C4. [Handoff](docs/c2d5e1-revoked-common-cleanup-runtime.md) · [Inventory](docs/c2d5e1-test-inventory.json).
+| Metric | Result |
+|---|---|
+| Gold evidence spans found in the top 5 results (hybrid + rerank) | 31 / 34 |
+| Quoted evidence matches the source text verbatim | 25 / 25 |
+| Claims fully supported by the cited passage (AI judge) | 21 / 23 |
+| Citations pointing to the correct passage (AI judge) | 27 / 27 |
+| Unanswerable questions correctly refused | 9 / 10 |
+| Prompt-injection instructions followed / private-data leaks | 0 / 0 |
+| Outcome matched the expectation, single-paper questions | 14 / 16 |
+| Outcome matched the expectation, multi-paper comparisons | 1 / 6 |
 
-**Review PR #53 tại `3c4c165`: cần sửa P2 trước merge.** Đường operator nhận runtime khi guard lỗi/profile không hợp lệ; reviewer tái hiện object bị xóa dù safety pending. 101 test cleanup/migration/ORM đạt; hai regression mới fail đúng lỗi. [Report và giới hạn](docs/reviews/pr53-c2d5e1-revoked-common-cleanup-runtime.md) · [Prompt sửa PR #53](docs/tasks/fix-pr53-operator-cleanup-identity-and-seal.md). Agent 1.575 pass được kiểm artifact riêng; not-run logic 2.976, không phải raw 2.978. Safety pending tới C4; số nhánh review dưới đây giữ source/luợt agent.
+The "AI judge" rows were graded by a separate language model, not by human reviewers. The judge's records are kept apart from the human-review track, which has no human verdicts yet.
 
-**Task tiếp theo:** C2d-5e1 đã triển khai trên nhánh review, chờ chủ dự án review/merge; mục kế tiếp theo roadmap (orphan reconcile → discovery/citation → search/query/rerank → RAG/generation → tổng hồi quy C2d) chưa giao.
+The system is deliberately conservative: it refused 7 answerable questions, mostly comparisons, rather than answer without enough evidence. Multi-paper comparison is the main area to improve. The full report is in [docs/m7c-live-quality-verification.md](docs/m7c-live-quality-verification.md).
 
-**C2d-5e1 trên nhánh review (chưa merge):** [handoff cleanup runtime](docs/c2d5e1-revoked-common-cleanup-runtime.md) · [inventory](docs/c2d5e1-test-inventory.json). Base merge PR #52 `ba20fda`, source `0043 → 0044`; code kiểm `3b54a6f`. Normal Celery/CLI/direct cleanup qua runtime: fence xóa bền vững theo key (`object_delete_fences`, routine `ras_auth_cleanup_fence`, trigger SourceFile INSERT cùng key lock), S3 ngoài mọi transaction, finalize tombstone → item → journal. Recovery giữ đường operator `operator_cleanup_revoked`. Seal: **1575 API unique pass**, 0 fail/error/skip (collect 4551, 2978 not-run gồm 24 node debt base tái hiện ở `ba20fda`); 8/8 countercheck. Orphan reconcile/discovery/citation/query/RAG/C3/C4 riêng; **safety pending tới C4**.
+## Run it locally (development stack)
 
-**Mốc giao C2d-5e1 (lịch sử):** [Prompt C2d-5e1 — cleanup bản chung đã thu hồi qua runtime](docs/tasks/m6c2b2c2d5e1-revoked-common-cleanup-runtime.md). Tách DB checkpoint khỏi S3, bảo vệ shared object bằng deletion fence và giữ recovery operator riêng. Base merge PR #52 `ba20fda`, source `0043`; mới giao tài liệu, chưa triển khai/kiểm. **Safety pending tới C4.**
+Requirements: Docker with Compose, Node.js 24 (only for the web tests), and optionally Python 3.12 for the API tests.
 
-**Review PR #52 tại `97bc6e7`: không phát hiện điểm chặn merge mới trong phạm vi document index runtime.** Reviewer thực chạy **254/254 API**, gồm worker/beat Linux và Redis outage/restart; 302 source hashes khớp. Artifact agent **703 API/8 countercheck**, 403 file được đối chiếu riêng. PR **đã merge `ba20fda`**, chưa rerun tại merge, source `0043`, **safety pending tới C4**. [Report và giới hạn](docs/reviews/pr52-c2d5d2b-document-index-runtime.md).
+```bash
+cp .env.example .env              # then fill in every empty secret value
+docker compose up -d --build --wait
+docker compose exec api python -m app.cli.bootstrap_admin --email you@example.org   # asks for a password
+```
 
-**C2d-5d2b đã merge PR #52 `ba20fda`:** [Handoff](docs/c2d5d2b-document-index-runtime.md) · [Inventory](docs/c2d5d2b-test-inventory.json). Private/common document index qua runtime, nonce reservation, heartbeat/reaper, late financial settlement và publish nguyên tử. Base `9fb8890`, source `0043`; **safety pending tới C4**, không mở pricing. Các mốc giao/review bên dưới giữ lịch sử.
+Open <http://127.0.0.1:3000/login>. In development, invitation and reset links appear in the admin page's *Dev outbox* instead of being e-mailed.
 
-**Mốc giao C2d-5d2b (lịch sử, tại lúc giao chưa triển khai/kiểm):** [prompt document embedding/index runtime](docs/tasks/m6c2b2c2d5d2b-document-index-runtime.md). Dispatch/claim index, reservation/heartbeat, provider admission/outcome và công bố keyword/vector generation; fake provider trên project runtime cô lập. Base PR #51 merge `9fb8890`, source `0042`; hiện triển khai và review PR #52 như trên, safety pending tới C4.
+AI features are off by default. Search and question answering need an OpenRouter key, and each paid route stays disabled until its pricing has been verified (`RAS_*__PRICING_VERIFIED`).
 
-**Review PR #51 tại `b569d0c`: không phát hiện điểm chặn merge mới trong phạm vi worker runtime/extraction.** Reviewer thực chạy **103/103 API**, gồm worker/beat thực và Redis stop/start; 293 source hashes khớp. Artifact **549 API/8 countercheck** của agent được đối chiếu riêng. PR **đã merge `9fb8890`**, chưa rerun tại merge, source `0042`, **safety pending tới C4**; index/provider C2d-5d2b và C3/C4 còn riêng. [Report, evidence và giới hạn](docs/reviews/pr51-c2d5d2a-worker-runtime-extraction.md).
+Tests:
 
-**C2d-5d2a đã merge PR #51 `9fb8890`:** [worker runtime/extraction](docs/c2d5d2a-worker-runtime-extraction.md) · [selection/JUnit/hash và giới hạn](docs/c2d5d2a-test-inventory.json). Code `dfca84a`, base PR #50 `03b7985`, source `0042`, không migration/grants. Runtime worker/beat trên override cô lập, dispatch UUID, proof/lease/clock mới mỗi checkpoint, S3/parser ngoài DB; dừng `awaiting_index`/`metadata_only`. Index/provider chờ C2d-5d2b, background task khác và mặc định Compose/API cutover còn riêng. **Safety pending tới C4.**
+```bash
+pip install -c api/constraints-rc2.txt -e "./api[dev]"
+pytest api -q                     # needs the dev database running
+npm ci --prefix web && npm test --prefix web && npm run typecheck --prefix web && npm run build --prefix web
+```
 
-Kiểm sealed tại `dfca84a`: **549 API unique pass**, 0 fail/error/skip; collect 4343, **3794 not-run**; 8 cơ chế đối chứng đạt (9 lượt raw, 1 yếu không tính). Bốn lỗi baseline PR #50 chưa sửa; kết quả và giới hạn trong inventory, không cộng pass lịch sử.
+For an HTTPS deployment with SMTP, rate limiting, backups and alerts, see [deploy/](deploy/compose.yaml) and the runbooks:
 
-**Review PR #50 tại `ff5fa82`: không phát hiện điểm chặn merge mới trong scope một POST index request.** Reviewer thực chạy **200/200 API**, **70/70 web**, typecheck/build và Chrome qua proxy; artifact **923 API/9 mutant** của agent đối chiếu riêng. Bốn ca lỗi baseline giữ riêng cho tổng hồi quy trước C4; không gọi toàn inventory đã xanh. PR đã merge **`03b7985`**; chưa rerun tại merge, source `0042`, **safety pending tới C4**; worker/provider/C3/C4 riêng. [Report và giới hạn](docs/reviews/pr50-c2d5d1-common-index-request.md).
+- [docs/m8a-pilot-entry-hardening.md](docs/m8a-pilot-entry-hardening.md): HTTPS, SMTP, rate limiting
+- [docs/m8b-pilot-operations.md](docs/m8b-pilot-operations.md): backups, journal replica, alerts
+- [docs/m9-lan-demo-deployment.md](docs/m9-lan-demo-deployment.md): the LAN demo setup
 
-**C2d-5d1 đã merge PR #50 `03b7985`:** đúng `POST /admin/common-copies/{item_id}/index` qua runtime (`api/common_index_request.py`): xác nhận chỉ boolean true, current Admin/session/CSRF/clock, tạo hoặc trả lại đúng một live job bền vững, outcome độc lập, response proof mới; không storage/broker/provider. Kiểm tại `e283bc6`: **923/923 API unique pass**, 0 fail/error/skip (collect 4.268, **3.341 not-run**, 4 node lỗi có sẵn ở base chạy riêng vẫn fail như base); web **70/70**, typecheck/build; Chrome qua Next proxy; **9/9 mutant** bắt assertion. Không migration, source `0042`; worker/ingest/provider là C2d-5d2, **safety pending tới C4**. [Handoff](docs/c2d5d1-common-index-request.md) · [Inventory](docs/c2d5d1-test-inventory.json).
+## Repository layout
 
-**Review PR #49 tại `f8dc44c`: không phát hiện điểm chặn merge mới trong phạm vi POST revoke.** Reviewer thực chạy **295/295 API**, **66/66 web**, typecheck/build và hai Chrome qua proxy; artifact **529 API/8 mutant** của agent đối chiếu riêng. Raw lượt observer yếu bị ghi đè được giữ là giới hạn evidence. PR đã merge `859dfe9`; chưa rerun tại merge, source `0042`, **safety pending tới C4**. [Report và giới hạn](docs/reviews/pr49-c2d5c2-common-revoke.md).
+```text
+api/          FastAPI app, Celery tasks, Alembic migrations, tests
+web/          Next.js app (UI and API proxy)
+deploy/       Production-style Compose file, Caddy config, ops image, systemd timers
+scripts/      Backup/restore, operations entry point, test harnesses and drills
+evaluation/   Retrieval/RAG test sets, AI-judge records, human-review bundle
+docs/         Requirements, access model, decisions, per-milestone handoffs and reviews
+```
 
-**C2d-5c2 đã merge PR #49 `859dfe9`:** đúng POST revoke qua runtime, migration `0042` với mirror/confirm hẹp bind transaction/tombstone/retention, current Admin/clock, outcome độc lập và response proof mới. Append lỗi giữ false mirror/gate đóng; commit exception luôn unknown, không HTTP replay. [Handoff](docs/c2d5c2-common-revoke.md) · [Inventory kiểm chứng](docs/c2d5c2-test-inventory.json). Base PR #48 `1eede17`; common-index/worker/provider/C3/C4 riêng; **safety pending tới C4**.
+Good starting points in `docs/`: [product requirements](docs/product-requirements.md), [access and data model](docs/access-and-data.md), [decision log](docs/decisions.md) and [MVP plan](docs/mvp-delivery-plan.md).
 
-**Review PR #48 tại `654fbac`: không phát hiện điểm chặn merge mới trong phạm vi POST publish.** Reviewer thực chạy **215 API publication + 3 lượt ca setup (216 unique)**, **64 web**, typecheck/build và Chrome proxy; artifact **2.016 API/7 mutants** của agent kiểm riêng. Setup error và container drift vẫn chưa rõ nguyên nhân, giữ riêng với rerun xanh. PR đã merge `1eede17`; chưa rerun tại merge, **safety pending tới C4**. [Report và giới hạn](docs/reviews/pr48-c2d5c1-common-publish.md).
+## Status and limits
 
-C2d-5c1 code `520ac54`: **2.016 unique API pass**, **64 web pass**, typecheck/build và Chrome proxy đạt; 1.907 API not-run, 7 đối chứng bắt đúng assertion, 283 source hashes khớp. Lỗi chuẩn bị và giới hạn được ghi riêng trong [handoff](docs/c2d5c1-common-publish.md), không cộng pass lịch sử.
+- **Status:** feature-complete MVP, now used as a personal research library on a single machine (HTTPS on localhost). It is not a hosted public service. The deployment kit still supports an invite-only group on a LAN or a server.
+- **Out of scope for now:** OCR (scanned PDFs are reported, not indexed), automatic AI summaries, streaming answers, an advanced citation graph, and multi-tenant teams.
+- **Performance:** targets have been measured only on small data sets; they are not service-level guarantees.
 
-**C2d-5c1 đã merge PR #48 `1eede17`:** [handoff publish metadata](docs/c2d5c1-common-publish.md) · [inventory](docs/c2d5c1-test-inventory.json) · [task](docs/tasks/m6c2b2c2d5c1-common-publish.md). Chỉ POST publish: proof/caller/clock mới, hash ngoài DB locks, outcome độc lập và response proof mới. Base PR #47 `04434e3`, source migration `0041`, không grants/migration mới; kết quả giữ theo source review trước merge. Revoke C2d-5c2 và index/provider/C3/C4 riêng, **safety pending tới C4**. Kết quả hiện hành trong inventory, không cộng lịch sử bên dưới.
+The papers used in the demo are open-licence arXiv papers and are not stored in this repository.
 
-**Review lại P2 PR #47 tại `78fbe1d`: đã sửa P2, không phát hiện điểm chặn merge mới trong phạm vi approve/copy.** Reviewer thực chạy **66/66 API**; artifact **1.727** của agent đối chiếu riêng. [Report và giới hạn](docs/reviews/pr47-c2d5b-review-approval-original-copy.md#review-lại-p2-tại-78fbe1d). PR đã merge `04434e3`; chưa rerun tại merge, safety pending tới C4; kết quả web/Chrome trước sửa giữ theo source lịch sử.
-
-**Sửa P2 PR #47 (đã merge `04434e3`):** proof/caller-denial/response dùng Session ngắn có release kiểm soát; lỗi teardown → JSON 503, không 500, không tiếp tục copy. Regression 10 fail trước sửa → 22/22 sau sửa; selection **1.727/1.727**, 12/12 đối chứng. [Chi tiết](docs/c2d5b-review-approval-original-copy.md#sửa-p2-review-pr-47). Safety pending tới C4.
-
-**Review trước sửa PR #47 tại `bac3739` (lịch sử):** Proof đầu/caller-denial có lỗi teardown thoát thành HTTP 500; reviewer tái hiện 4 fail đúng lỗi / 2 control pass. Selection độc lập 281/281, web 62/62 và typecheck/build đạt; safety pending tới C4. [Report và prompt sửa lịch sử](docs/reviews/pr47-c2d5b-review-approval-original-copy.md).
-
-**C2d-5b đã merge PR #47 `04434e3`:** [phê duyệt review và copy original](docs/c2d5b-review-approval-original-copy.md) · [inventory](docs/c2d5b-test-inventory.json). Đúng `POST /admin/review-requests/{request_id}/approve` chạy runtime thật: proof ngắn trước/giữa I/O, copy checksum/readback ngoài DB lock do attempt sở hữu, approved/common/rights/audit/journal cùng transaction qua routine `0041` (binding xmin của chính transaction), commit uncertain giữ object/không success/retry và response thin proof mới. Kết quả ban đầu của agent tại `b7ba608`: **2.188/2.188 API**, web **62/62**; publish/revoke/index/provider/C3/C4 riêng, **safety pending tới C4**.
-
-**C2d-5b đã giao sau merge PR #46 `8ff5b4e`:** [prompt phê duyệt và copy original](docs/tasks/m6c2b2c2d5b-review-approval-original-copy.md). Đúng một POST approve: proof ngắn trước/sau I/O, runtime approved closure/common/rights coupling, outcome giữ object khi uncertain và proof thin response mới. Đã merge PR #47 `04434e3` (mục trên); publish/revoke/index/provider/C3/C4 riêng, **safety pending tới C4**.
-
-**Review PR #46 tại `7938153`: không phát hiện điểm chặn merge trong phạm vi C2d-5a.** Reviewer chạy độc lập **234/234 API** (gồm Chrome proxy thật), **58/58 web**, typecheck/build; artifact 1.371 và 7 mutants của agent đối chiếu riêng. PR OPEN tại lúc review, sau đó merge `8ff5b4e`; chưa rerun tại merge, safety **pending tới C4**. [Report và giới hạn](docs/reviews/pr46-c2d5a-review-json-writers.md).
-
-**C2d-5a đã merge PR #46 `8ff5b4e`:** [ba JSON writer review](docs/c2d5a-review-json-writers.md) · [inventory](docs/c2d5a-test-inventory.json). Runtime thật cho submit/withdraw/reject, migration `0040`, pending closure exact binding, actor/clock trước commit và proof response mới. Approval/publication/provider/C3/C4 riêng, **safety pending tới C4**. Kết quả cuối theo source trong inventory; không cộng số lịch sử PR #45.
-
-**Review PR #45 tại `b23ff82`: không phát hiện điểm chặn merge trong phạm vi C2d-4c.** Reviewer chạy độc lập **350/350 API**, **57/57 web** và typecheck; artifact 991 của agent được đối chiếu riêng. [Report và giới hạn](docs/reviews/pr45-c2d4c-original-downloads.md). PR sau đó đã merge `070cb37`; chưa rerun tại merge, safety **pending tới C4**.
-
-**C2d-4c đã merge PR #45 `070cb37`, base PR #44 `dd8bdc6`.** [Bàn giao tải original](docs/c2d4c-original-downloads.md) · [inventory](docs/c2d4c-test-inventory.json): đúng hai GET/ba gate private/common/review, spool size/SHA-256 ngoài DB, clock cuối, audit known commit rồi proof mới, ownership slot/temp và proxy streaming. Source code `4c49919`; kết quả cuối ghi tại inventory, các số PR #44 bên dưới giữ riêng. **Safety pending tới C4; không dùng kết quả lịch sử để mở traffic.**
-
-**Review lại PR #44 tại `5504810`: P2 đã sửa, không phát hiện điểm chặn merge trong phạm vi C2d-4b.** Độc lập **76/76 API** và hai ca fault/control riêng đạt; artifact 463 của agent được đối chiếu, không tính là chạy lại toàn bộ. [Report và giới hạn](docs/reviews/pr44-c2d4b-upload-original.md#review-lại-p2-tại-5504810) giữ review ban đầu tại `b578082`. PR sau đó đã merge `dd8bdc6`; chưa chạy lại suite tại merge. Safety **pending tới C4**; download C2d-4c riêng.
-
-**C2d-4b — PUT original đã merge PR #44 `dd8bdc6`:** [bàn giao](docs/c2d4b-upload-original.md) · [task](docs/tasks/m6c2b2c2d4b-upload-original.md). Intent consume nguyên tử ở giao dịch cuối; nhận file/parser/S3 ngoài khóa, response proof mới và giữ object khi commit uncertain. Download thuộc C2d-4c; safety pending tới C4.
-
-**Review PR #43 tại `f60645e`:** độc lập 167/167 API (đủ 155 test mới), 47/47 web và typecheck đạt; không phát hiện điểm chặn merge trong phạm vi notice/intent. [Report và giới hạn](docs/reviews/pr43-c2d4a-upload-intents.md). PR đã merge `632ec68`; số review giữ theo source cũ, không phải kiểm C2d-4b.
-
-**C2d-4a đã merge PR #43 `632ec68`**, base PR #42 `99db528`: [bàn giao notice/intent](docs/c2d4a-upload-notice-intent.md). Chỉ hai JSON route kiểm caller/binding/clock trước commit và proof mới trước trả token; PUT file và original download còn riêng. Source `0039`, safety **pending tới C4**; không có thao tác dev mới.
-
-**Review PR #42 tại `8f924c0`:** 124/124 API chọn pass độc lập, gồm đủ 65 test clock mới. Đối chứng hàm cũ bắt đúng 6 lỗi và giữ 2 ca sát hạn thành công; không thấy điểm chặn merge trong phạm vi sửa clock. [Report và giới hạn](docs/reviews/pr42-final-read-clock.md). Kết quả giữ theo source review trước merge, không phải kiểm thử C2d-4a.
-
-**Sửa final read clock:** [handoff](docs/c2d-final-read-clock.md) · [inventory](docs/c2d-final-read-clock-test-inventory.json). Source `0039`, safety pending tới C4; kết quả mới tách khỏi review PR #41 bên dưới.
-
-**PR #41 đã merge `5100ff6` (2026-10-06).** [Sửa final read clock sau SQL](docs/tasks/c2d-final-read-clock.md) đã merge trong PR #42 `99db528`. [Review và P2 đã tái hiện](docs/reviews/pr41-c2d3-resource-writes.md): 270/270 API chọn, 45/45 web và typecheck đạt tại source cũ; failure P2 giữ làm lịch sử. Safety pending tới C4.
-
-**C2d-3 đã merge PR #41 `5100ff6`, base `833db7c`:** [bàn giao 6 writer](docs/c2d3-library-collection-json-writes.md) · [inventory](docs/c2d3-test-inventory.json). Không migration/grants mới; safety pending tới C4. Kết quả PR #40 bên dưới giữ theo source lịch sử.
-
-**Review PR #40 (`11da731`): 261/261 test chọn độc lập pass** — 260 C2d-2b + 1 ORM/schema; không phát hiện điểm chặn trong phạm vi 9 GET. PR #40 đã merge `833db7c`, safety pending tới C4. [Báo cáo review](docs/reviews/pr40-c2d2b-review-publication-reads.md). Kết quả agent và reviewer giữ riêng theo source.
-
-**PR #40 đã merge `833db7c` (C2d-2b; head mã nguồn `0039`).** [Bàn giao 9 GET review/publication](docs/c2d2b-review-publication-json-reads.md) · [Review độc lập](docs/reviews/pr40-c2d2b-review-publication-reads.md). **[C2d-3 — 6 JSON writer library/collections](docs/tasks/m6c2b2c2d3-library-collection-json-writes.md)** đã merge PR #41 `5100ff6`; [phạm vi chốt theo ủy quyền](docs/decisions.md#giao-c2d-3-sau-merge-pr-40-2026-10-05). Kiểm actor/current role/resource/clock trước commit và proof mới sau commit; không dùng shared read guard làm quyền ghi. File/upload, review/publication writers, search/RAG provider callers và C3/C4 còn riêng. Safety vẫn pending tới C4; không suy revision DB dev từ source. Kết quả bên dưới giữ theo source lịch sử.
-
-**Baseline main đã merge trước C2c-1:** PR #33 đã merge `c98bd33` (C1 `0034`), PR #34 đã merge `78e0880` (C2a `0035`), [C2b reset/status](docs/c2b-reset-status.md) đã merge PR #35 `1d3e558`, chứa sửa P2 `f2ba336`; head source `0036`. Safety vẫn pending tới C4. C2b P2: **201/201**, 1095 API nodes chưa chạy lại; suite 471 tại `bdec9ea` là lịch sử; [inventory theo source](docs/c2b-test-inventory.json). Web không đổi trong C2b; 43/43, typecheck/build tại `a8cb586` là lịch sử. [Task tiếp theo C2c-1](docs/tasks/m6c2b2c2c1-bootstrap-initial-receipts.md) chuyển bootstrap Admin sang runtime/initial receipt; invitation lifecycle thuộc C2c-2, final callers C2d và operator/cutover C3–C4 còn mở. [Cách chia C2c](docs/decisions.md#chia-c2c-sau-merge-pr-35-2026-10-04) do orchestrator chốt theo ủy quyền. C1–C3 chỉ thử cô lập; không truy vấn/nâng DB hoặc restart dev. Head source không là revision DB dev. Các mô tả milestone dưới đây là lịch sử.
-
-Dự án website quản lý paper khoa học, khám phá paper mới hằng ngày, tìm kiếm toàn văn và hỏi đáp có dẫn nguồn. Đã merge (PR #1–#28): Compose dev, migration và bootstrap Admin; lời mời, phiên và ACL; upload riêng có xác nhận từng file; ingest PDF/Markdown với coverage/references; index và tìm kiếm hybrid (keyword + vector, rerank tùy chọn); collection cá nhân; RAG có dẫn nguồn trên paper riêng theo scope paper/collection/toàn bộ; bộ đánh giá ban đầu trên corpus tổng hợp; khám phá arXiv chỉ metadata và liên kết citation arXiv; quy trình đưa paper riêng vào kho chung (yêu cầu duyệt đúng version/file, phê duyệt, công bố metadata, thu hồi và cleanup, tải file gốc, lập chỉ mục, tìm kiếm toàn văn và RAG có dẫn nguồn trên bản chung theo `AccessRights`); journal thu hồi và recovery gate: DB/object store restore từ trước một lượt thu hồi không được phục vụ tới khi `recover` replay và cleanup; công cụ backup/kiểm/restore PostgreSQL + object store trên Compose cô lập và diễn tập restore. **Đã merge PR #28 (`47a1aab`):** M6c-2b1 ghi việc đóng request duyệt vào journal để restore không trả lại cho Admin quyền xem tạm file riêng (lịch backup hằng ngày, xóa sau 30 ngày, nơi lưu journal ngoài dev và journal cho membership chưa có; M6c-2b2a trên nhánh review thêm journal session, còn token/credential/account status chưa bảo vệ). Xem [môi trường phát triển](docs/dev-setup.md) và [roadmap](docs/roadmap.md).
-
-Provider thật (OpenRouter) **chưa bật** cho dữ liệu thật: `pricing_verified=false` mặc định chặn mọi lời gọi trả phí. Trước khi bật cần chốt kế toán embedding bản chung (hiện là phương án orchestrator, chủ dự án chưa trực tiếp xác nhận), đối soát charge trên key, điều kiện provider routing/retention và nơi lưu journal thu hồi bền vững ngoài dev. Chưa có streaming câu trả lời, và chưa có cấu hình triển khai ngoài dev.
-
-Bắt đầu từ [mục lục tài liệu](docs/README.md). Hướng dẫn chung cho agent nằm ở [AGENTS.md](AGENTS.md).
-
-## Chạy Docker trong giai đoạn C1–C3
-
-Auth safety đang **pending tới C4**: API có thể khởi động và trả `/healthz = 200`, nhưng `/readyz = 503`. Compose kiểm API bằng `/readyz`, nên `docker compose up -d --build --wait` sẽ báo API `unhealthy`; web chờ API healthy nên chưa khởi động. Đây là trạng thái bảo trì chủ động, không chứng minh API bị crash. `recover` không mở safety pending. Xem [chẩn đoán và giới hạn vận hành](docs/dev-setup.md#docker-khi-auth-safety-còn-pending); các lệnh chạy toàn stack ở milestone cũ là chứng cứ lịch sử.
+The personal demo snapshot for 27 October 2026 retains **3,167 library items**, including
+**1,643 indexed items**, in **8 collections** (seven topics and one review collection).
+M11 received 3,150 papers in scope; another 8 selected files were skipped before upload.
+Items needing review or failing extraction/indexing remain in the library with their original files.
+Uploads for this batch are closed. See the [M11 handoff](docs/m11-demo-knowledge-base.md)
+for state counts, licence evidence, the 15-question smoke check, costs and backup results;
+the [M9 guide](docs/m9-lan-demo-deployment.md) explains local HTTPS access and suggested questions.

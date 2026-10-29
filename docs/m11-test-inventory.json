@@ -1,0 +1,717 @@
+{
+  "at": "2026-10-24T01:42:47+00:00",
+  "stage": "Historical root checkpoint; finalization_20261027 is current. Final-head CI is recorded in PR #72.",
+  "base": "1f7bfac970fa0015a6d3211d3514a4136df4d4d6",
+  "source_commit_before_uncommitted_inventory_fix": "487b09859be6b49f8e4c04ce84a86a2897492400",
+  "unchanged_trees": {
+    "api/app": {
+      "base": "8100e7cf5dba2378c94afd7789ae7c3dde3254bd",
+      "head": "8100e7cf5dba2378c94afd7789ae7c3dde3254bd"
+    },
+    "web": {
+      "base": "a96ba92e509473233138c340f8a942967c84194d",
+      "head": "a96ba92e509473233138c340f8a942967c84194d"
+    },
+    "deploy": {
+      "base": "4a9f25daad39af63300f9cf5b5fc475d6afaa5f0",
+      "head": "4a9f25daad39af63300f9cf5b5fc475d6afaa5f0"
+    }
+  },
+  "source_sha256": {
+    "scripts/m9_lan_demo.py": "7308e6e11c2cfddc28195de1c096550e6acbed8b9f62c739480dfa02eca47d1c",
+    "scripts/m11_papers.py": "86c3324caa2c8a15c4d24d1254937d27b660693f7b122cf430c1ffcc20e9cc2d",
+    "scripts/m11_library.py": "a123f9c95f80a4cdef4bfc88e51e47e06aba76314fa5b6eda62058fb6f8c55f8",
+    "scripts/m11_demo.py": "ae0ff4be982537a8fc49a255560d2db05b1c35aaf2f3c632d051d7a4612185b4",
+    "api/tests/test_m11_tooling.py": "ca034facc33adc6ece5c8f9bdcbc9df0e6d18753691d92be269321bb11d4bbd6",
+    ".github/workflows/ci.yml": "591ac73033c165d4df97fa53e9dd2f441d4ba15224ec7d042f71ca1898149200",
+    "evaluation/m11-papers/manifest.json": "3d153fd5d32f10d1e3eea9e026708008a12da8742f8ea34e6efe2574fc846548",
+    "evaluation/m11-papers/topic-exclusions.json": "81491af11f71b5bb9cefa03fa807d6590425d877c7e99623896b5e9e554d5ecd"
+  },
+  "offline": {
+    "tests": 65,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "junit_file": "offline-tooling-65-86299274ff76.xml",
+    "junit_sha256": "86299274ff764f66b0acc1e8094260d4991a7f82b175548b5d3ff874e2c5d942"
+  },
+  "ci_completed": {
+    "run_id": 40051049793,
+    "head": "25d50c6f03744e757e042ce5e40ad8527df59005",
+    "api_tests": 1308,
+    "jobs": {
+      "api": "success",
+      "web": "success",
+      "deploy": "success"
+    },
+    "junit_sha256": "289dd3a34248b3f7d216739c21602e084cdb0c0cad9b26afda5fd8729884cb67"
+  },
+  "runtime_checkpoint": {
+    "target_processed": 252,
+    "target_states": {
+      "ready": 121,
+      "needs_review": 40,
+      "terminal_failed": 89,
+      "indexing": 2
+    },
+    "retained_extras": 5,
+    "committed_usd": "2.7876122",
+    "after_backup": "pending",
+    "questions": "pending"
+  },
+  "raw_evidence_root": "%USERPROFILE%/ras-pilot/evidence/m11",
+  "expansion_checkpoint": {
+    "at": "2026-10-24T02:31:53+00:00",
+    "requested_additional_papers": 1000,
+    "interpreted_total_target": 1300,
+    "hard_cap_usd": "30",
+    "stop_usd": "24",
+    "same_ledger": true,
+    "offline": {
+      "tests": 68,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 1,
+      "deselected_reason": "manifest completeness checked only after target is fully downloaded",
+      "junit_file": "offline-expansion-68-b5f22561b1ee.xml",
+      "junit_sha256": "b5f22561b1eef61912a01431f219ac9b85cdf0d641fc4a43035925cb1ce7ca30"
+    },
+    "source_sha256": {
+      "scripts/m11_papers.py": "3cc5b4f66efb173f70de4a35a1487bacc3d4792bc6bf67d7b444c6358b55d888",
+      "scripts/m11_demo.py": "b397495da00a3fecc127b47a506f7cfb094b08965aaaeed91f350afc6a2be3d9",
+      "api/tests/test_m11_tooling.py": "dd73214fe96c2f3487435756a73e65ec31d6088fa40b46c4a3eb3422c5ed7e85"
+    },
+    "initial_300_manifest_sha256": "3d153fd5d32f10d1e3eea9e026708008a12da8742f8ea34e6efe2574fc846548",
+    "new_oai_requests": "filtered ListRecords and GetRecord timeout; Identify 200; continue retained OAI candidates with fresh exact-version abs licence checks",
+    "scope_confirmed_total_target": 1300,
+    "latest_offline": {
+      "tests": 89,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 1,
+      "deselected_reason": "manifest completeness waits for full target",
+      "junit_file": "offline-atom-89-eabee3963cbb.xml",
+      "junit_sha256": "eabee3963cbb3f8f7ebb13cdf497da37401eb4193b458482b7dd7136bc802e8a"
+    },
+    "latest_source_sha256": {
+      "scripts/m11_atom.py": "b1156dd4c3d176fdb757d061a431f2c8cd3290f5350be77b130f37701bf802f1",
+      "scripts/m11_papers.py": "1da286575fcc2f4eaed066d6ca52b51d7f03df91cf91add98f97919033d2e8b3",
+      "scripts/m11_demo.py": "b397495da00a3fecc127b47a506f7cfb094b08965aaaeed91f350afc6a2be3d9",
+      "api/tests/test_m11_tooling.py": "5a6de914a107e9e2c1422b6c86f856067c72fac00d76a2bac81419afa9cf0076"
+    },
+    "licence_source_fallback": "Primary Atom with live latest and exact-version abs history and matching open licences; raw HTML/XML hashes; never fabricate OAI evidence"
+  },
+  "ci_previous": {
+    "run_id": 39969594383,
+    "head": "487b09859be6b49f8e4c04ce84a86a2897492400",
+    "api_tests": 1307,
+    "jobs": {
+      "api": "success",
+      "web": "success",
+      "deploy": "success"
+    },
+    "junit_sha256": "c041afd9c48ed0b0735a9c604a037116aafc911299b5587053b2a3ff5897d1ae"
+  },
+  "budget50_checkpoint": {
+    "hard_cap_usd": "50",
+    "total_stop_usd": "40",
+    "index_stop_usd": "39.187",
+    "smoke_headroom_usd": "0.813",
+    "scope": "owner confirmed expand until budget, beyond 1300 if headroom remains",
+    "same_ledger": true,
+    "app_quotas_unchanged": true,
+    "provider_key_limit_reset": "daily",
+    "provider_remaining_is_not_wallet_balance": true,
+    "offline": {
+      "tests": 92,
+      "deselected": 1,
+      "failures": 0,
+      "errors": 0,
+      "junit_file": "offline-budget50-92-519853beb5ca.xml",
+      "junit_sha256": "519853beb5ca3dbbb489f7e9ef836cff6a739409a7266a120c8ce2bb4e437b73"
+    },
+    "source_sha256": {
+      "scripts/m11_library.py": "11277af87fc938071e0904deed21ae00dae18778d5280021197d4fdab6e4b12c",
+      "api/tests/test_m11_tooling.py": "a0694ce445200032e5c32085af4b443d63b5a56b440987effbe58a6b112724bb"
+    },
+    "helper_sha256": "e1ba764c3a2e97f6951c432e25f8aee40618a8dc6eced76b8601de6cf7c9e20b",
+    "helper_plan_validated_without_execution": true,
+    "helper_finalize_fixture": {
+      "files_retained": 1302,
+      "receipts_unchanged": 1300,
+      "deferred_credits": 2,
+      "uncertain_mutation_guard": "pass",
+      "real_api_calls": 0
+    },
+    "prior_ci_completed": {
+      "run_id": 40060677369,
+      "head": "dea9b99e880b7c26802db189450e634f08bce79e",
+      "tests": 1333,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "all_three_jobs": "success",
+      "junit_sha256": "17ad95540c1a47b04b5d67ef0396d3d740f7b8ea0db3169429b26e07e13bcc5d"
+    }
+  },
+  "windows_checkpoint_recovery": {
+    "cause": "WinError 5 on metadata atomic replace; index client kept running",
+    "prior_manifest_count": 2114,
+    "unpublished_temp_count": 2115,
+    "temp_prefix_matches": true,
+    "unpublished_pdf_sha_and_size_match": true,
+    "history": "recovery-20261024T152307Z",
+    "metadata_replace_attempts": 8,
+    "max_total_retry_sleep_seconds": 3.55,
+    "api_mutations_retried": false,
+    "index_client_restarted": false,
+    "adopted_index_pid": 36716,
+    "offline": {
+      "tests": 94,
+      "deselected": 1,
+      "failures": 0,
+      "errors": 0,
+      "junit_file": "offline-sharing-94-b217ca57f962.xml",
+      "junit_sha256": "b217ca57f962266df68801e20d7ce9858c1e882459e334b21280b44f7a134088"
+    },
+    "source_sha256": {
+      "scripts/m11_papers.py": "0aa4842cdbc824d86678e5e04b141ddac7374505dc7d1074c52a36977b59ac45",
+      "scripts/m11_status.py": "f9c33ca6d8db2a15585b91c27efa1250eb4a33eb9c4f36f4aaa6b6b93173dd5d",
+      "api/tests/test_m11_tooling.py": "785ccd8e057014a302067a5f9eb5444e4b35407781a45bff3e42357d6b7d1253"
+    },
+    "helper_sha256": "d82e909f8fb8ae4a878d6a1ab14937bbfaaf92f45652fa779f38c6280d2dc148"
+  },
+  "maintenance_recovery_20261025": {
+    "cause": "GET 503 maintenance during scheduled backup",
+    "backup_id": "20261024T200001Z-4327f91a",
+    "backup_status": "ok",
+    "backup_reopen": "ok",
+    "backup_window_seconds": 151.02,
+    "backup_total_seconds": 421.94,
+    "maintenance_now": null,
+    "replica_equal_seq": 14,
+    "local_verify": "pass",
+    "history": "recovery-20261025T014028Z",
+    "uncertain_mutations": 0,
+    "missing_ledger_bindings": 0,
+    "known_jobs_read_back": {
+      "ready": 1,
+      "terminal_failed_embedding_outcome_uncertain": 1
+    },
+    "read_only_maintenance_wait_seconds": 1200,
+    "mutations_retried": false,
+    "offline": {
+      "tests": 100,
+      "deselected": 1,
+      "failures": 0,
+      "errors": 0,
+      "junit_file": "offline-maintenance-100-f329e09dfd13.xml",
+      "junit_sha256": "f329e09dfd137584b2111fe4a815a98933708076f65aa9c8f4c5a0175619924c"
+    },
+    "source_sha256": {
+      "scripts/m11_library.py": "a36170898b30d99b13c7c37f56896e2c96bf56e58292996ed5e826c09c395fd5",
+      "api/tests/test_m11_tooling.py": "2bc79e147c777ce46807ba304363f5c7e66b4459b057b3446706ba2100dd7ebc"
+    }
+  },
+  "owner_upload_stop_20261026": {
+    "at": "2026-10-26T08:12:30+00:00",
+    "reason": "owner_requested_stop",
+    "new_uploads_allowed": false,
+    "target_receipts": 3150,
+    "processed_target_rows": 3158,
+    "downloaded_manifest_papers": 4601,
+    "committed_usd_not_billed": "33.7896042",
+    "runtime": "paused_by_owner; Docker Desktop is not running",
+    "admission_marker": "evidence/m11/upload-admission-closed.json",
+    "uploads_sha256": "ca3ea566857cc562877c3ec8c39397fea88b8dc9e6190955b5c31bea2f64c4a8",
+    "ledger_sha256": "fe8136765a87105473196208b2055e205b8cfd9dddee4433c705f27b497545fb",
+    "offline": {
+      "tests": 102,
+      "failures": 0,
+      "errors": 0,
+      "deselected": 1,
+      "deselected_reason": "manifest remains unfinalized until final receipt metadata is complete",
+      "junit_file": "offline-owner-stop-102-f32de2a44977.xml",
+      "junit_sha256": "f32de2a44977b190f0ff0ce1b6b17f46deeb853bec34ec172702868688258d8a"
+    },
+    "earlier_environment_runs": [
+      {
+        "file": "output/m11-owner-stop-offline.xml",
+        "passed": 28,
+        "errors": 74,
+        "reason": "sandbox denied access to the existing pytest temp root"
+      },
+      {
+        "file": "output/m11-owner-stop-offline-recheck.xml",
+        "passed": 73,
+        "failures": 29,
+        "reason": "repository temp directory was correctly refused by the external-ledger guard"
+      }
+    ],
+    "remaining": [
+      "two receipt title/collection updates",
+      "manifest finalization",
+      "15 smoke questions once",
+      "backup/check",
+      "final README/handoff and final-head CI"
+    ]
+  },
+  "finalization_20261027": {
+    "at": "2026-10-27T08:43:52+00:00",
+    "stage": "runtime_complete; final CI/head and job conclusions are recorded in PR #72 after the final push",
+    "stop_reason": "owner_requested_stop",
+    "target_processed": 3158,
+    "target_receipts": 3150,
+    "target_states": {
+      "indexed": 1631,
+      "needs_review": 629,
+      "terminal_failed": 873,
+      "fulltext_rejected": 17,
+      "skipped": 8
+    },
+    "owner_items": 3167,
+    "owner_indexed": 1643,
+    "pages": 54751,
+    "original_bytes": 7299246539,
+    "derived_chunks": 112573,
+    "indexed_chunks": 68162,
+    "collections": {
+      "Dense retrieval & embeddings": {
+        "total": 369,
+        "verified_receipts": 369,
+        "states": {
+          "metadata_only": 142,
+          "indexed": 227
+        }
+      },
+      "Reranking & search": {
+        "total": 412,
+        "verified_receipts": 412,
+        "states": {
+          "indexed": 219,
+          "metadata_only": 193
+        }
+      },
+      "Retrieval-augmented generation": {
+        "total": 265,
+        "verified_receipts": 265,
+        "states": {
+          "metadata_only": 129,
+          "indexed": 136
+        }
+      },
+      "RAG evaluation & benchmarks": {
+        "total": 532,
+        "verified_receipts": 532,
+        "states": {
+          "metadata_only": 266,
+          "indexed": 266
+        }
+      },
+      "Grounding & hallucination": {
+        "total": 595,
+        "verified_receipts": 595,
+        "states": {
+          "metadata_only": 313,
+          "indexed": 282
+        }
+      },
+      "Long context & chunking": {
+        "total": 286,
+        "verified_receipts": 286,
+        "states": {
+          "metadata_only": 134,
+          "indexed": 152
+        }
+      },
+      "Search agents & tools": {
+        "total": 691,
+        "verified_receipts": 691,
+        "states": {
+          "indexed": 349,
+          "metadata_only": 342
+        }
+      },
+      "Cần xem lại — ngoài phạm vi M11": {
+        "total": 5,
+        "verified_receipts": 5,
+        "states": {
+          "indexed": 2,
+          "metadata_only": 3
+        }
+      }
+    },
+    "verified_titles_and_memberships": 3155,
+    "baseline_originals_sha256_verified": 12,
+    "new_uploads_during_finalization": 0,
+    "provider_billed_usd": null,
+    "billed_note": "not attributable: rc2 retains token-price estimates/ceilings without per-call provider receipts; shared key usage is not M11 billing",
+    "embedding_product_usage_price_estimate_usd": "1.60245220",
+    "embedding_unknown_calls": 109,
+    "embedding_unknown_ceiling_usd": "0.17858560",
+    "committed_usd_not_billed": "34.6026042",
+    "smoke": {
+      "attempts": 15,
+      "responses": 15,
+      "errors": 0,
+      "verified_citations": 11,
+      "citations": 11,
+      "single_with_claims": 5,
+      "unanswerable_without_claims": 3,
+      "comparison_with_claims": 0,
+      "rows": [
+        {
+          "number": 1,
+          "kind": "single",
+          "status": "response",
+          "outcome": "answered",
+          "reason": null,
+          "claims": 3,
+          "citations": 3,
+          "verified_citations": 3,
+          "rerank_status": null,
+          "hits": 0,
+          "error": null
+        },
+        {
+          "number": 2,
+          "kind": "single",
+          "status": "response",
+          "outcome": "answered",
+          "reason": null,
+          "claims": 2,
+          "citations": 2,
+          "verified_citations": 2,
+          "rerank_status": null,
+          "hits": 0,
+          "error": null
+        },
+        {
+          "number": 3,
+          "kind": "single",
+          "status": "response",
+          "outcome": "answered",
+          "reason": null,
+          "claims": 4,
+          "citations": 4,
+          "verified_citations": 4,
+          "rerank_status": null,
+          "hits": 0,
+          "error": null
+        },
+        {
+          "number": 4,
+          "kind": "single",
+          "status": "response",
+          "outcome": "answered",
+          "reason": null,
+          "claims": 1,
+          "citations": 1,
+          "verified_citations": 1,
+          "rerank_status": null,
+          "hits": 0,
+          "error": null
+        },
+        {
+          "number": 5,
+          "kind": "single",
+          "status": "response",
+          "outcome": "answered",
+          "reason": null,
+          "claims": 1,
+          "citations": 1,
+          "verified_citations": 1,
+          "rerank_status": null,
+          "hits": 0,
+          "error": null
+        },
+        {
+          "number": 6,
+          "kind": "unanswerable",
+          "status": "response",
+          "outcome": "insufficient_evidence",
+          "reason": null,
+          "claims": 0,
+          "citations": 0,
+          "verified_citations": 0,
+          "rerank_status": null,
+          "hits": 0,
+          "error": null
+        },
+        {
+          "number": 7,
+          "kind": "unanswerable",
+          "status": "response",
+          "outcome": "insufficient_evidence",
+          "reason": null,
+          "claims": 0,
+          "citations": 0,
+          "verified_citations": 0,
+          "rerank_status": null,
+          "hits": 0,
+          "error": null
+        },
+        {
+          "number": 8,
+          "kind": "unanswerable",
+          "status": "response",
+          "outcome": "insufficient_evidence",
+          "reason": null,
+          "claims": 0,
+          "citations": 0,
+          "verified_citations": 0,
+          "rerank_status": null,
+          "hits": 0,
+          "error": null
+        },
+        {
+          "number": 9,
+          "kind": "comparison",
+          "status": "response",
+          "outcome": "insufficient_evidence",
+          "reason": "comparison_requires_multiple_papers",
+          "claims": 0,
+          "citations": 0,
+          "verified_citations": 0,
+          "rerank_status": null,
+          "hits": 0,
+          "error": null
+        },
+        {
+          "number": 10,
+          "kind": "comparison",
+          "status": "response",
+          "outcome": "insufficient_evidence",
+          "reason": "comparison_requires_multiple_papers",
+          "claims": 0,
+          "citations": 0,
+          "verified_citations": 0,
+          "rerank_status": null,
+          "hits": 0,
+          "error": null
+        },
+        {
+          "number": 11,
+          "kind": "comparison",
+          "status": "response",
+          "outcome": "insufficient_evidence",
+          "reason": "comparison_requires_multiple_papers",
+          "claims": 0,
+          "citations": 0,
+          "verified_citations": 0,
+          "rerank_status": null,
+          "hits": 0,
+          "error": null
+        },
+        {
+          "number": 12,
+          "kind": "hybrid_search",
+          "status": "response",
+          "outcome": null,
+          "reason": null,
+          "claims": 0,
+          "citations": 0,
+          "verified_citations": 0,
+          "rerank_status": "applied",
+          "hits": 20,
+          "error": null
+        },
+        {
+          "number": 13,
+          "kind": "hybrid_search",
+          "status": "response",
+          "outcome": null,
+          "reason": null,
+          "claims": 0,
+          "citations": 0,
+          "verified_citations": 0,
+          "rerank_status": "applied",
+          "hits": 20,
+          "error": null
+        },
+        {
+          "number": 14,
+          "kind": "hybrid_search",
+          "status": "response",
+          "outcome": null,
+          "reason": null,
+          "claims": 0,
+          "citations": 0,
+          "verified_citations": 0,
+          "rerank_status": "applied",
+          "hits": 20,
+          "error": null
+        },
+        {
+          "number": 15,
+          "kind": "hybrid_search",
+          "status": "response",
+          "outcome": null,
+          "reason": null,
+          "claims": 0,
+          "citations": 0,
+          "verified_citations": 0,
+          "rerank_status": "applied",
+          "hits": 20,
+          "error": null
+        }
+      ]
+    },
+    "backup": {
+      "backup_id": "20261027T082255Z-2d3d4bae",
+      "finished_at": "2026-10-27T08:42:03.201019+00:00",
+      "reopen": "ok",
+      "seconds": 1147.95,
+      "started_at": "2026-10-27T08:22:55.247742+00:00",
+      "status": "ok",
+      "steps": {
+        "capture": {
+          "captured": "20261027T082255Z-2d3d4bae",
+          "database_bytes": 694856503,
+          "dump_bytes": 694856503,
+          "file_rows_checked": 3167,
+          "journal_db_head_seq": 17,
+          "objects": 3167,
+          "snapshot_taken_at": "2026-10-27T08:23:02.411052+00:00"
+        },
+        "prune": {
+          "good": 7,
+          "incomplete": 0,
+          "pruned": 0,
+          "pruned_ids": []
+        },
+        "ship": {
+          "backup_id": "20261027T082255Z-2d3d4bae",
+          "ciphertext_bytes": 7999136734,
+          "ciphertext_sha256": "df7fa157941c773b6b6e26beaa4c7c2448a8ea2a334624acb6715b2a040d6a6b",
+          "objects": 3167,
+          "tar_sha256": "f895e087d8d64241be520a1aef196040c8dc63228e5a7086304b4ee338fd64ff"
+        }
+      },
+      "window_seconds": 293.23
+    },
+    "check": {
+      "check": {
+        "conditions": [],
+        "delivery_error": null,
+        "delivery_errors": {},
+        "failed": 0,
+        "fence": false,
+        "mailed": 1,
+        "new": [],
+        "repeat": [],
+        "resolved": [
+          "backup_failed:preflight_failed",
+          "backup_stale"
+        ]
+      },
+      "exit": 0
+    },
+    "status": {
+      "backup": {
+        "last_run": {
+          "backup_id": "20261027T082255Z-2d3d4bae",
+          "finished_at": "2026-10-27T08:42:03.201019+00:00",
+          "reopen": "ok",
+          "seconds": 1147.95,
+          "started_at": "2026-10-27T08:22:55.247742+00:00",
+          "status": "ok",
+          "window_seconds": 293.23
+        },
+        "last_success": {
+          "backup_id": "20261027T082255Z-2d3d4bae",
+          "finished_at": "2026-10-27T08:42:03.201019+00:00",
+          "reopen": "ok",
+          "seconds": 1147.95,
+          "started_at": "2026-10-27T08:22:55.247742+00:00",
+          "status": "ok",
+          "window_seconds": 293.23
+        }
+      },
+      "drill": {
+        "backup_id": "20261021T044518Z-bdb7b222",
+        "journal_relation": "replica_only",
+        "last_success_at": "2026-10-21T04:46:44.627457+00:00",
+        "restore_seconds": 39.27
+      },
+      "lock": null,
+      "maintenance": null,
+      "replica": {
+        "checked_at": "2026-10-27T08:42:10.139451+00:00",
+        "code": "ok",
+        "format": "ras-journal-replica/1",
+        "lag_records": 0,
+        "last_success_at": "2026-10-27T08:42:10.139451+00:00",
+        "local_seq": 17,
+        "local_torn": false,
+        "ok": true,
+        "remote_seq": 17,
+        "unshipped_since": null
+      },
+      "running": [
+        "api",
+        "beat",
+        "db",
+        "edge",
+        "journal-replicator",
+        "minio",
+        "redis",
+        "web",
+        "worker"
+      ]
+    },
+    "https_verify": {
+      "access_mode": "local",
+      "bind_address_valid": true,
+      "listen_addresses": [
+        "127.0.0.1"
+      ],
+      "only_expected_address_listens": true,
+      "other_interfaces": {
+        "vEthernet (WSL (Hyper-V firewall)):172.24.48.1": "closed",
+        "Ethernet:192.168.69.184": "closed",
+        "Radmin VPN:26.35.43.6": "closed"
+      },
+      "other_interfaces_closed": true,
+      "https_hostname": "HTTP/1.1 200 OK",
+      "https_ip": "error: SSLError: [SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error (_ssl.c:1010)",
+      "ok": true
+    },
+    "offline": {
+      "tests": 104,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "junit_file": "offline-final-104-ad54fe95ec63.xml",
+      "junit_sha256": "ad54fe95ec63bb825405a20d5ff2e129c9bce440630bf56445cfaed6ea8dad7a"
+    },
+    "artifact_sha256": {
+      "uploads.json": "4f3f60d74511a8a7f87bd3703b7abf9b531a6c02e6f3785b5b114054c3634b06",
+      "cost/ledger.jsonl": "d8be6de499ab65219616f0b20d63ae9078224f90507c2f846e924fc9618470f2",
+      "upload-admission-closed.json": "f9b9241246f51e851810cffce2f3fe5a0b4b90a7479511a6b79c01d5ed838560",
+      "verified-metadata.json": "753895c5d5b6d263988750d7a044125e2f22a60b7b8ab6bc50625baa5343e788",
+      "baseline-originals-final-verified.json": "820ec7315f59a9c31f920b4fef1ed4dfc21a9183361ba36e9dac2f1830ce76de",
+      "finalization-20261027/corpus-audit.json": "ad77b61bad28de07bafbc31ab4dfb459cabd76c50be505d74a4744eb0f95dd15",
+      "inventory.json": "fac45de2b6bd1f0f4bd9f67cab9a3a7c276d245aada80e96d95b0dcb2a303292",
+      "smoke.json": "00699ea926e17d25307cdd516d43c612d5881ce8262e180a61eac536ebbd86e1",
+      "final-cost-report.json": "509fdab29efecd2a45b25aec183dd614800b96088da98ac237ce9e981917b90d",
+      "final-backup.json": "264ab8e7bbde5a1256c2f1c1e39689d489db72ea9170587508c6f27fbe93a5e6",
+      "final-check.json": "78cf4f9052cf8e6d5091e8f09628966c95e71e78ce75e051b3157dd38642c97b",
+      "final-status.json": "3651996763b85e50c3624a27f3b5a1f290734230c2f865ef02b36edb5af8671f",
+      "final-verify.json": "0f5bcc8be8a47ac06e623063c897cdb61c6a40854dc2d3832ec56c453e391f89"
+    },
+    "source_sha256": {
+      "scripts/m11_library.py": "8dc22b6e3f0fba659ae2c43cad87e9b6d9e7142736e39bb1b6715eca0d09982f",
+      "scripts/m11_papers.py": "0aa4842cdbc824d86678e5e04b141ddac7374505dc7d1074c52a36977b59ac45",
+      "scripts/m11_atom.py": "b1156dd4c3d176fdb757d061a431f2c8cd3290f5350be77b130f37701bf802f1",
+      "scripts/m11_demo.py": "bb11a82ac81ef0b7307115571712b2dce66f22179681a5e4964311e4d62c7a95",
+      "scripts/m11_status.py": "d0abdd0083fa08b2750b32385abf9a37705b21a4d2cbe9abe37d3774236b3f34",
+      "scripts/m9_lan_demo.py": "7308e6e11c2cfddc28195de1c096550e6acbed8b9f62c739480dfa02eca47d1c",
+      "api/tests/test_m11_tooling.py": "4a44fdad6633f3528ebcdb8e9a606a0035b1470b9d3e54056660fd3c78f1ec74",
+      "evaluation/m11-papers/manifest.json": "448c6542315394d9e7c3a9afdbd225d46a80769599271ec8f7e05d9efcc31827",
+      "evaluation/m11-papers/download-exclusions.json": "abda69d74e236a341c037d23cea98c985ad142ba5f7db4d342c395505f282e9d"
+    }
+  }
+}

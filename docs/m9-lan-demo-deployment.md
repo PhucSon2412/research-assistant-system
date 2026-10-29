@@ -1,5 +1,91 @@
 # M9 — demo LAN trên máy của chủ dự án
 
+**Chế độ hiện hành từ M11 (2026-10-23): dùng cá nhân trên máy này.** Edge chỉ publish
+`127.0.0.1:8443`; địa chỉ vẫn là **https://ras-demo.lan:8443**. State lưu `access_mode=local`,
+`provider`/`web-image` giữ chế độ này. Leaf mới chỉ có DNS SAN `ras-demo.lan` (CA cũ có name constraints
+không bao gồm loopback IP); CA không đổi. Hướng dẫn LAN phía dưới giữ làm lịch sử/tùy chọn.
+Kho paper mở rộng, kết quả thử và chi phí: [handoff M11](m11-demo-knowledge-base.md).
+
+<!-- M11 final usage -->
+### Kho paper đã chốt và cách dùng (27-10-2026)
+
+Thư viện user demo giữ **3.167 item, 1.643 indexed**, trong **8 collection**.
+M11 có 3.150 paper đã nhận: 1.631 indexed, 629 cần xem lại, 890 lỗi/từ chối;
+8 file được bỏ qua trước upload. Giữ cả 12 paper cũ và 5 item ngoài chủ đề trong collection xem lại.
+Lô M11 đã đóng upload; không khởi chạy lại helper mở rộng hoặc gỡ marker để tiêu ngân sách còn lại.
+
+| Collection | Item | Indexed |
+| --- | ---: | ---: |
+| Dense retrieval & embeddings | 369 | 227 |
+| Reranking & search | 412 | 219 |
+| Retrieval-augmented generation | 265 | 136 |
+| RAG evaluation & benchmarks | 532 | 266 |
+| Grounding & hallucination | 595 | 282 |
+| Long context & chunking | 286 | 152 |
+| Search agents & tools | 691 | 349 |
+| Cần xem lại — ngoài phạm vi M11 | 5 | 2 |
+
+Để học một paper, tìm bằng tiêu đề thật trong thư viện, mở item **indexed**, rồi hỏi trên chính item đó.
+Để khảo sát một chủ đề, chọn collection tương ứng và dùng hybrid search có rerank trước khi hỏi đáp.
+Mở panel nguồn để xem đoạn trích, trang và PDF gốc. Item cần xem lại/lỗi vẫn giữ original,
+nhưng không có full-text/RAG cho tới khi được xử lý riêng; M11 không OCR hoặc tự retry chúng.
+
+Các câu dưới đây đã được thử một lần qua API thật; giữ tiếng Anh như input đã chạy:
+
+- What is the role of test-time reasoning in Rank-K listwise reranking?
+- How does HLATR combine retrieval and reranking information?
+- How does TimeSeek evaluate the temporal reliability of agentic forecasters?
+- What recall does SCAR achieve on boundary-fragmented queries, and with how many chunks?
+- What effect did the MS MARCO-trained cross-encoder reranker have in SciRet?
+
+Trong lượt thử, cả ba câu so sánh đều trả `insufficient_evidence/comparison_requires_multiple_papers`.
+Kịch bản gợi ý hiện dùng câu một paper và hybrid search; chưa có câu so sánh nhiều paper đạt trong lượt này.
+Các câu về giá thuê bao Rank-K hoặc ngày ra mắt thương mại SCAR/TimeSeek dùng để thử trường hợp
+nguồn không có đáp án; xem outcome thật trong bảng 15 câu ở [M11](m11-demo-knowledge-base.md#15-câu-thử-thật).
+Smoke này không thay bộ evaluation M7c hoặc phiếu human. Không tự chạy lại toàn bộ câu hỏi trả phí.
+
+Backup cuối `20261027T082255Z-2d3d4bae`: **293,23 s** bảo trì, **7.999.136.734 byte ciphertext**,
+status/reopen `ok`, sau đó `ras_ops check` exit 0 và HTTPS local được kiểm lại.
+Chi phí cam kết M11 **$34,6026042**; billed thực riêng M11 chưa xác minh được vì rc2 không lưu receipt provider.
+Kết quả và giới hạn đầy đủ ở [handoff M11](m11-demo-knowledge-base.md).
+
+<!-- /M11 final usage -->
+
+### Dùng trên chính máy Windows
+
+1. Mở Docker Desktop. Containers có `restart: unless-stopped` tự chạy lại.
+2. PowerShell **Administrator**, tự mở file hosts rồi thay dòng `ras-demo.lan` thành
+   `127.0.0.1 ras-demo.lan` (không giữ dòng LAN cũ):
+
+   ```powershell
+   notepad.exe "$env:SystemRoot\System32\drivers\etc\hosts"
+   ipconfig /flushdns
+   Remove-NetFirewallRule -DisplayName 'RAS pilot LAN demo HTTPS' -ErrorAction SilentlyContinue
+   ```
+
+3. Giữ CA demo đã cài trên máy Windows; nếu chưa cài:
+   `certutil -user -addstore Root "$env:USERPROFILE\ras-pilot\public\ras-demo-ca.crt"`.
+4. Mở **https://ras-demo.lan:8443**, đăng nhập tài khoản demo hiện có. Chọn collection theo chủ đề,
+   dùng tìm kiếm **hybrid** và hỏi đáp trên một paper/collection. Các item “cần xem lại” vẫn giữ file gốc,
+   không vào RAG. Đổi Wi-Fi/Ethernet không cần rebind.
+5. Kiểm từ repo: `python scripts/m9_lan_demo.py verify`. Lệnh đổi local có thể chạy lại:
+   `python scripts/m9_lan_demo.py rebind --local --apply` (chỉ recreate edge, không đổi dữ liệu).
+
+Agent **không sửa hosts/firewall/trust store**. HTTPS đã được kiểm bằng kết nối loopback với SNI/Host
+và CA thật; browser theo hostname phụ thuộc chủ dự án thực hiện bước hosts.
+
+Gỡ cấu hình trên máy Ubuntu từng dùng LAN (chủ dự án tự chạy):
+
+```bash
+sudoedit /etc/hosts  # xóa token/dòng ras-demo.lan đã thêm, giữ các entry khác
+sudo rm -- /usr/local/share/ca-certificates/ras-demo-ca.crt  # nếu CA đã cài với đúng tên này
+sudo update-ca-certificates --fresh
+```
+
+Nếu đã import CA riêng vào Firefox/Chrome, gỡ “RAS LAN demo CA” trong kho certificate của browser.
+Muốn trở về LAN sau này: `rebind --lan-ip <IP Ethernet> --apply`, sửa hosts/firewall theo hướng dẫn
+lịch sử phía dưới. Không chạy toàn bộ `compose up` chỉ để đổi địa chỉ.
+
 Task: [M9](tasks/m9-lan-demo-deployment.md). Base `origin/main = 7009a8483e4f9891f11a966f114df136c90c4953` (merge PR #68),
 nhánh `ops/m9-lan-demo-deployment`. Source migration **0052**. Không đổi code ứng dụng, không build image.
 
@@ -22,10 +108,10 @@ lại: gate open, journal = DB, replica `ok`.
 | Mục | Giá trị |
 |---|---|
 | Truy cập | `https://ras-demo.lan:8443` (thiết bị cần dòng hosts + CA demo, mục 5) |
-| Bind | Chỉ `192.168.69.97:8443` (IP Ethernet lúc chạy, `/22`, profile Public). Không publish `0.0.0.0`, không 80/443/8080 |
+| Bind | **Từ M11: chỉ `127.0.0.1:8443`**. Lịch sử M9: `192.168.69.97:8443` (IP Ethernet lúc dựng). Không publish `0.0.0.0`, không 80/443/8080 |
 | Project Docker | `ras-pilot` (ứng dụng), `ras-pilot-offsite` (MinIO đích replica + backup), `ras-pilot-drill` (scratch, chỉ tồn tại khi drill chạy) |
 | Thư mục | `%USERPROFILE%\ras-pilot\` — `release\` (bản sao `deploy/` + `scripts/ras_ops.py` của `7009a84` bằng `git archive`), `pilot\` (env, overlay, journal, ops-config, ops-state, staging, maintenance), `drill\`, `offsite\`, `secrets\`, `ca\`, `tls.d\`, `public\` (CA cert để cài lên thiết bị), `operator-handoff\` (private key `age`), `bin\`, `logs\`, `evidence\` |
-| Image | `ras-pilot-api:rc2` = `sha256:c0936a81…0a06`, `ras-pilot-web:rc2` = `sha256:59cb5141…2cb3`, `ras-pilot-ops:rc2` = `sha256:22656406…66fc` — tag alias trỏ đúng ID của `rasm8c-*` (M8c), kiểm ID trước khi tạo |
+| Image | Hiện hành: API `ras-pilot-api:rc2` = `sha256:c0936a81…0a06`, web `ras-pilot-web:ui2` = `sha256:aeb3cc71…519b`, ops `ras-pilot-ops:rc2` = `sha256:22656406…66fc`. Lịch sử M9: web rc2 `sha256:59cb5141…2cb3`; M10 thay riêng web, M11 không đổi image |
 | Hạ tầng | Caddy/PostgreSQL 16.14/Redis/MinIO theo digest pin trong `deploy/compose.yaml` (đều đã có trong cache máy) |
 | Mạng nội bộ | backend `ras-pilot` `172.30.64.0/24`, drill `172.30.48.0/24`; `ras-pilot-offsite_offsite` internal, chỉ replicator/`ops`/`ops-check` nối vào |
 | SMTP | `smtp.gmail.com:465` `implicit_tls`, CA hệ thống của image; tài khoản/sender/người nhận alert = địa chỉ trong `secrets\smtp_username`; mật khẩu chỉ là Compose secret `smtp_password` |
@@ -47,7 +133,8 @@ redirect HTTP.
 `default_sni`, handshake thất bại (đã kiểm: `tlsv1 alert internal error`). Thiết bị phải dùng hostname.
 
 **CA demo:** EC P-256, 3 năm, **name constraints** chỉ cho `ras-demo.lan` và dải IP private (10/8, 172.16/12,
-192.168/16): lộ khóa CA cũng không giả mạo được site khác. Leaf 397 ngày, SAN `ras-demo.lan` + IP LAN, EKU serverAuth.
+192.168/16): lộ khóa CA cũng không giả mạo được site khác. Leaf 397 ngày, EKU serverAuth;
+**từ M11 chỉ SAN `ras-demo.lan`**, lịch sử M9 có thêm SAN IP LAN. CA không cho IP loopback.
 Khóa CA ở `ca\demo-ca.key`, thư mục chỉ cấp quyền cho user hiện tại (bỏ kế thừa). Không có trong repo.
 
 ## 2. Lệnh đã chạy và kết quả (agent)
