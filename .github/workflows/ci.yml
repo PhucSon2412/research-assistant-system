@@ -35,13 +35,15 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}-${{ github.event_name }}
+  # A newer push cancels the older run of the same branch/event; every manual dispatch is its own
+  # group, so a measurement run never cancels another one.
+  group: ci-${{ github.ref }}-${{ github.event_name }}${{ github.event_name == 'workflow_dispatch' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 env:
   # Shards per tier and xdist workers (= isolated stacks) per shard, measured in docs/m12-fast-ci.md.
   FAST_SHARDS: 4
-  FULL_SHARDS: 6
+  FULL_SHARDS: 10
   WORKERS: 2
 
 jobs:

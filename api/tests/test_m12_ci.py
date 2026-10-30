@@ -124,3 +124,8 @@ def test_harness_merges_the_timing_phase_into_one_junit(tmp_path):
     host.merge_junit(main, timing)
     cases = {c.get("name"): c.find("failure") is not None for c in ET.parse(main).getroot().iter("testcase")}
     assert cases == {"a": False, "t": True} and not timing.exists()
+
+
+def test_a_manual_dispatch_never_cancels_another_run():
+    group = _workflow()["concurrency"]["group"]
+    assert "github.run_id" in group and "workflow_dispatch" in group
