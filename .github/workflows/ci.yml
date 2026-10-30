@@ -22,6 +22,14 @@ on:
         type: choice
         options: [full, fast]
         default: full
+      shards:
+        description: API shards (empty = the tier default below)
+        type: string
+        default: ""
+      workers:
+        description: xdist workers per shard (empty = WORKERS below)
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -32,9 +40,9 @@ concurrency:
 
 env:
   # Shards per tier and xdist workers (= isolated stacks) per shard, measured in docs/m12-fast-ci.md.
-  FAST_SHARDS: 2
+  FAST_SHARDS: 4
   FULL_SHARDS: 6
-  WORKERS: 4
+  WORKERS: 2
 
 jobs:
   changes:
@@ -50,6 +58,7 @@ jobs:
       deploy: ${{ steps.paths.outputs.deploy }}
       tier: ${{ steps.tier.outputs.tier }}
       shards: ${{ steps.tier.outputs.shards }}
+      workers: ${{ steps.tier.outputs.workers }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -74,11 +83,17 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           INPUT_TIER: ${{ inputs.tier }}
+          INPUT_SHARDS: ${{ inputs.shards }}
+          INPUT_WORKERS: ${{ inputs.workers }}
         run: |
           tier=full
           if [ "$EVENT" = pull_request ] || [ "$INPUT_TIER" = fast ]; then tier=fast; fi
           if [ "$tier" = fast ]; then n=$FAST_SHARDS; else n=$FULL_SHARDS; fi
+          n=${INPUT_SHARDS:-$n}
+          w=${INPUT_WORKERS:-$WORKERS}
+          case "$n$w" in *[!0-9]*) echo "shards/workers must be numbers"; exit 1;; esac
           echo "tier=$tier" | tee -a "$GITHUB_OUTPUT"
+          echo "workers=$w" | tee -a "$GITHUB_OUTPUT"
           echo "shards=$(python3 -c "import json,sys; print(json.dumps([str(i) for i in range(1, int(sys.argv[1]) + 1)]))" "$n")" \
             | tee -a "$GITHUB_OUTPUT"
 
@@ -96,6 +111,7 @@ jobs:
       TIER: ${{ needs.changes.outputs.tier }}
       SHARD: ${{ matrix.shard }}
       SHARDS: ${{ strategy.job-total }}
+      WORKERS: ${{ needs.changes.outputs.workers }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -121,7 +137,7 @@ jobs:
           if [ "${#files[@]}" = 0 ]; then echo "no test file for this shard"; exit 1; fi
           marker=()
           if [ "$TIER" = fast ]; then marker=(-m "not slow"); fi
-          echo "tier=$TIER shard=$SHARD/$SHARDS files=${#files[@]} workers=$WORKERS"
+          echo "tier=$TIER shard=$SHARD/$SHARDS files=${#files[@]} workers=$WORKERS cpus=$(nproc) mem=$(free -m | awk '/Mem:/ {print $2}')MiB"
           python scripts/m8a_test_host.py --context "$RUNNER_TEMP/m8a-api" test \
             --junit "$RUNNER_TEMP/m8a-api/junit-api.xml" -- "${files[@]}" "${marker[@]}" --durations=15
       - name: Scan JUnit for context secrets before upload
