@@ -1976,3 +1976,23 @@ Runtime worker/beat chỉ được kiểm bằng override cô lập; mặc đị
 Theo gói task do chủ dự án giao, HTTP search/viewer chuyển sang `search_runtime` và `search_accounting`; giữ `app.search.search` cho RAG/evaluation compatibility. Không đổi model, retrieval/RRF, giá hoặc quyền common; không chứng nhận RAG runtime. Revision `0047` thêm nonce/operation/session binding query/rerank, all-NULL cho lịch sử/generation; legacy renew/settle không nhận nonce mới. Session ID không FK để late financial settlement không mất ownership sau dọn session.
 
 Scope đổi giữa attempt dừng `409 search_scope_changed` (thay expectation cũ 200 rỗng), viewer stale vẫn 404. Financial commit/release không rõ dừng attempt, không degraded success hay tự retry provider; lease hết giải slot, giữ ceiling. Giữ ngưỡng/cap/warnings hiện hành, generation vẫn vào app total. Boundary, caller map và giới hạn response sau release ở [handoff](c2d6-search-query-rerank-runtime.md). Safety pending tới C4, chưa mở pricing/cutover.
+
+## Chính sách kiểm thử giai đoạn dùng cá nhân (2026-10-29)
+
+Chủ dự án (2026-10-29), sau merge PR #72: dự án đã xong chức năng MVP, dùng học tập cá nhân trên một máy; CI API ~1,5 giờ/lần là quá lâu so với thời gian code. Muốn agent dành thời gian cho tính năng, **tăng ngân sách OpenRouter cho kiểm live**, giảm thời gian test. Orchestrator chốt theo ủy quyền:
+
+- **Giữ nguyên các bất biến** (ACL trước retrieval, citation, consent upload, journal/thu hồi/restore, không hardcode config). Chỉ đổi *cách chứng minh*, không đổi điều phải đúng.
+- **Kiểm theo rủi ro của thay đổi:**
+  - *Lõi an toàn* (auth/session/journal/recovery/ACL/thu hồi/migration): test đích + file test liên quan + CI tầng nhanh; tầng đầy đủ chạy ở push `main`/nightly.
+  - *Tính năng API* (search/RAG/ingest/UI data): test đích + CI tầng nhanh + kiểm live có ngân sách khi chất lượng là mục tiêu.
+  - *Web/docs*: test/typecheck/build web và ảnh chụp; docs không chạy CI.
+- **Bỏ mặc định** (chỉ dùng khi task ghi rõ):
+  - hash-seal source;
+  - inventory JSON toàn bộ node;
+  - countercheck đột biến hàng loạt;
+  - đối chiếu artifact hash trong review.
+
+  Vẫn bắt buộc: báo đúng lệnh đã chạy và kết quả thật; không ghi pass cho thứ chưa chạy; CI GitHub phải xanh trước merge.
+- **Review của orchestrator:** đọc diff, chạy test đích/tái hiện rủi ro, kiểm CI và demo khi có thay đổi runtime; không lặp lại audit hash/inventory.
+- **Ngân sách live mặc định:** $10/task, dừng gọi mới ở 80 %, ledger fail-closed, qua demo hoặc stack thử; budget/quota ứng dụng không tự nới. Task có thể ghi mức khác theo chỉ dẫn chủ dự án. Số dư thật của key nhóm chưa xác minh (khóa báo hạn mức theo ngày); dừng nếu provider báo hết tiền.
+- Task áp dụng đầu tiên: [M12 CI nhanh](tasks/m12-fast-ci-and-test-tiers.md), [M13 hỏi đáp toàn thư viện](tasks/m13-library-qa-and-vector-scale.md).
