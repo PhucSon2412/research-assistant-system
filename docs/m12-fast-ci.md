@@ -96,6 +96,10 @@ Số đo thật trên máy này (20 CPU, Docker Desktop, demo `ras-pilot` vẫn 
 | selection CI cũ 33 file, 8 worker, chưa có `slow` | 1.348 pass (gồm test dump/restore trước đây bị deselect) | 695 s |
 | tầng nhanh, 8 worker, `--ras-shuffle 20261030 --dist worksteal` | 1.362 + 45 `timing` pass | 680 s |
 | tầng nhanh, 8 worker, `--ras-shuffle 7919 --dist loadfile` | 1.362 + 45 `timing` pass | 818 s |
+| tầng đầy đủ 112 file (gồm `slow`), 8 worker, `worksteal` (`6ba6a3d`) | 5.657 + 51 `timing` pass, **1 fail** (xem dưới) | 6.542 s (1 h 49 m) |
+| chạy lại riêng `test_publication.py`, 8 worker | 18 pass | 323 s |
+
+Fail duy nhất của lượt tầng đầy đủ local: `test_publication::test_publish_refuses_missing_or_altered_common_object` nhận `{"error":"service_recovering"}` ở bước login đầu tiên. Recovery gate đóng ngay đầu test, không có log kèm. Chạy riêng file thì pass, nên có thể là lệ thuộc thứ tự/trạng thái do test chạy trước trên cùng worker để lại (worksteal đổi thứ tự so với các lượt tuần tự trước đây). JUnit không ghi test nào chạy trước trên worker đó, nên **chưa xác định nguyên nhân**. Không retry, không gắn marker; cần điều tra riêng (ví dụ chạy lại tầng đầy đủ với `--dist loadfile` và `--ras-shuffle` cố định để có thứ tự tái lập được, rồi khoanh vùng theo file). Đây là bằng chứng local, không thay cho run CI tầng đầy đủ.
 
 ## Thời gian CI trước/sau (GitHub Actions, runner private `ubuntu-24.04`, 2 vCPU)
 
@@ -128,7 +132,7 @@ Thời gian job lấy từ `startedAt`/`completedAt` của GitHub API; số test
 **Chưa đạt:**
 - Tầng nhanh: chưa có run CI ≤ 15 phút trên cấu hình cuối. Run tốt nhất 4×2 có shard dài nhất 15m00s, với 34 file.
 - Tầng đầy đủ: **không đạt ≤ 45 phút** trên runner 2 vCPU. Ước lượng từ log ≈ 820 phút-shard cho cả tầng, tức cần khoảng 20 shard (~900 phút Actions mỗi lượt) để xuống 45 phút.
-- Chưa có run tầng đầy đủ nào pass trên CI.
+- Chưa có run tầng đầy đủ nào pass trên CI. Lượt local tầng đầy đủ 8 worker: 5.708/5.709 pass, 1 fail lệ thuộc thứ tự chưa rõ nguyên nhân (mục lệnh local).
 - PR chỉ sửa docs/web chưa được chạy thật. Quy tắc lọc được kiểm bằng `test_m12_ci.py`; job `changes` đo được 5–7 s.
 
 ## Phát hiện cần orchestrator quyết
