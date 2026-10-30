@@ -42,7 +42,7 @@ concurrency:
 
 env:
   # Shards per tier and xdist workers (= isolated stacks) per shard, measured in docs/m12-fast-ci.md.
-  FAST_SHARDS: 5
+  FAST_SHARDS: 6
   FULL_SHARDS: 12
   WORKERS: 2
 
