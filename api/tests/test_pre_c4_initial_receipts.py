@@ -182,6 +182,7 @@ def test_durable_creation_proof_survives_current_profile_changes(old_install,kin
     with Session(w.runtime) as db:assert auth_safety.account_live(db,uid)
 
 
+@pytest.mark.slow
 def test_two_dump_restore_rounds_keep_valid_provenance_and_restrict_forgery(old_install, admin_engine, tmp_path,monkeypatch):
     w = old_install; upgrade(w.engine.url)
     monkeypatch.setattr(auth_safety,'cutover',REAL_CUTOVER)

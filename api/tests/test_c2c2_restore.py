@@ -6,6 +6,8 @@ explicit admin URL. No Compose/.env/object store or provider is needed.
 import json
 import os
 import subprocess
+
+import pytest
 from types import SimpleNamespace
 
 from sqlalchemy import create_engine,text
@@ -19,6 +21,7 @@ from tests.test_c2c1_bootstrap import installation
 from tests.test_auth_safety_foundation import NOW
 
 
+@pytest.mark.slow
 def test_dump_restore_pre_accept_twice_current_journal(world,admin_engine,tmp_path,monkeypatch):
     w=world
     # The host runner sets these explicit identifiers after its ownership check.

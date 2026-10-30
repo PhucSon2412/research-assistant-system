@@ -1011,6 +1011,7 @@ def dump_restore(w, admin_engine, tmp_path, label):
     return restore
 
 
+@pytest.mark.slow
 def test_two_dump_restore_rounds_never_reuse_case_or_rebuild_credential(world, admin_engine, tmp_path):
     from tests.conftest import drop_database
     w = world

@@ -33,6 +33,8 @@ dev = [
     "pyyaml>=6",
     # M8b: age encryption, same pin as deploy/ops/requirements.txt
     "pyrage==1.4.0",
+    # M12: parallel test workers (pinned in constraints-dev.txt)
+    "pytest-xdist>=3.6,<4",
 ]
 
 [tool.setuptools.packages.find]
@@ -40,4 +42,7 @@ include = ["app*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra"
+addopts = "-ra --strict-markers"
+markers = [
+    "slow: full tier only (push main, nightly, workflow_dispatch): dump/restore rounds, the evaluation ACL matrix, tests that need a host container (docs/m12-fast-ci.md)",
+]
