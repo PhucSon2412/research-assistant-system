@@ -684,6 +684,27 @@ npm run build --prefix web
 
 *Kết quả kiểm ngày 2026-09-24 (M1b):* `pytest api -q` → **181 passed** (PowerShell, Conda `ras`, Python 3.12); `npm run typecheck`/`npm run build` đạt; `docker compose up -d --build --wait` đạt với mọi service healthy và `alembic current` = `0002 (head)`, kể cả khi nâng DB dev đang ở `0001`. Test M1b chạy trên PostgreSQL thật với đồng hồ giả (`tests/helpers.py`) để kiểm biên idle 30 phút/absolute 8 giờ/invite 72 giờ/reset 30 phút; các ca đồng thời (hai request cùng token, login đua với reset) gọi service trong nhiều luồng. Kiểm đối chứng: bỏ điều kiện `owner_user_id` khỏi `visible_items_clause` làm 9 test ACL thất bại.
 
+### Tầng test và chạy song song (M12, 2026-10-30)
+
+Cách chạy API test hiện hành cho agent là harness [`scripts/m8a_test_host.py`](../scripts/m8a_test_host.py):
+- N bộ PostgreSQL/Redis/MinIO riêng, mỗi worker xdist một bộ;
+- DB mẫu đã migrate, clone cho từng test;
+- pha `timing` chạy tuần tự sau pha song song.
+
+Context phải là đường dẫn ngắn ngoài repo (giới hạn MAX_PATH). Tầng, shard, lọc đường dẫn CI và lý do các file chưa vào CI ở [handoff M12](m12-fast-ci.md).
+
+```powershell
+& $py -m pip install -c .\api\constraints-rc2.txt -c .\api\constraints-dev.txt -e ".\api[dev]"   # thêm pytest-xdist
+& $py scripts\m8a_test_host.py --context "$env:USERPROFILE\rt\m12" setup --workers 8
+& $py scripts\m8a_test_host.py --context "$env:USERPROFILE\rt\m12" test --junit "$env:USERPROFILE\rt\fast.xml" -- (& $py scripts\ci_tiers.py files --tier fast).Split(' ') -m "not slow"
+& $py scripts\m8a_test_host.py --context "$env:USERPROFILE\rt\m12" test -- tests\test_search.py -m "not slow"   # lọc file/marker
+& $py scripts\m8a_test_host.py --context "$env:USERPROFILE\rt\m12" cleanup
+```
+
+*Đo 2026-10-30 trên máy này (20 CPU, demo `ras-pilot` vẫn chạy):*
+- Tầng nhanh 8 worker: 1.362 test song song + 45 `timing` pass, trong 680 s (`--ras-shuffle 20261030`, `worksteal`) và 818 s (`--ras-shuffle 7919`, `--dist loadfile`).
+- Ba file auth chạy tuần tự: 616 s với conftest cũ (migrate từng test), 398 s với DB mẫu.
+
 ## Upload intent và original (M1c)
 
 Mở `http://127.0.0.1:3000` bằng tài khoản User. Form upload hiển thị thông báo xử lý ngoài trả từ `GET /uploads/notice`, checkbox rỗng cho mỗi lần upload. UI tính size/SHA-256 trên file đã chọn, gọi `POST /uploads/intents` với xác nhận/notice version và metadata, rồi mới `PUT /uploads/original` với raw file. PDF tối đa 30 MiB/100 trang, Markdown tối đa 2 MiB (`Settings.files`). API kiểm bytes thực, UTF-8 Markdown hoặc PDF hợp lệ/số trang, chưa trích text hay gọi OpenRouter. Item mới private, `metadata_only`, job `received`. Trang item cho chủ sở hữu xem job, metadata và link tải original. Link `/api/files/{id}/original` qua API quyền mỗi lần; User khác và Admin nhận `404` cho file riêng.
