@@ -124,6 +124,7 @@ def test_starttls_required_when_server_does_not_offer_it(pki, capture):
     assert server.messages == []
 
 
+@pytest.mark.timing
 def test_slow_server_stops_at_the_total_deadline(pki, capture):
     server = capture(Behaviour(data_delay_seconds=5))
     started = time.monotonic()

@@ -14,8 +14,10 @@ can happen.
 M12: ``setup --workers N`` starts N independent PostgreSQL/Redis/MinIO sets in
 the one project; ``test`` then runs pytest-xdist with ``-n N`` and gives each
 worker its own set (cluster roles, limiter keys, buckets and the DB container
-for dump/restore rounds never cross workers). The credentials are random per
-context and shared by the sets.
+for dump/restore rounds never cross workers), followed by the tests marked
+``timing`` alone on set 0; both phases go to one JUnit file. Passing ``-n`` or
+``-p no:xdist`` yourself runs one plain pytest instead. The credentials are
+random per context and shared by the sets.
 """
 from __future__ import annotations
 
@@ -198,26 +200,66 @@ def main() -> int:
         "RAS_REDIS_HOST": "127.0.0.1", "RAS_REDIS_PASSWORD": c["redis"],
         "RAS_TEST_REDIS_HOST": "127.0.0.1", "RAS_TEST_REDIS_PASSWORD": c["redis"],
         "RAS_EMBEDDING__API_KEY": "", "RAS_EMBEDDING__PRICING_VERIFIED": "false",
-        "PYTHONPATH": os.pathsep.join([str(root / "guard"), str(a.api_dir)]), "PYTHONUTF8": "1"})
+        # The repository root last: some suites import tooling as `from scripts import ...`.
+        "PYTHONPATH": os.pathsep.join([str(root / "guard"), str(a.api_dir), str(REPO)]), "PYTHONUTF8": "1"})
     if a.action == "env":
         print(json.dumps(sorted(k for k in env if k.startswith("RAS_"))))
         return 0
     args = [x for x in a.rest if x != "--"]
     chosen = any(x in ("-n", "--numprocesses", "no:xdist") or x.startswith(("-n", "--numprocesses=")) for x in args)
-    if len(c["stacks"]) > 1 and not chosen:
-        # One worker per isolated stack; worksteal rebalances the uneven file durations.
-        args = ["-n", str(len(c["stacks"])), "--dist", "worksteal", *args]
     worker_file = root / "worker-env.json"
     worker_file.write_text(json.dumps(blocks), encoding="utf-8")
     env["RAS_TEST_WORKER_ENV_FILE"] = str(worker_file)
     # Fixture files (journals, case files, synthetic credentials) stay under this context.
     basetemp = root / "pytest-tmp" / str(time.time_ns())
-    basetemp.parent.mkdir(parents=True, exist_ok=True)
-    cmd = [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "-q", "--basetemp", str(basetemp), *args]
-    if a.junit:
-        cmd += ["--junitxml", str(a.junit)]
-    return subprocess.call(cmd, cwd=a.api_dir, env=env)
+    basetemp.mkdir(parents=True)
+    base =[sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "-q"]
 
+    def pytest(extra: list[str], temp: Path, junit: Path | None) -> int:
+        return subprocess.call(base + ["--basetemp", str(temp), *extra] + (["--junitxml", str(junit)] if junit else []),
+                               cwd=a.api_dir, env=env)
+
+    if len(c["stacks"]) == 1 or chosen:
+        return pytest(args, basetemp, a.junit)
+    # One xdist worker per isolated stack (worksteal rebalances the uneven file durations), then the
+    # tests marked `timing` (wall-clock bounds) alone, without parallel load; one merged JUnit.
+    expr, rest = marker_expression(args)
+    timing_junit = a.junit.with_name(a.junit.stem + "-timing.xml") if a.junit else None
+    first = pytest(["-n", str(len(c["stacks"])), "--dist", "worksteal", "-m",
+                    f"({expr}) and not timing" if expr else "not timing", *rest], basetemp / "parallel", a.junit)
+    second = pytest(["-p", "no:xdist", "-m", f"({expr}) and timing" if expr else "timing", *rest],
+                    basetemp / "timing", timing_junit)
+    if a.junit and timing_junit.exists():
+        merge_junit(a.junit, timing_junit)
+    if first == second == 5:
+        return 5  # nothing collected in either phase
+    return next((code for code in (first, second) if code not in (0, 5)), 0)
+
+
+def marker_expression(args: list[str]) -> tuple[str | None, list[str]]:
+    """The last ``-m EXPR`` of the pytest arguments (as pytest uses it) and the arguments without any."""
+    expr, rest, skip = None, [], False
+    for n, x in enumerate(args):
+        if skip:
+            skip = False
+        elif x == "-m" and n + 1 < len(args):
+            expr, skip = args[n + 1], True
+        elif x.startswith("-m") and len(x) > 2:
+            expr = x[2:].lstrip("=")
+        else:
+            rest.append(x)
+    return expr, rest
+
+
+def merge_junit(target: Path, extra: Path) -> None:
+    import xml.etree.ElementTree as ET
+    if not target.exists():
+        extra.replace(target)
+        return
+    tree = ET.parse(target)
+    tree.getroot().extend(list(ET.parse(extra).getroot()))
+    tree.write(target, encoding="utf-8", xml_declaration=True)
+    extra.unlink()
 
 if __name__ == "__main__":
     raise SystemExit(main())

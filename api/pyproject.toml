@@ -45,4 +45,5 @@ testpaths = ["tests"]
 addopts = "-ra --strict-markers"
 markers = [
     "slow: full tier only (push main, nightly, workflow_dispatch): dump/restore rounds, the evaluation ACL matrix, tests that need a host container (docs/m12-fast-ci.md)",
+    "timing: wall-clock bound below a few seconds; the harness runs these after the xdist phase, without parallel load",
 ]

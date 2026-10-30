@@ -14,9 +14,13 @@ import threading
 import time
 from pathlib import Path
 
+import pytest
+
 REPO = Path(__file__).resolve().parents[2]
 SECRET = 'sk-or-v1-synthetic-not-a-real-key-0123456789'
 DEADLINE = 3.0
+# M12: wall-clock bounds; run without parallel load (scripts/m8a_test_host.py timing phase).
+pytestmark = pytest.mark.timing
 EXIT_BOUND = 20.0  # deadline + child start-up/teardown on a loaded Windows host
 
 HANG = textwrap.dedent('''

@@ -97,3 +97,30 @@ def test_workflow_tiers_triggers_and_conditional_jobs():
     # Third-party actions only from the GitHub-owned actions/ namespace.
     uses = {s["uses"].split("@")[0] for job in jobs.values() for s in job["steps"] if "uses" in s}
     assert all(u.startswith("actions/") for u in uses), uses
+
+
+HOST_SPEC = importlib.util.spec_from_file_location("m8a_test_host_m12", REPO / "scripts" / "m8a_test_host.py")
+host = importlib.util.module_from_spec(HOST_SPEC)
+sys.path.insert(0, str(REPO / "scripts"))  # the harness imports c4_isolation next to it
+HOST_SPEC.loader.exec_module(host)
+
+
+@pytest.mark.parametrize("args, expected", [
+    (["tests/a.py", "-m", "not slow", "-x"], ("not slow", ["tests/a.py", "-x"])),
+    (["-m", "a", "-m", "b"], ("b", [])),  # pytest keeps the last -m
+    (["-mslow"], ("slow", [])),
+    (["tests/a.py"], (None, ["tests/a.py"])),
+])
+def test_harness_lifts_the_marker_expression_for_both_phases(args, expected):
+    assert host.marker_expression(args) == expected
+
+
+def test_harness_merges_the_timing_phase_into_one_junit(tmp_path):
+    import xml.etree.ElementTree as ET
+    main, timing = tmp_path / "junit-api.xml", tmp_path / "junit-api-timing.xml"
+    main.write_text('<testsuites><testsuite name="pytest"><testcase name="a"/></testsuite></testsuites>')
+    timing.write_text('<testsuites><testsuite name="pytest"><testcase name="t"><failure/></testcase>'
+                      '</testsuite></testsuites>')
+    host.merge_junit(main, timing)
+    cases = {c.get("name"): c.find("failure") is not None for c in ET.parse(main).getroot().iter("testcase")}
+    assert cases == {"a": False, "t": True} and not timing.exists()
