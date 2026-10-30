@@ -129,3 +129,7 @@ def test_harness_merges_the_timing_phase_into_one_junit(tmp_path):
 def test_a_manual_dispatch_never_cancels_another_run():
     group = _workflow()["concurrency"]["group"]
     assert "github.run_id" in group and "workflow_dispatch" in group
+
+
+def test_harness_timing_phase_drops_xdist_distribution():
+    assert host.without_dist(["a.py", "--dist", "loadfile", "--dist=load", "-x"]) == ["a.py", "-x"]

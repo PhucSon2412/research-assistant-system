@@ -22,6 +22,11 @@ from app.delivery import DeliveryFailed, MessageKind, OutgoingMessage, SmtpDeliv
 from tests.m8a_tls import make_ca, make_leaf
 from tests.smtp_capture import Behaviour, CaptureServer
 
+
+# M12: SMTP sends through a child process with second-level deadlines; run without parallel load
+# (scripts/m8a_test_host.py timing phase).
+pytestmark = pytest.mark.timing
+
 TOKEN = "SyntheticTokenValue_ABCdef0123456789"
 LINK = f"https://ras.test/invite#token={TOKEN}"
 RECIPIENT = "invitee@example.test"
@@ -124,7 +129,6 @@ def test_starttls_required_when_server_does_not_offer_it(pki, capture):
     assert server.messages == []
 
 
-@pytest.mark.timing
 def test_slow_server_stops_at_the_total_deadline(pki, capture):
     server = capture(Behaviour(data_delay_seconds=5))
     started = time.monotonic()

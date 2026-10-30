@@ -227,13 +227,26 @@ def main() -> int:
     timing_junit = a.junit.with_name(a.junit.stem + "-timing.xml") if a.junit else None
     first = pytest(["-n", str(len(c["stacks"])), "--dist", "worksteal", "-m",
                     f"({expr}) and not timing" if expr else "not timing", *rest], basetemp / "parallel", a.junit)
-    second = pytest(["-p", "no:xdist", "-m", f"({expr}) and timing" if expr else "timing", *rest],
+    second = pytest(["-p", "no:xdist", "-m", f"({expr}) and timing" if expr else "timing", *without_dist(rest)],
                     basetemp / "timing", timing_junit)
     if a.junit and timing_junit.exists():
         merge_junit(a.junit, timing_junit)
     if first == second == 5:
         return 5  # nothing collected in either phase
     return next((code for code in (first, second) if code not in (0, 5)), 0)
+
+
+def without_dist(args: list[str]) -> list[str]:
+    """The arguments minus ``--dist MODE`` (an xdist option the serial timing phase does not know)."""
+    out, skip = [], False
+    for x in args:
+        if skip:
+            skip = False
+        elif x == "--dist":
+            skip = True
+        elif not x.startswith("--dist="):
+            out.append(x)
+    return out
 
 
 def marker_expression(args: list[str]) -> tuple[str | None, list[str]]:
