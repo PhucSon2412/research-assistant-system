@@ -2,7 +2,7 @@
 
     python scripts/ci_tiers.py files --tier fast|full [--shard I --shards N]
     python scripts/ci_tiers.py check
-    python scripts/ci_tiers.py durations <junit.xml> ...   # refresh scripts/ci_durations.json
+    python scripts/ci_tiers.py durations --tier fast|full <junit.xml> ...   # refresh scripts/ci_durations.json
 
 ``fast`` (pull requests) runs FAST with ``-m "not slow"``; ``full`` (push main,
 nightly, workflow_dispatch) runs every file except NOT_IN_CI, slow tests
@@ -42,6 +42,10 @@ FAST = [
     "test_m11_tooling.py",
     # M12
     "test_m12_ci.py",
+    # M12 expansion within the PR budget (one more shard): ACL before retrieval, search,
+    # review requests, upload intent/original, collections, ingest worker.
+    "test_library_acl.py", "test_search.py", "test_review_requests.py", "test_uploads.py", "test_collections.py",
+    "test_ingest_worker.py",
 ]
 
 # Never in CI, with the reason (docs/m12-fast-ci.md lists them for the orchestrator).
@@ -65,13 +69,16 @@ def tier_files(tier: str) -> list[str]:
     return [f for f in all_files() if f not in NOT_IN_CI]
 
 
-def durations() -> dict[str, float]:
-    return json.loads(DURATIONS.read_text(encoding="utf-8")) if DURATIONS.exists() else {}
+def durations(tier: str = "fast") -> dict[str, float]:
+    """Seconds per file for a tier: ``fast`` excludes slow tests; ``full`` falls back to ``fast``."""
+    data = json.loads(DURATIONS.read_text(encoding="utf-8")) if DURATIONS.exists() else {}
+    return data.get("fast", {}) | (data.get("full", {}) if tier == "full" else {})
 
 
-def shard(files: list[str], index: int, count: int, seconds: dict[str, float] | None = None) -> list[str]:
+def shard(files: list[str], index: int, count: int, seconds: dict[str, float] | None = None,
+          tier: str = "fast") -> list[str]:
     """Greedy longest-first split; deterministic for the same files and durations."""
-    seconds = durations() if seconds is None else seconds
+    seconds = durations(tier) if seconds is None else seconds
     loads, names = [0.0] * count, [[] for _ in range(count)]
     for name in sorted(files, key=lambda f: (-seconds.get(f, DEFAULT_SECONDS), f)):
         n = min(range(count), key=lambda i: (loads[i], i))
@@ -89,7 +96,7 @@ def check() -> list[str]:
     problems += [f"FAST repeats {f}" for f, k in collections.Counter(FAST).items() if k > 1]
     for tier in ("fast", "full"):
         for count in range(1, 9):
-            split = [f for i in range(count) for f in shard(tier_files(tier), i, count)]
+            split = [f for i in range(count) for f in shard(tier_files(tier), i, count, tier=tier)]
             if sorted(split) != sorted(tier_files(tier)):
                 problems.append(f"{tier} split into {count} loses or repeats a file")
     return problems
@@ -119,13 +126,14 @@ def main() -> int:
                                      f"{len(NOT_IN_CI)} not in CI")
         return 1 if problems else 0
     if a.action == "durations":
-        merged = durations() | from_junit(a.junit)
-        DURATIONS.write_text(json.dumps(merged, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-        print(f"{len(merged)} files, {round(sum(merged.values()))} s")
+        data = json.loads(DURATIONS.read_text(encoding="utf-8")) if DURATIONS.exists() else {}
+        data[a.tier] = data.get(a.tier, {}) | from_junit(a.junit)
+        DURATIONS.write_text(json.dumps(data, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        print(f"{a.tier}: {len(data[a.tier])} files, {round(sum(data[a.tier].values()))} s")
         return 0
     if not 1 <= a.shard <= a.shards:
         raise SystemExit("--shard must be 1..--shards")
-    print(" ".join("tests/" + f for f in shard(tier_files(a.tier), a.shard - 1, a.shards)))
+    print(" ".join("tests/" + f for f in shard(tier_files(a.tier), a.shard - 1, a.shards, tier=a.tier)))
     return 0
 
 
