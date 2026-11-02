@@ -1,5 +1,29 @@
 # M12 — CI nhanh và kiểm thử theo tầng (handoff)
 
+## Sửa review 2026-11-02 (đang kiểm chứng)
+
+Repo đã public. Log run `41020635195` attempt 2 xác nhận runner thực tế có 4 CPU / 15.983 MiB RAM;
+CI đã khởi chạy trở lại. Các dòng billing và cấu hình 12 shard bên dưới là kết quả lịch sử ngày 2026-10-30.
+
+- Tầng nhanh: 6 shard × 2 worker; tầng đầy đủ: 18 shard × 3 worker, timeout 50 phút/shard.
+  Mỗi run full có tối đa 18 API job và hai job web/deploy. Không dùng self-hosted runner.
+- Shard chia **theo test sau khi lọc marker**, dùng giây của file chia cho số test được chọn làm trọng số.
+  Nhờ đó một file lớn không còn chặn riêng cả shard. Mọi worker tính cùng một tập node trước khi xáo seed.
+- Bỏ nightly. Full chạy ở push `main` và `workflow_dispatch`; quyền, HTTP guard, random credential và scan JUnit giữ nguyên.
+- Một push docs nối tiếp chỉ tái dùng checks khi head PR trước đó đã có run CI thành công.
+  Nếu head trước còn chạy, fail hoặc không tra được, kiểm diff toàn PR. Push mới vẫn hủy run cũ cùng PR.
+- JUnit ghi `ras_worker` và `ras_previous` để dựng lại đúng thứ tự từng worker, kể cả failure ở setup.
+
+Kiểm đích workflow/shard/scan: **38 pass**. Chuỗi tiền nhiệm lấy từ thư mục tạm worker `gw7` của lượt fail cũ:
+`test_private_index.py` → `test_publish_lists_metadata_only_and_nothing_else` →
+`test_publish_refuses_missing_or_altered_common_object`: **30 pass, 650,43 s** trên stack riêng.
+Chưa tái hiện được lỗi cũ bằng chuỗi này; chưa kết luận nguyên nhân hoặc đánh dấu P2 đã sửa.
+
+Run PR cấu hình sửa `41390031761` tại `fed2c44`: **success**, chờ từ lúc tạo run tới job cuối **11m11s**,
+shard API dài nhất **10m34s**, tổng thời gian các job **50m07s** (API cộng **48m15s**).
+Run full chạy tay `41390390204` trên cùng code đang chạy; kết quả sẽ bổ sung sau khi hoàn tất.
+Lệnh full local 8 worker nằm trong `docs/dev-setup.md`.
+
 Task: [m12-fast-ci-and-test-tiers](tasks/m12-fast-ci-and-test-tiers.md), áp dụng [chính sách kiểm thử giai đoạn dùng cá nhân](decisions.md#chính-sách-kiểm-thử-giai-đoạn-dùng-cá-nhân-2026-10-29). Nhánh `chore/m12-fast-ci`, base `origin/main = 959e4a4`. Không đổi code ứng dụng, schema hay image; không xóa test, không nới assertion.
 
 ## Cơ chế
