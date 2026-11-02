@@ -110,7 +110,17 @@ def shard_nodes(nodes: list[str], index: int, count: int, seconds: dict[str, flo
     """
     file_of = lambda node: Path(node.split("::", 1)[0]).name
     sizes = collections.Counter(file_of(node) for node in nodes)
-    weight = {node: seconds.get(file_of(node), DEFAULT_SECONDS) / sizes[file_of(node)] for node in nodes}
+    # Keep only sparse measured hotspots in the source duration file, not a full
+    # node inventory. Subtract them from the file total before averaging its rest.
+    known_seconds = collections.Counter()
+    known_count = collections.Counter()
+    for node in nodes:
+        if node in seconds:
+            known_seconds[file_of(node)] += seconds[node]
+            known_count[file_of(node)] += 1
+    average = {file: max(0.001, (seconds.get(file, DEFAULT_SECONDS) - known_seconds[file]) /
+                            max(1, size - known_count[file])) for file, size in sizes.items()}
+    weight = {node: seconds.get(node, average[file_of(node)]) for node in nodes}
     loads, names = [0.0] * count, [[] for _ in range(count)]
     for node in sorted(nodes, key=lambda n: (-weight[n], n)):
         target = min(range(count), key=lambda i: (loads[i], i))
@@ -121,12 +131,17 @@ def shard_nodes(nodes: list[str], index: int, count: int, seconds: dict[str, flo
 
 def from_junit(paths: list[Path]) -> dict[str, float]:
     seconds: dict[str, float] = collections.defaultdict(float)
+    hotspots: dict[str, float] = {}
     for path in paths:
         for case in ET.parse(path).getroot().iter("testcase"):
             module = (case.get("classname") or "").split(".")
             if len(module) >= 2 and module[0] == "tests":
-                seconds[module[1] + ".py"] += float(case.get("time") or 0)
-    return {k: round(v, 1) for k, v in sorted(seconds.items())}
+                elapsed = float(case.get("time") or 0)
+                seconds[module[1] + ".py"] += elapsed
+                if elapsed >= 600:
+                    node = "tests/" + module[1] + ".py::" + "::".join([*module[2:], case.get("name")])
+                    hotspots[node] = elapsed
+    return {k: round(v, 1) for k, v in sorted((seconds | hotspots).items())}
 
 
 def main() -> int:
@@ -146,7 +161,7 @@ def main() -> int:
         data = json.loads(DURATIONS.read_text(encoding="utf-8")) if DURATIONS.exists() else {}
         data[a.tier] = data.get(a.tier, {}) | from_junit(a.junit)
         DURATIONS.write_text(json.dumps(data, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-        print(f"{a.tier}: {len(data[a.tier])} files, {round(sum(data[a.tier].values()))} s")
+        print(f"{a.tier}: {len(data[a.tier])} duration entries (file totals and sparse hotspots)")
         return 0
     if not 1 <= a.shard <= a.shards:
         raise SystemExit("--shard must be 1..--shards")

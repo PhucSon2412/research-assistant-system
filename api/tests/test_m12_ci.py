@@ -83,6 +83,29 @@ def test_node_shards_split_a_large_file_without_losing_or_repeating_tests():
     assert split == [ci_tiers.shard_nodes(list(reversed(nodes)), i, 18, seconds) for i in range(18)]
 
 
+def test_measured_hotspot_runs_first_without_double_counting_its_file_time():
+    nodes = ["tests/a.py::test_small", "tests/a.py::test_big", "tests/b.py::test_b"]
+    seconds = {"a.py": 101, "b.py": 50, "tests/a.py::test_big": 100}
+    split = [ci_tiers.shard_nodes(nodes, i, 2, seconds) for i in range(2)]
+    assert split == [["tests/a.py::test_big"], ["tests/b.py::test_b", "tests/a.py::test_small"]]
+    assert ci_tiers.shard_nodes(nodes, 0, 1, seconds)[0] == "tests/a.py::test_big"
+
+
+def test_collection_hook_keeps_heavy_first_execution_order(monkeypatch):
+    from types import SimpleNamespace
+    from tests.conftest import pytest_collection_modifyitems
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    monkeypatch.setitem(sys.modules, "ci_tiers", ci_tiers)
+    monkeypatch.setattr(ci_tiers, "durations", lambda tier: {
+        "a.py": 101, "b.py": 50, "tests/a.py::test_big": 100,
+    })
+    config = SimpleNamespace(getoption=lambda key: "1/1" if key == "--ras-shard" else None,
+                             hook=SimpleNamespace(pytest_deselected=lambda **kw: None))
+    items = [SimpleNamespace(nodeid=n) for n in ("tests/a.py::test_small", "tests/a.py::test_big", "tests/b.py::test_b")]
+    pytest_collection_modifyitems(config, items)
+    assert [item.nodeid for item in items] == ["tests/a.py::test_big", "tests/b.py::test_b", "tests/a.py::test_small"]
+
+
 def _workflow():
     import yaml
     return yaml.safe_load((REPO / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))

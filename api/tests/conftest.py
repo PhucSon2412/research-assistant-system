@@ -76,10 +76,14 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         sys.path.insert(0, str(REPO_DIR / "scripts"))
         from ci_tiers import durations, shard_nodes
         # The workflow sets the tier explicitly; local full is the conservative default.
-        selected = set(shard_nodes([item.nodeid for item in items], index - 1, count,
-                                  durations(os.environ.get("TIER", "full"))))
+        ordered = shard_nodes([item.nodeid for item in items], index - 1, count,
+                              durations(os.environ.get("TIER", "full")))
+        selected = set(ordered)
         deselected = [item for item in items if item.nodeid not in selected]
-        items[:] = [item for item in items if item.nodeid in selected]
+        by_id = {item.nodeid: item for item in items}
+        # Start long cases first; otherwise a late 28-minute case can dominate
+        # wall time even when total shard weights are balanced.
+        items[:] = [by_id[node] for node in ordered]
         config.hook.pytest_deselected(items=deselected)
     seed = config.getoption("--ras-shuffle")
     if seed is not None:
