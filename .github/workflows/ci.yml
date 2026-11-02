@@ -42,6 +42,7 @@ env:
   FAST_SHARDS: 6
   FULL_SHARDS: 18
   WORKERS: 2
+  FULL_WORKERS: 3 # public ubuntu runner measured at 4 CPUs / 16 GiB
 
 jobs:
   changes:
@@ -96,7 +97,8 @@ jobs:
           if [ "$EVENT" = pull_request ] || [ "$INPUT_TIER" = fast ]; then tier=fast; fi
           if [ "$tier" = fast ]; then n=$FAST_SHARDS; else n=$FULL_SHARDS; fi
           n=${INPUT_SHARDS:-$n}
-          w=${INPUT_WORKERS:-$WORKERS}
+          if [ "$tier" = full ]; then default_workers=$FULL_WORKERS; else default_workers=$WORKERS; fi
+          w=${INPUT_WORKERS:-$default_workers}
           case "$n$w" in *[!0-9]*) echo "shards/workers must be numbers"; exit 1;; esac
           if [ "$n" -lt 1 ] || [ "$n" -gt 18 ] || [ "$w" -lt 1 ] || [ "$w" -gt 8 ]; then
             echo "shards must be 1..18 and workers 1..8"; exit 1
