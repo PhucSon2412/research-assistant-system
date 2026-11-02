@@ -237,14 +237,14 @@ def main() -> int:
 
 
 def without_dist(args: list[str]) -> list[str]:
-    """The arguments minus ``--dist MODE`` (an xdist option the serial timing phase does not know)."""
+    """Remove xdist scheduling flags the serial timing phase does not know."""
     out, skip = [], False
     for x in args:
         if skip:
             skip = False
-        elif x == "--dist":
+        elif x in ("--dist", "--maxschedchunk"):
             skip = True
-        elif not x.startswith("--dist="):
+        elif not x.startswith(("--dist=", "--maxschedchunk=")):
             out.append(x)
     return out
 

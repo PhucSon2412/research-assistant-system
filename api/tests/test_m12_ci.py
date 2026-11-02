@@ -172,4 +172,5 @@ def test_a_manual_dispatch_never_cancels_another_run():
 
 
 def test_harness_timing_phase_drops_xdist_distribution():
-    assert host.without_dist(["a.py", "--dist", "loadfile", "--dist=load", "-x"]) == ["a.py", "-x"]
+    assert host.without_dist(["a.py", "--dist", "loadfile", "--dist=load", "--maxschedchunk", "2",
+                              "--maxschedchunk=4", "-x"]) == ["a.py", "-x"]
