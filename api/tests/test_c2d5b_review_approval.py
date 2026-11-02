@@ -738,9 +738,39 @@ def test_copy_deadline_stops_observing_but_owns_resources_until_thread_settles(a
     monkeypatch.setenv('RAS_FILES__APPROVAL_COPY_DEADLINE_SECONDS', '0.5')
     get_settings.cache_clear()
     settled = []
+    budget = {}
+    entered = []
+    real_proof = boundary.proof
+    proofs = []
+
+    def proof(*args, **kwargs):
+        value = real_proof(*args, **kwargs)
+        proofs.append(1)
+        if len(proofs) == 2:
+            # Reproduce a valid slow SQL proof before put. The resource-ownership
+            # case must reach its faulted SDK call, regardless of machine speed.
+            time.sleep(1)
+        return value
+
+    class IoDeadline:
+        def __getattr__(self, name):
+            return getattr(asyncio, name)
+
+        def timeout(self, seconds):
+            assert seconds == 0.5
+            budget.update(loop=asyncio.get_running_loop(), seconds=seconds, timeout=asyncio.timeout(None))
+            return budget['timeout']
+
+    monkeypatch.setattr(boundary, 'proof', proof)
+    # Only this module's timeout factory is controlled; the real asyncio
+    # Timeout expires while the SDK thread runs. Total-budget coverage is below.
+    monkeypatch.setattr(boundary, 'asyncio', IoDeadline())
 
     def slow(key):
         if (where == 'source_read' and key == b.own.key) or where == 'put':
+            entered.append(time.monotonic())
+            loop = budget['loop']
+            loop.call_soon_threadsafe(lambda: budget['timeout'].reschedule(loop.time() + budget['seconds']))
             time.sleep(2)  # a blocked SDK call: cancellation cannot kill this thread
             settled.append(time.monotonic())
 
@@ -749,7 +779,31 @@ def test_copy_deadline_stops_observing_but_owns_resources_until_thread_settles(a
     r = approve(b)
     assert (r.status_code, r.json()) == (503, {'error': 'approval_copy_timeout'})
     assert settled and settled[0] - started >= 1.9 and time.monotonic() - started >= 2
+    assert len(entered) == 1 and settled[0] - entered[0] >= 1.9 and budget['timeout'].expired()
     assert nothing(b) and b.storage.copies() == {} and b.storage.deleted == b.storage.puts
+    assert failure_reasons(b) == ['copy_timeout'] and boundary.slots.active == 0
+    assert gate(b).open and get_engine().pool.checkedout() == 0
+
+
+def test_copy_deadline_includes_proof_before_put(approvals, monkeypatch):
+    """A real total deadline can expire before SDK I/O; no copy may then start."""
+    b = approvals
+    monkeypatch.setenv('RAS_FILES__APPROVAL_COPY_DEADLINE_SECONDS', '0.5')
+    get_settings.cache_clear()
+    real = boundary.proof
+    calls = []
+
+    def slow_proof(*args, **kwargs):
+        value = real(*args, **kwargs)
+        calls.append(1)
+        if len(calls) == 2:
+            time.sleep(2)
+        return value
+
+    monkeypatch.setattr(boundary, 'proof', slow_proof)
+    r = approve(b)
+    assert (r.status_code, r.json()) == (503, {'error': 'approval_copy_timeout'})
+    assert nothing(b) and b.storage.puts == [] and b.storage.copies() == {}
     assert failure_reasons(b) == ['copy_timeout'] and boundary.slots.active == 0
     assert gate(b).open and get_engine().pool.checkedout() == 0
 
