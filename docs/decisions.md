@@ -1996,3 +1996,14 @@ Chủ dự án (2026-10-29), sau merge PR #72: dự án đã xong chức năng M
 - **Review của orchestrator:** đọc diff, chạy test đích/tái hiện rủi ro, kiểm CI và demo khi có thay đổi runtime; không lặp lại audit hash/inventory.
 - **Ngân sách live mặc định:** $10/task, dừng gọi mới ở 80 %, ledger fail-closed, qua demo hoặc stack thử; budget/quota ứng dụng không tự nới. Task có thể ghi mức khác theo chỉ dẫn chủ dự án. Số dư thật của key nhóm chưa xác minh (khóa báo hạn mức theo ngày); dừng nếu provider báo hết tiền.
 - Task áp dụng đầu tiên: [M12 CI nhanh](tasks/m12-fast-ci-and-test-tiers.md), [M13 hỏi đáp toàn thư viện](tasks/m13-library-qa-and-vector-scale.md).
+
+## Repo chuyển public (2026-11-02)
+
+Chủ dự án yêu cầu chuyển repo GitHub sang public để CI dùng runner miễn phí và phục vụ CV. Trước khi chuyển, orchestrator đã quét secret toàn lịch sử: không có secret thật, chi tiết ở [review PR #73](reviews/pr73-m12-fast-ci.md#cập-nhật-2026-11-02-repo-chuyển-public).
+
+Từ nay, vì repo public:
+
+- Không commit secret, `.env`, PDF hoặc toàn văn paper, dữ liệu demo hay email thật.
+- Workflow không dùng secret và không dùng `pull_request_target`.
+- Artifact CI phải qua bước quét trước khi upload.
+- Không dùng self-hosted runner.
