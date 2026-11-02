@@ -73,6 +73,16 @@ def test_shards_balance_by_measured_seconds():
     assert split == [["a.py", "d.py"], ["b.py", "c.py"]]  # 110 s and 110 s
 
 
+def test_node_shards_split_a_large_file_without_losing_or_repeating_tests():
+    nodes = [f"tests/large.py::test_case[{i}]" for i in range(100)] + ["tests/small.py::test_a"]
+    seconds = {"large.py": 1000, "small.py": 10}
+    split = [ci_tiers.shard_nodes(nodes, i, 18, seconds) for i in range(18)]
+    assert sorted(n for group in split for n in group) == sorted(nodes)
+    assert all(any(n.startswith("tests/large.py") for n in group) for group in split)
+    assert max(map(len, split)) - min(map(len, split)) <= 1
+    assert split == [ci_tiers.shard_nodes(list(reversed(nodes)), i, 18, seconds) for i in range(18)]
+
+
 def _workflow():
     import yaml
     return yaml.safe_load((REPO / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))

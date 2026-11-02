@@ -59,12 +59,43 @@ REPO_DIR = API_DIR.parent
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption("--ras-shuffle", type=int, default=None, metavar="SEED",
                      help="M12: run the collected tests in a seeded random order (same order on every xdist worker)")
+    parser.addoption("--ras-shard", default=None, metavar="INDEX/COUNT",
+                     help="M12: 1-based node shard, applied after marker deselection")
 
 
+@pytest.hookimpl(trylast=True)
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    shard = config.getoption("--ras-shard")
+    if shard:
+        try:
+            index, count = map(int, shard.split("/"))
+            assert 1 <= index <= count
+        except (ValueError, AssertionError):
+            raise pytest.UsageError("--ras-shard must be INDEX/COUNT with 1 <= INDEX <= COUNT") from None
+        import sys
+        sys.path.insert(0, str(REPO_DIR / "scripts"))
+        from ci_tiers import durations, shard_nodes
+        # The workflow sets the tier explicitly; local full is the conservative default.
+        selected = set(shard_nodes([item.nodeid for item in items], index - 1, count,
+                                  durations(os.environ.get("TIER", "full"))))
+        deselected = [item for item in items if item.nodeid not in selected]
+        items[:] = [item for item in items if item.nodeid in selected]
+        config.hook.pytest_deselected(items=deselected)
     seed = config.getoption("--ras-shuffle")
     if seed is not None:
         random.Random(seed).shuffle(items)
+
+
+_previous_node = ""
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    """JUnit can reconstruct the exact order of each worker, including setup failures."""
+    global _previous_node
+    item.user_properties.extend((("ras_worker", os.environ.get("PYTEST_XDIST_WORKER", "serial")),
+                                 ("ras_previous", _previous_node)))
+    _previous_node = item.nodeid
 
 
 def pytest_report_header(config: pytest.Config) -> str | None:

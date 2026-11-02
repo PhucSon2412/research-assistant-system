@@ -102,6 +102,23 @@ def check() -> list[str]:
     return problems
 
 
+def shard_nodes(nodes: list[str], index: int, count: int, seconds: dict[str, float]) -> list[str]:
+    """Spread large files across runners; estimate each node from its file's measured total.
+
+    Membership is independent of collection order and shuffle seed. Pytest applies
+    marker deselection first, so a tier's duration is divided over its selected nodes.
+    """
+    file_of = lambda node: Path(node.split("::", 1)[0]).name
+    sizes = collections.Counter(file_of(node) for node in nodes)
+    weight = {node: seconds.get(file_of(node), DEFAULT_SECONDS) / sizes[file_of(node)] for node in nodes}
+    loads, names = [0.0] * count, [[] for _ in range(count)]
+    for node in sorted(nodes, key=lambda n: (-weight[n], n)):
+        target = min(range(count), key=lambda i: (loads[i], i))
+        loads[target] += weight[node]
+        names[target].append(node)
+    return names[index]
+
+
 def from_junit(paths: list[Path]) -> dict[str, float]:
     seconds: dict[str, float] = collections.defaultdict(float)
     for path in paths:
