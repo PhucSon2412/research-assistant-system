@@ -595,6 +595,7 @@ def test_citation_lock_timeout_is_busy_not_a_fault(cit, monkeypatch):
     assert run() == {'batches': 1, 'references': 1, 'links_written': 1}
 
 
+@pytest.mark.timing
 def test_busy_common_item_is_skipped_without_blocking_later_candidates(cit, monkeypatch):
     h = cit
     copy = common_copy(h.w, indexed=False)  # one pending reference on a common copy
