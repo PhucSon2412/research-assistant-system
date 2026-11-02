@@ -697,6 +697,8 @@ Context phải là đường dẫn ngắn ngoài repo (giới hạn MAX_PATH). T
 & $py -m pip install -c .\api\constraints-rc2.txt -c .\api\constraints-dev.txt -e ".\api[dev]"   # thêm pytest-xdist
 & $py scripts\m8a_test_host.py --context "$env:USERPROFILE\rt\m12" setup --workers 8
 & $py scripts\m8a_test_host.py --context "$env:USERPROFILE\rt\m12" test --junit "$env:USERPROFILE\rt\fast.xml" -- (& $py scripts\ci_tiers.py files --tier fast).Split(' ') -m "not slow"
+# Tầng đầy đủ: gồm slow, 8 worker từ context đã setup; đổi seed cho lượt thứ hai.
+& $py scripts\m8a_test_host.py --context "$env:USERPROFILE\rt\m12" test --junit "$env:USERPROFILE\rt\full.xml" -- (& $py scripts\ci_tiers.py files --tier full).Split(' ') --ras-shuffle 20261102
 & $py scripts\m8a_test_host.py --context "$env:USERPROFILE\rt\m12" test -- tests\test_search.py -m "not slow"   # lọc file/marker
 & $py scripts\m8a_test_host.py --context "$env:USERPROFILE\rt\m12" cleanup
 ```

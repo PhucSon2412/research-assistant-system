@@ -81,16 +81,23 @@ def _workflow():
 def test_workflow_tiers_triggers_and_conditional_jobs():
     wf = _workflow()
     on = wf[True] if True in wf else wf["on"]  # PyYAML reads the bare key `on` as True
-    assert {"pull_request", "push", "schedule", "workflow_dispatch"} <= set(on)
+    assert {"pull_request", "push", "workflow_dispatch"} <= set(on)
+    assert "schedule" not in on and "pull_request_target" not in on
+    assert wf["permissions"] == {"contents": "read"}
     jobs = wf["jobs"]
     paths = next(s for s in jobs["changes"]["steps"] if s.get("id") == "paths")["run"]
-    assert "git diff --name-only HEAD^1 HEAD | python3 scripts/ci_paths.py" in paths
+    assert 'git diff --name-only "$base" HEAD | python3 scripts/ci_paths.py' in paths
+    assert 'base=HEAD^1' in paths
+    assert '--event pull_request --status success' in paths
     for job, output in (("api", "api"), ("web", "web"), ("deploy-config", "deploy")):
         assert jobs[job]["needs"] == "changes"
         assert jobs[job]["if"] == f"needs.changes.outputs.{output} == 'true'"
     run = next(s for s in jobs["api"]["steps"] if s.get("name") == "Run API tests of this tier and shard")["run"]
     assert 'marker=(-m "not slow")' in run and "ci_tiers.py files" in run and 'exit 1' in run
     assert jobs["api"]["strategy"]["fail-fast"] is False
+    assert int(wf["env"]["FULL_SHARDS"]) <= 18
+    assert jobs["api"]["strategy"]["max-parallel"] <= 18
+    assert all(job["runs-on"] == "ubuntu-24.04" for job in jobs.values())
     for job in jobs.values():
         assert "continue-on-error" not in job
         assert all("continue-on-error" not in step for step in job["steps"])

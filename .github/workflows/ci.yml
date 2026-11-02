@@ -12,9 +12,6 @@ on:
   pull_request:
   push:
     branches: [main]
-  schedule:
-    # Nightly full tier, 02:23 Asia/Ho_Chi_Minh; skipped when this main commit already passed it.
-    - cron: "23 19 * * *"
   workflow_dispatch:
     inputs:
       tier:
@@ -43,7 +40,7 @@ concurrency:
 env:
   # Shards per tier and xdist workers (= isolated stacks) per shard, measured in docs/m12-fast-ci.md.
   FAST_SHARDS: 6
-  FULL_SHARDS: 12
+  FULL_SHARDS: 18
   WORKERS: 2
 
 jobs:
@@ -53,7 +50,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
-      actions: read  # nightly: look up an earlier full-tier run of the same commit
+      actions: read  # synchronize: reuse checks only after the previous PR head passed
     outputs:
       api: ${{ steps.paths.outputs.api }}
       web: ${{ steps.paths.outputs.web }}
@@ -70,13 +67,20 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+          ACTION: ${{ github.event.action }}
         run: |
           if [ "$EVENT" = pull_request ]; then
-            git diff --name-only HEAD^1 HEAD | python3 scripts/ci_paths.py
-          elif [ "$EVENT" = schedule ] && [ "$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$GITHUB_SHA" \
-                --status success --json event --jq '[.[] | select(.event == "push" or .event == "schedule")] | length')" != 0 ]; then
-            echo "main $GITHUB_SHA already passed the full tier; nightly API skipped"
-            printf 'api=false\nweb=false\ndeploy=false\n' | tee -a "$GITHUB_OUTPUT"
+            base=HEAD^1
+            # A docs-only follow-up can reuse a successful previous PR head. If that head
+            # is still running, failed, or unavailable, check the complete PR instead.
+            if [ "$ACTION" = synchronize ] && [[ "$BEFORE" =~ ^[0-9a-f]{40}$ ]] && \
+                [ "$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$BEFORE" \
+                  --event pull_request --status success --json databaseId --jq 'length')" -gt 0 ]; then
+              git fetch --no-tags --depth=1 origin "$BEFORE"
+              base=$BEFORE
+            fi
+            git diff --name-only "$base" HEAD | python3 scripts/ci_paths.py
           else
             printf 'api=true\nweb=true\ndeploy=true\n' | tee -a "$GITHUB_OUTPUT"
           fi
@@ -94,6 +98,9 @@ jobs:
           n=${INPUT_SHARDS:-$n}
           w=${INPUT_WORKERS:-$WORKERS}
           case "$n$w" in *[!0-9]*) echo "shards/workers must be numbers"; exit 1;; esac
+          if [ "$n" -lt 1 ] || [ "$n" -gt 18 ] || [ "$w" -lt 1 ] || [ "$w" -gt 8 ]; then
+            echo "shards must be 1..18 and workers 1..8"; exit 1
+          fi
           echo "tier=$tier" | tee -a "$GITHUB_OUTPUT"
           echo "workers=$w" | tee -a "$GITHUB_OUTPUT"
           echo "shards=$(python3 -c "import json,sys; print(json.dumps([str(i) for i in range(1, int(sys.argv[1]) + 1)]))" "$n")" \
@@ -104,9 +111,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.api == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 50
     strategy:
       fail-fast: false
+      max-parallel: 18 # leaves two of the account's 20 concurrent jobs for web/deploy
       matrix:
         shard: ${{ fromJSON(needs.changes.outputs.shards) }}
     env:
