@@ -12,6 +12,14 @@
 
 ## Trạng thái triển khai và lịch sử
 
+**Repo public (2026-11-02):** chủ dự án yêu cầu; quét gitleaks + mẫu key toàn lịch sử trước khi chuyển, không có secret thật ([decisions](docs/decisions.md#repo-chuyển-public-2026-11-02)). Không commit secret/`.env`/paper/dữ liệu demo; workflow không secret, không `pull_request_target`, không self-hosted runner.
+
+**Review PR #73 (M12) tại `89caa8a` (2026-11-02): chưa merge.** Template DB/xdist/shard đúng hướng (tầng nhanh 15–17 phút thay 96). Chặn: lịch nightly/push-main tầng đầy đủ (~820 phút/lượt) làm cạn phút Actions của repo private (run bị chặn billing); lỗi `service_recovering` phụ thuộc thứ tự chưa rõ nguyên nhân; chưa có run cấu hình cuối. [Report](docs/reviews/pr73-m12-fast-ci.md) · [prompt sửa](docs/tasks/fix-pr73-ci-minutes-and-order-flake.md). Ghi nhận: `auth_safety.cutover → verify` chạy mỗi request (test 810 s), đo trên demo trước khi quyết task riêng.
+
+**Sau merge PR #72 (2026-10-29):** `origin/main = 959e4a4456b30f44754b676be7f9e9f43aa25664`; M11 vào main, kho cá nhân trên demo `ras-pilot` (local `127.0.0.1:8443`) 3.167 item/1.643 indexed/8 collection. Từ nay áp dụng [chính sách kiểm thử giai đoạn dùng cá nhân](docs/decisions.md#chính-sách-kiểm-thử-giai-đoạn-dùng-cá-nhân-2026-10-29): kiểm theo rủi ro, bỏ mặc định hash-seal/inventory toàn node/countercheck hàng loạt, live $10/task dừng 80 %; bất biến giữ nguyên. Giao song song, **mới giao**:
+- [M12 — CI nhanh, test theo tầng](docs/tasks/m12-fast-ci-and-test-tiers.md): template DB đã migrate, xdist/shard, marker `slow`, lọc đường dẫn; CI PR ≤ 15 phút.
+- [M13 — hỏi đáp toàn thư viện + vector cho kho lớn](docs/tasks/m13-library-qa-and-vector-scale.md): trang `/ask`, đo/HNSW (migration `0053` nếu cần), baseline live, cập nhật demo có backup/rollback.
+
 <!-- M11 final checkpoint -->
 **M11 — hoàn tất runtime/hậu kiểm (2026-10-27):** [PR #72](https://github.com/PhucSon2412/research-assistant-system/pull/72), nhánh `ops/m11-demo-knowledge-base`, base `1f7bfac`. Không nhận thêm paper; giữ marker đóng upload. Chốt 3.150 receipt mục tiêu: 1.631 indexed, 629 cần xem lại, 890 lỗi/từ chối; 8 file bỏ qua trước upload. Toàn thư viện 3.167 item/1.643 indexed/8 collection; metadata 3.155 receipt và 12 original cũ đã đối chiếu. 15/15 request thử có response, 11/11 citation khớp; 5 câu một paper trả lời, 3 không có đáp án từ chối, 3 so sánh thiếu nguồn nhiều paper, 4 hybrid/rerank đạt. Ledger giữ $34,6026042 cam kết, billed riêng M11 chưa xác minh được. Backup `20261027T082255Z-2d3d4bae` ok/reopen ok, bảo trì 293,23 s, ciphertext 7.999.136.734 byte; check exit 0 và HTTPS local được kiểm lại. Offline 104/104 pass; CI head bàn giao và từng job được ghi tại PR sau khi kết thúc. Không đổi app/image/deploy, không merge. [Handoff M11](docs/m11-demo-knowledge-base.md). Các mốc dưới đây là lịch sử.
 <!-- /M11 final checkpoint -->

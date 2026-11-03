@@ -70,6 +70,7 @@ def recover(w, engine=None, **kwargs):
     return recovery.recover(engine or w.h.setup_engine, w.storage, get_settings(), w.h.clock.now, **kwargs)
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("sessions", [0, 3])
 @pytest.mark.parametrize("how", ["consumed", "replaced", "completed", "disabled"])
 def test_restore_endings_inside_ttl_twice_and_other_token_stays_valid(world, admin_engine, app_env, how, sessions):
@@ -117,6 +118,7 @@ def test_restore_endings_inside_ttl_twice_and_other_token_stays_valid(world, adm
         assert confirm(w, other.token).status_code == 200  # Unrelated token completes a real reset after restore.
 
 
+@pytest.mark.slow
 def test_post_snapshot_token_and_user_remain_absent(world, admin_engine, app_env):
     w = world
     with backup(w.h, admin_engine) as snap:
@@ -236,6 +238,7 @@ def test_sql_deferred_trigger_matches_actual_token_ending(world, change):
         db.commit()
 
 
+@pytest.mark.slow
 def test_absent_token_of_existing_user_is_not_recreated(world, admin_engine, app_env):
     w = world
     with backup(w.h, admin_engine) as snap:
@@ -264,6 +267,7 @@ def test_failed_replay_keeps_gate_closed_and_token_error_has_no_session_claim(wo
     assert confirm(w, issued.token).status_code == 400
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("change", ["owner", "kind", "time", "reason"])
 @pytest.mark.parametrize("mirrored", [False, True])
 def test_recover_checks_conflicts_even_with_existing_mirror(world, admin_engine, app_env, change, mirrored):
@@ -453,6 +457,7 @@ def test_confirm_races_request_disable_with_observed_user_lock(world, monkeypatc
         event.remove(w.h.engine, "before_cursor_execute", observe)
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("registered", [False, True])
 def test_migrate_0030_backfill_hold_register_and_downgrade(empty_db_url, journal_path, app_env, admin_engine, registered,monkeypatch):
     from app import auth_safety

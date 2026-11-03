@@ -498,25 +498,33 @@ def test_revoke_committed_before_the_response_lock_withholds_it(w, monkeypatch):
 
 
 def test_revoke_waiting_on_the_response_lock_lets_that_response_finish(w, monkeypatch):
-    from app import search_runtime
-    original = search_runtime.locks
+    from app import search_boundary
+    original = search_boundary.release
     done = {}
+    revoker = w.api.admin_browser()  # authenticate before the response holds the journal lock
 
-    def lock_then_revoke(db, *args):
-        original(db, *args)
-        if db.info.get('search_phase') != 'response':
-            return
-        thread = Thread(target=lambda: done.setdefault("status", revoke(w.api.admin_browser(), w.ok).status_code))
-        thread.start()
-        wait_for_lock_wait(w.api)  # the revoke waits on the item lock this response holds
-        done["thread"] = thread
-    monkeypatch.setattr(search_runtime, "locks", lock_then_revoke)
-    response = search(w.admin)
+    def response_then_revoke(db):
+        if db.info.get('search_phase') == 'response' and "thread" not in done:
+            # All response SQL proofs have completed, but its item locks are
+            # still held. Starting at locks() put the whole proof inside the
+            # revoker's 2-second lock budget, so a slow proof caused a valid 503.
+            blocker = db.scalar(text('SELECT pg_backend_pid()'))
+            thread = Thread(target=lambda: done.setdefault("response", revoke(revoker, w.ok)))
+            done["thread"] = thread
+            thread.start()
+            wait_for_lock_wait(w.api, blocker_pid=blocker)
+        original(db)
+    monkeypatch.setattr(search_boundary, "release", response_then_revoke)
+    try:
+        response = search(w.admin)
+    finally:
+        if "thread" in done:
+            done["thread"].join(10)
     # The response passed its last check before t_rev and is sent whole (a stated limit).
     assert hit_items(response) == {w.ok}
-    done["thread"].join(10)
-    assert done["status"] == 200
-    monkeypatch.setattr(search_runtime, "locks", original)
+    assert not done["thread"].is_alive()
+    assert done["response"].status_code == 200, done["response"].text
+    monkeypatch.setattr(search_boundary, "release", original)
     assert_gone_for_new_requests(w)
 
 

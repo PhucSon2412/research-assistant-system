@@ -22,6 +22,11 @@ from app.delivery import DeliveryFailed, MessageKind, OutgoingMessage, SmtpDeliv
 from tests.m8a_tls import make_ca, make_leaf
 from tests.smtp_capture import Behaviour, CaptureServer
 
+
+# M12: SMTP sends through a child process with second-level deadlines; run without parallel load
+# (scripts/m8a_test_host.py timing phase).
+pytestmark = pytest.mark.timing
+
 TOKEN = "SyntheticTokenValue_ABCdef0123456789"
 LINK = f"https://ras.test/invite#token={TOKEN}"
 RECIPIENT = "invitee@example.test"

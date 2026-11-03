@@ -429,6 +429,7 @@ def test_abstention_scoring_needs_one_consistent_reviewed_verdict(dataset):
 ACL_ITEMS = {"A/P01", "A/P10", "A/P11", "B/P11", "B/P20", "B/P21", "C/C01"}
 
 
+@pytest.mark.slow
 def test_acl_same_doi_hash_matrix_through_runner(upload_api, monkeypatch, dataset):
     """A/B/Admin with one DOI, byte-identical uploads and per-copy canaries."""
     api, storage = upload_api

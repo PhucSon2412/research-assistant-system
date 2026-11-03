@@ -23,6 +23,11 @@ from tests.helpers import ADMIN_EMAIL, USER_PASSWORD, Harness
 from tests.m8a_tls import make_ca, make_leaf
 from tests.smtp_capture import Behaviour, CaptureServer
 
+
+# M12: SMTP sends through a child process with second-level deadlines; run without parallel load
+# (scripts/m8a_test_host.py timing phase).
+pytestmark = pytest.mark.timing
+
 INVITEE = "pilot.member@example.test"
 
 

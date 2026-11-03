@@ -14,6 +14,8 @@ from scripts import m7a_live
 
 DEADLINE = 1.0
 TOLERANCE = 0.6  # cancellation/teardown slack on a loaded Windows/Linux host
+# M12: wall-clock bounds; run without parallel load (scripts/m8a_test_host.py timing phase).
+pytestmark = pytest.mark.timing
 
 
 class Server:

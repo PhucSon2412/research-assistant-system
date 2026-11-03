@@ -1011,6 +1011,7 @@ def dump_restore(w, admin_engine, tmp_path, label):
     return restore
 
 
+@pytest.mark.slow
 def test_two_dump_restore_rounds_never_reuse_case_or_rebuild_credential(world, admin_engine, tmp_path):
     from tests.conftest import drop_database
     w = world
@@ -1144,6 +1145,7 @@ def test_case_file_strict_schema_and_location(world, tmp_path):
         load_case_file(inside, max_bytes=4096)
     big = tmp_path / "big.json"
     big.write_bytes(b" " * 5000)
+    os.chmod(big, 0o600)  # owner-only like every case file, so POSIX reaches the size check (M12: first Linux run)
     with pytest.raises(CaseError, match="too_large"):
         load_case_file(big, max_bytes=4096)
 

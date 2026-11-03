@@ -396,24 +396,33 @@ def test_revoke_committed_before_the_response_lock_withholds_the_answer(w, monke
 
 
 def test_revoke_waiting_on_the_response_lock_lets_that_answer_finish(w, monkeypatch):
+    from app import search_boundary
     answering(monkeypatch)
-    original = rag_module.original_urls
+    original = search_boundary.release
     done = {}
+    revoker = w.api.admin_browser()
 
-    def urls_then_revoke(db, principal, file_ids):
-        # Called under the response share locks: the revoke must wait for this response.
-        thread = Thread(target=lambda: done.setdefault("status", revoke(w.api.admin_browser(), w.ok).status_code))
-        thread.start()
-        wait_for_lock_wait(w.api)
-        done["thread"] = thread
-        return original(db, principal, file_ids)
-    monkeypatch.setattr("app.rag.original_urls", urls_then_revoke)
-    data = ask(w.admin, item_id=w.ok).json()
+    def answer_then_revoke(db):
+        if db.info.get('rag_phase') == 'response' and "thread" not in done:
+            # Observe an item-lock wait after the last real answer proof;
+            # logging in here could instead wait on the journal lock.
+            blocker = db.scalar(text('SELECT pg_backend_pid()'))
+            thread = Thread(target=lambda: done.setdefault("response", revoke(revoker, w.ok)))
+            done["thread"] = thread
+            thread.start()
+            wait_for_lock_wait(w.api, blocker_pid=blocker)
+        original(db)
+    monkeypatch.setattr(search_boundary, "release", answer_then_revoke)
+    try:
+        data = ask(w.admin, item_id=w.ok).json()
+    finally:
+        if "thread" in done:
+            done["thread"].join(10)
     # The answer passed its last check before t_rev and is sent whole (a stated limit).
     assert data["status"] == "answered" and {c["item_id"] for c in citations(data)} == {w.ok}
-    done["thread"].join(10)
-    assert done["status"] == 200
-    monkeypatch.setattr("app.rag.original_urls", original)
+    assert not done["thread"].is_alive()
+    assert done["response"].status_code == 200, done["response"].text
+    monkeypatch.setattr(search_boundary, "release", original)
     assert_gone_for_new_requests(w, monkeypatch)
 
 

@@ -595,16 +595,43 @@ def test_citation_lock_timeout_is_busy_not_a_fault(cit, monkeypatch):
     assert run() == {'batches': 1, 'references': 1, 'links_written': 1}
 
 
-def test_busy_common_item_is_skipped_without_blocking_later_candidates(cit, monkeypatch):
+@pytest.mark.timing
+@pytest.mark.parametrize('slow_proof', [False, True])
+def test_busy_common_item_is_skipped_without_blocking_later_candidates(cit, monkeypatch, slow_proof):
     h = cit
     copy = common_copy(h.w, indexed=False)  # one pending reference on a common copy
     a = source(h.w, h.aid, 'PRIVATE')
     refs(h, a, ['arXiv:2609.00011', 'arXiv:2609.00012', 'arXiv:2609.00013'])
+    real_lock = citations._key_share
+    lock_times = []
+
+    def timed_lock(*args, **kwargs):
+        started = time.monotonic()
+        try:
+            return real_lock(*args, **kwargs)
+        finally:
+            lock_times.append(time.monotonic() - started)
+
+    monkeypatch.setattr(citations, '_key_share', timed_lock)
+    if slow_proof:
+        real_entry = citations.entry
+
+        def entry(*args, **kwargs):
+            result = real_entry(*args, **kwargs)
+            time.sleep(0.6)  # real proofs can be slow without waiting for the held item
+            return result
+
+        monkeypatch.setattr(citations, 'entry', entry)
     with h.w.engine.connect() as holder:  # labelled: a revoke/extraction transaction holding the item FOR UPDATE
         holder.execute(text('SELECT id FROM library_items WHERE id=:i FOR UPDATE'), {'i': copy.item})
         started = time.monotonic()
         result = run(reconcile_batch_size=1, reconcile_max_batches=10)
-        assert time.monotonic() - started < 2  # SKIP LOCKED: never waited for the item
+        elapsed = time.monotonic() - started
+        # Bound the real lock attempts, not unrelated gate proofs/commits of
+        # the entire multi-batch pass. The adversary still owns the item here.
+        assert lock_times and sum(lock_times) < 2  # SKIP LOCKED: never waited for the item
+        if slow_proof:
+            assert elapsed >= 2  # regression: the former whole-pass clock would fail
         holder.rollback()
     assert result == {'batches': 3, 'references': 3, 'links_written': 3, 'skipped:busy': 1}
     assert run() == {'batches': 1, 'references': 1, 'links_written': 1}  # the next pass takes it

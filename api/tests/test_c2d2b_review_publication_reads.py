@@ -356,13 +356,20 @@ def test_review_request_item_journal_order_both_winners(reads, monkeypatch, how,
             # Approval rolls back the metadata read before copy I/O; preserve
             # only the test observer label across that transaction boundary.
             db.execute(text("SET application_name='c2d2b_writer'"))
-            db.commit()
+            # Withdrawal/rejection must keep the label and first row lock on
+            # the same checkout. A commit can return the labelled backend to
+            # the pool and make the writer continue on an unlabelled backend.
+            if how == "approve":
+                db.commit()
             end_review(b, how, db)
     with ThreadPoolExecutor(2) as pool:
         if winner == "reader":
             monkeypatch.setattr(boundary, "final_caller", pause)
             reader = pool.submit(b.client.get, b.path("admin_get"))
             assert entered.wait(15)
+            # Spare FIFO backends make an accidental checkout change observable.
+            with b.w.engine.connect(), b.w.engine.connect(), b.w.engine.connect():
+                pass
             writer = pool.submit(write)
             try:
                 writer_wait(b.w, approval=how == "approve")

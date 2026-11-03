@@ -1,5 +1,9 @@
 # Tài liệu dự án
 
+**M12/M13 (2026-10-29, mới giao):** [CI nhanh, test theo tầng](tasks/m12-fast-ci-and-test-tiers.md) · [hỏi đáp toàn thư viện + vector cho kho lớn](tasks/m13-library-qa-and-vector-scale.md) · [chính sách kiểm thử mới](decisions.md#chính-sách-kiểm-thử-giai-đoạn-dùng-cá-nhân-2026-10-29).
+
+**M12 (2026-10-30, PR #73 chờ review, chưa merge):** [handoff CI nhanh: DB mẫu, xdist theo stack, tầng/shard, lọc đường dẫn, lệnh local](m12-fast-ci.md).
+
 **M11 (2026-10-27, đã chốt 3.150 receipt; hoàn tất runtime/hậu kiểm, không nhận thêm paper):** [dùng cá nhân trên máy, corpus mở rộng và ledger](m11-demo-knowledge-base.md)
 · [task](tasks/m11-demo-knowledge-base-expansion.md) · [manifest](../evaluation/m11-papers/manifest.json).
 

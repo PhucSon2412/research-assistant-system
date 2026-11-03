@@ -25,6 +25,8 @@ from tests.smtp_capture import Behaviour, CaptureServer, _Handler
 
 DEADLINE = 0.6
 MARGIN = 0.5  # scheduling + kill/reap of the child; far below the multi-second repro
+# M12: wall-clock bounds; run without parallel load (scripts/m8a_test_host.py timing phase).
+pytestmark = pytest.mark.timing
 
 
 class DripReply(_Handler):

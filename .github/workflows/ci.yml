@@ -1,64 +1,158 @@
-# M8a minimal CI: an explicit API selection (not the full suite), web
-# tests/typecheck/build and the pilot deploy contract. No .env, no real account,
-# no provider/arXiv key: tests run against throwaway PostgreSQL/Redis/MinIO
-# containers with random per-run credentials; pytest refuses outbound HTTP
-# except loopback (scripts/m8a_test_host.py). No continue-on-error: a failing
-# step fails the job after the evidence step ran.
+# M12 tiered CI. Pull requests: path filter (scripts/ci_paths.py), then the fast API tier
+# (scripts/ci_tiers.py FAST files, -m "not slow"), web and deploy-config only when their paths
+# changed. Push main and workflow_dispatch: the full API tier (every test file except
+# NOT_IN_CI, slow tests included), web and deploy-config. Each API shard runs pytest-xdist on its
+# own isolated PostgreSQL/Redis/MinIO set per worker (scripts/m8a_test_host.py). No .env, no real
+# account, no provider/arXiv key: random per-run credentials, pytest refuses outbound HTTP except
+# loopback. No continue-on-error and no automatic retry: a failing test fails its shard after the
+# evidence step ran.
 name: ci
 
 on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: API test tier
+        type: choice
+        options: [full, fast]
+        default: full
+      shards:
+        description: API shards (empty = the tier default below)
+        type: string
+        default: ""
+      workers:
+        description: xdist workers per shard (empty = WORKERS below)
+        type: string
+        default: ""
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # A newer push cancels the older run of the same branch/event; every manual dispatch is its own
+  # group, so a measurement run never cancels another one.
+  group: ci-${{ github.ref }}-${{ github.event_name }}${{ github.event_name == 'workflow_dispatch' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
+env:
+  # Shards per tier and xdist workers (= isolated stacks) per shard, measured in docs/m12-fast-ci.md.
+  FAST_SHARDS: 6
+  FULL_SHARDS: 18
+  WORKERS: 2
+  FULL_WORKERS: 3 # public ubuntu runner measured at 4 CPUs / 16 GiB
+
 jobs:
-  api:
-    name: API selection (config, auth, invitation/reset/delivery, limiter, migrations, C4 contract)
+  changes:
+    name: Changed paths and API tier
     runs-on: ubuntu-24.04
-    timeout-minutes: 130
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read  # synchronize: reuse checks only after the previous PR head passed
+    outputs:
+      api: ${{ steps.paths.outputs.api }}
+      web: ${{ steps.paths.outputs.web }}
+      deploy: ${{ steps.paths.outputs.deploy }}
+      tier: ${{ steps.tier.outputs.tier }}
+      shards: ${{ steps.tier.outputs.shards }}
+      workers: ${{ steps.tier.outputs.workers }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # pull_request: HEAD is the merge commit, HEAD^1 the base branch tip
+      - name: Jobs this event needs
+        id: paths
+        env:
+          EVENT: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+          ACTION: ${{ github.event.action }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            base=HEAD^1
+            # A docs-only follow-up can reuse a successful previous PR head. If that head
+            # is still running, failed, or unavailable, check the complete PR instead.
+            if [ "$ACTION" = synchronize ] && [[ "$BEFORE" =~ ^[0-9a-f]{40}$ ]] && \
+                [ "$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$BEFORE" \
+                  --event pull_request --status success --json databaseId --jq 'length')" -gt 0 ]; then
+              git fetch --no-tags --depth=1 origin "$BEFORE"
+              base=$BEFORE
+            fi
+            git diff --name-only "$base" HEAD | python3 scripts/ci_paths.py
+          else
+            printf 'api=true\nweb=true\ndeploy=true\n' | tee -a "$GITHUB_OUTPUT"
+          fi
+      - name: API tier and shards
+        id: tier
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_TIER: ${{ inputs.tier }}
+          INPUT_SHARDS: ${{ inputs.shards }}
+          INPUT_WORKERS: ${{ inputs.workers }}
+        run: |
+          tier=full
+          if [ "$EVENT" = pull_request ] || [ "$INPUT_TIER" = fast ]; then tier=fast; fi
+          if [ "$tier" = fast ]; then n=$FAST_SHARDS; else n=$FULL_SHARDS; fi
+          n=${INPUT_SHARDS:-$n}
+          if [ "$tier" = full ]; then default_workers=$FULL_WORKERS; else default_workers=$WORKERS; fi
+          w=${INPUT_WORKERS:-$default_workers}
+          case "$n$w" in *[!0-9]*) echo "shards/workers must be numbers"; exit 1;; esac
+          if [ "$n" -lt 1 ] || [ "$n" -gt 18 ] || [ "$w" -lt 1 ] || [ "$w" -gt 8 ]; then
+            echo "shards must be 1..18 and workers 1..8"; exit 1
+          fi
+          echo "tier=$tier" | tee -a "$GITHUB_OUTPUT"
+          echo "workers=$w" | tee -a "$GITHUB_OUTPUT"
+          echo "shards=$(python3 -c "import json,sys; print(json.dumps([str(i) for i in range(1, int(sys.argv[1]) + 1)]))" "$n")" \
+            | tee -a "$GITHUB_OUTPUT"
+
+  api:
+    name: API ${{ needs.changes.outputs.tier }} tier, shard ${{ matrix.shard }}
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      max-parallel: 18 # leaves two of the account's 20 concurrent jobs for web/deploy
+      matrix:
+        shard: ${{ fromJSON(needs.changes.outputs.shards) }}
+    env:
+      TIER: ${{ needs.changes.outputs.tier }}
+      SHARD: ${{ matrix.shard }}
+      SHARDS: ${{ strategy.job-total }}
+      WORKERS: ${{ needs.changes.outputs.workers }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install API with dev extras, pinned to the accepted image rc2
-        # Same parser/library versions as the running image (pypdf 6.21.1); dev-only extras keep their ranges.
-        run: python -m pip install -c api/constraints-rc2.txt -e "./api[dev]"
-      - name: Start isolated PostgreSQL/Redis/MinIO
+          cache: pip
+          cache-dependency-path: |
+            api/constraints-rc2.txt
+            api/constraints-dev.txt
+            api/pyproject.toml
+      - name: Install API with dev extras, pinned to the accepted image rc2 and the dev test tooling
+        # Same parser/library versions as the running image (pypdf 6.21.1); xdist pinned in constraints-dev.
+        run: python -m pip install -c api/constraints-rc2.txt -c api/constraints-dev.txt -e "./api[dev]"
+      - name: Start isolated PostgreSQL/Redis/MinIO, one set per xdist worker
         # PostgreSQL/Redis/MinIO come from the digests pinned in deploy/compose.yaml (pulled fresh on the runner).
-        run: python scripts/m8a_test_host.py --context "$RUNNER_TEMP/m8a-api" setup
-      - name: Run API selection
-        # Why each file: config and new M8a modules; session/CSRF/Origin/cookies;
-        # invitation and reset runtime/journal/compensation (delivery boundary);
-        # provenance/receipts and auth safety; migrations/ORM; C4 contract/health;
-        # M8b journal replica, encrypted backups/retention, alerts, host entrypoint, real MinIO;
-        # M7c: the evaluation CLI/runner, the AI judge track and the live tooling (offline only:
-        # the outbound-HTTP guard stays; live runs are manual scripts with a ledger, never CI).
-        # Deselected: one dump/restore round that needs the C3 host container fixture.
-        run: >-
-          python scripts/m8a_test_host.py --context "$RUNNER_TEMP/m8a-api" test
-          --junit "$RUNNER_TEMP/m8a-api/junit-api.xml" --
-          tests/test_config.py tests/test_m8a_smtp_delivery.py tests/test_m8a_rate_limit.py
-          tests/test_m8a_smtp_deadline.py tests/test_m8a_ci_guard.py
-          tests/test_m8a_auth_delivery.py tests/test_csrf_and_cookies.py tests/test_c2a_origin.py
-          tests/test_auth_sessions.py tests/test_c2a_login_sessions.py tests/test_auth_secrets.py
-          tests/test_invitations.py tests/test_invitation_journal.py tests/test_c2c2_invitations.py
-          tests/test_password_reset.py tests/test_c2b_reset_status.py tests/test_reset_token_journal.py
-          tests/test_session_revocation_journal.py tests/test_pre_c4_initial_receipts.py
-          tests/test_auth_safety_foundation.py tests/test_c2c1_bootstrap.py tests/test_migrations.py
-          tests/test_c4_contract.py tests/test_health.py
-          tests/test_m8b_replica.py tests/test_m8b_artifacts.py tests/test_m8b_alerts.py
-          tests/test_m8b_ops_host.py tests/test_m8b_s3_minio.py
-          tests/test_evaluation.py tests/test_m7c_ai_review.py tests/test_m7c_tooling.py
-          tests/test_m11_tooling.py
-          --deselect tests/test_pre_c4_initial_receipts.py::test_two_dump_restore_rounds_keep_valid_provenance_and_restrict_forgery
+        run: python scripts/m8a_test_host.py --context "$RUNNER_TEMP/m8a-api" setup --workers "$WORKERS"
+      - name: Run API tests of this tier and shard
+        # Files per tier: scripts/ci_tiers.py; conftest partitions nodes, so large files span shards.
+        # Weights: scripts/ci_durations.json (seconds per file / selected nodes of that file).
+        # Files never in CI (Chrome, frozen process image) and why: docs/m12-fast-ci.md.
+        run: |
+          list=$(python scripts/ci_tiers.py files --tier "$TIER")
+          read -r -a files <<< "$list"
+          if [ "${#files[@]}" = 0 ]; then echo "no test file for this shard"; exit 1; fi
+          marker=()
+          if [ "$TIER" = fast ]; then marker=(-m "not slow"); fi
+          echo "tier=$TIER shard=$SHARD/$SHARDS files=${#files[@]} workers=$WORKERS cpus=$(nproc) mem=$(free -m | awk '/Mem:/ {print $2}')MiB"
+          python scripts/m8a_test_host.py --context "$RUNNER_TEMP/m8a-api" test \
+            --junit "$RUNNER_TEMP/m8a-api/junit-api.xml" -- "${files[@]}" "${marker[@]}" --ras-shard "$SHARD/$SHARDS" --durations=15
       - name: Scan JUnit for context secrets before upload
         # Runs even when tests failed, so clean failure evidence stays available.
         # Only scanned bytes reach the publish directory, and only on a clean scan.
@@ -73,7 +167,7 @@ jobs:
         if: ${{ !cancelled() && steps.scan.outputs.clean == 'true' }}
         uses: actions/upload-artifact@v4
         with:
-          name: junit-api
+          name: junit-api-${{ needs.changes.outputs.tier }}-${{ matrix.shard }}
           path: ${{ runner.temp }}/m8a-publish/junit-api.xml
           if-no-files-found: error
           retention-days: 14
@@ -83,6 +177,8 @@ jobs:
 
   web:
     name: Web tests, typecheck, build
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -101,6 +197,8 @@ jobs:
 
   deploy-config:
     name: Pilot deploy config contract
+    needs: changes
+    if: needs.changes.outputs.deploy == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:

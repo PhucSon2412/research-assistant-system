@@ -434,14 +434,17 @@ def test_late_writes_after_purge_are_refused_and_cost_stays_reconcilable(world):
         conn.execute(text("UPDATE chunks SET text = text WHERE item_id=:i"), {"i": uuid.UUID(ids["a_md"]["item_id"])})
 
 
-def wait_for_lock_wait(api) -> None:
+def wait_for_lock_wait(api, *, blocker_pid: int | None = None) -> None:
     deadline = time.monotonic() + 10
     # Runtime cannot inspect other users' pg_stat_activity fields. The owner
     # observes this labelled legacy adversary; no runtime grants are widened.
     while True:
         with api.setup_engine.connect() as conn:
-            waiting = conn.scalar(text("""SELECT count(*) FROM pg_stat_activity
-                WHERE datname=current_database() AND wait_event_type='Lock'"""))
+            waiting = conn.scalar(text("""SELECT count(*) FROM pg_stat_activity a
+                WHERE datname=current_database() AND wait_event_type='Lock'
+                  AND (CAST(:blocker AS integer) IS NULL OR
+                    (CAST(:blocker AS integer)=ANY(pg_blocking_pids(a.pid))
+                     AND a.query LIKE '%library_items%'))"""), {"blocker": blocker_pid})
         if waiting:
             return
         assert time.monotonic() < deadline, "nothing waited for the item lock"

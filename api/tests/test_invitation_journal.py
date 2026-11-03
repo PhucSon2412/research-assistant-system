@@ -101,6 +101,7 @@ def sql_mirror(db, body, **overrides):
                values | {"line": line,"seq":seq})
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("how", ["accept", "revoke", "replace", "delivery"])
 def test_restore_twice_blocks_both_endpoints_without_recreating_account(world, admin_engine, app_env, monkeypatch, how):
     w = world
@@ -370,6 +371,7 @@ def test_failed_replay_stays_gated(world, monkeypatch):
     assert w.h.scalar("SELECT count(*) FROM users WHERE email=:e", e=EMAIL) == 0
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("mirrored", [False, True])
 @pytest.mark.parametrize("change", ["open", "kind", "reason", "time"])
 def test_recover_postcondition_even_if_mirror_exists(world, admin_engine, app_env, mirrored, change):
@@ -398,6 +400,7 @@ def test_recover_postcondition_even_if_mirror_exists(world, admin_engine, app_en
             assert gate(snap.engine) != "open"
 
 
+@pytest.mark.slow
 def test_absent_invitation_and_user_not_recreated(world, admin_engine, app_env):
     w = world
     with backup(w.h, admin_engine) as snap:

@@ -90,6 +90,7 @@ def perform(w, how):
     return w.admin.post(f"/admin/users/{w.uid}/disable"), set(w.ids), "user_disabled"
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("how", ["logout", "one", "others", "replace", "cross_user_replace", "reset", "disable"])
 def test_restore_keeps_every_revocation_reason_and_saved_cookie_csrf_blocked(world, admin_engine, app_env, how):
     w = world
@@ -130,6 +131,7 @@ def test_restore_keeps_every_revocation_reason_and_saved_cookie_csrf_blocked(wor
             assert conn.scalar(text("SELECT status FROM users WHERE id=:u"), {"u": w.uid}) == ("disabled" if how=="disable" else "active")
 
 
+@pytest.mark.slow
 def test_sessions_and_users_created_then_revoked_after_backup_stay_absent(world, admin_engine, app_env):
     w = world
     with backup(w.h, admin_engine) as snap:
@@ -325,6 +327,7 @@ def test_partial_bulk_journal_and_rollback_replays_prefix_then_retry_finishes_re
     assert {uuid.UUID(r.body["session_id"]) for r in revocations()} == set(w.ids[1:])
 
 
+@pytest.mark.slow
 def test_legacy_revoked_sessions_backfill_and_hold_on_unmigrated_snapshot(empty_db_url, journal_path, admin_engine, app_env):
     upgrade(empty_db_url, "0029")
     app_env(empty_db_url)

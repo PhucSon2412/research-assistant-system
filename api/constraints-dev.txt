@@ -1,0 +1,5 @@
+# M12: pins of the dev-only test tooling that changes how the suite runs, used together with
+# constraints-rc2.txt (image pins):
+#   pip install -c api/constraints-rc2.txt -c api/constraints-dev.txt -e "./api[dev]"
+pytest-xdist==3.8.0
+execnet==2.1.2

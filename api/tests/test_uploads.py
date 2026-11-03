@@ -75,19 +75,25 @@ def upload_api(installation, monkeypatch):
     monkeypatch.setenv("RAS_STORAGE__BUCKET", bucket)
     app_config.get_settings.cache_clear()
     storage = get_storage(app_config.get_settings())
-    storage.ensure_bucket()
-    recovery.recover(installation.engine,storage,app_config.get_settings(),utcnow())
-    yield api, storage
-    app.dependency_overrides.pop(_storage, None)
     try:
-        for key, _ in storage.orphan_keys(""):
-            storage.delete(key)
-        storage.client.delete_bucket(Bucket=bucket)
-    except Exception:
-        pass
-    app_config.get_settings.cache_clear()
-    app.dependency_overrides.clear()
-    get_delivery.cache_clear()
+        storage.ensure_bucket()
+        recovery.recover(installation.engine,storage,app_config.get_settings(),utcnow())
+        yield api, storage
+    finally:
+        app.dependency_overrides.pop(_storage, None)
+        try:
+            for key, _ in storage.orphan_keys(""):
+                storage.delete(key)
+            storage.client.delete_bucket(Bucket=bucket)
+        except Exception:
+            pass
+        finally:
+            try:
+                storage.client.close()
+            finally:
+                app_config.get_settings.cache_clear()
+                app.dependency_overrides.clear()
+                get_delivery.cache_clear()
 
 
 def pdf(pages=1) -> bytes:
