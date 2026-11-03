@@ -202,3 +202,30 @@ def test_cached_database_connection_is_closed_at_fixture_boundary(migrated_db_ur
         if not finished:
             with pytest.raises(StopIteration):
                 next(scope)
+
+
+def test_original_storage_socket_is_closed_at_fixture_teardown(installation, monkeypatch):
+    from app.config import get_settings
+    from tests.test_uploads import upload_api
+
+    scope = upload_api.__wrapped__(installation, monkeypatch)
+    _, storage = next(scope)
+    manager = storage.client._endpoint.http_session._manager
+    pool = manager.connection_from_url(get_settings().storage.endpoint_url)
+    with pool.pool.mutex:
+        sockets = [c.sock for c in pool.pool.queue if c is not None and c.sock is not None]
+    # Observe the sockets only: holding the pool itself would prolong its
+    # lifetime even after botocore removes it from the client's pool manager.
+    del pool, manager
+    assert sockets and all(s.fileno() >= 0 for s in sockets)
+    finished = False
+    try:
+        with pytest.raises(StopIteration):
+            next(scope)
+        finished = True
+        assert all(s.fileno() == -1 for s in sockets), "fixture still owns an open S3 HTTP socket"
+    finally:
+        storage.client.close()
+        if not finished:
+            with pytest.raises(StopIteration):
+                next(scope)
