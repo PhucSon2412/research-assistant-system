@@ -437,18 +437,30 @@ def real_rate_limiter(monkeypatch: pytest.MonkeyPatch):
 
 @pytest.fixture
 def app_env(monkeypatch: pytest.MonkeyPatch):
-    """Point application settings at a database through RAS_DB__* parts."""
+    """Select a test database and release the previous application's pooled sockets."""
+
+    def clear() -> None:
+        try:
+            # cache_clear() drops the reference, but does not close idle DBAPI
+            # connections. DROP DATABASE FORCE then leaves their client sockets
+            # in CLOSE_WAIT until GC, which accumulates across a long worker run.
+            # Do not instantiate an engine (or read settings) for an empty cache.
+            if app_db.get_engine.cache_info().currsize:
+                app_db.get_engine().dispose()
+        finally:
+            app_db.get_engine.cache_clear()
+            app_config.get_settings.cache_clear()
 
     def _set(url: URL) -> None:
+        clear()
         monkeypatch.delenv("RAS_DATABASE_URL", raising=False)
         for key, value in db_env(url).items():
             monkeypatch.setenv(key, value)
-        app_config.get_settings.cache_clear()
-        app_db.get_engine.cache_clear()
 
-    yield _set
-    app_config.get_settings.cache_clear()
-    app_db.get_engine.cache_clear()
+    try:
+        yield _set
+    finally:
+        clear()
 
 
 # Reuse the installation fixture for legacy modules that import upload_api

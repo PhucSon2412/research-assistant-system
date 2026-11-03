@@ -174,3 +174,31 @@ def test_a_manual_dispatch_never_cancels_another_run():
 def test_harness_timing_phase_drops_xdist_distribution():
     assert host.without_dist(["a.py", "--dist", "loadfile", "--dist=load", "--maxschedchunk", "2",
                               "--maxschedchunk=4", "-x"]) == ["a.py", "-x"]
+
+
+@pytest.mark.parametrize("ending", ["switch", "teardown"])
+def test_cached_database_connection_is_closed_at_fixture_boundary(migrated_db_url, monkeypatch, ending):
+    from app import db as app_db
+    from tests.conftest import app_env
+
+    scope = app_env.__wrapped__(monkeypatch)
+    select_database = next(scope)
+    select_database(migrated_db_url)
+    pooled = app_db.get_engine().raw_connection()
+    driver = pooled.driver_connection
+    pooled.close()
+    assert not driver.closed  # returned to QueuePool, not to the server
+    finished = False
+    try:
+        if ending == "switch":
+            select_database(migrated_db_url)
+        else:
+            with pytest.raises(StopIteration):
+                next(scope)
+            finished = True
+        assert driver.closed, "previous test database pool still owns a live DBAPI connection"
+    finally:
+        driver.close()
+        if not finished:
+            with pytest.raises(StopIteration):
+                next(scope)
