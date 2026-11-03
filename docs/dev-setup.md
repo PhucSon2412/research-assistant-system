@@ -691,21 +691,36 @@ Cách chạy API test hiện hành cho agent là harness [`scripts/m8a_test_host
 - DB mẫu đã migrate, clone cho từng test;
 - pha `timing` chạy tuần tự sau pha song song.
 
-Context phải là đường dẫn ngắn ngoài repo (giới hạn MAX_PATH). Tầng, shard, lọc đường dẫn CI và lý do các file chưa vào CI ở [handoff M12](m12-fast-ci.md).
+Context phải là đường dẫn ngắn ngoài repo (giới hạn MAX_PATH) và là thư mục mới cho mỗi bộ lượt. `cleanup` chỉ dọn Docker, giữ log/metadata; `setup` từ chối thư mục đã có `context.json`. Tầng, shard, lọc đường dẫn CI và lý do các file chưa vào CI ở [handoff M12](m12-fast-ci.md).
 
 ```powershell
+$py = "$env:USERPROFILE\.conda\envs\ras\python.exe"
+$ctx = "$env:USERPROFILE\rt\m12-$([guid]::NewGuid().ToString('N').Substring(0,6))"
 & $py -m pip install -c .\api\constraints-rc2.txt -c .\api\constraints-dev.txt -e ".\api[dev]"   # thêm pytest-xdist
-& $py scripts\m8a_test_host.py --context "$env:USERPROFILE\rt\m12" setup --workers 8
-& $py scripts\m8a_test_host.py --context "$env:USERPROFILE\rt\m12" test --junit "$env:USERPROFILE\rt\fast.xml" -- (& $py scripts\ci_tiers.py files --tier fast).Split(' ') -m "not slow"
-# Tầng đầy đủ: gồm slow, 8 worker từ context đã setup; đổi seed cho lượt thứ hai.
-& $py scripts\m8a_test_host.py --context "$env:USERPROFILE\rt\m12" test --junit "$env:USERPROFILE\rt\full.xml" -- (& $py scripts\ci_tiers.py files --tier full).Split(' ') --ras-shuffle 20261102
-& $py scripts\m8a_test_host.py --context "$env:USERPROFILE\rt\m12" test -- tests\test_search.py -m "not slow"   # lọc file/marker
-& $py scripts\m8a_test_host.py --context "$env:USERPROFILE\rt\m12" cleanup
+& $py scripts\m8a_test_host.py --context $ctx setup --workers 8
+& $py scripts\m8a_test_host.py --context $ctx test --junit "$ctx\fast.xml" -- (& $py scripts\ci_tiers.py files --tier fast).Split(' ') -m "not slow"
+# Một lượt full khi cần trước push: gồm slow, 8 worker; worksteal là mặc định của harness.
+& $py scripts\m8a_test_host.py --context $ctx test --junit "$ctx\full.xml" -- (& $py scripts\ci_tiers.py files --tier full).Split(' ') --ras-shuffle 20261103 --dist worksteal
+# Bổ sung khi điều tra ảnh hưởng thứ tự (như task M12), không phải mặc định cho mọi PR.
+& $py scripts\m8a_test_host.py --context $ctx test --junit "$ctx\full-order.xml" -- (& $py scripts\ci_tiers.py files --tier full).Split(' ') --ras-shuffle 20261102 --dist loadfile
+& $py scripts\m8a_test_host.py --context $ctx test -- tests\test_search.py -m "not slow"   # lọc file/marker
+& $py scripts\m8a_test_host.py --context $ctx cleanup
 ```
 
 *Đo 2026-10-30 trên máy này (20 CPU, demo `ras-pilot` vẫn chạy):*
 - Tầng nhanh 8 worker: 1.362 test song song + 45 `timing` pass, trong 680 s (`--ras-shuffle 20261030`, `worksteal`) và 818 s (`--ras-shuffle 7919`, `--dist loadfile`).
 - Ba file auth chạy tuần tự: 616 s với conftest cũ (migrate từng test), 398 s với DB mẫu.
+
+*Full local đo ngày 2026-11-03 trên source `637d60c`, 8 worker, gồm cả `slow` và pha timing:*
+
+| Seed / phân phối | Kết quả | Wall gồm hai pha |
+|---|---|---|
+| `20261102` / `loadfile` | 5.717/5.717 pass, 0 skip | 7.770,91 s (2h09m31s) |
+| `20261103` / `worksteal` | 5.717/5.717 pass, 0 skip | 6.335,30 s (1h45m35s) |
+
+Sau hai lượt này, `99780fb` chỉ sửa observer của test C2; fixture/harness/app/workflow giữ nguyên.
+Toàn file C2 sau sửa pass 260 test trong 741,16 s. Số đo CI và giới hạn điều tra failure cũ nằm trong
+[handoff M12](m12-fast-ci.md).
 
 ## Upload intent và original (M1c)
 
